@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Muko Brand Colors */
+  --color-chartreuse-50: #F7FFE6;
+  --color-chartreuse-100: #EFFFCC;
+  --color-chartreuse-500: #A8B475;
+  --color-chartreuse-600: #8A9660;
+  --color-chartreuse-700: #6C784B;
+  --color-chartreuse: #A8B475;
+  
+  --color-camel-50: #F5F0E8;
+  --color-camel-100: #EBE1D1;
+  --color-camel-500: #B8876B;
+  --color-camel-600: #9A6F57;
+  --color-camel-700: #7C5744;
+  --color-camel: #B8876B;
+  
+  --color-steel-50: #E8F1F7;
+  --color-steel-100: #D1E3EF;
+  --color-steel-500: #7D96AC;
+  --color-steel-600: #677E91;
+  --color-steel-700: #516676;
+  --color-steel: #7D96AC;
+  
+  --color-rose-50: #F9F2EE;
+  --color-rose-100: #F3E5DD;
+  --color-rose-500: #A97B8F;
+  --color-rose-600: #8E6577;
+  --color-rose-700: #73505F;
+  --color-rose: #A97B8F;
+}
+
+body {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  background-color: white;
+  color: rgb(17, 24, 39);
+}
+
+.font-heading {
+  font-family: var(--font-sohne-breit), system-ui, sans-serif;
+}
+
+.font-body {
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+/* Floating blob animations */
+@keyframes float {
+  0%, 100% { 
+    transform: translate(0, 0) scale(1); 
+  }
+  33% { 
+    transform: translate(30px, -30px) scale(1.1); 
+  }
+  66% { 
+    transform: translate(-20px, 20px) scale(0.9); 
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% { 
+    transform: translate(0, 0) scale(1); 
+  }
+  33% { 
+    transform: translate(-30px, 20px) scale(0.9); 
+  }
+  66% { 
+    transform: translate(20px, -20px) scale(1.1); 
+  }
+}
+
+.animate-float {
+  animation: float 20s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 25s ease-in-out infinite;
+}
