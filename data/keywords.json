@@ -1,0 +1,23 @@
+{
+    "aesthetic": [
+      "Minimalist", "Maximalist", "Romantic", "Edgy", "Sporty",
+      "Bohemian", "Preppy", "Grunge", "Western", "Coastal",
+      "Urban", "Rustic", "Gothic", "Feminine", "Masculine"
+    ],
+    "values": [
+      "Sustainable", "Luxe", "Accessible", "Innovative",
+      "Timeless", "Trendy", "Artisanal", "Technical",
+      "Ethical", "Premium", "Playful", "Sophisticated"
+    ],
+    "mood": [
+      "Moody", "Serene", "Bold", "Rebellious",
+      "Soft", "Dramatic", "Minimalist", "Vibrant"
+    ],
+    "conflicts": [
+      ["Minimalist", "Maximalist"],
+      ["Luxe", "Accessible"],
+      ["Timeless", "Trendy"],
+      ["Formal", "Casual"],
+      ["Edgy", "Classic"]
+    ]
+  }
