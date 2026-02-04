@@ -35,6 +35,76 @@ export default function ConceptStudioPage() {
   const [selectedPaletteId, setSelectedPaletteId] = useState<string | null>(null);
   const [hasSubmittedAesthetic, setHasSubmittedAesthetic] = useState(false);
   const [pulseUpdated, setPulseUpdated] = useState(false);
+  
+  // 🆕 NEW: Moodboard state
+  const [moodboardImages, setMoodboardImages] = useState<string[]>([]);
+  const [matchedAestheticFolder, setMatchedAestheticFolder] = useState<string | null>(null);
+
+  // 🆕 NEW: Aesthetic matching helper
+  const matchAestheticToFolder = (input: string): string | null => {
+    const normalized = input.toLowerCase().trim();
+    
+    const aestheticMap: Record<string, string> = {
+      'poetcore': 'poetcore',
+      'poet': 'poetcore',
+      'academic': 'poetcore',
+      'bookish': 'poetcore',
+      'literary': 'poetcore',
+      
+      'rugged luxury': 'rugged-luxury',
+      'rugged': 'rugged-luxury',
+      'gorpcore': 'rugged-luxury',
+      'outdoor': 'rugged-luxury',
+      
+      'glamoratti': 'glamoratti',
+      '80s': 'glamoratti',
+      'eighties': 'glamoratti',
+      'power suit': 'glamoratti',
+      'maximal': 'glamoratti',
+      
+      'refined clarity': 'refined-clarity',
+      'minimalist': 'refined-clarity',
+      'minimal': 'refined-clarity',
+      'quiet luxury': 'refined-clarity',
+      
+      'modern craft': 'modern-craft',
+      'afro bohemian': 'modern-craft',
+      'heritage': 'modern-craft',
+      'artisan': 'modern-craft',
+      'sustainable': 'modern-craft',
+      
+      'indie chic grunge': 'indie-chic-grunge',
+      'indie grunge': 'indie-chic-grunge',
+      'grunge': 'indie-chic-grunge',
+      '2016': 'indie-chic-grunge',
+      'indie sleaze': 'indie-chic-grunge',
+      
+      'gummy aesthetic': 'gummy-aesthetic',
+      'gummy': 'gummy-aesthetic',
+      'jelly': 'gummy-aesthetic',
+      'squishy': 'gummy-aesthetic',
+      'glossy': 'gummy-aesthetic',
+      
+      'cult of cute': 'cult-of-cute',
+      'kawaii': 'cult-of-cute',
+      'cute': 'cult-of-cute',
+      'playful': 'cult-of-cute',
+    };
+    
+    // Try exact match
+    if (normalized in aestheticMap) {
+      return aestheticMap[normalized];
+    }
+    
+    // Try partial match
+    for (const [keyword, folder] of Object.entries(aestheticMap)) {
+      if (normalized.includes(keyword) || keyword.includes(normalized)) {
+        return folder;
+      }
+    }
+    
+    return null;
+  };
 
   useEffect(() => {
     setCurrentStep(2);
@@ -119,6 +189,34 @@ export default function ConceptStudioPage() {
     }
   }, [identityPulse?.score, resonancePulse?.score]);
 
+  // 🆕 NEW: Load moodboard images when aesthetic input changes
+  useEffect(() => {
+    if (!aestheticInput || aestheticInput.length < 3) {
+      setMoodboardImages([]);
+      setMatchedAestheticFolder(null);
+      return;
+    }
+
+    const folder = matchAestheticToFolder(aestheticInput);
+    
+    if (folder) {
+      // Load 9 random images from this aesthetic
+      const allImages = Array.from({ length: 10 }, (_, i) => 
+        `/images/aesthetics/${folder}/${i + 1}.jpg`
+      );
+      
+      // Shuffle and take 9
+      const shuffled = allImages.sort(() => Math.random() - 0.5);
+      const selected = shuffled.slice(0, 9);
+      
+      setMoodboardImages(selected);
+      setMatchedAestheticFolder(folder);
+    } else {
+      setMoodboardImages([]);
+      setMatchedAestheticFolder(null);
+    }
+  }, [aestheticInput]);
+
   const handleSelectRecommendation = (aesthetic: string) => {
     setAestheticInput(aesthetic);
     setInputExpanded(true);
@@ -201,291 +299,64 @@ export default function ConceptStudioPage() {
         background: '#FAF9F6',
         display: 'flex',
         position: 'relative',
-        overflow: 'hidden',
       }}
     >
-      <style>{`
-        @keyframes wash-drift {
-          0%, 100% { transform: translate(-50%, -50%) translate3d(0px, 0px, 0); }
-          50% { transform: translate(-50%, -50%) translate3d(40px, 28px, 0); }
-        }
-
-        @keyframes wash-drift-2 {
-          0%, 100% { transform: translate(-50%, -50%) translate3d(0px, 0px, 0); }
-          50% { transform: translate(-50%, -50%) translate3d(-36px, -22px, 0); }
-        }
-
-        @keyframes pulse-glow {
-          0%, 100% { 
-            box-shadow: 0 8px 24px rgba(125, 150, 172, 0.20), 
-                        0 0 20px rgba(125, 150, 172, 0.12),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.95);
-          }
-          50% { 
-            box-shadow: 0 12px 40px rgba(125, 150, 172, 0.35), 
-                        0 0 40px rgba(125, 150, 172, 0.25),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.95);
-          }
-        }
-
-        @keyframes float-gentle {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-3px); }
-        }
-
-        @keyframes pulse-container-glow {
-          0% { 
-            box-shadow: 0 12px 48px rgba(169, 123, 143, 0.15),
-                        0 0 40px rgba(169, 123, 143, 0.08),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.92);
-          }
-          50% { 
-            box-shadow: 0 20px 72px rgba(169, 123, 143, 0.35),
-                        0 0 90px rgba(169, 123, 143, 0.25),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.92);
-          }
-          100% { 
-            box-shadow: 0 12px 48px rgba(169, 123, 143, 0.15),
-                        0 0 40px rgba(169, 123, 143, 0.08),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.92);
-          }
-        }
-
-        @keyframes float-container {
-          0%, 100% { transform: translateY(0px) scale(1); }
-          50% { transform: translateY(-2px) scale(1.005); }
-        }
-
-        @keyframes skeleton-loading {
-          0% {
-            background-position: -200% 0;
-          }
-          100% {
-            background-position: 200% 0;
-          }
-        }
-
-        .grain-overlay {
-          position: fixed;
-          inset: 0;
-          background: transparent url('data:image/svg+xml;utf8,<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)"/></svg>') repeat 0 0;
-          background-size: 240px 240px;
-          opacity: 0.16;
-          mix-blend-mode: soft-light;
-          pointer-events: none;
-          z-index: 1;
-        }
-
-        .glaze-overlay {
-          position: fixed;
-          inset: 0;
-          pointer-events: none;
-          z-index: 2;
-          background:
-            radial-gradient(900px 560px at 62% 26%,
-              rgba(169,123,143,0.08) 0%,
-              rgba(125,150,172,0.06) 35%,
-              rgba(196,207,142,0.06) 58%,
-              transparent 76%),
-            linear-gradient(115deg,
-              rgba(255,255,255,0.10) 0%,
-              rgba(255,255,255,0.00) 40%,
-              rgba(255,255,255,0.08) 100%);
-          mix-blend-mode: soft-light;
-          opacity: 0.9;
-        }
-
-        .vignette {
-          position: fixed;
-          inset: 0;
-          pointer-events: none;
-          z-index: 3;
-          background: radial-gradient(circle at 58% 24%,
-            transparent 0%,
-            rgba(25,25,25,0.06) 88%,
-            rgba(25,25,25,0.10) 100%);
-          opacity: 0.55;
-        }
-
-        .wash-rose {
-          position: absolute;
-          left: 72%;
-          top: 26%;
-          width: 980px;
-          height: 780px;
-          transform: translate(-50%, -50%);
-          background: radial-gradient(circle at 35% 35%,
-            rgba(169, 123, 143, 0.28) 0%,
-            rgba(205, 170, 179, 0.16) 34%,
-            rgba(169, 123, 143, 0.10) 54%,
-            transparent 74%);
-          filter: blur(52px);
-          opacity: 0.95;
-          animation: wash-drift 18s ease-in-out infinite;
-          z-index: 0;
-        }
-
-        .wash-blue {
-          position: absolute;
-          left: 56%;
-          top: 78%;
-          width: 1080px;
-          height: 860px;
-          transform: translate(-50%, -50%);
-          background: radial-gradient(circle at 55% 45%,
-            rgba(125, 150, 172, 0.26) 0%,
-            rgba(138, 164, 184, 0.15) 36%,
-            rgba(125, 150, 172, 0.10) 56%,
-            transparent 76%);
-          filter: blur(54px);
-          opacity: 0.92;
-          animation: wash-drift-2 20s ease-in-out infinite;
-          z-index: 0;
-        }
-      `}</style>
-
       {/* Main Content */}
-      <main
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
-          zIndex: 10,
-          maxWidth: '1400px',
-          margin: '0 auto',
-          width: '100%',
-          height: '100vh',
-          overflow: 'hidden',
-        }}
-      >
+      <main style={{ flex: 1, paddingLeft: '120px', position: 'relative' }}>
         {/* Content Area - Scrollable */}
         <div
           style={{
-            flex: 1,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            padding: '64px 64px 180px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '32px',
+            padding: '120px 120px 180px',
+            maxWidth: '1400px',
+            margin: '0 auto',
           }}
         >
-          {/* Header with Back/Revert buttons */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h1
-                style={{
-                  fontSize: '48px',
-                  fontWeight: 400,
-                  color: BRAND.oliveInk,
-                  margin: 0,
-                  fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
-                }}
-              >
-                Concept Studio
-              </h1>
-              <p
-                style={{
-                  fontSize: '14px',
-                  color: 'rgba(67, 67, 43, 0.55)',
-                  fontFamily: 'var(--font-inter), system-ui, sans-serif',
-                  margin: '4px 0 0 0',
-                }}
-              >
-                New Collection • {season || 'SS26'}
-              </p>
-            </div>
-            
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                onClick={() => {
-                  // Handle back action
-                  console.log('Back clicked');
-                }}
-                style={{
-                  padding: '12px 24px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: BRAND.rose,
-                  background: 'transparent',
-                  border: `1.5px solid ${BRAND.rose}`,
-                  borderRadius: '999px',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
-                  letterSpacing: '0.02em',
-                  transition: 'all 220ms ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(169, 123, 143, 0.08)';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
-              >
-                Back
-              </button>
-              
-              <button
-                onClick={() => {
-                  // Handle revert action
-                  console.log('Revert clicked');
-                  setAestheticInput('');
-                  setHasSubmittedAesthetic(false);
-                  setSelectedPaletteId(null);
-                }}
-                style={{
-                  padding: '12px 24px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: BRAND.rose,
-                  background: 'transparent',
-                  border: `1.5px solid ${BRAND.rose}`,
-                  borderRadius: '999px',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
-                  letterSpacing: '0.02em',
-                  transition: 'all 220ms ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(169, 123, 143, 0.08)';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
-              >
-                Revert
-              </button>
-            </div>
+          {/* Header */}
+          <div style={{ marginBottom: '48px' }}>
+            <h1
+              style={{
+                fontSize: '42px',
+                fontWeight: 400,
+                color: BRAND.oliveInk,
+                marginBottom: '12px',
+                fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Concept Studio
+            </h1>
+            <p
+              style={{
+                fontSize: '15px',
+                color: 'rgba(67, 67, 43, 0.55)',
+                fontFamily: 'var(--font-inter), system-ui, sans-serif',
+              }}
+            >
+              Define your aesthetic direction. Identity and Resonance will update in real-time.
+            </p>
           </div>
 
           {/* Two Column Layout */}
-          <div style={{ display: 'flex', gap: '80px' }}>
-            {/* Left Column - Inputs */}
-            <div style={{ flex: '0 0 500px' }}>
-              
+          <div style={{ display: 'grid', gridTemplateColumns: '45fr 55fr', gap: '60px' }}>
+            {/* Left Column - Input */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
               {/* Aesthetic Direction Section */}
-              <div style={{ marginBottom: '40px' }}>
-                <label
-                  style={{
-                    fontSize: '18px',
-                    fontWeight: 600,
-                    color: BRAND.oliveInk,
-                    marginBottom: '10px',
-                    display: 'block',
-                    fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
-                    letterSpacing: '0.01em',
-                  }}
-                >
-                  Aesthetic Direction
-                </label>
-            
-            {/* Instructional subtitle */}
+              <div>
+            <label
+              style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                color: BRAND.oliveInk,
+                marginBottom: '10px',
+                display: 'block',
+                fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
+                letterSpacing: '0.01em',
+              }}
+            >
+              Aesthetic Direction
+            </label>
+
+            {/* Info as subtitle */}
             <p
               style={{
                 fontSize: '13px',
@@ -495,9 +366,10 @@ export default function ConceptStudioPage() {
                 lineHeight: '1.5',
               }}
             >
-              Tell me what you're going for and click the arrow to proceed
+              Enter the aesthetic you'd like to explore. Identity and Resonance will update as you type.
             </p>
 
+            {/* Input or Button */}
             {!inputExpanded ? (
               <button
                 onClick={() => setInputExpanded(true)}
@@ -505,18 +377,19 @@ export default function ConceptStudioPage() {
                   width: '100%',
                   padding: '22px 28px',
                   fontSize: '15px',
-                  color: 'rgba(67, 67, 43, 0.45)',
+                  fontWeight: 500,
+                  color: 'rgba(67, 67, 43, 0.55)',
                   background: 'rgba(255, 255, 255, 0.68)',
                   border: '1.5px solid rgba(67, 67, 43, 0.14)',
                   borderRadius: '999px',
                   cursor: 'pointer',
                   fontFamily: 'var(--font-inter), system-ui, sans-serif',
-                  textAlign: 'left',
-                  boxShadow: '0 4px 16px rgba(67, 67, 43, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.90)',
-                  transition: 'all 220ms ease',
                   display: 'flex',
-                  justifyContent: 'space-between',
                   alignItems: 'center',
+                  justifyContent: 'space-between',
+                  transition: 'all 220ms ease',
+                  textAlign: 'left',
+                  boxShadow: '0 4px 16px rgba(67, 67, 43, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.80)',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = 'rgba(67, 67, 43, 0.22)';
@@ -553,7 +426,7 @@ export default function ConceptStudioPage() {
                       handleSubmitAesthetic();
                     }
                   }}
-                  placeholder="e.g., Neo-Western, Dark Romantic..."
+                  placeholder="e.g., Poetcore, Glamoratti, Gummy..."
                   autoFocus
                   style={{
                     width: '100%',
@@ -730,41 +603,50 @@ export default function ConceptStudioPage() {
                   <button
                     key={index}
                     onClick={() => {
-                      setAestheticInput(alt.name);
-                      setInputExpanded(true); // Expand the input so user can see what was selected
-                      setHasSubmittedAesthetic(false); // Reset so Try These section disappears and user must submit again
+                      setAestheticInput(alt.alternative);
+                      setHasSubmittedAesthetic(true);
                     }}
                     style={{
                       padding: '16px 20px',
-                      background: 'rgba(255, 255, 255, 0.68)',
-                      border: '1.5px solid rgba(67, 67, 43, 0.12)',
+                      textAlign: 'left',
+                      background: 'rgba(255, 255, 255, 0.72)',
+                      border: '1.5px solid rgba(125, 150, 172, 0.18)',
                       borderRadius: '12px',
                       cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 220ms ease',
-                      boxShadow: '0 4px 16px rgba(67, 67, 43, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.80)',
+                      fontFamily: 'var(--font-inter), system-ui, sans-serif',
+                      transition: 'all 220ms cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: '0 4px 16px rgba(125, 150, 172, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.75)',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(171, 171, 99, 0.24)';
-                      e.currentTarget.style.backgroundColor = 'rgba(196, 207, 142, 0.10)';
+                      e.currentTarget.style.borderColor = 'rgba(125, 150, 172, 0.30)';
+                      e.currentTarget.style.backgroundColor = 'rgba(125, 150, 172, 0.06)';
                       e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(125, 150, 172, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.75)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(67, 67, 43, 0.12)';
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.68)';
+                      e.currentTarget.style.borderColor = 'rgba(125, 150, 172, 0.18)';
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.72)';
                       e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(125, 150, 172, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.75)';
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '8px',
+                      }}
+                    >
                       <span
                         style={{
-                          fontSize: '14px',
+                          fontSize: '15px',
                           fontWeight: 600,
                           color: BRAND.oliveInk,
                           fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
                         }}
                       >
-                        {alt.name}
+                        {alt.alternative}
                       </span>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         {alt.identityDelta > 0 && (
@@ -789,6 +671,7 @@ export default function ConceptStudioPage() {
                                 fill="rgba(125, 150, 172, 0.90)" 
                                 stroke="rgba(125, 150, 172, 0.90)" 
                                 strokeWidth="1.5"
+                                strokeLinejoin="round"
                               />
                               <circle cx="12" cy="12" r="2" fill="white" />
                             </svg>
@@ -966,55 +849,141 @@ export default function ConceptStudioPage() {
                 </h2>
               )}
               
-              {/* Moodboard Grid */}
+              {/* 🆕 UPDATED: Moodboard Grid with Real Images */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
                   gap: '16px',
                 }}
               >
-              {Array.from({ length: 9 }).map((_, i) => (
+                {moodboardImages.length > 0 ? (
+                  // Show real images with fade-in animation
+                  moodboardImages.map((imageSrc, i) => (
+                    <div
+                      key={`${matchedAestheticFolder}-${i}`}
+                      style={{
+                        aspectRatio: '1',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        border: '1.5px solid rgba(67, 67, 43, 0.08)',
+                        boxShadow: '0 4px 16px rgba(67, 67, 43, 0.06)',
+                        position: 'relative',
+                        transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)',
+                        animation: `fadeIn 400ms ease-out ${i * 50}ms both`,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.03)';
+                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(67, 67, 43, 0.12)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = '0 4px 16px rgba(67, 67, 43, 0.06)';
+                      }}
+                    >
+                      <img
+                        src={imageSrc}
+                        alt={`${aestheticInput} moodboard ${i + 1}`}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                        loading="lazy"
+                      />
+                      {/* Subtle overlay */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background: 'linear-gradient(to top, rgba(0,0,0,0.1), transparent)',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    </div>
+                  ))
+                ) : (
+                  // Show skeleton placeholders if no match
+                  Array.from({ length: 9 }).map((_, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        aspectRatio: '1',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(90deg, rgba(235, 232, 228, 0.4) 0%, rgba(245, 242, 238, 0.8) 50%, rgba(235, 232, 228, 0.4) 100%)',
+                        backgroundSize: '200% 100%',
+                        animation: 'skeleton-loading 1.5s ease-in-out infinite',
+                        border: '1.5px solid rgba(67, 67, 43, 0.06)',
+                        boxShadow: '0 4px 16px rgba(67, 67, 43, 0.04)',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        transition: 'transform 220ms ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.03)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <svg
+                          width="32"
+                          height="32"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          style={{ opacity: 0.15 }}
+                        >
+                          <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                          <rect x="13" y="3" width="8" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                          <rect x="3" y="13" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                          <rect x="13" y="13" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                        </svg>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* 🆕 NEW: Aesthetic match indicator */}
+              {matchedAestheticFolder && moodboardImages.length > 0 && (
                 <div
-                  key={i}
                   style={{
-                    aspectRatio: '1',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(90deg, rgba(235, 232, 228, 0.4) 0%, rgba(245, 242, 238, 0.8) 50%, rgba(235, 232, 228, 0.4) 100%)',
-                    backgroundSize: '200% 100%',
-                    animation: 'skeleton-loading 1.5s ease-in-out infinite',
-                    border: '1.5px solid rgba(67, 67, 43, 0.06)',
-                    boxShadow: '0 4px 16px rgba(67, 67, 43, 0.04)',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    transition: 'transform 220ms ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.03)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
+                    marginTop: '16px',
+                    textAlign: 'center',
                   }}
                 >
                   <div
                     style={{
-                      position: 'absolute',
-                      bottom: '8px',
-                      right: '8px',
-                      padding: '4px 10px',
-                      background: 'rgba(25, 25, 25, 0.65)',
-                      backdropFilter: 'blur(8px)',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      color: 'rgba(255, 255, 255, 0.90)',
-                      fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
+                      padding: '8px 16px',
+                      background: 'rgba(171, 171, 99, 0.08)',
+                      border: '1px solid rgba(171, 171, 99, 0.12)',
+                      borderRadius: '999px',
+                      display: 'inline-block',
                     }}
                   >
-                    {i + 1}
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: 'rgba(67, 67, 43, 0.65)',
+                        fontFamily: 'var(--font-inter), system-ui, sans-serif',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      ✓ Visual reference loaded
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
 
             {!aestheticInput && (
               <div
@@ -1101,9 +1070,15 @@ export default function ConceptStudioPage() {
               >
                 Pulse
               </span>
-
-              {/* Individual Pulse Pills */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+            <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '16px',
+            }}
+          >
               {/* Identity */}
               <div
                 style={{
