@@ -48,6 +48,9 @@ export default function EntryScreen() {
     setTouchedName(true);
     setTouchedSeason(true);
     if (!canContinue) return;
+    window.localStorage.setItem('muko_collectionName', collectionName.trim());
+    const seasonLabel = allSeasons.find(s => s.id === selectedSeason)?.label ?? '';
+    window.localStorage.setItem('muko_seasonLabel', seasonLabel);
     router.push('/concept');
   };
 
