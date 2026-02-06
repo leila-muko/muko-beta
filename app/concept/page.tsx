@@ -1,4 +1,4 @@
-'use client';
+"use client"
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '@/lib/store/sessionStore';
@@ -72,8 +72,17 @@ export default function ConceptStudioPage() {
   const moodboardTitle = previewAesthetic || '';
 
   // Guided expression: refine input + interpretation
+  // refineDraft = what the user is typing; refineText = last submitted refinement (drives interpretation)
   const [refineText, setRefineText] = useState('');
+  const [refineDraft, setRefineDraft] = useState('');
   const [interpretation, setInterpretation] = useState<Interpretation | null>(null);
+
+  const submitRefine = () => {
+    if (!selectedAesthetic) return;
+    const next = (refineDraft || '').trim();
+    if (!next) return;
+    setRefineText(next);
+  };
 
   // Accept / Adjust (only for low-confidence)
   const [acceptedInterpretation, setAcceptedInterpretation] = useState(false);
@@ -85,6 +94,7 @@ export default function ConceptStudioPage() {
   useEffect(() => {
     if (!selectedAesthetic) {
       setRefineText('');
+      setRefineDraft('');
       setInterpretation(null);
       setAcceptedInterpretation(false);
       setShowAdjust(false);
@@ -92,7 +102,10 @@ export default function ConceptStudioPage() {
       return;
     }
 
-    setRefineText(`${selectedAesthetic}, but…`);
+    const initial = `${selectedAesthetic}, but…`;
+
+    setRefineDraft(initial);
+    setRefineText(initial);
     setInterpretation({
       base: selectedAesthetic,
       modifiers: [],
@@ -112,7 +125,7 @@ export default function ConceptStudioPage() {
     setAcceptedInterpretation(false);
     setShowAdjust(false);
     setBaseOverride(null);
-  }, [refineText, selectedAesthetic]);
+  }, [refineDraft, selectedAesthetic]);
 
   // Moodboard images
   const [moodboardImages, setMoodboardImages] = useState<string[]>([]);
@@ -289,15 +302,40 @@ export default function ConceptStudioPage() {
           : '#C19A6B'
       : 'rgba(67, 67, 43, 0.75)';
 
-  // Match input width to chip section
+  // Match refine input width to the chip section.
+  // NOTE: refine only appears after you select a chip, so we must measure on selection too.
   const chipSectionRef = useRef<HTMLDivElement>(null);
   const [chipSectionWidth, setChipSectionWidth] = useState<number | null>(null);
 
   useEffect(() => {
-    if (chipSectionRef.current) {
-      setChipSectionWidth(chipSectionRef.current.offsetWidth);
+    const el = chipSectionRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const w = Math.round(el.getBoundingClientRect().width);
+      if (w > 0) setChipSectionWidth(w);
+    };
+
+    // Measure after layout settles
+    const raf1 = requestAnimationFrame(() => {
+      requestAnimationFrame(measure);
+    });
+
+    let ro: ResizeObserver | null = null;
+    try {
+      ro = new ResizeObserver(() => measure());
+      ro.observe(el);
+    } catch {
+      // no-op
     }
-  }, [showAllAesthetics]);
+
+    window.addEventListener('resize', measure);
+    return () => {
+      cancelAnimationFrame(raf1);
+      window.removeEventListener('resize', measure);
+      ro?.disconnect();
+    };
+  }, [showAllAesthetics, selectedAesthetic]);
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', position: 'relative' }}>
@@ -594,11 +632,16 @@ export default function ConceptStudioPage() {
                     </button>
                   )}
                 </div>
-              </div>
 
               {/* Guided free expression — only after selection */}
               {selectedAesthetic && (
-                <div>
+                <div
+                  style={{
+                    marginTop: '36px',
+                    width: chipSectionWidth ? `${chipSectionWidth}px` : '100%',
+                    maxWidth: chipSectionWidth ? `${chipSectionWidth}px` : '100%',
+                  }}
+                >
                   <label
                     style={{
                       fontSize: '18px',
@@ -613,39 +656,139 @@ export default function ConceptStudioPage() {
                     <span style={{ color: 'rgba(67, 67, 43, 0.45)', fontWeight: 400, fontSize: '14px' }}>(optional)</span>
                   </label>
 
-                  <input
-                    ref={refineInputRef}
-                    type="text"
-                    value={refineText}
-                    onChange={(e) => setRefineText(e.target.value)}
-                    placeholder="Add texture, mood, references, or constraints"
+                  <div
                     style={{
-                      width: chipSectionWidth ? `${chipSectionWidth}px` : '100%',
-                      padding: '18px 22px',
-                      fontSize: '15px',
-                      color: BRAND.oliveInk,
-                      background: 'rgba(255, 255, 255, 0.72)',
-                      border: '1.5px solid rgba(67, 67, 43, 0.12)',
-                      borderRadius: '14px',
-                      fontFamily: 'var(--font-inter), system-ui, sans-serif',
-                      outline: 'none',
-                      boxShadow: '0 6px 18px rgba(67, 67, 43, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.84)',
+                      position: 'relative',
+                      width: '100%',
                     }}
-                  />
-
-                  {interpretation?.note && (
-                    <div
+                  >
+                    <input
+                      ref={refineInputRef}
+                      type="text"
+                      value={refineDraft}
+                      onChange={(e) => setRefineDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') submitRefine();
+                      }}
+                      placeholder="Add texture, mood, references, or constraints"
                       style={{
-                        marginTop: 10,
-                        fontSize: 12,
-                        color: 'rgba(67, 67, 43, 0.55)',
+                        width: '100%',
+                        height: 56,
+                        padding: '0 56px 0 22px',
+                        fontSize: 16,
+                        lineHeight: '56px',
+                        color: BRAND.oliveInk,
+                        background: 'rgba(255, 255, 255, 0.78)',
+                        border: '1.5px solid rgba(67, 67, 43, 0.14)',
+                        borderRadius: 16,
                         fontFamily: 'var(--font-inter), system-ui, sans-serif',
-                        lineHeight: 1.4,
+                        outline: 'none',
+                        boxShadow:
+                          '0 6px 18px rgba(67, 67, 43, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.84)',
+                        transition: 'box-shadow 120ms ease, border-color 120ms ease',
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(169, 123, 143, 0.32)';
+                        e.currentTarget.style.boxShadow =
+                          '0 10px 26px rgba(169, 123, 143, 0.12), 0 6px 18px rgba(67, 67, 43, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.88)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(67, 67, 43, 0.14)';
+                        e.currentTarget.style.boxShadow =
+                          '0 6px 18px rgba(67, 67, 43, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.84)';
+                      }}
+                    />
+
+                    <button
+                      onClick={submitRefine}
+                      disabled={!refineDraft.trim() || refineDraft.trim() === refineText.trim()}
+                      aria-label="Apply refinement"
+                      style={{
+                        position: 'absolute',
+                        right: 12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: 34,
+                        height: 34,
+                        borderRadius: 999,
+                        border: '1px solid rgba(67, 67, 43, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                        lineHeight: 1,
+                        background:
+                          !refineDraft.trim() || refineDraft.trim() === refineText.trim()
+                            ? 'rgba(67, 67, 43, 0.06)'
+                            : 'rgba(169, 123, 143, 0.92)',
+                        color:
+                          !refineDraft.trim() || refineDraft.trim() === refineText.trim()
+                            ? 'rgba(67, 67, 43, 0.35)'
+                            : '#fff',
+                        cursor:
+                          !refineDraft.trim() || refineDraft.trim() === refineText.trim() ? 'not-allowed' : 'pointer',
+                        boxShadow:
+                          !refineDraft.trim() || refineDraft.trim() === refineText.trim()
+                            ? 'none'
+                            : '0 10px 26px rgba(169, 123, 143, 0.18)',
+                        fontSize: 18,
+                        fontWeight: 600,
+                        transition: 'transform 140ms ease, box-shadow 140ms ease, background 140ms ease',
+                      }}
+                      onMouseDown={(e) => {
+                        if (!e.currentTarget.disabled) e.currentTarget.style.transform = 'translateY(-50%) scale(0.98)';
+                      }}
+                      onMouseUp={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-50%)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-50%)';
                       }}
                     >
-                      {interpretation.note}
-                    </div>
-                  )}
+                      →
+                    </button>
+                  </div>
+{/* Interpretation sentence */}
+{interpretation && (
+  <div style={{ marginTop: 12, marginBottom: 32 }}>
+    <p
+      style={{
+        fontSize: 15,
+        lineHeight: 1.6,
+        color: 'rgba(67, 67, 43, 0.78)',
+        fontFamily: 'var(--font-inter), system-ui, sans-serif',
+      }}
+    >
+      We’re reading this as{' '}
+      <strong
+        style={{
+          fontWeight: 650,
+          color: 'rgba(67, 67, 43, 0.95)',
+          fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
+        }}
+      >
+        {interpretation.base}
+      </strong>
+      {interpretation.modifiers?.length ? (
+        <>
+          {', '}with an{' '}
+          <strong
+            style={{
+              fontWeight: 650,
+              color: 'rgba(67, 67, 43, 0.95)',
+              fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
+            }}
+          >
+            {interpretation.modifiers.join(' / ')}
+          </strong>{' '}
+          edge.
+        </>
+      ) : (
+        '.'
+      )}
+    </p>
+  </div>
+)}
 
                   {/* Accept / Adjust (only when confidence is low) */}
                   {interpretation?.confidence === 'low' && !acceptedInterpretation && (
@@ -804,7 +947,7 @@ export default function ConceptStudioPage() {
               )}
 
               {/* Confirm direction */}
-              <div style={{ marginTop: '2px' }}>
+              <div style={{ marginTop: selectedAesthetic ? '24px' : '22px' }}>
                 <button
                   onClick={handleConfirmClick}
                   disabled={!canConfirm || isConfirmed}
@@ -840,6 +983,7 @@ export default function ConceptStudioPage() {
                   If you edit the direction, you'll confirm again.
                 </div>
               </div>
+            </div>
             </div>
 
             {/* Right Column - Moodboard */}

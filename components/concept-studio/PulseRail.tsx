@@ -1,4 +1,4 @@
-'use client';
+"use client"
 
 import React from 'react';
 import { BRAND } from '../../lib/concept-studio/constants';
@@ -45,14 +45,14 @@ export function PulseRail({
           alignItems: 'center',
           gap: '20px',
           padding: '16px 22px',
-          backgroundColor: 'rgba(255, 255, 255, 0.65)',
+          backgroundColor: 'rgba(255, 255, 255, 0.86)',
           backdropFilter: 'blur(40px) saturate(180%)',
           WebkitBackdropFilter: 'blur(40px) saturate(180%)',
           borderRadius: '999px',
-          border: '1px solid rgba(255, 255, 255, 0.50)',
+          border: '1px solid rgba(67, 67, 43, 0.16)',
           boxShadow: pulseUpdated
-            ? '0 20px 80px rgba(169, 123, 143, 0.40), 0 0 80px rgba(169, 123, 143, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.92)'
-            : '0 12px 48px rgba(67, 67, 43, 0.12), 0 0 40px rgba(169, 123, 143, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.92)',
+            ? '0 26px 110px rgba(169, 123, 143, 0.42), 0 0 90px rgba(169, 123, 143, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.92)'
+            : '0 28px 110px rgba(67, 67, 43, 0.20), 0 14px 34px rgba(67, 67, 43, 0.12), 0 0 46px rgba(169, 123, 143, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.94)',
           transition: 'all 800ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
