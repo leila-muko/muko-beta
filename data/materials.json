@@ -1,0 +1,154 @@
+{
+  "materials": [
+    {
+      "id": "organic-cotton",
+      "name": "Organic Cotton",
+      "cost_per_yard": 18,
+      "lead_time_weeks": 3,
+      "complexity_tier": "low",
+      "properties": ["breathable", "versatile", "sustainable"],
+      "hand_feel": "soft",
+      "weight": "medium"
+    },
+    {
+      "id": "tencel",
+      "name": "Tencel",
+      "cost_per_yard": 22,
+      "lead_time_weeks": 4,
+      "complexity_tier": "low",
+      "properties": ["luxe-drape", "lightweight", "sustainable", "breathable"],
+      "hand_feel": "silky",
+      "weight": "light"
+    },
+    {
+      "id": "linen",
+      "name": "Linen",
+      "cost_per_yard": 28,
+      "lead_time_weeks": 4,
+      "complexity_tier": "low",
+      "properties": ["breathable", "textured", "natural"],
+      "hand_feel": "crisp",
+      "weight": "medium"
+    },
+    {
+      "id": "recycled-poly",
+      "name": "Recycled Poly",
+      "cost_per_yard": 12,
+      "lead_time_weeks": 3,
+      "complexity_tier": "low",
+      "properties": ["durable", "lightweight", "sustainable", "versatile"],
+      "hand_feel": "smooth",
+      "weight": "light"
+    },
+    {
+      "id": "cotton-twill",
+      "name": "Cotton Twill",
+      "cost_per_yard": 20,
+      "lead_time_weeks": 3,
+      "complexity_tier": "low",
+      "properties": ["durable", "structured", "versatile"],
+      "hand_feel": "sturdy",
+      "weight": "medium-heavy"
+    },
+    {
+      "id": "modal",
+      "name": "Modal",
+      "cost_per_yard": 24,
+      "lead_time_weeks": 4,
+      "complexity_tier": "low",
+      "properties": ["luxe-drape", "lightweight", "breathable"],
+      "hand_feel": "silky",
+      "weight": "light"
+    },
+    {
+      "id": "wool",
+      "name": "Wool",
+      "cost_per_yard": 56,
+      "lead_time_weeks": 6,
+      "complexity_tier": "moderate",
+      "properties": ["warm", "structured", "luxe", "durable"],
+      "hand_feel": "textured",
+      "weight": "heavy"
+    },
+    {
+      "id": "merino-wool",
+      "name": "Merino Wool",
+      "cost_per_yard": 68,
+      "lead_time_weeks": 6,
+      "complexity_tier": "moderate",
+      "properties": ["warm", "luxe", "lightweight", "breathable"],
+      "hand_feel": "soft",
+      "weight": "medium"
+    },
+    {
+      "id": "silk",
+      "name": "Silk",
+      "cost_per_yard": 84,
+      "lead_time_weeks": 8,
+      "complexity_tier": "moderate",
+      "properties": ["luxe-drape", "lightweight", "luxe"],
+      "hand_feel": "silky",
+      "weight": "light"
+    },
+    {
+      "id": "silk-blend",
+      "name": "Silk Blend",
+      "cost_per_yard": 48,
+      "lead_time_weeks": 6,
+      "complexity_tier": "moderate",
+      "properties": ["luxe-drape", "lightweight", "luxe"],
+      "hand_feel": "silky",
+      "weight": "light"
+    },
+    {
+      "id": "denim",
+      "name": "Denim",
+      "cost_per_yard": 22,
+      "lead_time_weeks": 4,
+      "complexity_tier": "moderate",
+      "properties": ["durable", "structured", "versatile"],
+      "hand_feel": "sturdy",
+      "weight": "heavy"
+    },
+    {
+      "id": "leather",
+      "name": "Leather",
+      "cost_per_yard": 120,
+      "lead_time_weeks": 10,
+      "complexity_tier": "high",
+      "properties": ["structured", "luxe", "durable"],
+      "hand_feel": "smooth",
+      "weight": "heavy"
+    },
+    {
+      "id": "vegan-leather",
+      "name": "Vegan Leather",
+      "cost_per_yard": 35,
+      "lead_time_weeks": 4,
+      "complexity_tier": "moderate",
+      "properties": ["structured", "sustainable", "durable"],
+      "hand_feel": "smooth",
+      "weight": "medium-heavy"
+    },
+    {
+      "id": "cashmere",
+      "name": "Cashmere",
+      "cost_per_yard": 145,
+      "lead_time_weeks": 10,
+      "complexity_tier": "high",
+      "properties": ["luxe", "lightweight", "warm"],
+      "hand_feel": "soft",
+      "weight": "light"
+    },
+    {
+      "id": "nylon",
+      "name": "Technical Nylon",
+      "cost_per_yard": 16,
+      "lead_time_weeks": 3,
+      "complexity_tier": "low",
+      "properties": ["durable", "lightweight", "versatile"],
+      "hand_feel": "smooth",
+      "weight": "light"
+    }
+  ]
+}

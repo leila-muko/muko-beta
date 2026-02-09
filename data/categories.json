@@ -1,0 +1,64 @@
+{
+  "categories": [
+    {
+      "id": "outerwear",
+      "name": "Outerwear",
+      "subcategories": ["Trench Coat", "Puffer", "Blazer", "Bomber", "Overcoat"],
+      "defaultConstruction": "high",
+      "silhouettes": [
+        { "id": "cocoon", "name": "Cocoon", "yardage": 3.8 },
+        { "id": "belted", "name": "Belted", "yardage": 3.2 },
+        { "id": "straight", "name": "Straight", "yardage": 3.0 },
+        { "id": "cropped", "name": "Cropped", "yardage": 2.4 }
+      ]
+    },
+    {
+      "id": "tops",
+      "name": "Tops",
+      "subcategories": ["T-Shirt", "Blouse", "Button-Down", "Knit Top", "Tank"],
+      "defaultConstruction": "low",
+      "silhouettes": [
+        { "id": "relaxed", "name": "Relaxed", "yardage": 1.8 },
+        { "id": "fitted", "name": "Fitted", "yardage": 1.4 },
+        { "id": "oversized", "name": "Oversized", "yardage": 2.2 },
+        { "id": "boxy", "name": "Boxy", "yardage": 1.9 }
+      ]
+    },
+    {
+      "id": "bottoms",
+      "name": "Bottoms",
+      "subcategories": ["Trousers", "Jeans", "Shorts", "Skirt", "Wide-Leg Pants"],
+      "defaultConstruction": "moderate",
+      "silhouettes": [
+        { "id": "wide-leg", "name": "Wide Leg", "yardage": 2.8 },
+        { "id": "straight-leg", "name": "Straight", "yardage": 2.2 },
+        { "id": "slim", "name": "Slim", "yardage": 1.8 },
+        { "id": "flare", "name": "Flare", "yardage": 2.6 }
+      ]
+    },
+    {
+      "id": "dresses",
+      "name": "Dresses",
+      "subcategories": ["Midi Dress", "Maxi Dress", "Mini Dress", "Shirt Dress", "Slip Dress"],
+      "defaultConstruction": "moderate",
+      "silhouettes": [
+        { "id": "column", "name": "Column", "yardage": 2.8 },
+        { "id": "a-line", "name": "A-Line", "yardage": 3.2 },
+        { "id": "wrap", "name": "Wrap", "yardage": 3.0 },
+        { "id": "shift", "name": "Shift", "yardage": 2.4 }
+      ]
+    },
+    {
+      "id": "knitwear",
+      "name": "Knitwear",
+      "subcategories": ["Sweater", "Cardigan", "Knit Vest", "Turtleneck"],
+      "defaultConstruction": "moderate",
+      "silhouettes": [
+        { "id": "relaxed", "name": "Relaxed", "yardage": 2.0 },
+        { "id": "fitted", "name": "Fitted", "yardage": 1.6 },
+        { "id": "oversized", "name": "Oversized", "yardage": 2.6 },
+        { "id": "cropped", "name": "Cropped", "yardage": 1.4 }
+      ]
+    }
+  ]
+}
