@@ -264,8 +264,7 @@ const MODIFIER_BUCKETS: Record<string, string[]> = {
   
   Loungewear: [
     'lounge', 'comfort', 'cozy', 'relaxed', 'casual', 'easy', 'effortless',
-    'laid-back', 'chill', 'homewear', 'sleepwear-inspired', 'pajama',
-    'soft', 'stretchy', 'forgiving'
+    'laid-back', 'chill', 'homewear', 'sleepwear-inspired', 'pajama', 'stretchy', 'forgiving'
   ],
 
   // Cultural References
