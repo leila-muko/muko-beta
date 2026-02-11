@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import {
   BRAND,
@@ -324,15 +324,58 @@ export default function ConceptStudioPage() {
       const base = baseOverride || selectedAesthetic;
       const interp = interpretRefine(base, refineText);
 
-      const identityDelta =
-        (interp.modifiers.includes("Refined") ? 2 : 0) +
-        (interp.modifiers.includes("Sculptural") ? 1 : 0) +
-        (interp.modifiers.includes("Polished") ? -1 : 0);
+      // ✅ NEW: Enhanced modifier impact on scores based on texture, mood, and constraint
+      let identityDelta = 0;
+      let resonanceDelta = 0;
 
-      const resonanceDelta =
-        (interp.modifiers.includes("Playful") ? 2 : 0) +
-        (interp.modifiers.includes("Utility") ? 1 : 0) +
-        (interp.modifiers.includes("Nostalgic") ? -1 : 0);
+      // Texture modifiers (affect identity more)
+      if (interp.modifiers.includes("Refined")) identityDelta += 3;
+      if (interp.modifiers.includes("Textured")) identityDelta += 2;
+      if (interp.modifiers.includes("Sculptural")) identityDelta += 2;
+      if (interp.modifiers.includes("Soft")) identityDelta += 1;
+      if (interp.modifiers.includes("Structured")) identityDelta += 2;
+      if (interp.modifiers.includes("Fluid")) identityDelta += 1;
+      if (interp.modifiers.includes("Raw")) identityDelta -= 1;
+      if (interp.modifiers.includes("Polished")) identityDelta += 2;
+
+      // Mood modifiers (affect both identity and resonance)
+      if (interp.modifiers.includes("Romantic")) {
+        identityDelta += 1;
+        resonanceDelta += 2;
+      }
+      if (interp.modifiers.includes("Moody")) {
+        identityDelta += 1;
+        resonanceDelta += 1;
+      }
+      if (interp.modifiers.includes("Playful")) {
+        resonanceDelta += 3;
+      }
+      if (interp.modifiers.includes("Serious")) {
+        identityDelta += 1;
+        resonanceDelta -= 1;
+      }
+      if (interp.modifiers.includes("Ethereal")) {
+        identityDelta += 2;
+        resonanceDelta += 1;
+      }
+      if (interp.modifiers.includes("Grounded")) {
+        identityDelta += 1;
+      }
+
+      // Constraint modifiers (affect resonance more - market positioning)
+      if (interp.modifiers.includes("Minimal")) resonanceDelta += 2;
+      if (interp.modifiers.includes("Maximal")) resonanceDelta -= 1;
+      if (interp.modifiers.includes("Utility")) resonanceDelta += 2;
+      if (interp.modifiers.includes("Decorative")) resonanceDelta -= 1;
+      if (interp.modifiers.includes("Nostalgic")) resonanceDelta -= 2;
+      if (interp.modifiers.includes("Contemporary")) resonanceDelta += 2;
+      if (interp.modifiers.includes("Timeless")) {
+        identityDelta += 2;
+        resonanceDelta += 1;
+      }
+      if (interp.modifiers.includes("Trend-forward")) {
+        resonanceDelta += 3;
+      }
 
       const newIdentity = Math.max(
         0,
@@ -438,6 +481,30 @@ export default function ConceptStudioPage() {
 
   const topSuggestedTwo = TOP_SUGGESTED.slice(0, 2);
 
+  // ✅ FIXED: Determine recommended aesthetic based on highest combined score, not just list position
+  const recommendedAesthetic = useMemo(() => {
+    // Calculate combined scores for all aesthetics
+    const scoredAesthetics = AESTHETICS.map((aesthetic) => {
+      const content = AESTHETIC_CONTENT[aesthetic];
+      const identityScore = content?.identityScore ?? 0;
+      const resonanceScore = content?.resonanceScore ?? 0;
+      const combinedScore = identityScore + resonanceScore;
+      
+      return {
+        aesthetic,
+        identityScore,
+        resonanceScore,
+        combinedScore,
+      };
+    });
+
+    // Sort by combined score descending
+    scoredAesthetics.sort((a, b) => b.combinedScore - a.combinedScore);
+
+    // Return the highest scoring aesthetic
+    return scoredAesthetics[0]?.aesthetic || TOP_SUGGESTED[0];
+  }, []);
+
   const scoreTextStyle: React.CSSProperties = {
     fontSize: 12,
     fontWeight: 650,
@@ -509,6 +576,229 @@ export default function ConceptStudioPage() {
       : "1.5px solid transparent",
   };
 
+  // ✅ NEW: Generate actionable suggestions based on current state - only when needed
+  const generateSuggestions = () => {
+    if (!selectedAesthetic) return [];
+    
+    const suggestions: Array<{
+      label: string;
+      sub: string;
+      action: () => void;
+    }> = [];
+
+    const hasRefinement = refineText && refineText !== `${selectedAesthetic}, but…`;
+    const isRecommended = selectedAesthetic === recommendedAesthetic;
+
+    // If both scores are already high (>= 80), don't show suggestions
+    if (identityScore && identityScore >= 80 && resonanceScore && resonanceScore >= 80 && !hasRefinement) {
+      return suggestions; // Empty - this direction is already strong
+    }
+
+    // Suggest switching to recommended if significantly weaker
+    if (!isRecommended && (identityScore && identityScore < 65 || resonanceScore && resonanceScore < 65)) {
+      suggestions.push({
+        label: `Switch to ${recommendedAesthetic}`,
+        sub: "Stronger consumer resonance with clearer brand alignment.",
+        action: () => handleSelectAesthetic(recommendedAesthetic),
+      });
+    }
+
+    // Only suggest texture refinement if identity is weak
+    if (identityScore && identityScore < 75 && (!hasRefinement || (hasRefinement && !interpretation?.modifiers.includes("Refined") && !interpretation?.modifiers.includes("Soft")))) {
+      suggestions.push({
+        label: "Add 'more refined' for texture",
+        sub: "Elevates clarity and brings structure to the direction.",
+        action: () => {
+          const current = refineDraft || `${selectedAesthetic}, but…`;
+          setRefineDraft(current + " more refined");
+          setTimeout(() => submitRefine(), 100);
+        },
+      });
+    }
+
+    // Only suggest mood refinement based on specific aesthetic types or weak resonance
+    if (!hasRefinement || (hasRefinement && !interpretation?.modifiers.includes("Ethereal") && !interpretation?.modifiers.includes("Grounded") && !interpretation?.modifiers.includes("Playful"))) {
+      if ((identityScore && identityScore < 75 || resonanceScore && resonanceScore < 75)) {
+        if (selectedAesthetic.toLowerCase().includes("romantic") || selectedAesthetic.toLowerCase().includes("coastal")) {
+          suggestions.push({
+            label: "Add 'ethereal' for mood",
+            sub: "Softens the read — appeals to consumers seeking quiet luxury.",
+            action: () => {
+              const current = refineDraft || `${selectedAesthetic}, but…`;
+              setRefineDraft(current + " ethereal");
+              setTimeout(() => submitRefine(), 100);
+            },
+          });
+        } else if (selectedAesthetic.toLowerCase().includes("western") || selectedAesthetic.toLowerCase().includes("grunge") || selectedAesthetic.toLowerCase().includes("dark")) {
+          suggestions.push({
+            label: "Try 'grounded' for mood",
+            sub: "Anchors authenticity — resonates with consumers wanting realness.",
+            action: () => {
+              const current = refineDraft || `${selectedAesthetic}, but…`;
+              setRefineDraft(current + " grounded");
+              setTimeout(() => submitRefine(), 100);
+            },
+          });
+        } else if (resonanceScore && resonanceScore < 70) {
+          suggestions.push({
+            label: "Try 'playful' for mood",
+            sub: "Opens market positioning — taps into emerging consumer optimism.",
+            action: () => {
+              const current = refineDraft || `${selectedAesthetic}, but…`;
+              setRefineDraft(current + " playful");
+              setTimeout(() => submitRefine(), 100);
+            },
+          });
+        }
+      }
+    }
+
+    // Only suggest constraint refinement if resonance is weak
+    if (resonanceScore && resonanceScore < 70 && (!hasRefinement || (hasRefinement && !interpretation?.modifiers.includes("Minimal") && !interpretation?.modifiers.includes("Contemporary")))) {
+      suggestions.push({
+        label: "Add 'minimal' for constraint",
+        sub: "Sharpens positioning in a crowded market — clearer consumer read.",
+        action: () => {
+          const current = refineDraft || `${selectedAesthetic}, but…`;
+          setRefineDraft(current + " minimal");
+          setTimeout(() => submitRefine(), 100);
+        },
+      });
+    }
+
+    return suggestions.slice(0, 3); // Max 3 suggestions
+  };
+
+  // ✅ NEW: Generate enhanced Muko Insight based on selection and refinement
+  const generateEnhancedMukoInsight = () => {
+    if (!selectedAesthetic) {
+      return (
+        <>
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 650,
+              lineHeight: 1.5,
+              color: "rgba(67, 67, 43, 0.88)",
+              fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+              marginBottom: 12,
+            }}
+          >
+            Start by selecting a direction
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              lineHeight: 1.58,
+              color: "rgba(67, 67, 43, 0.66)",
+              fontFamily: "var(--font-inter), system-ui, sans-serif",
+              marginBottom: 12,
+            }}
+          >
+            Look for the subtle rose glow — those are Muko's recommendations for your brand DNA.
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              lineHeight: 1.58,
+              color: "rgba(67, 67, 43, 0.60)",
+              fontFamily: "var(--font-inter), system-ui, sans-serif",
+            }}
+          >
+            After selecting, refine with texture, mood, or constraint to see how it shifts identity and resonance.
+          </div>
+        </>
+      );
+    }
+
+    const isRecommended = selectedAesthetic === recommendedAesthetic;
+    const hasRefinement = refineText && refineText !== `${selectedAesthetic}, but…`;
+    
+    if (!identityScore || !resonanceScore) {
+      return `Analyzing ${selectedAesthetic}...`;
+    }
+
+    let insight = "";
+
+    // High-performing direction (both scores strong)
+    if (identityScore >= 80 && resonanceScore >= 80) {
+      if (isRecommended) {
+        insight = `${selectedAesthetic} is a natural fit — reads clearly as your brand voice and consumers are actively searching for this point of view. `;
+        if (hasRefinement && interpretation?.modifiers && interpretation?.modifiers.length > 0) {
+          insight += `Adding ${interpretation.modifiers.slice(0, 2).join(" + ")} sharpens the target customer without losing the core appeal.`;
+        } else {
+          insight += "You can move forward as-is, or refine to claim a more specific consumer niche.";
+        }
+      } else {
+        insight = `${selectedAesthetic} performs well on both fronts — strong brand alignment and healthy consumer demand. `;
+        if (hasRefinement && interpretation?.modifiers && interpretation?.modifiers.length > 0) {
+          insight += `Your refinement (${interpretation.modifiers.slice(0, 2).join(" + ")}) adds strategic nuance, though ${recommendedAesthetic} would require less translation work.`;
+        } else {
+          insight += `This direction works, though ${recommendedAesthetic} would be more effortless to execute across your line.`;
+        }
+      }
+    }
+    // Good brand fit, weaker market resonance
+    else if (identityScore >= 75 && resonanceScore < 75) {
+      insight = `${selectedAesthetic} feels authentic to your brand, but the market is crowded here. `;
+      if (hasRefinement && interpretation?.modifiers && interpretation?.modifiers.length > 0) {
+        insight += `${interpretation.modifiers.slice(0, 2).join(" + ")} helps carve out differentiation, but you'll need sharp execution to stand out to consumers.`;
+      } else {
+        insight += "Consider refining with mood or constraint to find a less saturated angle that still feels like you.";
+      }
+    }
+    // Good market demand, weaker brand fit
+    else if (resonanceScore >= 75 && identityScore < 75) {
+      insight = `${selectedAesthetic} has strong consumer interest, but it's not your most natural language. `;
+      if (hasRefinement && interpretation?.modifiers && interpretation?.modifiers.length > 0) {
+        insight += `Adding ${interpretation.modifiers.slice(0, 2).join(" + ")} bridges the gap, though you'll need to work harder to make it feel authentic across touchpoints.`;
+      } else {
+        insight += "Refine with texture to pull it closer to your voice, or consider a direction that requires less brand translation.";
+      }
+    }
+    // Both scores moderate
+    else if (identityScore >= 60 && resonanceScore >= 60) {
+      if (isRecommended) {
+        insight = `${selectedAesthetic} is a solid middle ground — enough brand clarity and consumer traction to work with. `;
+        if (hasRefinement && interpretation?.modifiers && interpretation?.modifiers.length > 0) {
+          insight += `Your refinement (${interpretation.modifiers.slice(0, 2).join(" + ")}) helps tip it into stronger territory.`;
+        } else {
+          insight += "Refinement will push this into clearer positioning.";
+        }
+      } else {
+        insight = `${selectedAesthetic} sits in workable territory, but both brand fit and market positioning could be sharper. `;
+        if (hasRefinement && interpretation?.modifiers && interpretation?.modifiers.length > 0) {
+          insight += `Adding ${interpretation.modifiers.slice(0, 2).join(" + ")} helps, though ${recommendedAesthetic} would give you a stronger starting point.`;
+        } else {
+          insight += `Consider ${recommendedAesthetic} for clearer consumer communication and easier brand expression.`;
+        }
+      }
+    }
+    // Low scores - needs intervention
+    else {
+      if (identityScore && identityScore < 60 && resonanceScore && resonanceScore < 60) {
+        insight = `${selectedAesthetic} creates tension — it doesn't align with your brand DNA and faces heavy market saturation. `;
+        if (isRecommended) {
+          insight += "Refinement can help, but this direction will require significant effort to execute convincingly.";
+        } else {
+          insight += `Switch to ${recommendedAesthetic} for authentic brand expression and better consumer appetite.`;
+        }
+      } else if (identityScore < 60) {
+        insight = `${selectedAesthetic} pulls you off-brand. While consumers respond to it, you'll struggle to execute it authentically. `;
+        insight += hasRefinement 
+          ? `Even with refinement, this direction fights your natural voice.`
+          : `${recommendedAesthetic} lets you speak in your native language while still capturing consumer interest.`;
+      } else {
+        insight = `${selectedAesthetic} feels like you, but the market is oversaturated. `;
+        insight += hasRefinement
+          ? `Your refinement adds differentiation, but you're still entering a crowded space.`
+          : `Refine to find a fresh angle, or explore a direction with more consumer headroom.`;
+      }
+    }
+
+    return insight;
+  };
+
   return (
     <div
       style={{
@@ -568,7 +858,6 @@ export default function ConceptStudioPage() {
               ].map((s) => {
                 const isActive = s.state === "active";
                 const isDone = s.state === "done";
-                const isIdle = s.state === "idle";
 
                 // Colors per state
                 const stepBg = isDone
@@ -581,11 +870,6 @@ export default function ConceptStudioPage() {
                   : isActive
                     ? `1.5px solid ${STEEL_BLUE}`
                     : "1.5px solid rgba(67, 67, 43, 0.10)";
-                const stepColor = isDone
-                  ? BRAND.chartreuse
-                  : isActive
-                    ? STEEL_BLUE
-                    : "rgba(67, 67, 43, 0.38)";
                 const labelColor = isDone
                   ? "rgba(67, 67, 43, 0.72)"
                   : isActive
@@ -615,7 +899,6 @@ export default function ConceptStudioPage() {
                       letterSpacing: "0.01em",
                     }}
                   >
-                    {/* Icon/dot */}
                     {isDone ? (
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <circle cx="7" cy="7" r="6" fill={BRAND.chartreuse} opacity="0.22" />
@@ -795,7 +1078,8 @@ export default function ConceptStudioPage() {
                     marginBottom: 16,
                   }}
                 >
-                  Hover to preview the moodboard. Click to select.
+                  {/* ✅ NEW: Updated copy to mention rose glow */}
+                  Look for the rose glow — that's Muko's top recommendation for your brand.
                 </div>
 
                 <div
@@ -808,9 +1092,11 @@ export default function ConceptStudioPage() {
                   {visibleAesthetics.map((aesthetic) => {
                     const isSelected = selectedAesthetic === aesthetic;
                     const isHovered = hoveredAesthetic === aesthetic;
-
                     const isExpanded = isHovered || isSelected;
                     const content = AESTHETIC_CONTENT[aesthetic];
+
+                    // ✅ NEW: Check if this is the recommended aesthetic
+                    const isRecommended = aesthetic === recommendedAesthetic;
 
                     const identityColorChip =
                       (content?.identityScore ?? 0) >= 80
@@ -826,11 +1112,14 @@ export default function ConceptStudioPage() {
                           ? BRAND.rose
                           : "#C19A6B";
 
-                    const isSuggestedHighlight =
-                      topSuggestedTwo.includes(aesthetic) && !isSelected;
-
-                    const suggestedRing =
-                      "inset 0 0 0 1px rgba(169, 123, 143, 0.30), 0 0 18px rgba(169, 123, 143, 0.14)";
+                    // ✅ NEW: Rose glow styling for recommended option
+                    const roseGlow = isRecommended
+                      ? {
+                          boxShadow:
+                            "0 18px 50px rgba(169,123,143,0.16), 0 0 0 1px rgba(169,123,143,0.22), inset 0 1px 0 rgba(255,255,255,0.60)",
+                          border: "1.5px solid rgba(169,123,143,0.28)",
+                        }
+                      : {};
 
                     return (
                       <button
@@ -846,21 +1135,20 @@ export default function ConceptStudioPage() {
                           background: "rgba(255,255,255,0.62)",
                           border: isSelected
                             ? `1px solid ${BRAND.chartreuse}`
-                            : isSuggestedHighlight
-                              ? "1px solid rgba(169, 123, 143, 0.28)"
-                              : "1px solid rgba(67, 67, 43, 0.10)",
+                            : "1px solid rgba(67, 67, 43, 0.10)",
                           boxShadow: isSelected
                             ? `0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)`
-                            : isSuggestedHighlight
-                              ? `0 14px 44px rgba(67, 67, 43, 0.08), ${suggestedRing}`
-                              : isHovered
-                                ? "0 14px 44px rgba(67, 67, 43, 0.10)"
-                                : "0 10px 32px rgba(67, 67, 43, 0.06)",
+                            : isHovered
+                              ? "0 14px 44px rgba(67, 67, 43, 0.10)"
+                              : "0 10px 32px rgba(67, 67, 43, 0.06)",
                           cursor: "pointer",
                           transition:
                             "all 220ms cubic-bezier(0.4, 0, 0.2, 1)",
                           transform: isHovered ? "translateY(-1px)" : "translateY(0)",
                           outline: "none",
+                          position: "relative",
+                          // ✅ NEW: Apply rose glow to recommended
+                          ...(isRecommended ? roseGlow : {}),
                         }}
                       >
                         <div
@@ -879,22 +1167,6 @@ export default function ConceptStudioPage() {
                               minWidth: 0,
                             }}
                           >
-                            <span
-                              style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: 999,
-                                background: isSelected
-                                  ? BRAND.chartreuse
-                                  : "rgba(67, 67, 43, 0.18)",
-                                boxShadow: isSelected
-                                  ? "0 0 0 3px rgba(171, 171, 99, 0.18)"
-                                  : "none",
-                                flex: "0 0 auto",
-                                marginTop: isExpanded ? 5 : 0,
-                              }}
-                            />
-                            {/* Subtler text */}
                             <div
                               style={{
                                 fontSize: 16,
@@ -912,32 +1184,97 @@ export default function ConceptStudioPage() {
                             </div>
                           </div>
 
+                          {/* ✅ FIXED: Before selection = total scores on hover only. After selection = delta dot + delta scores on hover */}
                           <div
                             style={{
                               display: "flex",
-                              gap: 14,
+                              gap: 10,
                               alignItems: "center",
                               flex: "0 0 auto",
                               paddingTop: 2,
                             }}
                           >
-                            <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
-                              <span style={{ ...scoreIconWrapStyle, color: identityColorChip }}>
-                                <IconIdentity size={16} />
-                              </span>
-                              <span style={scoreTextStyle}>
-                                {content?.identityScore ?? "—"}
-                              </span>
-                            </div>
+                            {!selectedAesthetic ? (
+                              // Before any selection: only show total scores on hover
+                              isHovered ? (
+                                <>
+                                  <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+                                    <span style={{ ...scoreIconWrapStyle, color: identityColorChip }}>
+                                      <IconIdentity size={16} />
+                                    </span>
+                                    <span style={scoreTextStyle}>
+                                      {content?.identityScore ?? "—"}
+                                    </span>
+                                  </div>
 
-                            <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
-                              <span style={{ ...scoreIconWrapStyle, color: resonanceColorChip }}>
-                                <IconResonance size={16} />
-                              </span>
-                              <span style={scoreTextStyle}>
-                                {content?.resonanceScore ?? "—"}
-                              </span>
-                            </div>
+                                  <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+                                    <span style={{ ...scoreIconWrapStyle, color: resonanceColorChip }}>
+                                      <IconResonance size={16} />
+                                    </span>
+                                    <span style={scoreTextStyle}>
+                                      {content?.resonanceScore ?? "—"}
+                                    </span>
+                                  </div>
+                                </>
+                              ) : null
+                            ) : (
+                              // After selection: show delta dot, and delta scores on hover
+                              <>
+                                {isHovered ? (
+                                  // Show delta scores on hover
+                                  <>
+                                    <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+                                      <span style={{ ...scoreIconWrapStyle, color: identityColorChip }}>
+                                        <IconIdentity size={16} />
+                                      </span>
+                                      <span style={{
+                                        ...scoreTextStyle,
+                                        color: isSelected ? "rgba(67, 67, 43, 0.62)" : "rgba(67, 67, 43, 0.52)",
+                                      }}>
+                                        {isSelected 
+                                          ? `${content?.identityScore ?? "—"}`
+                                          : `${((content?.identityScore ?? 0) - (AESTHETIC_CONTENT[selectedAesthetic]?.identityScore ?? 0)) >= 0 ? '+' : ''}${(content?.identityScore ?? 0) - (AESTHETIC_CONTENT[selectedAesthetic]?.identityScore ?? 0)}`
+                                        }
+                                      </span>
+                                    </div>
+
+                                    <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+                                      <span style={{ ...scoreIconWrapStyle, color: resonanceColorChip }}>
+                                        <IconResonance size={16} />
+                                      </span>
+                                      <span style={{
+                                        ...scoreTextStyle,
+                                        color: isSelected ? "rgba(67, 67, 43, 0.62)" : "rgba(67, 67, 43, 0.52)",
+                                      }}>
+                                        {isSelected 
+                                          ? `${content?.resonanceScore ?? "—"}`
+                                          : `${((content?.resonanceScore ?? 0) - (AESTHETIC_CONTENT[selectedAesthetic]?.resonanceScore ?? 0)) >= 0 ? '+' : ''}${(content?.resonanceScore ?? 0) - (AESTHETIC_CONTENT[selectedAesthetic]?.resonanceScore ?? 0)}`
+                                        }
+                                      </span>
+                                    </div>
+                                  </>
+                                ) : (
+                                  // Show delta dot when not hovering
+                                  !isSelected && (
+                                    <div
+                                      style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: "50%",
+                                        background: 
+                                          ((content?.identityScore ?? 0) - (AESTHETIC_CONTENT[selectedAesthetic]?.identityScore ?? 0)) + 
+                                          ((content?.resonanceScore ?? 0) - (AESTHETIC_CONTENT[selectedAesthetic]?.resonanceScore ?? 0)) > 0
+                                            ? BRAND.chartreuse
+                                            : ((content?.identityScore ?? 0) - (AESTHETIC_CONTENT[selectedAesthetic]?.identityScore ?? 0)) + 
+                                              ((content?.resonanceScore ?? 0) - (AESTHETIC_CONTENT[selectedAesthetic]?.resonanceScore ?? 0)) < 0
+                                              ? BRAND.rose
+                                              : "rgba(67, 67, 43, 0.22)",
+                                      }}
+                                    />
+                                  )
+                                )}
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -945,16 +1282,52 @@ export default function ConceptStudioPage() {
                           <div
                             style={{
                               marginTop: 10,
-                              marginLeft: 22,
-                              fontSize: 12,
-                              color: "rgba(67, 67, 43, 0.45)",
-                              fontFamily:
-                                "var(--font-inter), system-ui, sans-serif",
-                              lineHeight: 1.5,
-                              maxWidth: 520,
                             }}
                           >
-                            {content?.description ?? " "}
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "rgba(67, 67, 43, 0.70)",
+                                fontFamily:
+                                  "var(--font-inter), system-ui, sans-serif",
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              {/* ✅ NEW: Show recommended insight or default description */}
+                              {isRecommended
+                                ? "Strongest alignment with your brand DNA — clear, intentional, and room to make it your own."
+                                : content?.description ?? " "}
+                            </div>
+
+                            {/* ✅ NEW: "Why This Works" section for recommended */}
+                            {isRecommended && (
+                              <div style={{ marginTop: 10 }}>
+                                <div
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    letterSpacing: "0.08em",
+                                    textTransform: "uppercase" as const,
+                                    color: "rgba(67,67,43,0.50)",
+                                    fontFamily:
+                                      "var(--font-sohne-breit), system-ui, sans-serif",
+                                    marginBottom: 4,
+                                  }}
+                                >
+                                  Why This Works
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: 12,
+                                    lineHeight: 1.5,
+                                    color: "rgba(67,67,43,0.62)",
+                                    fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                  }}
+                                >
+                                  Supports your direction while staying flexible across product categories — easier to execute without losing brand clarity.
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </button>
@@ -1025,7 +1398,7 @@ export default function ConceptStudioPage() {
                         outline: "none",
                         boxShadow: "0 14px 40px rgba(67, 67, 43, 0.06)",
                       }}
-                      placeholder="e.g., softer, more romantic, less street"
+                      placeholder="e.g., more refined, ethereal, minimal"
                     />
 
                     <button
@@ -1108,26 +1481,42 @@ export default function ConceptStudioPage() {
                         })}
                       </div>
 
+                      {/* ✅ NEW: Detailed insight about interpretation */}
                       {interpretation.modifiers?.length > 0 && (
-                        <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                          {interpretation.modifiers.map((m) => (
-                            <span
-                              key={m}
+                        <>
+                          <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                            {interpretation.modifiers.map((m) => (
+                              <span
+                                key={m}
+                                style={{
+                                  padding: "6px 10px",
+                                  borderRadius: 999,
+                                  fontSize: 12,
+                                  fontWeight: 650,
+                                  color: "rgba(67, 67, 43, 0.66)",
+                                  background: "rgba(171, 171, 99, 0.10)",
+                                  border: "1px solid rgba(171, 171, 99, 0.18)",
+                                  fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                }}
+                              >
+                                {m}
+                              </span>
+                            ))}
+                          </div>
+
+                          <div style={{ marginTop: 10 }}>
+                            <div
                               style={{
-                                padding: "6px 10px",
-                                borderRadius: 999,
                                 fontSize: 12,
-                                fontWeight: 650,
-                                color: "rgba(67, 67, 43, 0.66)",
-                                background: "rgba(171, 171, 99, 0.10)",
-                                border: "1px solid rgba(171, 171, 99, 0.18)",
+                                lineHeight: 1.5,
+                                color: "rgba(67,67,43,0.62)",
                                 fontFamily: "var(--font-inter), system-ui, sans-serif",
                               }}
                             >
-                              {m}
-                            </span>
-                          ))}
-                        </div>
+                              These modifiers add specificity — they'll influence how materials, silhouettes, and palette read in the next step.
+                            </div>
+                          </div>
+                        </>
                       )}
 
                       {interpretation.confidence === "low" && !acceptedInterpretation && (
@@ -1612,7 +2001,7 @@ export default function ConceptStudioPage() {
                   </div>
                 </div>
 
-                {/* ✅ Glassmorphic Muko Insight */}
+                {/* ✅ UPDATED: Glassmorphic Muko Insight with enhanced content */}
                 <div
                   style={{
                     ...glassPanelBase,
@@ -1653,10 +2042,97 @@ export default function ConceptStudioPage() {
                         fontFamily: "var(--font-inter), system-ui, sans-serif",
                       }}
                     >
-                      {typeof identityScore === "number" || typeof resonanceScore === "number"
-                        ? generateMukoInsight(identityScore ?? 0, resonanceScore ?? 0)
-                        : "Start making selections to see live intelligence…"}
+                      {/* ✅ NEW: Use enhanced insight generator - handles both JSX and string */}
+                      {typeof generateEnhancedMukoInsight() === 'string' 
+                        ? generateEnhancedMukoInsight()
+                        : generateEnhancedMukoInsight()
+                      }
                     </div>
+
+                    {/* ✅ NEW: Suggestions section */}
+                    {selectedAesthetic && generateSuggestions().length > 0 && (
+                      <div style={{ marginTop: 16 }}>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            letterSpacing: "0.10em",
+                            textTransform: "uppercase",
+                            color: "rgba(67, 67, 43, 0.42)",
+                            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                            marginBottom: 10,
+                          }}
+                        >
+                          Suggestions
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          {generateSuggestions().map((sug, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                padding: "14px 16px",
+                                borderRadius: 14,
+                                background: "rgba(255,255,255,0.46)",
+                                border: "1px solid rgba(67,67,43,0.10)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 12,
+                              }}
+                            >
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 650,
+                                    color: "rgba(67,67,43,0.82)",
+                                    fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                                    marginBottom: 4,
+                                  }}
+                                >
+                                  {sug.label}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: 12,
+                                    lineHeight: 1.45,
+                                    color: "rgba(67,67,43,0.55)",
+                                    fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                  }}
+                                >
+                                  {sug.sub}
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={sug.action}
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 650,
+                                  color: BRAND.chartreuse,
+                                  border: `1px solid ${BRAND.chartreuse}`,
+                                  borderRadius: 999,
+                                  padding: "8px 16px",
+                                  background: "rgba(171,171,99,0.08)",
+                                  cursor: "pointer",
+                                  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                                  flex: "0 0 auto",
+                                  transition: "all 180ms ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = "rgba(171,171,99,0.14)";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = "rgba(171,171,99,0.08)";
+                                }}
+                              >
+                                Apply
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
