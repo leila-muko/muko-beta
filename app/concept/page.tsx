@@ -851,7 +851,7 @@ export default function ConceptStudioPage() {
             {/* ✅ UPDATED: Colored stepper */}
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               {[
-                { label: "Entry", state: "done" as const },
+                { label: "Intent", state: "done" as const },
                 { label: "Concept", state: "active" as const },
                 { label: "Spec", state: "idle" as const },
                 { label: "Report", state: "idle" as const },

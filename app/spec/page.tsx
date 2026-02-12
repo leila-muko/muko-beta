@@ -1018,7 +1018,7 @@ export default function SpecStudioPage() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {[
-                { label: "Entry", state: "done" },
+                { label: "Intent", state: "done" },
                 { label: "Concept", state: "done" },
                 { label: "Spec", state: "active" },
                 { label: "Report", state: "idle" },
