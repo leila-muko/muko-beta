@@ -14,10 +14,50 @@ import {
   interpretRefine,
   generateMukoInsight,
 } from "../../lib/concept-studio/utils";
-import {
-  IconIdentity,
-  IconResonance,
-} from "../../components/concept-studio/Icons";
+
+/* ─── Icons: matched to Report page (star, users, cog) ─── */
+function IconIdentity({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconResonance({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M17 21V19C17 16.79 15.21 15 13 15H5C2.79 15 1 16.79 1 19V21"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M23 21V19C22.99 17.18 21.8 15.58 20 15.13"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16 3.13C17.8 3.58 18.99 5.18 18.99 7C18.99 8.82 17.8 10.42 16 10.87"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 type Confidence = "high" | "med" | "low";
 
@@ -454,8 +494,8 @@ export default function ConceptStudioPage() {
       ? identityScore >= 80
         ? BRAND.chartreuse
         : identityScore >= 60
-          ? BRAND.rose
-          : "#C19A6B"
+          ? BRAND.camel
+          : BRAND.rose
       : "rgba(67, 67, 43, 0.75)";
 
   const resonanceColor =
@@ -463,8 +503,8 @@ export default function ConceptStudioPage() {
       ? resonanceScore >= 80
         ? BRAND.chartreuse
         : resonanceScore >= 60
-          ? BRAND.rose
-          : "#C19A6B"
+          ? BRAND.camel
+          : BRAND.rose
       : "rgba(67, 67, 43, 0.75)";
 
   const confirmEnabledBySelection = Boolean(selectedAesthetic);
@@ -514,14 +554,8 @@ export default function ConceptStudioPage() {
 
   const scoreIconWrapStyle: React.CSSProperties = {
     display: "inline-flex",
-    width: 18,
-    height: 18,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 999,
-    background: "rgba(255,255,255,0.70)",
-    border: "1px solid rgba(67, 67, 43, 0.10)",
-    boxShadow: "0 6px 16px rgba(67, 67, 43, 0.06)",
   };
 
   /* ✅ Premium glassmorphic panels — transparent glass over ambient mesh */
@@ -576,7 +610,8 @@ export default function ConceptStudioPage() {
       : "1.5px solid transparent",
   };
 
-  // ✅ NEW: Generate actionable suggestions based on current state - only when needed
+  // ✅ REWORKED: Suggestions now prioritize refining the SELECTED direction
+  // Only suggest switching when scores are critically low
   const generateSuggestions = () => {
     if (!selectedAesthetic) return [];
     
@@ -589,87 +624,103 @@ export default function ConceptStudioPage() {
     const hasRefinement = refineText && refineText !== `${selectedAesthetic}, but…`;
     const isRecommended = selectedAesthetic === recommendedAesthetic;
 
-    // If both scores are already high (>= 80), don't show suggestions
-    if (identityScore && identityScore >= 80 && resonanceScore && resonanceScore >= 80 && !hasRefinement) {
-      return suggestions; // Empty - this direction is already strong
+    // If both scores are strong, no suggestions needed
+    if (identityScore && identityScore >= 80 && resonanceScore && resonanceScore >= 80) {
+      return suggestions;
     }
 
-    // Suggest switching to recommended if significantly weaker
-    if (!isRecommended && (identityScore && identityScore < 65 || resonanceScore && resonanceScore < 65)) {
-      suggestions.push({
-        label: `Switch to ${recommendedAesthetic}`,
-        sub: "Stronger consumer resonance with clearer brand alignment.",
-        action: () => handleSelectAesthetic(recommendedAesthetic),
-      });
-    }
-
-    // Only suggest texture refinement if identity is weak
-    if (identityScore && identityScore < 75 && (!hasRefinement || (hasRefinement && !interpretation?.modifiers.includes("Refined") && !interpretation?.modifiers.includes("Soft")))) {
-      suggestions.push({
-        label: "Add 'more refined' for texture",
-        sub: "Elevates clarity and brings structure to the direction.",
-        action: () => {
-          const current = refineDraft || `${selectedAesthetic}, but…`;
-          setRefineDraft(current + " more refined");
-          setTimeout(() => submitRefine(), 100);
-        },
-      });
-    }
-
-    // Only suggest mood refinement based on specific aesthetic types or weak resonance
-    if (!hasRefinement || (hasRefinement && !interpretation?.modifiers.includes("Ethereal") && !interpretation?.modifiers.includes("Grounded") && !interpretation?.modifiers.includes("Playful"))) {
-      if ((identityScore && identityScore < 75 || resonanceScore && resonanceScore < 75)) {
-        if (selectedAesthetic.toLowerCase().includes("romantic") || selectedAesthetic.toLowerCase().includes("coastal")) {
+    // PRIORITY 1: Refinement suggestions for the CURRENT direction
+    // Weak identity → suggest texture/structure refinements
+    if (identityScore && identityScore < 78) {
+      const hasTextureRefinement = interpretation?.modifiers.some(m => 
+        ["Refined", "Soft", "Structured", "Textured", "Polished"].includes(m)
+      );
+      if (!hasTextureRefinement) {
+        // Suggest refinement based on the aesthetic's character
+        const aestheticLower = selectedAesthetic.toLowerCase();
+        if (aestheticLower.includes("romantic") || aestheticLower.includes("coastal") || aestheticLower.includes("cottagecore")) {
+          const newText = `${selectedAesthetic}, but… soft, structured`;
           suggestions.push({
-            label: "Add 'ethereal' for mood",
-            sub: "Softens the read — appeals to consumers seeking quiet luxury.",
+            label: "Refine with 'soft, structured'",
+            sub: "Anchors the femininity in your brand's architectural voice — lifts identity without losing the mood.",
             action: () => {
-              const current = refineDraft || `${selectedAesthetic}, but…`;
-              setRefineDraft(current + " ethereal");
-              setTimeout(() => submitRefine(), 100);
+              setRefineDraft(newText);
+              setRefineText(newText);
             },
           });
-        } else if (selectedAesthetic.toLowerCase().includes("western") || selectedAesthetic.toLowerCase().includes("grunge") || selectedAesthetic.toLowerCase().includes("dark")) {
+        } else if (aestheticLower.includes("grunge") || aestheticLower.includes("dark") || aestheticLower.includes("western")) {
+          const newText = `${selectedAesthetic}, but… polished, grounded`;
           suggestions.push({
-            label: "Try 'grounded' for mood",
-            sub: "Anchors authenticity — resonates with consumers wanting realness.",
+            label: "Refine with 'polished, grounded'",
+            sub: "Keeps the edge but translates it through your brand's lens — more ownable, less costume.",
             action: () => {
-              const current = refineDraft || `${selectedAesthetic}, but…`;
-              setRefineDraft(current + " grounded");
-              setTimeout(() => submitRefine(), 100);
+              setRefineDraft(newText);
+              setRefineText(newText);
             },
           });
-        } else if (resonanceScore && resonanceScore < 70) {
+        } else {
+          const newText = `${selectedAesthetic}, but… more refined`;
           suggestions.push({
-            label: "Try 'playful' for mood",
-            sub: "Opens market positioning — taps into emerging consumer optimism.",
+            label: "Refine with 'more refined'",
+            sub: "Tightens the direction to better match your brand DNA — sharper identity signal.",
             action: () => {
-              const current = refineDraft || `${selectedAesthetic}, but…`;
-              setRefineDraft(current + " playful");
-              setTimeout(() => submitRefine(), 100);
+              setRefineDraft(newText);
+              setRefineText(newText);
             },
           });
         }
       }
     }
 
-    // Only suggest constraint refinement if resonance is weak
-    if (resonanceScore && resonanceScore < 70 && (!hasRefinement || (hasRefinement && !interpretation?.modifiers.includes("Minimal") && !interpretation?.modifiers.includes("Contemporary")))) {
+    // Weak resonance → suggest market-positioning refinements
+    if (resonanceScore && resonanceScore < 75) {
+      const hasMarketRefinement = interpretation?.modifiers.some(m => 
+        ["Minimal", "Contemporary", "Playful", "Trend-forward", "Timeless"].includes(m)
+      );
+      if (!hasMarketRefinement) {
+        if (resonanceScore < 65) {
+          const newText = hasRefinement 
+            ? `${refineDraft} contemporary, minimal` 
+            : `${selectedAesthetic}, but… contemporary, minimal`;
+          suggestions.push({
+            label: "Add 'contemporary, minimal'",
+            sub: "Opens the market read — helps consumers see themselves in the direction faster.",
+            action: () => {
+              setRefineDraft(newText);
+              setRefineText(newText);
+            },
+          });
+        } else {
+          const newText = hasRefinement 
+            ? `${refineDraft} timeless` 
+            : `${selectedAesthetic}, but… timeless`;
+          suggestions.push({
+            label: "Add 'timeless'",
+            sub: "Reduces trend dependency — consumer appeal that doesn't expire next season.",
+            action: () => {
+              setRefineDraft(newText);
+              setRefineText(newText);
+            },
+          });
+        }
+      }
+    }
+
+    // PRIORITY 2: Only suggest switching when BOTH scores are critically low
+    // and refinement alone won't be enough
+    if (!isRecommended && identityScore && identityScore < 55 && resonanceScore && resonanceScore < 55) {
       suggestions.push({
-        label: "Add 'minimal' for constraint",
-        sub: "Sharpens positioning in a crowded market — clearer consumer read.",
-        action: () => {
-          const current = refineDraft || `${selectedAesthetic}, but…`;
-          setRefineDraft(current + " minimal");
-          setTimeout(() => submitRefine(), 100);
-        },
+        label: `Consider ${recommendedAesthetic} as a base`,
+        sub: "Stronger starting point — you can still apply the same mood and texture refinements.",
+        action: () => handleSelectAesthetic(recommendedAesthetic),
       });
     }
 
-    return suggestions.slice(0, 3); // Max 3 suggestions
+    return suggestions.slice(0, 3);
   };
 
-  // ✅ NEW: Generate enhanced Muko Insight based on selection and refinement
+  // ✅ REWORKED: Insight focuses on HOW to refine the selected direction
+  // Only mentions the recommended when scores are critically low
   const generateEnhancedMukoInsight = () => {
     if (!selectedAesthetic) {
       return (
@@ -720,79 +771,77 @@ export default function ConceptStudioPage() {
 
     let insight = "";
 
-    // High-performing direction (both scores strong)
+    // ─── STRONG: Both scores 80+ ───
     if (identityScore >= 80 && resonanceScore >= 80) {
-      if (isRecommended) {
-        insight = `${selectedAesthetic} is a natural fit — reads clearly as your brand voice and consumers are actively searching for this point of view. `;
-        if (hasRefinement && interpretation?.modifiers && interpretation?.modifiers.length > 0) {
-          insight += `Adding ${interpretation.modifiers.slice(0, 2).join(" + ")} sharpens the target customer without losing the core appeal.`;
-        } else {
-          insight += "You can move forward as-is, or refine to claim a more specific consumer niche.";
-        }
+      insight = `${selectedAesthetic} is a strong direction — clear brand alignment and healthy consumer demand. `;
+      if (hasRefinement && interpretation?.modifiers?.length) {
+        insight += `Your refinement (${interpretation.modifiers.slice(0, 2).join(" + ")}) sharpens the target customer without losing the core appeal. You're ready to move to specs.`;
       } else {
-        insight = `${selectedAesthetic} performs well on both fronts — strong brand alignment and healthy consumer demand. `;
-        if (hasRefinement && interpretation?.modifiers && interpretation?.modifiers.length > 0) {
-          insight += `Your refinement (${interpretation.modifiers.slice(0, 2).join(" + ")}) adds strategic nuance, though ${recommendedAesthetic} would require less translation work.`;
-        } else {
-          insight += `This direction works, though ${recommendedAesthetic} would be more effortless to execute across your line.`;
-        }
+        insight += "You can move forward as-is, or use the refine input to claim a more specific consumer niche — try 'soft' or 'ethereal' for mood, or 'structured' for texture.";
       }
     }
-    // Good brand fit, weaker market resonance
+    // ─── GOOD IDENTITY, WEAKER RESONANCE ───
     else if (identityScore >= 75 && resonanceScore < 75) {
-      insight = `${selectedAesthetic} feels authentic to your brand, but the market is crowded here. `;
-      if (hasRefinement && interpretation?.modifiers && interpretation?.modifiers.length > 0) {
-        insight += `${interpretation.modifiers.slice(0, 2).join(" + ")} helps carve out differentiation, but you'll need sharp execution to stand out to consumers.`;
+      insight = `${selectedAesthetic} feels authentic to your brand, but consumer demand is softer here. `;
+      if (hasRefinement && interpretation?.modifiers?.length) {
+        insight += `${interpretation.modifiers.slice(0, 2).join(" + ")} helps carve out differentiation. `;
+        if (resonanceScore >= 65) {
+          insight += "You're in workable territory — the specificity of your refinement can create its own demand.";
+        } else {
+          insight += "Consider adding a contemporary or minimal constraint to widen the consumer aperture.";
+        }
       } else {
-        insight += "Consider refining with mood or constraint to find a less saturated angle that still feels like you.";
+        insight += "Refine with a positioning modifier to find a less saturated angle — try 'contemporary' to modernize the read, or 'timeless' to signal longevity.";
       }
     }
-    // Good market demand, weaker brand fit
+    // ─── GOOD RESONANCE, WEAKER IDENTITY ───
     else if (resonanceScore >= 75 && identityScore < 75) {
-      insight = `${selectedAesthetic} has strong consumer interest, but it's not your most natural language. `;
-      if (hasRefinement && interpretation?.modifiers && interpretation?.modifiers.length > 0) {
-        insight += `Adding ${interpretation.modifiers.slice(0, 2).join(" + ")} bridges the gap, though you'll need to work harder to make it feel authentic across touchpoints.`;
+      insight = `${selectedAesthetic} has strong consumer pull, but it's not your most natural brand language. `;
+      if (hasRefinement && interpretation?.modifiers?.length) {
+        insight += `Adding ${interpretation.modifiers.slice(0, 2).join(" + ")} bridges the gap — `;
+        if (identityScore >= 65) {
+          insight += "the direction is becoming more ownable. Keep refining toward your brand's texture vocabulary.";
+        } else {
+          insight += "you'll need to work harder to make this feel authentic across touchpoints. Focus on texture and structure.";
+        }
       } else {
-        insight += "Refine with texture to pull it closer to your voice, or consider a direction that requires less brand translation.";
+        insight += "Refine with texture to pull it closer to your voice — try 'refined' or 'structured' to make it feel earned rather than borrowed.";
       }
     }
-    // Both scores moderate
+    // ─── BOTH MODERATE (60-79) ───
     else if (identityScore >= 60 && resonanceScore >= 60) {
-      if (isRecommended) {
-        insight = `${selectedAesthetic} is a solid middle ground — enough brand clarity and consumer traction to work with. `;
-        if (hasRefinement && interpretation?.modifiers && interpretation?.modifiers.length > 0) {
-          insight += `Your refinement (${interpretation.modifiers.slice(0, 2).join(" + ")}) helps tip it into stronger territory.`;
+      insight = `${selectedAesthetic} sits in workable territory — both brand fit and market demand are present but could be sharper. `;
+      if (hasRefinement && interpretation?.modifiers?.length) {
+        insight += `Your refinement (${interpretation.modifiers.slice(0, 2).join(" + ")}) is pushing it in the right direction. `;
+        const total = identityScore + resonanceScore;
+        if (total >= 145) {
+          insight += "Getting close — one more refinement pass could tip this into confident territory.";
         } else {
-          insight += "Refinement will push this into clearer positioning.";
+          insight += "Layer in another modifier — texture for identity, constraint for resonance.";
         }
       } else {
-        insight = `${selectedAesthetic} sits in workable territory, but both brand fit and market positioning could be sharper. `;
-        if (hasRefinement && interpretation?.modifiers && interpretation?.modifiers.length > 0) {
-          insight += `Adding ${interpretation.modifiers.slice(0, 2).join(" + ")} helps, though ${recommendedAesthetic} would give you a stronger starting point.`;
-        } else {
-          insight += `Consider ${recommendedAesthetic} for clearer consumer communication and easier brand expression.`;
-        }
+        insight += "This is a good base to build on. Try 'refined, contemporary' to sharpen both identity and resonance in one pass — or start with 'structured' for brand fit.";
       }
     }
-    // Low scores - needs intervention
+    // ─── LOW: One or both below 60 ───
     else {
-      if (identityScore && identityScore < 60 && resonanceScore && resonanceScore < 60) {
-        insight = `${selectedAesthetic} creates tension — it doesn't align with your brand DNA and faces heavy market saturation. `;
-        if (isRecommended) {
-          insight += "Refinement can help, but this direction will require significant effort to execute convincingly.";
+      if (identityScore < 60 && resonanceScore < 60) {
+        insight = `${selectedAesthetic} creates tension on both fronts — it doesn't align with your brand DNA and faces heavy market headwinds. `;
+        if (hasRefinement && interpretation?.modifiers?.length) {
+          insight += `Even with ${interpretation.modifiers.slice(0, 2).join(" + ")}, this direction requires significant effort to execute convincingly. Consider whether the creative conviction justifies the commercial risk.`;
         } else {
-          insight += `Switch to ${recommendedAesthetic} for authentic brand expression and better consumer appetite.`;
+          insight += "You can try aggressive refinement to reshape it, but this will take real creative work to make it both ownable and commercially viable.";
         }
       } else if (identityScore < 60) {
-        insight = `${selectedAesthetic} pulls you off-brand. While consumers respond to it, you'll struggle to execute it authentically. `;
+        insight = `${selectedAesthetic} pulls you off-brand. While there's consumer interest, you'll struggle to execute it authentically. `;
         insight += hasRefinement 
-          ? `Even with refinement, this direction fights your natural voice.`
-          : `${recommendedAesthetic} lets you speak in your native language while still capturing consumer interest.`;
+          ? "Your refinement helps, but the core direction still fights your natural voice. Try adding 'structured' or 'polished' to anchor it in your brand's vocabulary."
+          : "Try refining with 'polished, structured' to pull it closer to your brand DNA — these modifiers make it feel earned rather than borrowed.";
       } else {
-        insight = `${selectedAesthetic} feels like you, but the market is oversaturated. `;
+        insight = `${selectedAesthetic} feels like you, but the market is oversaturated here. `;
         insight += hasRefinement
-          ? `Your refinement adds differentiation, but you're still entering a crowded space.`
-          : `Refine to find a fresh angle, or explore a direction with more consumer headroom.`;
+          ? `Your refinement adds differentiation, but you're still entering a crowded space. Try adding 'minimal' or 'contemporary' to sharpen the consumer read.`
+          : "Refine to carve out whitespace — try 'minimal, contemporary' for a sharper market position, or 'playful' to tap into emerging consumer energy.";
       }
     }
 
@@ -1102,15 +1151,15 @@ export default function ConceptStudioPage() {
                       (content?.identityScore ?? 0) >= 80
                         ? BRAND.chartreuse
                         : (content?.identityScore ?? 0) >= 60
-                          ? BRAND.rose
-                          : "#C19A6B";
+                          ? BRAND.camel
+                          : BRAND.rose;
 
                     const resonanceColorChip =
                       (content?.resonanceScore ?? 0) >= 80
                         ? BRAND.chartreuse
                         : (content?.resonanceScore ?? 0) >= 60
-                          ? BRAND.rose
-                          : "#C19A6B";
+                          ? BRAND.camel
+                          : BRAND.rose;
 
                     // ✅ NEW: Rose glow styling for recommended option
                     const roseGlow = isRecommended

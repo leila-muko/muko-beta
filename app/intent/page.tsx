@@ -38,6 +38,47 @@ type IntentPayload = {
   };
 };
 
+/* ─────────────────────────────────────────────────────────────── */
+/* Spec Studio pulse rail glass (exact vibe)                        */
+/* ─────────────────────────────────────────────────────────────── */
+const glassPanelBase: React.CSSProperties = {
+  borderRadius: 20,
+  border: "1px solid rgba(255, 255, 255, 0.35)",
+  background: "rgba(255, 255, 255, 0.25)",
+  backdropFilter: "blur(40px) saturate(180%)",
+  WebkitBackdropFilter: "blur(40px) saturate(180%)",
+  boxShadow:
+    "0 24px 80px rgba(0,0,0,0.05), 0 8px 32px rgba(67,67,43,0.04), inset 0 1px 0 rgba(255,255,255,0.60), inset 0 -1px 0 rgba(255,255,255,0.12)",
+  overflow: "hidden",
+  position: "relative",
+};
+
+const glassSheen: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  pointerEvents: "none",
+  background:
+    "radial-gradient(ellipse 280px 120px at 15% -5%, rgba(255,255,255,0.35), transparent 65%), radial-gradient(ellipse 200px 100px at 90% 10%, rgba(255,255,255,0.15), transparent 60%)",
+};
+
+const microLabel: React.CSSProperties = {
+  fontSize: 11,
+  textAlign: "left",
+  fontWeight: 800,
+  letterSpacing: "0.10em",
+  textTransform: "uppercase",
+  color: "rgba(67, 67, 43, 0.42)",
+  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+};
+
+const scoreTextStyle: React.CSSProperties = {
+  fontSize: 12,
+  textAlign: "left",
+  fontWeight: 650,
+  color: "rgba(67, 67, 43, 0.62)",
+  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+};
+
 export default function IntentCalibrationPage() {
   const router = useRouter();
   const { season, setCurrentStep } = useSessionStore();
@@ -48,7 +89,7 @@ export default function IntentCalibrationPage() {
   const [headerCollectionName, setHeaderCollectionName] =
     useState<string>("Collection");
   const [headerSeasonLabel, setHeaderSeasonLabel] = useState<string>(
-    season || "—",
+    season || "—"
   );
 
   useEffect(() => {
@@ -77,7 +118,7 @@ export default function IntentCalibrationPage() {
         { id: "protect_margins", label: "Protect margins and reduce risk" },
         { id: "experiment_learn", label: "Experiment and learn" },
       ] as { id: SuccessId; label: string }[],
-    [],
+    []
   );
 
   const tradeoffOptions = useMemo(
@@ -109,7 +150,7 @@ export default function IntentCalibrationPage() {
           desc: "",
         },
       ] as { id: TradeoffId; title: string; desc: string }[],
-    [],
+    []
   );
 
   const maxSuccess = 3;
@@ -135,9 +176,6 @@ export default function IntentCalibrationPage() {
       return [...prev, id];
     });
   };
-
-  const cycle = (v: TensionValue): TensionValue =>
-    v === "left" ? "center" : v === "center" ? "right" : "left";
 
   const saveIntent = () => {
     const payload: IntentPayload = {
@@ -202,13 +240,13 @@ export default function IntentCalibrationPage() {
     parts.push(
       wantsTrend
         ? "Expect more directional nudges toward what's peaking now."
-        : "Expect nudges toward longevity and brand coherence.",
+        : "Expect nudges toward longevity and brand coherence."
     );
 
     parts.push(
       wantsRisk
         ? "Muko will surface margin + risk flags earlier."
-        : "Muko will stay lighter on guardrails unless something looks off.",
+        : "Muko will stay lighter on guardrails unless something looks off."
     );
 
     if (tradeoff === "speed_over_perfection")
@@ -217,7 +255,7 @@ export default function IntentCalibrationPage() {
     return parts.join(" ");
   }, [success, tradeoff, tTrend]);
 
-  // Rose glow pulse on insight update (right rail)
+  // Pulse on insight update (keep subtle; no pink overlay on base rail)
   const [insightPulse, setInsightPulse] = useState(false);
   const prevInsightRef = useRef<string>("");
 
@@ -235,9 +273,10 @@ export default function IntentCalibrationPage() {
     prevInsightRef.current = mukoInsight;
   }, []);
 
-  // Shared styles (Concept-native)
+  // Shared styles
   const sectionTitle: React.CSSProperties = {
-    fontSize: "18px",
+    fontSize: 18,
+    textAlign: "left",
     fontWeight: 650,
     color: BRAND.oliveInk,
     fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
@@ -245,7 +284,8 @@ export default function IntentCalibrationPage() {
   };
 
   const sectionSub: React.CSSProperties = {
-    fontSize: "13px",
+    fontSize: 13,
+    textAlign: "left",
     color: "rgba(67, 67, 43, 0.55)",
     fontFamily: "var(--font-inter), system-ui, sans-serif",
     lineHeight: 1.5,
@@ -255,7 +295,7 @@ export default function IntentCalibrationPage() {
   const cardBase: React.CSSProperties = {
     width: "100%",
     textAlign: "left",
-    borderRadius: "16px",
+    borderRadius: 16,
     padding: "14px 18px",
     background: "rgba(255,255,255,0.62)",
     border: "1px solid rgba(67, 67, 43, 0.10)",
@@ -282,6 +322,13 @@ export default function IntentCalibrationPage() {
     fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
   };
 
+  // Rail “status” colors to mirror your Spec screenshot behavior
+  const statusGreen = BRAND.chartreuse;
+  const statusMuted = "rgba(67,67,43,0.18)";
+
+  const goalDot = success.length ? statusGreen : statusMuted;
+  const tradeoffDot = tradeoff ? statusGreen : statusMuted;
+
   return (
     <div
       style={{
@@ -298,7 +345,7 @@ export default function IntentCalibrationPage() {
           top: 0,
           left: 0,
           right: 0,
-          height: "72px",
+          height: 72,
           background: "rgba(250, 249, 246, 0.86)",
           backdropFilter: "blur(26px) saturate(180%)",
           WebkitBackdropFilter: "blur(26px) saturate(180%)",
@@ -308,31 +355,30 @@ export default function IntentCalibrationPage() {
       >
         <div
           style={{
-            maxWidth: "1520px",
+            maxWidth: 1520,
             margin: "0 auto",
             height: "100%",
             padding: "0 64px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: "20px",
+            gap: 20,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
             <div
               style={{
                 fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
                 fontWeight: 700,
                 letterSpacing: "-0.02em",
                 color: BRAND.oliveInk,
-                fontSize: "18px",
+                fontSize: 18,
               }}
             >
               muko
             </div>
 
-            {/* Stepper pills */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {[
                 { label: "Intent", state: "active" as const },
                 { label: "Concept", state: "idle" as const },
@@ -345,20 +391,20 @@ export default function IntentCalibrationPage() {
                 const stepBg = isDone
                   ? "rgba(171, 171, 99, 0.10)"
                   : isActive
-                    ? "rgba(169, 191, 214, 0.08)"
-                    : "rgba(67, 67, 43, 0.03)";
+                  ? "rgba(169, 191, 214, 0.08)"
+                  : "rgba(67, 67, 43, 0.03)";
 
                 const stepBorder = isDone
                   ? `1.5px solid ${BRAND.chartreuse}`
                   : isActive
-                    ? `1.5px solid ${STEEL_BLUE}`
-                    : "1.5px solid rgba(67, 67, 43, 0.10)";
+                  ? `1.5px solid ${STEEL_BLUE}`
+                  : "1.5px solid rgba(67, 67, 43, 0.10)";
 
                 const labelColor = isDone
                   ? "rgba(67, 67, 43, 0.72)"
                   : isActive
-                    ? "rgba(67, 67, 43, 0.85)"
-                    : "rgba(67, 67, 43, 0.38)";
+                  ? "rgba(67, 67, 43, 0.85)"
+                  : "rgba(67, 67, 43, 0.38)";
 
                 return (
                   <div
@@ -366,27 +412,38 @@ export default function IntentCalibrationPage() {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "7px",
+                      gap: 7,
                       padding: "7px 14px",
-                      borderRadius: "999px",
+                      borderRadius: 999,
                       border: stepBorder,
                       background: stepBg,
                       boxShadow: isActive
-                        ? `0 8px 24px rgba(169, 191, 214, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.80)`
+                        ? "0 8px 24px rgba(169, 191, 214, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.80)"
                         : isDone
-                          ? `0 6px 18px rgba(171, 171, 99, 0.08)`
-                          : "none",
-                      fontFamily:
-                        "var(--font-sohne-breit), system-ui, sans-serif",
-                      fontSize: "12px",
+                        ? "0 6px 18px rgba(171, 171, 99, 0.08)"
+                        : "none",
+                      fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                      fontSize: 12,
                       fontWeight: 650,
                       letterSpacing: "0.01em",
                     }}
                   >
                     {isDone ? (
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <circle cx="7" cy="7" r="6" fill={BRAND.chartreuse} opacity="0.22" />
-                        <path d="M4.5 7.2L6.2 8.8L9.5 5.5" stroke={BRAND.chartreuse} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle
+                          cx="7"
+                          cy="7"
+                          r="6"
+                          fill={BRAND.chartreuse}
+                          opacity="0.22"
+                        />
+                        <path
+                          d="M4.5 7.2L6.2 8.8L9.5 5.5"
+                          stroke={BRAND.chartreuse}
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                     ) : isActive ? (
                       <span
@@ -395,7 +452,7 @@ export default function IntentCalibrationPage() {
                           height: 8,
                           borderRadius: 999,
                           background: STEEL_BLUE,
-                          boxShadow: `0 0 0 3px rgba(169, 191, 214, 0.22)`,
+                          boxShadow: "0 0 0 3px rgba(169, 191, 214, 0.22)",
                         }}
                       />
                     ) : (
@@ -415,10 +472,10 @@ export default function IntentCalibrationPage() {
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
             <div
               style={{
-                fontSize: "13px",
+                fontSize: 13,
                 fontWeight: 700,
                 color: "rgba(67, 67, 43, 0.55)",
                 fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
@@ -430,11 +487,11 @@ export default function IntentCalibrationPage() {
               {headerCollectionName}
             </div>
 
-            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <button
                 onClick={() => window.history.back()}
                 style={{
-                  fontSize: "12px",
+                  fontSize: 12,
                   fontWeight: 650,
                   color: BRAND.rose,
                   background: "rgba(169, 123, 143, 0.06)",
@@ -450,7 +507,13 @@ export default function IntentCalibrationPage() {
                 }}
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M8.5 3L4.5 7L8.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M8.5 3L4.5 7L8.5 11"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
                 Back
               </button>
@@ -460,7 +523,7 @@ export default function IntentCalibrationPage() {
                   saveIntent();
                 }}
                 style={{
-                  fontSize: "12px",
+                  fontSize: 12,
                   fontWeight: 650,
                   color: BRAND.rose,
                   background: "rgba(169, 123, 143, 0.06)",
@@ -476,10 +539,32 @@ export default function IntentCalibrationPage() {
                 }}
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M11 8.5V11.5C11 11.776 10.776 12 10.5 12H3.5C3.224 12 3 11.776 3 11.5V2.5C3 2.224 3.224 2 3.5 2H8.5L11 4.5V8.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M8.5 2V4.5H11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M5 8H9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                  <path d="M5 10H7.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                  <path
+                    d="M11 8.5V11.5C11 11.776 10.776 12 10.5 12H3.5C3.224 12 3 11.776 3 11.5V2.5C3 2.224 3.224 2 3.5 2H8.5L11 4.5V8.5Z"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M8.5 2V4.5H11"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M5 8H9"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M5 10H7.5"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                  />
                 </svg>
                 Save &amp; Close
               </button>
@@ -488,19 +573,19 @@ export default function IntentCalibrationPage() {
         </div>
       </div>
 
-      <main style={{ flex: 1, paddingTop: "88px" }}>
+      <main style={{ flex: 1, paddingTop: 88 }}>
         <div
           style={{
             padding: "46px 72px 120px",
-            maxWidth: "1520px",
+            maxWidth: 1520,
             margin: "0 auto",
           }}
         >
           {/* Header copy */}
-          <div style={{ marginBottom: "38px" }}>
+          <div style={{ marginBottom: 38 }}>
             <h1
               style={{
-                fontSize: "32px",
+                fontSize: 32,
                 fontWeight: 600,
                 color: BRAND.oliveInk,
                 margin: 0,
@@ -513,10 +598,10 @@ export default function IntentCalibrationPage() {
 
             <p
               style={{
-                fontSize: "14px",
+                fontSize: 14,
                 color: "rgba(67, 67, 43, 0.55)",
                 fontFamily: "var(--font-inter), system-ui, sans-serif",
-                marginTop: "14px",
+                marginTop: 14,
                 marginBottom: 0,
                 maxWidth: 820,
                 lineHeight: 1.55,
@@ -531,7 +616,7 @@ export default function IntentCalibrationPage() {
             style={{
               display: "grid",
               gridTemplateColumns: "minmax(720px, 1fr) 372px",
-              gap: "40px",
+              gap: 40,
               alignItems: "start",
             }}
           >
@@ -540,7 +625,7 @@ export default function IntentCalibrationPage() {
               {/* Section 1 */}
               <div>
                 <div style={sectionTitle}>What does success look like for this collection?</div>
-                <div style={sectionSub}>Choose up to {maxSuccess}. This sets Muko's bias.</div>
+                <div style={sectionSub}>Choose up to {maxSuccess}. This sets Muko&apos;s bias.</div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
                   {successOptions.map((opt) => {
@@ -558,7 +643,7 @@ export default function IntentCalibrationPage() {
                             ? `1px solid ${BRAND.chartreuse}`
                             : "1px solid rgba(67, 67, 43, 0.10)",
                           boxShadow: active
-                            ? `0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)`
+                            ? "0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)"
                             : "0 10px 32px rgba(67, 67, 43, 0.06)",
                           opacity: disabled ? 0.55 : 1,
                         }}
@@ -566,13 +651,13 @@ export default function IntentCalibrationPage() {
                           if (disabled) return;
                           e.currentTarget.style.transform = "translateY(-1px)";
                           e.currentTarget.style.boxShadow = active
-                            ? `0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)`
+                            ? "0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)"
                             : "0 14px 44px rgba(67, 67, 43, 0.10)";
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.transform = "translateY(0)";
                           e.currentTarget.style.boxShadow = active
-                            ? `0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)`
+                            ? "0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)"
                             : "0 10px 32px rgba(67, 67, 43, 0.06)";
                         }}
                       >
@@ -584,7 +669,12 @@ export default function IntentCalibrationPage() {
                             gap: 12,
                           }}
                         >
-                          <div style={{ ...pillText, color: active ? BRAND.oliveInk : "rgba(67,67,43,0.78)" }}>
+                          <div
+                            style={{
+                              ...pillText,
+                              color: active ? BRAND.oliveInk : "rgba(67,67,43,0.78)",
+                            }}
+                          >
                             {opt.label}
                           </div>
 
@@ -593,7 +683,9 @@ export default function IntentCalibrationPage() {
                               width: 18,
                               height: 18,
                               borderRadius: 999,
-                              background: active ? "rgba(171,171,99,0.18)" : "rgba(67,67,43,0.08)",
+                              background: active
+                                ? "rgba(171,171,99,0.18)"
+                                : "rgba(67,67,43,0.08)",
                               border: active
                                 ? "1px solid rgba(171,171,99,0.55)"
                                 : "1px solid rgba(67,67,43,0.10)",
@@ -621,7 +713,9 @@ export default function IntentCalibrationPage() {
 
               {/* Section 2 */}
               <div>
-                <div style={sectionTitle}>When tradeoffs come up, what are you most willing to give on?</div>
+                <div style={sectionTitle}>
+                  When tradeoffs come up, what are you most willing to give on?
+                </div>
                 <div style={sectionSub}>Pick one. This helps Muko decide what to protect.</div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
@@ -641,19 +735,19 @@ export default function IntentCalibrationPage() {
                             ? `1px solid ${BRAND.chartreuse}`
                             : "1px solid rgba(67, 67, 43, 0.10)",
                           boxShadow: active
-                            ? `0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)`
+                            ? "0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)"
                             : "0 10px 32px rgba(67, 67, 43, 0.06)",
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = "translateY(-1px)";
                           e.currentTarget.style.boxShadow = active
-                            ? `0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)`
+                            ? "0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)"
                             : "0 14px 44px rgba(67, 67, 43, 0.10)";
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.transform = "translateY(0)";
                           e.currentTarget.style.boxShadow = active
-                            ? `0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)`
+                            ? "0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)"
                             : "0 10px 32px rgba(67, 67, 43, 0.06)";
                         }}
                       >
@@ -690,7 +784,9 @@ export default function IntentCalibrationPage() {
                               width: 18,
                               height: 18,
                               borderRadius: 999,
-                              background: active ? "rgba(171,171,99,0.18)" : "rgba(67,67,43,0.08)",
+                              background: active
+                                ? "rgba(171,171,99,0.18)"
+                                : "rgba(67,67,43,0.08)",
                               border: active
                                 ? "1px solid rgba(171,171,99,0.55)"
                                 : "1px solid rgba(67,67,43,0.10)",
@@ -718,10 +814,14 @@ export default function IntentCalibrationPage() {
                 )}
               </div>
 
-              {/* Section 3 — refined draggable sliders with brand colors */}
+              {/* Section 3 — slimmer, more premium sliders (keep colors) */}
               <div>
-                <div style={sectionTitle}>What tension are you intentionally navigating with this collection?</div>
-                <div style={sectionSub}>Slide to set the line you're walking. (You can keep it balanced.)</div>
+                <div style={sectionTitle}>
+                  What tension are you intentionally navigating with this collection?
+                </div>
+                <div style={sectionSub}>
+                  Slide to set the line you&apos;re walking. (You can keep it balanced.)
+                </div>
 
                 <RefinedSlider
                   left="Trend-forward"
@@ -759,11 +859,11 @@ export default function IntentCalibrationPage() {
               {/* Section 4 */}
               <div>
                 <div style={sectionTitle}>What would make this collection feel like a miss? (Optional)</div>
-                <div style={sectionSub}>One line is enough. This helps Muko avoid "safe generic."</div>
+                <div style={sectionSub}>One line is enough. This helps Muko avoid “safe generic.”</div>
 
                 <div
                   style={{
-                    borderRadius: "16px",
+                    borderRadius: 16,
                     padding: "14px 18px",
                     background: "rgba(255,255,255,0.62)",
                     border: "1px solid rgba(67, 67, 43, 0.10)",
@@ -788,80 +888,42 @@ export default function IntentCalibrationPage() {
               </div>
             </div>
 
-            {/* RIGHT RAIL */}
-            <div style={{ position: "sticky", top: 110 }}>
-              <div
-                style={{
-                  position: "relative",
-                  borderRadius: "18px",
-                  padding: "18px 18px 16px",
-                  background: "rgba(255,255,255,0.62)",
-                  border: "1px solid rgba(67, 67, 43, 0.10)",
-                  boxShadow: "0 10px 32px rgba(67, 67, 43, 0.06)",
-                  overflow: "hidden",
-                }}
-              >
-                {/* Rose glow pulse layer (subtle) */}
-                <div
-                  aria-hidden
-                  style={{
-                    position: "absolute",
-                    inset: -60,
-                    background:
-                      "radial-gradient(420px 320px at 65% 35%, rgba(169, 123, 143, 0.28), rgba(169, 123, 143, 0.10), transparent 70%)",
-                    opacity: insightPulse ? 1 : 0,
-                    transform: insightPulse ? "scale(1)" : "scale(0.98)",
-                    transition: "opacity 420ms ease, transform 520ms ease",
-                    pointerEvents: "none",
-                    filter: "blur(6px)",
-                  }}
-                />
-
+            {/* RIGHT RAIL — now matches Spec Studio pulse screenshot glass + coloring */}
+            <div style={{ position: "sticky", top: 96 }}>
+              {/* Intent Summary (pulse-style panel) */}
+              <div style={{ ...glassPanelBase, padding: 18 }}>
+                <div style={glassSheen} />
                 <div style={{ position: "relative" }}>
+                  <div style={{ ...microLabel, marginBottom: 12 }}>Intent</div>
+
+                  <PulseLikeRow
+                    dot={goalDot}
+                    label="Primary goal"
+                    value={primaryGoalText}
+                  />
+                  <PulseLikeRow
+                    dot={tradeoffDot}
+                    label="Tradeoff"
+                    value={tradeoffText}
+                  />
+
+                  {/* Muko Insight (nested, also glassy like Spec rows) */}
                   <div
                     style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "rgba(67, 67, 43, 0.55)",
-                      fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                      letterSpacing: "0.10em",
-                      textTransform: "uppercase",
-                      marginBottom: 14,
-                    }}
-                  >
-                    Intent Summary
-                  </div>
-
-                  <SummaryRow label="Primary goal" value={primaryGoalText} />
-                  <div style={{ height: 10 }} />
-                  <SummaryRow label="Tradeoff bias" value={tradeoffText} />
-
-                  <div style={{ height: 16 }} />
-
-                  {/* Muko Insight */}
-                  <div
-                    style={{
+                      marginTop: 14,
+                      padding: "14px 14px",
                       borderRadius: 14,
-                      padding: "12px 12px",
-                      border: "1px solid rgba(186, 156, 168, 0.18)",
-                      background: "rgba(186, 156, 168, 0.06)",
+                      border: "1px solid rgba(255,255,255,0.30)",
+                      background: "rgba(255,255,255,0.18)",
+                      backdropFilter: "blur(12px)",
+                      WebkitBackdropFilter: "blur(12px)",
                       boxShadow: insightPulse
-                        ? "0 18px 54px rgba(169, 123, 143, 0.10)"
+                        ? "0 22px 70px rgba(169,123,143,0.10)"
                         : "none",
                       transition: "box-shadow 420ms ease",
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: "rgba(67, 67, 43, 0.55)",
-                        fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                        letterSpacing: "0.10em",
-                        textTransform: "uppercase",
-                        marginBottom: 10,
-                      }}
-                    >
+                    <div style={{ ...microLabel, marginBottom: 10 }}>
                       Muko Insight
                     </div>
 
@@ -869,7 +931,7 @@ export default function IntentCalibrationPage() {
                       style={{
                         fontSize: 13,
                         lineHeight: 1.58,
-                        color: "rgba(67, 67, 43, 0.70)",
+                        color: "rgba(67, 67, 43, 0.66)",
                         fontFamily: "var(--font-inter), system-ui, sans-serif",
                       }}
                     >
@@ -879,7 +941,7 @@ export default function IntentCalibrationPage() {
                 </div>
               </div>
 
-              {/* Continue button - outside container, matching Concept Studio exactly */}
+              {/* Continue button */}
               <button
                 onClick={onContinue}
                 disabled={!canContinue}
@@ -945,82 +1007,108 @@ export default function IntentCalibrationPage() {
                 <div
                   style={{
                     marginTop: 12,
-                    borderRadius: "18px",
-                    padding: "16px 18px",
-                    background: "rgba(255,255,255,0.62)",
-                    border: "1px solid rgba(67, 67, 43, 0.10)",
-                    boxShadow: "0 10px 32px rgba(67, 67, 43, 0.06)",
+                    ...glassPanelBase,
+                    padding: 18,
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "rgba(67, 67, 43, 0.55)",
-                      fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                      letterSpacing: "0.10em",
-                      textTransform: "uppercase",
-                      marginBottom: 10,
-                    }}
-                  >
-                    "A miss" looks like
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      lineHeight: 1.58,
-                      color: "rgba(67, 67, 43, 0.70)",
-                      fontFamily: "var(--font-inter), system-ui, sans-serif",
-                    }}
-                  >
-                    {miss.trim()}
+                  <div style={glassSheen} />
+                  <div style={{ position: "relative" }}>
+                    <div style={{ ...microLabel, marginBottom: 10 }}>
+                      “A miss” looks like
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        lineHeight: 1.58,
+                        color: "rgba(67, 67, 43, 0.66)",
+                        fontFamily: "var(--font-inter), system-ui, sans-serif",
+                      }}
+                    >
+                      {miss.trim()}
+                    </div>
                   </div>
                 </div>
               ) : null}
             </div>
           </div>
+
+          <style>{`
+            @media (max-width: 1100px) {
+              main > div > div[style*="grid-template-columns: minmax(720px, 1fr) 372px"] {
+                grid-template-columns: 1fr !important;
+              }
+            }
+          `}</style>
         </div>
       </main>
     </div>
   );
 }
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
+/* ─────────────────────────────────────────────────────────────── */
+/* Pulse-style row (matches Spec rail row treatment)                */
+/* ─────────────────────────────────────────────────────────────── */
+function PulseLikeRow({
+  dot,
+  label,
+  value,
+}: {
+  dot: string;
+  label: string;
+  value: string;
+}) {
   return (
     <div
       style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "14px 14px",
         borderRadius: 14,
-        padding: "10px 12px",
-        border: "1px solid rgba(67, 67, 43, 0.10)",
-        background: "rgba(67, 67, 43, 0.03)",
+        border: "1px solid rgba(255,255,255,0.30)",
+        background: "rgba(255,255,255,0.18)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        marginBottom: 10,
       }}
     >
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          color: "rgba(67, 67, 43, 0.55)",
-          fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-          marginBottom: 6,
-        }}
-      >
-        {label}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: 999,
+            background: dot,
+            boxShadow:
+              dot === "rgba(67,67,43,0.18)"
+                ? "none"
+                : `0 0 0 4px ${dot}22`,
+          }}
+        />
+        <div
+          style={{
+            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+            fontWeight: 750,
+            fontSize: 12,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            color: "rgba(67,67,43,0.74)",
+          }}
+        >
+          {label}
+        </div>
       </div>
-      <div
-        style={{
-          fontSize: 13,
-          fontWeight: 650,
-          color: "rgba(67, 67, 43, 0.82)",
-          fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-          lineHeight: 1.45,
-        }}
-      >
-        {value}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={scoreTextStyle}>{value}</span>
       </div>
     </div>
   );
 }
 
+/* ─────────────────────────────────────────────────────────────── */
+/* Sliders — slimmer + premium                                     */
+/* ─────────────────────────────────────────────────────────────── */
 function RefinedSlider({
   left,
   right,
@@ -1044,15 +1132,9 @@ function RefinedSlider({
     const rect = trackRef.current.getBoundingClientRect();
     const x = clientX - rect.left;
     const percent = (x / rect.width) * 100;
-    
-    // Snap to nearest position with wider zones
-    if (percent < 33.33) {
-      onSet("left");
-    } else if (percent > 66.67) {
-      onSet("right");
-    } else {
-      onSet("center");
-    }
+    if (percent < 33.33) onSet("left");
+    else if (percent > 66.67) onSet("right");
+    else onSet("center");
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -1062,46 +1144,42 @@ function RefinedSlider({
   };
 
   const handleMouseMove = (e: MouseEvent) => {
-    if (isDragging) {
-      handleInteraction(e.clientX);
-    }
+    if (isDragging) handleInteraction(e.clientX);
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+  const handleMouseUp = () => setIsDragging(false);
 
   useEffect(() => {
-    if (isDragging) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-      return () => {
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
-      };
-    }
+    if (!isDragging) return;
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
   }, [isDragging]);
 
-  const stateLabel = value === "center" ? "Balanced" : value === "left" ? "Leaning left" : "Leaning right";
+  const stateLabel =
+    value === "center" ? "Balanced" : value === "left" ? "Leaning left" : "Leaning right";
 
   return (
     <div
       style={{
-        borderRadius: "14px",
-        padding: "18px 20px",
-        background: "rgba(255,255,255,0.75)",
+        borderRadius: 16,
+        padding: "12px 14px 12px",
+        background: "rgba(255,255,255,0.62)",
         border: "1px solid rgba(67, 67, 43, 0.08)",
-        boxShadow: "0 6px 20px rgba(67, 67, 43, 0.03)",
+        boxShadow: "0 10px 26px rgba(67, 67, 43, 0.05)",
       }}
     >
-      {/* Labels row - perfectly aligned */}
+      {/* Labels row */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "1fr auto 1fr",
           alignItems: "center",
-          gap: 16,
-          marginBottom: 16,
+          gap: 14,
+          marginBottom: 12,
         }}
       >
         <div
@@ -1114,7 +1192,7 @@ function RefinedSlider({
         >
           {left}
         </div>
-        
+
         <div
           style={{
             fontSize: 11,
@@ -1122,12 +1200,12 @@ function RefinedSlider({
             fontFamily: "var(--font-inter), system-ui, sans-serif",
             fontWeight: 600,
             textAlign: "center",
-            minWidth: 80,
+            minWidth: 78,
           }}
         >
           {stateLabel}
         </div>
-        
+
         <div
           style={{
             fontSize: 13,
@@ -1141,23 +1219,26 @@ function RefinedSlider({
         </div>
       </div>
 
-      {/* Slider track - premium and interactive */}
+      {/* Track */}
       <div
         ref={trackRef}
         onMouseDown={handleMouseDown}
         style={{
           position: "relative",
-          height: 48,
-          borderRadius: 12,
-          background: `linear-gradient(90deg, ${color}08 0%, ${color}04 50%, ${color}08 100%)`,
+          height: 22,
+          borderRadius: 999,
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.80), rgba(255,255,255,0.52))",
           cursor: "pointer",
-          border: `1px solid ${color}18`,
+          border: "1px solid rgba(255,255,255,0.42)",
           display: "flex",
           alignItems: "center",
-          padding: "0 6px",
+          padding: "0 8px",
+          boxShadow:
+            "0 10px 26px rgba(67,67,43,0.05), inset 0 1px 0 rgba(255,255,255,0.75), inset 0 -1px 0 rgba(255,255,255,0.14)",
         }}
       >
-        {/* Active fill from left */}
+        {/* Active fill */}
         <div
           style={{
             position: "absolute",
@@ -1165,68 +1246,49 @@ function RefinedSlider({
             top: 0,
             bottom: 0,
             width: `${position}%`,
-            background: `linear-gradient(90deg, ${color}20, ${color}12)`,
-            borderRadius: "12px 0 0 12px",
-            transition: isDragging ? "none" : "width 280ms cubic-bezier(0.4, 0, 0.2, 1)",
+            background: `linear-gradient(90deg, ${color}24, ${color}10)`,
+            borderRadius: "999px 0 0 999px",
+            transition: isDragging ? "none" : "width 260ms cubic-bezier(0.4, 0, 0.2, 1)",
             pointerEvents: "none",
           }}
         />
 
-        {/* Tick marks */}
-        <div
-          style={{
-            position: "absolute",
-            left: "33.33%",
-            top: "50%",
-            transform: "translateY(-50%)",
-            width: 2,
-            height: 12,
-            borderRadius: 2,
-            background: "rgba(67,67,43,0.12)",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            left: "50%",
-            top: "50%",
-            transform: "translateY(-50%)",
-            width: 2,
-            height: 16,
-            borderRadius: 2,
-            background: "rgba(67,67,43,0.18)",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            left: "66.67%",
-            top: "50%",
-            transform: "translateY(-50%)",
-            width: 2,
-            height: 12,
-            borderRadius: 2,
-            background: "rgba(67,67,43,0.12)",
-            pointerEvents: "none",
-          }}
-        />
+        {/* Subtle ticks */}
+        {[
+          { left: "33.33%", h: 10, o: 0.11 },
+          { left: "50%", h: 12, o: 0.16 },
+          { left: "66.67%", h: 10, o: 0.11 },
+        ].map((t) => (
+          <div
+            key={t.left}
+            style={{
+              position: "absolute",
+              left: t.left,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 1,
+              height: t.h,
+              borderRadius: 999,
+              background: `rgba(67,67,43,${t.o})`,
+              pointerEvents: "none",
+            }}
+          />
+        ))}
 
-        {/* Knob - premium elevated design */}
+        {/* Knob (smaller + cleaner) */}
         <div
           style={{
             position: "absolute",
             left: `${position}%`,
             top: "50%",
             transform: "translate(-50%, -50%)",
-            width: 28,
-            height: 28,
+            width: 14,
+            height: 14,
             borderRadius: "50%",
-            background: color,
-            boxShadow: `0 6px 20px ${color}50, 0 2px 8px ${color}40, inset 0 1px 0 rgba(255,255,255,0.50)`,
-            border: "2.5px solid rgba(255,255,255,0.95)",
-            transition: isDragging ? "none" : "left 280ms cubic-bezier(0.4, 0, 0.2, 1)",
+            background: "rgba(255,255,255,0.96)",
+            boxShadow: `0 8px 20px rgba(67,67,43,0.10), 0 2px 8px ${color}18, inset 0 1px 0 rgba(255,255,255,0.75)`,
+            border: `1.5px solid ${color}`,
+            transition: isDragging ? "none" : "left 260ms cubic-bezier(0.4, 0, 0.2, 1)",
             cursor: isDragging ? "grabbing" : "grab",
             pointerEvents: "auto",
           }}
@@ -1236,126 +1298,6 @@ function RefinedSlider({
           }}
         />
       </div>
-
-      {/* Position indicators */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          gap: 8,
-          marginTop: 12,
-        }}
-      >
-        <button
-          onClick={() => onSet("left")}
-          style={{
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: value === "left" 
-              ? `1.5px solid ${color}60` 
-              : "1px solid rgba(67, 67, 43, 0.08)",
-            background: value === "left" 
-              ? `${color}12` 
-              : "rgba(255,255,255,0.50)",
-            color: value === "left" 
-              ? "rgba(67, 67, 43, 0.82)" 
-              : "rgba(67, 67, 43, 0.45)",
-            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-            fontSize: 11,
-            fontWeight: 650,
-            cursor: "pointer",
-            transition: "all 180ms ease",
-            textAlign: "center",
-          }}
-        >
-          Left
-        </button>
-        
-        <button
-          onClick={() => onSet("center")}
-          style={{
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: value === "center" 
-              ? `1.5px solid ${color}60` 
-              : "1px solid rgba(67, 67, 43, 0.08)",
-            background: value === "center" 
-              ? `${color}12` 
-              : "rgba(255,255,255,0.50)",
-            color: value === "center" 
-              ? "rgba(67, 67, 43, 0.82)" 
-              : "rgba(67, 67, 43, 0.45)",
-            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-            fontSize: 11,
-            fontWeight: 650,
-            cursor: "pointer",
-            transition: "all 180ms ease",
-            textAlign: "center",
-          }}
-        >
-          Balanced
-        </button>
-        
-        <button
-          onClick={() => onSet("right")}
-          style={{
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: value === "right" 
-              ? `1.5px solid ${color}60` 
-              : "1px solid rgba(67, 67, 43, 0.08)",
-            background: value === "right" 
-              ? `${color}12` 
-              : "rgba(255,255,255,0.50)",
-            color: value === "right" 
-              ? "rgba(67, 67, 43, 0.82)" 
-              : "rgba(67, 67, 43, 0.45)",
-            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-            fontSize: 11,
-            fontWeight: 650,
-            cursor: "pointer",
-            transition: "all 180ms ease",
-            textAlign: "center",
-          }}
-        >
-          Right
-        </button>
-      </div>
     </div>
-  );
-}
-
-const segmentBtn: React.CSSProperties = {
-  border: "none",
-  background: "transparent",
-  cursor: "pointer",
-};
-
-function SmallPill({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        borderRadius: 999,
-        padding: "6px 10px",
-        border: active ? "1px solid rgba(125, 150, 172, 0.36)" : "1px solid rgba(67, 67, 43, 0.10)",
-        background: active ? "rgba(125, 150, 172, 0.08)" : "rgba(67, 67, 43, 0.03)",
-        color: active ? "rgba(67, 67, 43, 0.82)" : "rgba(67, 67, 43, 0.48)",
-        fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-        fontSize: 12,
-        fontWeight: 650,
-        cursor: "pointer",
-      }}
-    >
-      {label}
-    </button>
   );
 }

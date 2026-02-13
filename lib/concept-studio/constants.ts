@@ -5,6 +5,7 @@ export const BRAND = {
     rose: '#A97B8F',
     steelBlue: '#7D96AC',
     chartreuse: '#ABAB63',
+    camel: '#B8876B',
   };
   
   // Supported aesthetics

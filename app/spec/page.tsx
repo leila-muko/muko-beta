@@ -19,7 +19,57 @@ import {
 import categoriesData from "@/data/categories.json";
 import materialsData from "@/data/materials.json";
 
-import { IconIdentity, IconResonance } from "@/components/concept-studio/Icons";
+/* ─── Icons: matched to Concept Studio (star, users, cog) ─── */
+function IconIdentity({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconResonance({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M17 21V19C17 16.79 15.21 15 13 15H5C2.79 15 1 16.79 1 19V21"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx="9"
+        cy="7"
+        r="4"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M23 21V19C22.99 17.18 21.8 15.58 20 15.13"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16 3.13C17.8 3.58 18.99 5.18 18.99 7C18.99 8.82 17.8 10.42 16 10.87"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 const BRAND = {
   chartreuse: "#ABAB63",
@@ -2603,58 +2653,59 @@ export default function SpecStudioPage() {
                       </>
                     )}
 
-                    {/* Run Analysis Button */}
-                    <button
-                      disabled={!isComplete}
-                      onClick={() => console.log("Run Muko Analysis")}
-                      style={{
-                        marginTop: 16,
-                        width: "100%",
-                        padding: "14px 16px",
-                        borderRadius: 14,
-                        fontSize: 13,
-                        fontWeight: 750,
-                        fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                        color: isComplete ? BRAND.steelBlue : "rgba(67,67,43,0.32)",
-                        background: isComplete ? "rgba(169,191,214,0.08)" : "rgba(255,255,255,0.46)",
-                        border: isComplete ? `1.5px solid ${BRAND.steelBlue}` : "1.5px solid rgba(67,67,43,0.10)",
-                        cursor: isComplete ? "pointer" : "not-allowed",
-                        boxShadow: isComplete
-                          ? "0 14px 44px rgba(169,191,214,0.16), inset 0 1px 0 rgba(255,255,255,0.60)"
-                          : "none",
-                        transition: "all 280ms cubic-bezier(0.4, 0, 0.2, 1)",
-                        opacity: isComplete ? 1 : 0.75,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 10,
-                        animation: isComplete ? "continueReady 600ms ease-out 1" : "none",
-                      }}
-                    >
-                      <span>Run Muko Analysis</span>
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        style={{
-                          transition: "transform 280ms ease",
-                          transform: isComplete ? "translateX(0)" : "translateX(-2px)",
-                          opacity: isComplete ? 1 : 0.4,
-                          animation: isComplete ? "arrowNudge 2s ease-in-out infinite 1s" : "none",
-                        }}
-                      >
-                        <path
-                          d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
                   </div>
                 </div>
+
+                {/* Run Analysis Button (below Muko Insight — matches Concept Studio placement) */}
+                <button
+                  disabled={!isComplete}
+                  onClick={() => console.log("Run Muko Analysis")}
+                  style={{
+                    marginTop: 14,
+                    width: "100%",
+                    padding: "14px 16px",
+                    borderRadius: 14,
+                    fontSize: 13,
+                    fontWeight: 750,
+                    fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                    color: isComplete ? BRAND.steelBlue : "rgba(67,67,43,0.32)",
+                    background: isComplete ? "rgba(169,191,214,0.08)" : "rgba(255,255,255,0.46)",
+                    border: isComplete ? `1.5px solid ${BRAND.steelBlue}` : "1.5px solid rgba(67,67,43,0.10)",
+                    cursor: isComplete ? "pointer" : "not-allowed",
+                    boxShadow: isComplete
+                      ? "0 14px 44px rgba(169,191,214,0.16), inset 0 1px 0 rgba(255,255,255,0.60)"
+                      : "none",
+                    transition: "all 280ms cubic-bezier(0.4, 0, 0.2, 1)",
+                    opacity: isComplete ? 1 : 0.75,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 10,
+                    animation: isComplete ? "continueReady 600ms ease-out 1" : "none",
+                  }}
+                >
+                  <span>Run Muko Analysis</span>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    style={{
+                      transition: "transform 280ms ease",
+                      transform: isComplete ? "translateX(0)" : "translateX(-2px)",
+                      opacity: isComplete ? 1 : 0.4,
+                      animation: isComplete ? "arrowNudge 2s ease-in-out infinite 1s" : "none",
+                    }}
+                  >
+                    <path
+                      d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>

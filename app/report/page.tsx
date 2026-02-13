@@ -181,8 +181,8 @@ function IconArrowRight() {
 /* ─── Score color helper ─── */
 function getScoreColor(score: number): string {
   if (score >= 80) return BRAND.chartreuse;
-  if (score >= 60) return BRAND.rose;
-  return BRAND.camel;
+  if (score >= 60) return BRAND.camel;
+  return BRAND.rose;
 }
 
 function getScoreLabel(score: number): string {
@@ -218,15 +218,15 @@ function useCountUp(target: number, duration = 1200, delay = 400) {
   return value;
 }
 
-/* ─── Radar Chart Component ─── */
+/* ─── Premium Radar Chart Component ─── */
 function RadarChart({
   data,
 }: {
   data: { label: string; value: number; color: string }[];
 }) {
-  const cx = 170,
-    cy = 150,
-    maxR = 110;
+  const cx = 180,
+    cy = 175,
+    maxR = 130;
   const n = data.length;
 
   function polarToCart(angle: number, r: number) {
@@ -238,12 +238,18 @@ function RadarChart({
 
   // Grid rings
   const rings = [0.25, 0.5, 0.75, 1.0];
-  const gridPaths = rings.map((pct) => {
+  const ringPolygons = rings.map((pct) => {
     const pts = Array.from({ length: n }, (_, i) => {
       const p = polarToCart(i * angleStep, maxR * pct);
       return `${p.x},${p.y}`;
     });
     return pts.join(" ");
+  });
+
+  // Axis endpoints
+  const axes = Array.from({ length: n }, (_, i) => {
+    const outer = polarToCart(i * angleStep, maxR);
+    return { x2: outer.x, y2: outer.y };
   });
 
   // Data shape
@@ -253,77 +259,211 @@ function RadarChart({
   });
   const dataPath = dataPts.map((p) => `${p.x},${p.y}`).join(" ");
 
-  // Axis lines
-  const axes = data.map((_, i) => {
-    const outer = polarToCart(i * angleStep, maxR);
-    return { x1: cx, y1: cy, x2: outer.x, y2: outer.y };
-  });
-
   // Labels
   const labels = data.map((d, i) => {
-    const p = polarToCart(i * angleStep, maxR + 22);
+    const p = polarToCart(i * angleStep, maxR + 30);
     return { ...d, x: p.x, y: p.y };
   });
 
+  // Score labels positioned outside the data point, away from center
+  const scoreLabels = data.map((d, i) => {
+    const r = (d.value / 100) * maxR;
+    const angle = i * angleStep;
+    // Push label outward from the data point
+    const labelR = r + 18;
+    const p = polarToCart(angle, labelR);
+    return { value: d.value, x: p.x, y: p.y, color: d.color };
+  });
+
   return (
-    <svg viewBox="0 0 340 310" style={{ width: "100%", maxWidth: 340 }}>
-      {/* Grid */}
-      {gridPaths.map((pts, i) => (
+    <svg viewBox="0 0 360 360" style={{ width: "100%", maxWidth: 380 }}>
+      <defs>
+        {/* Multi-stop radial gradient for the data fill — gives depth like the reference */}
+        <radialGradient id="dataFillRadial" cx="50%" cy="45%" r="55%">
+          <stop offset="0%" stopColor={BRAND.steelBlue} stopOpacity="0.20" />
+          <stop offset="40%" stopColor={BRAND.steelBlue} stopOpacity="0.12" />
+          <stop offset="70%" stopColor="#8BA0B4" stopOpacity="0.08" />
+          <stop offset="100%" stopColor={BRAND.steelBlue} stopOpacity="0.04" />
+        </radialGradient>
+
+        {/* Secondary fill layer — warm undertone for richness */}
+        <linearGradient id="dataFillWarm" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={BRAND.camel} stopOpacity="0.06" />
+          <stop offset="50%" stopColor={BRAND.rose} stopOpacity="0.04" />
+          <stop offset="100%" stopColor={BRAND.camel} stopOpacity="0.06" />
+        </linearGradient>
+
+        {/* Outer "ideal zone" tint */}
+        <radialGradient id="idealZone" cx="50%" cy="50%" r="50%">
+          <stop offset="60%" stopColor="rgba(67,67,43,0)" stopOpacity="0" />
+          <stop offset="100%" stopColor="rgba(67,67,43,0.015)" stopOpacity="1" />
+        </radialGradient>
+
+        {/* Inner "risk zone" tint */}
+        <radialGradient id="riskZone" cx="50%" cy="50%" r="35%">
+          <stop offset="0%" stopColor={BRAND.rose} stopOpacity="0.05" />
+          <stop offset="100%" stopColor={BRAND.rose} stopOpacity="0" />
+        </radialGradient>
+
+        {/* Soft shadow for the data shape */}
+        <filter id="dataShadow" x="-25%" y="-25%" width="150%" height="150%">
+          <feDropShadow dx="0" dy="6" stdDeviation="12" floodColor={BRAND.steelBlue} floodOpacity="0.12" />
+        </filter>
+
+        {/* Glow for data points */}
+        <filter id="pointGlow" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      {/* Background zones */}
+      <polygon
+        points={ringPolygons[3]}
+        fill="url(#idealZone)"
+      />
+      <polygon
+        points={ringPolygons[0]}
+        fill="url(#riskZone)"
+      />
+
+      {/* Grid rings — outer solid, inner dashed */}
+      {ringPolygons.map((pts, i) => (
         <polygon
           key={i}
           points={pts}
           fill="none"
-          stroke="rgba(67,67,43,0.08)"
-          strokeWidth={i === 3 ? 1 : 0.5}
+          stroke={i === 3 ? "rgba(67,67,43,0.14)" : "rgba(67,67,43,0.06)"}
+          strokeWidth={i === 3 ? 1.2 : 0.7}
+          strokeDasharray={i < 3 ? "4,6" : "none"}
         />
       ))}
-      {/* Axes */}
+
+      {/* Axis lines */}
       {axes.map((a, i) => (
-        <line key={i} {...a} stroke="rgba(67,67,43,0.06)" strokeWidth="0.5" />
+        <line
+          key={i}
+          x1={cx}
+          y1={cy}
+          x2={a.x2}
+          y2={a.y2}
+          stroke="rgba(67,67,43,0.05)"
+          strokeWidth="0.8"
+        />
       ))}
-      {/* Fill */}
+
+      {/* Axis endpoint markers */}
+      {axes.map((a, i) => (
+        <circle
+          key={`ep-${i}`}
+          cx={a.x2}
+          cy={a.y2}
+          r={2.5}
+          fill="rgba(67,67,43,0.12)"
+          stroke="rgba(67,67,43,0.06)"
+          strokeWidth="1"
+        />
+      ))}
+
+      {/* Data shape: shadow layer */}
       <polygon
         points={dataPath}
-        fill="rgba(168,180,117,0.12)"
-        stroke={BRAND.chartreuse}
-        strokeWidth="2"
-        strokeLinejoin="round"
-        style={{
-          animation: "radarReveal 1s cubic-bezier(0.22,1,0.36,1) 0.5s both",
-        }}
+        fill="url(#dataFillRadial)"
+        stroke="none"
+        filter="url(#dataShadow)"
+        style={{ animation: "radarReveal 1s cubic-bezier(0.22,1,0.36,1) 0.4s both" }}
       />
-      {/* Points */}
+
+      {/* Data shape: warm undertone layer */}
+      <polygon
+        points={dataPath}
+        fill="url(#dataFillWarm)"
+        stroke="none"
+        style={{ animation: "radarReveal 1s cubic-bezier(0.22,1,0.36,1) 0.4s both" }}
+      />
+
+      {/* Data shape: primary fill */}
+      <polygon
+        points={dataPath}
+        fill="url(#dataFillRadial)"
+        stroke="none"
+        style={{ animation: "radarReveal 1s cubic-bezier(0.22,1,0.36,1) 0.4s both" }}
+      />
+
+      {/* Data stroke — steel blue, the main visual anchor */}
+      <polygon
+        points={dataPath}
+        fill="none"
+        stroke={BRAND.steelBlue}
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        opacity={0.85}
+        style={{ animation: "radarReveal 1s cubic-bezier(0.22,1,0.36,1) 0.45s both" }}
+      />
+
+      {/* Data points — layered circles for premium feel */}
       {dataPts.map((p, i) => (
-        <circle
-          key={i}
-          cx={p.x}
-          cy={p.y}
-          r={4.5}
-          fill={data[i].color}
-          stroke="white"
-          strokeWidth="2"
-          style={{
-            animation: `radarReveal 0.4s ease ${0.7 + i * 0.1}s both`,
-          }}
-        />
+        <g key={i} style={{ animation: `radarReveal 0.5s ease ${0.7 + i * 0.08}s both` }}>
+          {/* Outer glow halo */}
+          <circle cx={p.x} cy={p.y} r={12} fill={data[i].color} opacity={0.08} />
+          {/* Mid ring */}
+          <circle cx={p.x} cy={p.y} r={8} fill="white" opacity={0.6} />
+          {/* Colored ring */}
+          <circle
+            cx={p.x}
+            cy={p.y}
+            r={6}
+            fill="white"
+            stroke={data[i].color}
+            strokeWidth="2"
+          />
+          {/* Center dot */}
+          <circle cx={p.x} cy={p.y} r={2.2} fill={data[i].color} />
+        </g>
       ))}
-      {/* Labels */}
+
+      {/* Score value labels */}
+      {scoreLabels.map((s, i) => (
+        <text
+          key={`sv-${i}`}
+          x={s.x}
+          y={s.y}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill={s.color}
+          fontSize="11"
+          fontWeight="800"
+          fontFamily="var(--font-sohne-breit), system-ui, sans-serif"
+          style={{ animation: `radarReveal 0.4s ease ${0.9 + i * 0.08}s both` }}
+        >
+          {s.value}
+        </text>
+      ))}
+
+      {/* Axis labels */}
       {labels.map((l, i) => (
         <text
-          key={i}
+          key={`al-${i}`}
           x={l.x}
           y={l.y}
           textAnchor="middle"
           dominantBaseline="middle"
-          fill="rgba(67,67,43,0.55)"
+          fill="rgba(67,67,43,0.48)"
           fontSize="10"
           fontWeight="700"
           fontFamily="var(--font-sohne-breit), system-ui, sans-serif"
-          letterSpacing="0.06em"
+          letterSpacing="0.08em"
         >
           {l.label.toUpperCase()}
         </text>
       ))}
+
+      {/* Center point */}
+      <circle cx={cx} cy={cy} r={1.8} fill="rgba(67,67,43,0.08)" />
     </svg>
   );
 }
@@ -530,7 +670,7 @@ export default function StandardReportPage() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {[
-                { label: "Intent", state: "done" },
+                { label: "Entry", state: "done" },
                 { label: "Concept", state: "done" },
                 { label: "Spec", state: "done" },
                 { label: "Report", state: "active" },
@@ -1141,8 +1281,8 @@ export default function StandardReportPage() {
                 >
                   {[
                     { label: "Strong", color: BRAND.chartreuse },
-                    { label: "Watch", color: BRAND.rose },
-                    { label: "At Risk", color: BRAND.camel },
+                    { label: "Watch", color: BRAND.camel },
+                    { label: "At Risk", color: BRAND.rose },
                   ].map((l) => (
                     <div
                       key={l.label}
@@ -1193,7 +1333,7 @@ export default function StandardReportPage() {
                   name: "Sustainability",
                   passed: null,
                   metric: "—",
-                  detail: "EU Digital Product Passport compliance scoring will be available in Phase 2.",
+                  detail: "Environmental impact scoring, material circularity assessment, and regulatory compliance (EU Digital Product Passport, California SB 707) will be available in Phase 2.",
                 },
               ].map((gate) => (
                 <div
