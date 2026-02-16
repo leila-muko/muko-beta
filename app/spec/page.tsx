@@ -18,6 +18,7 @@ import {
 
 import categoriesData from "@/data/categories.json";
 import materialsData from "@/data/materials.json";
+import AskMuko from "@/components/AskMuko";
 
 /* ─── Icons: matched to Concept Studio (star, users, cog) ─── */
 function IconIdentity({ size = 16 }: { size?: number }) {
@@ -2655,6 +2656,27 @@ export default function SpecStudioPage() {
 
                   </div>
                 </div>
+
+                {/* After the Muko Insight glassmorphic panel */}
+{/* Before the Continue button */}
+
+<AskMuko
+  step="spec"
+  suggestedQuestions={[
+    "Why is COGS $2 over ceiling?",
+    "What happens if I keep Cocoon?",
+    "Is Modal the right choice here?",
+  ]}
+  context={{
+    aesthetic: conceptContext.aestheticMatchedId,
+    refinement,
+    identityScore: conceptContext.identityScore,
+    resonanceScore: conceptContext.resonanceScore,
+    material: selectedMaterial?.name,
+    silhouette: selectedSilhouette?.name,
+    category: categoryId,
+  }}
+/>
 
                 {/* Run Analysis Button (below Muko Insight — matches Concept Studio placement) */}
                 <button

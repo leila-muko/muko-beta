@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import AskMuko from "@/components/AskMuko";
 
 /* ═══════════════════════════════════════════════════════════════
    Muko — The Standard Report (Step 4)
@@ -1591,6 +1592,23 @@ export default function StandardReportPage() {
               </div>
             </div>
           </div>
+
+          <AskMuko
+  step="report"
+  suggestedQuestions={[
+    "Why did Execution score 64?",
+    "Should I act on the silhouette redirect?",
+    "How confident is this score?",
+  ]}
+  context={{
+    score: report.overallScore,
+    identity: report.identity,
+    resonance: report.resonance,
+    execution: report.execution,
+    gates: { costGatePassed: report.costGatePassed },
+    narrative: report.narrative,
+  }}
+/>
 
           {/* ═══ ACTION BAR ═══ */}
           <div

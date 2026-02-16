@@ -14,6 +14,7 @@ import {
   interpretRefine,
   generateMukoInsight,
 } from "../../lib/concept-studio/utils";
+import AskMuko from "@/components/AskMuko";
 
 /* ─── Icons: matched to Report page (star, users, cog) ─── */
 function IconIdentity({ size = 16 }: { size?: number }) {
@@ -2184,6 +2185,24 @@ export default function ConceptStudioPage() {
                     )}
                   </div>
                 </div>
+
+                {/* After the Muko Insight glassmorphic panel */}
+{/* Before the Continue button */}
+
+<AskMuko
+  step="concept"
+  suggestedQuestions={[
+    "Why is Resonance at 75?",
+    "How does this compare to Refined Clarity?",
+    "What brands are doing this well?",
+  ]}
+  context={{
+    aesthetic: selectedAesthetic,
+    refineText,
+    identityScore: identityPulse?.score,
+    resonanceScore: resonancePulse?.score,
+  }}
+/>
 
                 {/* Continue button — outlined steel blue */}
                 <button
