@@ -81,7 +81,7 @@ const scoreTextStyle: React.CSSProperties = {
 
 export default function IntentCalibrationPage() {
   const router = useRouter();
-  const { season, setCurrentStep } = useSessionStore();
+  const { season, setCurrentStep, setIntentGoals, setIntentTradeoff } = useSessionStore();
 
   const STEEL_BLUE =
     (BRAND as any)?.steelBlue ?? (BRAND as any)?.steel ?? "#7D96AC";
@@ -197,6 +197,15 @@ export default function IntentCalibrationPage() {
     try {
       window.localStorage.setItem("muko_intent", JSON.stringify(payload));
     } catch {}
+
+    // Write to Zustand store
+    const goalLabels = success.map(
+      (id) => successOptions.find((o) => o.id === id)?.label ?? id
+    );
+    setIntentGoals(goalLabels);
+    setIntentTradeoff(
+      tradeoff ? (tradeoffOptions.find((o) => o.id === tradeoff)?.title ?? tradeoff) : ''
+    );
   };
 
   const onContinue = () => {
@@ -906,17 +915,21 @@ export default function IntentCalibrationPage() {
                     label="Tradeoff"
                     value={tradeoffText}
                   />
+                </div>
+              </div>
 
-                  {/* Muko Insight (nested, also glassy like Spec rows) */}
+              {/* Muko Insight */}
+              <div
+                style={{
+                  ...glassPanelBase,
+                  marginTop: 12,
+                  padding: 18,
+                }}
+              >
+                <div style={glassSheen} />
+                <div style={{ position: "relative" }}>
                   <div
                     style={{
-                      marginTop: 14,
-                      padding: "14px 14px",
-                      borderRadius: 14,
-                      border: "1px solid rgba(255,255,255,0.30)",
-                      background: "rgba(255,255,255,0.18)",
-                      backdropFilter: "blur(12px)",
-                      WebkitBackdropFilter: "blur(12px)",
                       boxShadow: insightPulse
                         ? "0 22px 70px rgba(169,123,143,0.10)"
                         : "none",
@@ -1061,8 +1074,8 @@ function PulseLikeRow({
     <div
       style={{
         display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
+        alignItems: "flex-start",
+        gap: 10,
         padding: "14px 14px",
         borderRadius: 14,
         border: "1px solid rgba(255,255,255,0.30)",
@@ -1072,19 +1085,21 @@ function PulseLikeRow({
         marginBottom: 10,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: 999,
-            background: dot,
-            boxShadow:
-              dot === "rgba(67,67,43,0.18)"
-                ? "none"
-                : `0 0 0 4px ${dot}22`,
-          }}
-        />
+      <span
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: 999,
+          background: dot,
+          flex: "0 0 auto",
+          marginTop: 3,
+          boxShadow:
+            dot === "rgba(67,67,43,0.18)"
+              ? "none"
+              : `0 0 0 4px ${dot}22`,
+        }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
             fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
@@ -1093,14 +1108,14 @@ function PulseLikeRow({
             letterSpacing: "0.06em",
             textTransform: "uppercase",
             color: "rgba(67,67,43,0.74)",
+            marginBottom: 4,
           }}
         >
           {label}
         </div>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={scoreTextStyle}>{value}</span>
+        <div style={{ ...scoreTextStyle }}>
+          {value}
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import {
   BRAND,
@@ -144,6 +145,7 @@ function boldParts({
 }
 
 export default function ConceptStudioPage() {
+  const router = useRouter();
   const {
     season,
     aestheticInput,
@@ -2208,8 +2210,15 @@ export default function ConceptStudioPage() {
                 <button
                   onClick={() => {
                     if (!canContinue) return;
+
+                    // Persist concept context to store
+                    useSessionStore.setState({
+                      aestheticMatchedId: selectedAesthetic,
+                      moodboardImages,
+                    });
+
                     setCurrentStep(3);
-                    console.log("Continue to Spec Studio");
+                    router.push("/spec");
                   }}
                   disabled={!canContinue}
                   style={{

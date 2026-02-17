@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useSessionStore } from "@/lib/store/sessionStore";
 import type {
   Material,
   Category,
@@ -19,6 +21,7 @@ import {
 import categoriesData from "@/data/categories.json";
 import materialsData from "@/data/materials.json";
 import AskMuko from "@/components/AskMuko";
+import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
 
 /* ─── Icons: matched to Concept Studio (star, users, cog) ─── */
 function IconIdentity({ size = 16 }: { size?: number }) {
@@ -338,8 +341,13 @@ const COMPLEXITY_CONTEXT: Record<
   },
 };
 
-/* ─── Mock data ─── */
-const MOCK_CONCEPT: ConceptContextType = {
+/* ─── Slug helper ─── */
+function toSlug(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, "-");
+}
+
+/* ─── Fallback concept data ─── */
+const FALLBACK_CONCEPT: ConceptContextType = {
   aestheticName: "Refined Clarity",
   aestheticMatchedId: "refined-clarity",
   identityScore: 88,
@@ -347,9 +355,9 @@ const MOCK_CONCEPT: ConceptContextType = {
   moodboardImages: [],
   recommendedPalette: [],
 };
-const MOCK_REFINEMENT = {
+const FALLBACK_REFINEMENT = {
   base: "Refined Clarity",
-  modifiers: ["Feminine", "Soft"],
+  modifiers: [] as string[],
 };
 
 /* ─────────────────────────────────────────────────────────────── */
@@ -455,6 +463,8 @@ function compactDeltaCluster({
 }
 
 export default function SpecStudioPage() {
+  const router = useRouter();
+  const { setCategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep } = useSessionStore();
   const categories: Category[] = categoriesData.categories as Category[];
   const materials: Material[] = materialsData.materials;
 
@@ -473,20 +483,51 @@ export default function SpecStudioPage() {
   const [hoveredPaletteIdx, setHoveredPaletteIdx] = useState<number | null>(null);
   const [hoveredComplexity, setHoveredComplexity] = useState<ConstructionTier | null>(null);
 
-  const conceptContext = MOCK_CONCEPT;
-  const refinement = MOCK_REFINEMENT;
+  const storeAesthetic = useSessionStore((s) => s.aestheticMatchedId);
+  const storeMoodboard = useSessionStore((s) => s.moodboardImages);
+
+  const conceptContext = useMemo<ConceptContextType>(() => {
+    if (!storeAesthetic) return FALLBACK_CONCEPT;
+    const scores = AESTHETIC_CONTENT[storeAesthetic];
+    return {
+      aestheticName: storeAesthetic,
+      aestheticMatchedId: toSlug(storeAesthetic),
+      identityScore: scores?.identityScore ?? 88,
+      resonanceScore: scores?.resonanceScore ?? 92,
+      moodboardImages: storeMoodboard || [],
+      recommendedPalette: [],
+    };
+  }, [storeAesthetic, storeMoodboard]);
+
+  const refinement = useMemo(() => {
+    if (!storeAesthetic) return FALLBACK_REFINEMENT;
+    return { base: storeAesthetic, modifiers: [] as string[] };
+  }, [storeAesthetic]);
   const brandTargetMargin = 0.60;
+
+  const storeCollectionName = useSessionStore((s) => s.collectionName);
+  const storeSeason = useSessionStore((s) => s.season);
 
   const [headerCollectionName, setHeaderCollectionName] = useState("Desert Mirage");
   const [headerSeasonLabel, setHeaderSeasonLabel] = useState("SS26");
   useEffect(() => {
-    try {
-      const n = window.localStorage.getItem("muko_collectionName");
-      const s = window.localStorage.getItem("muko_seasonLabel");
-      if (n) setHeaderCollectionName(n);
-      if (s) setHeaderSeasonLabel(s);
-    } catch {}
-  }, []);
+    if (storeCollectionName) {
+      setHeaderCollectionName(storeCollectionName);
+    } else {
+      try {
+        const n = window.localStorage.getItem("muko_collectionName");
+        if (n) setHeaderCollectionName(n);
+      } catch {}
+    }
+    if (storeSeason) {
+      setHeaderSeasonLabel(storeSeason);
+    } else {
+      try {
+        const s = window.localStorage.getItem("muko_seasonLabel");
+        if (s) setHeaderSeasonLabel(s);
+      } catch {}
+    }
+  }, [storeCollectionName, storeSeason]);
 
   const selectedCategory = useMemo(
     () => categories.find((c) => c.id === categoryId) || categories[0],
@@ -2681,7 +2722,22 @@ export default function SpecStudioPage() {
                 {/* Run Analysis Button (below Muko Insight — matches Concept Studio placement) */}
                 <button
                   disabled={!isComplete}
-                  onClick={() => console.log("Run Muko Analysis")}
+                  onClick={() => {
+                    if (!isComplete) return;
+                    const cat = categories.find(c => c.id === categoryId);
+                    setCategory(cat?.name ?? categoryId);
+                    setTargetMsrp(targetMSRP);
+                    setMaterial(materialId);
+                    const sil = cat?.silhouettes.find(s => s.id === silhouetteId);
+                    setSilhouette(sil?.name ?? silhouetteId);
+                    setStoreTier(constructionTier);
+                    const palette = paletteOptions[selectedPaletteIdx];
+                    if (palette) {
+                      setColorPalette(palette.palette.map((c: PaletteColor) => c.hex), palette.name);
+                    }
+                    setCurrentStep(4);
+                    router.push("/report");
+                  }}
                   style={{
                     marginTop: 14,
                     width: "100%",

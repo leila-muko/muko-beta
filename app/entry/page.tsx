@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSessionStore } from '@/lib/store/sessionStore';
 
 export default function EntryScreen() {
   const router = useRouter();
@@ -44,6 +45,8 @@ export default function EntryScreen() {
   const seasonError = touchedSeason && !selectedSeason ? 'Please select a season.' : '';
   const canContinue = !!collectionName.trim() && !!selectedSeason;
 
+  const { setSeason, setCollectionName: setStoreCollectionName, setCurrentStep } = useSessionStore();
+
   const handleContinue = () => {
     setTouchedName(true);
     setTouchedSeason(true);
@@ -51,7 +54,10 @@ export default function EntryScreen() {
     window.localStorage.setItem('muko_collectionName', collectionName.trim());
     const seasonLabel = allSeasons.find(s => s.id === selectedSeason)?.label ?? '';
     window.localStorage.setItem('muko_seasonLabel', seasonLabel);
-    router.push('/concept');
+    setStoreCollectionName(collectionName.trim());
+    setSeason(seasonLabel);
+    setCurrentStep(2);
+    router.push('/intent');
   };
 
   useEffect(() => {

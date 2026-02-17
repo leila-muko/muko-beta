@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import AskMuko from "@/components/AskMuko";
+import { useSessionStore } from "@/lib/store/sessionStore";
+import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
 
 /* ═══════════════════════════════════════════════════════════════
    Muko — The Standard Report (Step 4)
@@ -588,7 +590,35 @@ const DIM_TAG_COLORS: Record<string, { bg: string; text: string }> = {
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════ */
 export default function StandardReportPage() {
-  const report = MOCK_REPORT;
+  const {
+    collectionName: storeCollection,
+    season: storeSeason,
+    aestheticMatchedId: storeAesthetic,
+    category: storeCategory,
+    targetMsrp: storeTargetMsrp,
+    materialId: storeMaterial,
+    silhouette: storeSilhouette,
+    constructionTier: storeTier,
+  } = useSessionStore();
+
+  // Derive identity/resonance scores from locked aesthetic
+  const aestheticScores = storeAesthetic ? AESTHETIC_CONTENT[storeAesthetic] : null;
+  const derivedIdentity = aestheticScores?.identityScore ?? MOCK_REPORT.identity;
+  const derivedResonance = aestheticScores?.resonanceScore ?? MOCK_REPORT.resonance;
+
+  const report = {
+    ...MOCK_REPORT,
+    collectionName: storeCollection || MOCK_REPORT.collectionName,
+    seasonLabel: storeSeason || MOCK_REPORT.seasonLabel,
+    aestheticName: storeAesthetic || MOCK_REPORT.aestheticName,
+    category: storeCategory || MOCK_REPORT.category,
+    material: storeMaterial || MOCK_REPORT.material,
+    silhouette: storeSilhouette || MOCK_REPORT.silhouette,
+    targetMSRP: storeTargetMsrp ?? MOCK_REPORT.targetMSRP,
+    constructionTier: (storeTier ? storeTier.charAt(0).toUpperCase() + storeTier.slice(1) : MOCK_REPORT.constructionTier) as "Low" | "Moderate" | "High",
+    identity: derivedIdentity,
+    resonance: derivedResonance,
+  };
 
   const animatedScore = useCountUp(report.overallScore, 1400, 500);
   const animatedIdentity = useCountUp(report.identity, 1000, 800);
@@ -600,17 +630,8 @@ export default function StandardReportPage() {
   const resonanceColor = getScoreColor(report.resonance);
   const executionColor = getScoreColor(report.execution);
 
-  const [headerCollectionName, setHeaderCollectionName] = useState(report.collectionName);
-  const [headerSeasonLabel, setHeaderSeasonLabel] = useState(report.seasonLabel);
-
-  useEffect(() => {
-    try {
-      const n = window.localStorage.getItem("muko_collectionName");
-      const s = window.localStorage.getItem("muko_seasonLabel");
-      if (n) setHeaderCollectionName(n);
-      if (s) setHeaderSeasonLabel(s);
-    } catch {}
-  }, []);
+  const headerCollectionName = storeCollection || MOCK_REPORT.collectionName;
+  const headerSeasonLabel = storeSeason || MOCK_REPORT.seasonLabel;
 
   const radarData = [
     { label: "Brand Fit", value: report.brandFit, color: getScoreColor(report.brandFit) },

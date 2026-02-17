@@ -34,7 +34,11 @@ interface SessionState {
   // Navigation state
   currentStep: 1 | 2 | 3 | 4;
   conceptLocked: boolean;
-  
+
+  // Intent
+  intentGoals: string[];
+  intentTradeoff: string;
+
   // Actions
   setSeason: (season: string) => void;
   setCollectionName: (name: string) => void;
@@ -50,6 +54,9 @@ interface SessionState {
   updateResonancePulse: (pulse: PulseState | null) => void;
   updateExecutionPulse: (pulse: PulseState | null) => void;
   
+  setIntentGoals: (goals: string[]) => void;
+  setIntentTradeoff: (tradeoff: string) => void;
+
   lockConcept: () => void;
   unlockConcept: () => void;
   setCurrentStep: (step: 1 | 2 | 3 | 4) => void;
@@ -77,7 +84,9 @@ export const useSessionStore = create<SessionState>((set) => ({
   executionPulse: null,
   currentStep: 1,
   conceptLocked: false,
-  
+  intentGoals: [],
+  intentTradeoff: '',
+
   // Actions
   setSeason: (season) => set({ season }),
   setCollectionName: (collectionName) => set({ collectionName }),
@@ -95,6 +104,9 @@ export const useSessionStore = create<SessionState>((set) => ({
   updateResonancePulse: (pulse) => set({ resonancePulse: pulse }),
   updateExecutionPulse: (pulse) => set({ executionPulse: pulse }),
   
+  setIntentGoals: (intentGoals) => set({ intentGoals }),
+  setIntentTradeoff: (intentTradeoff) => set({ intentTradeoff }),
+
   lockConcept: () => set({ conceptLocked: true }),
   unlockConcept: () => set({ conceptLocked: false }),
   setCurrentStep: (step) => set({ currentStep: step }),
@@ -118,5 +130,7 @@ export const useSessionStore = create<SessionState>((set) => ({
     executionPulse: null,
     currentStep: 1,
     conceptLocked: false,
+    intentGoals: [],
+    intentTradeoff: '',
   }),
 }));
