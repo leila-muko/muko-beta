@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import AskMuko from "@/components/AskMuko";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
@@ -565,9 +566,9 @@ const MOCK_REPORT = {
       tags: ["Execution"],
     },
     {
-      title: "Branch a Tencel version for comparison",
+      title: "Try a Tencel version",
       detail:
-        "Tencel at $22/yd offers similar hand feel with better drape. Run a parallel analysis to compare margin and timeline impact.",
+        "Tencel at $22/yd offers similar hand feel with better drape. Swap the material and re-run to see the margin impact.",
       tags: ["Identity", "Cost"],
     },
   ],
@@ -590,10 +591,12 @@ const DIM_TAG_COLORS: Record<string, { bg: string; text: string }> = {
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════ */
 export default function StandardReportPage() {
+  const router = useRouter();
   const {
     collectionName: storeCollection,
     season: storeSeason,
     aestheticMatchedId: storeAesthetic,
+    refinementModifiers: storeModifiers,
     category: storeCategory,
     targetMsrp: storeTargetMsrp,
     materialId: storeMaterial,
@@ -616,6 +619,7 @@ export default function StandardReportPage() {
     silhouette: storeSilhouette || MOCK_REPORT.silhouette,
     targetMSRP: storeTargetMsrp ?? MOCK_REPORT.targetMSRP,
     constructionTier: (storeTier ? storeTier.charAt(0).toUpperCase() + storeTier.slice(1) : MOCK_REPORT.constructionTier) as "Low" | "Moderate" | "High",
+    modifiers: storeModifiers.length > 0 ? storeModifiers : (storeAesthetic ? [] : MOCK_REPORT.modifiers),
     identity: derivedIdentity,
     resonance: derivedResonance,
   };
@@ -1631,6 +1635,9 @@ export default function StandardReportPage() {
   }}
 />
 
+          {/* spacer */}
+          <div style={{ height: 32 }} />
+
           {/* ═══ ACTION BAR ═══ */}
           <div
             style={{
@@ -1659,12 +1666,13 @@ export default function StandardReportPage() {
             </div>
             <div style={{ position: "relative", display: "flex", gap: 8 }}>
               {[
-                { label: "Branch Design", primary: false },
-                { label: "Export PDF", primary: false },
-                { label: "Save to Collection", primary: true },
+                { label: "Revise Design", primary: false, onClick: () => router.push("/spec") },
+                { label: "Export PDF", primary: false, onClick: () => {} },
+                { label: "Save to Collection", primary: true, onClick: () => {} },
               ].map((btn) => (
                 <button
                   key={btn.label}
+                  onClick={btn.onClick}
                   style={{
                     padding: "12px 22px",
                     borderRadius: 12,

@@ -484,6 +484,7 @@ export default function SpecStudioPage() {
   const [hoveredComplexity, setHoveredComplexity] = useState<ConstructionTier | null>(null);
 
   const storeAesthetic = useSessionStore((s) => s.aestheticMatchedId);
+  const storeModifiers = useSessionStore((s) => s.refinementModifiers);
   const storeMoodboard = useSessionStore((s) => s.moodboardImages);
 
   const conceptContext = useMemo<ConceptContextType>(() => {
@@ -501,8 +502,8 @@ export default function SpecStudioPage() {
 
   const refinement = useMemo(() => {
     if (!storeAesthetic) return FALLBACK_REFINEMENT;
-    return { base: storeAesthetic, modifiers: [] as string[] };
-  }, [storeAesthetic]);
+    return { base: storeAesthetic, modifiers: storeModifiers || [] };
+  }, [storeAesthetic, storeModifiers]);
   const brandTargetMargin = 0.60;
 
   const storeCollectionName = useSessionStore((s) => s.collectionName);

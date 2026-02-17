@@ -14,6 +14,7 @@ interface SessionState {
   // Step 2: Concept Studio
   aestheticInput: string;
   aestheticMatchedId: string | null;
+  refinementModifiers: string[];
   moodboardImages: string[];
   colorPalette: string[];
   colorPaletteName: string; // e.g., 'Earth Tones'
@@ -70,6 +71,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   collectionName: '',
   aestheticInput: '',
   aestheticMatchedId: null,
+  refinementModifiers: [],
   moodboardImages: [],
   colorPalette: [],
   colorPaletteName: '',
@@ -116,6 +118,7 @@ export const useSessionStore = create<SessionState>((set) => ({
     collectionName: '',
     aestheticInput: '',
     aestheticMatchedId: null,
+    refinementModifiers: [],
     moodboardImages: [],
     colorPalette: [],
     colorPaletteName: '',

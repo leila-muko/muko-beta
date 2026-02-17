@@ -2214,6 +2214,7 @@ export default function ConceptStudioPage() {
                     // Persist concept context to store
                     useSessionStore.setState({
                       aestheticMatchedId: selectedAesthetic,
+                      refinementModifiers: interpretation?.modifiers ?? [],
                       moodboardImages,
                     });
 
