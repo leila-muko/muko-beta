@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/lib/store/sessionStore";
+import type { ActivatedChip } from "@/lib/store/sessionStore";
 import type {
   Material,
   Category,
@@ -175,7 +176,7 @@ const AESTHETIC_PALETTE_OPTIONS: Record<
   string,
   { name: string; palette: PaletteColor[] }[]
 > = {
-  "refined-clarity": [
+  "quiet-structure": [
     {
       name: "Monochrome Authority",
       palette: [
@@ -269,7 +270,7 @@ const SILHOUETTE_AFFINITY: Record<string, string[]> = {
 
 /* ─── Aesthetic keywords for matching ─── */
 const AESTHETIC_KEYWORDS: Record<string, string[]> = {
-  "refined-clarity": [
+  "quiet-structure": [
     "minimal",
     "structural",
     "refined",
@@ -279,9 +280,13 @@ const AESTHETIC_KEYWORDS: Record<string, string[]> = {
     "architectural",
     "polished",
   ],
-  "neo-western": ["rustic", "western", "earthy", "bohemian", "textured", "vintage"],
-  "dark-romantic": ["romantic", "moody", "feminine", "dark", "dramatic", "edgy"],
-  "coastal-minimalism": ["minimal", "clean", "soft", "natural", "effortless", "fluid"],
+  "terrain-luxe": ["earthy", "utility", "rugged", "technical", "outdoor", "layered"],
+  "romantic-analog": ["romantic", "moody", "feminine", "vintage", "dramatic", "literary"],
+  "heritage-hand": ["artisanal", "handmade", "natural", "textured", "sustainable", "craft"],
+  "undone-glam": ["edgy", "distressed", "indie", "raw", "layered", "nostalgic"],
+  "haptic-play": ["playful", "tactile", "bouncy", "squishy", "sensory", "plastic"],
+  "high-voltage": ["bold", "maximalist", "glamour", "metallic", "statement", "power"],
+  "sweet-subversion": ["cute", "kawaii", "soft", "colorful", "adorable", "whimsical"],
   default: ["modern", "clean", "versatile"],
 };
 
@@ -310,34 +315,84 @@ function getSilhouetteAffinity(
 /* ─── Complexity (formerly Construction) ─── */
 const COMPLEXITY_CONTEXT: Record<
   ConstructionTier,
-  {
-    label: string;
-    description: string;
-    note: string;
-    includesLining: boolean;
-    liningOptional: boolean;
-  }
+  { label: string; description: string; note: string }
 > = {
   low: {
     label: "Low",
     description: "Clean build, minimal detailing",
-    note: "Unlined by default",
-    includesLining: false,
-    liningOptional: false,
+    note: "Simple seaming, no hardware",
   },
   moderate: {
     label: "Moderate",
     description: "Standard seaming + some detail",
-    note: "Optional lining (+$18)",
-    includesLining: false,
-    liningOptional: true,
+    note: "Category standard",
   },
   high: {
     label: "High",
-    description: "Tailoring, lining, hardware-ready",
-    note: "Fully lined included",
-    includesLining: true,
-    liningOptional: false,
+    description: "Tailoring, hardware, structural detail",
+    note: "Complex construction",
+  },
+};
+
+/* ─── Per-option contextual descriptions ─── */
+const MATERIAL_DESCRIPTIONS: Record<string, string> = {
+  "organic-cotton": "Clean, breathable, and GOTS-certified — lowest cost natural option that still carries a sustainability story.",
+  "conventional-cotton": "The most margin-friendly fabric in the lineup — high availability, but no sustainability narrative and tariff-sensitive.",
+  tencel: "Fluid drape with closed-loop credentials — reads elevated on-body; Lenzing trademark adds a small premium worth it.",
+  linen: "Natural slub texture that gets better with wear — long lead at 13 weeks, so plan sampling early.",
+  silk: "The sharpest identity signal in the sheet — fluid, luminous, expensive. Watch the 15-week lead and high complexity cost.",
+  "wool-merino": "Fine, itch-free, temperature-regulating — the easiest premium-feeling fabric to sell at this price tier.",
+  "cashmere-blend": "The softest handle in the lineup — a 18-week lead and $40/yd means it should be a hero SKU, not a basic.",
+  "recycled-polyester": "Lowest cost with a credible sustainability angle — best in layering or outerwear where drape is secondary.",
+  "virgin-polyester": "Cheapest option on the sheet — fast lead, no sustainability story. Use only where function justifies it.",
+  nylon: "Structured drape, durable, and mid-cost — works where the garment needs to hold shape without tailoring.",
+  leather: "High identity, long lead, complex construction — genuinely premium read, but expensive to execute correctly.",
+  "vegan-leather": "Leather's structure at lower cost — easier compliance story, but sustainability score is low; be transparent.",
+  "rayon-viscose": "Fluid and affordable — similar drape to Tencel at a lower price, but the environmental story is weak.",
+  "deadstock-fabric": "The fastest lead in the lineup at 2 weeks — lot-based availability means you can't reorder; size the run carefully.",
+  hemp: "Highest sustainability score in the sheet — structured drape, improving softness, and a strong provenance story to tell.",
+};
+
+const SILHOUETTE_DESCRIPTIONS: Record<string, string> = {
+  cocoon: "Volume through shape rather than fit — fabric drape and weight are critical to the read.",
+  belted: "Structure via cinching — adds waist definition without complex seaming; works across sizes.",
+  straight: "The cleanest read — no distraction, lets fabric and colorway carry the concept.",
+  cropped: "Proportion game — pairs with high-waisted bottoms; reads deliberate when executed tightly.",
+  relaxed: "Ease with intention — comfort-forward without losing editorial quality or polish.",
+  fitted: "Body-aware cut — amplifies the fabric's drape and surface characteristics directly.",
+  oversized: "Statement through scale — requires confident fabric weight to avoid reading as shapeless.",
+  boxy: "Architectural precision — the hem and shoulder seam are everything; finishing matters most.",
+  "wide-leg": "Fluid volume at the leg — posture and fabric weight shift the whole body language.",
+  "straight-leg": "Versatile and enduring — works across aesthetics, reads cleanest in structured fabrics.",
+  slim: "Streamlined and surface-focused — fit and fabric quality are both immediately visible.",
+  flare: "Strong market memory from retro references — works best in fluid, structured-drape fabrics.",
+  column: "Elongating and editorial — minimal seaming means the fabric surface does all the work.",
+  "a-line": "The most universally flattering geometry — gently structured, works in most fabric weights.",
+  wrap: "Adjustable and versatile — the overlap adds visual interest without extra construction cost.",
+  shift: "Modernist geometry — the seam lines and hem are the design; no room for shortcuts.",
+};
+
+const PALETTE_DESCRIPTIONS: Record<string, string> = {
+  "Monochrome Authority": "High-contrast discipline — neutrals at their most considered; commands attention without color.",
+  "Warm Neutrals": "Grounded and tactile — earthy warmth that works across skin tones and delivery windows.",
+  "Cool Mineral": "Restrained and architectural — the restraint reads expensive; strong sellthrough story.",
+  "Signature Muko": "The house palette — internally coherent, spans a full collection without effort.",
+  "Earth & Stone": "Terrain-rooted naturals — credible sustainability story with broad commercial appeal.",
+  "Muted Jewel": "Saturated but not loud — the right amount of color for an elevated fashion context.",
+};
+
+const COMPLEXITY_DESCRIPTIONS: Record<ConstructionTier, { hover: string; why: string }> = {
+  low: {
+    hover: "Fewer labor touchpoints — keeps COGS tight and production lead times shorter overall.",
+    why: "Matches the category's natural production standard — no over-engineering, no margin risk.",
+  },
+  moderate: {
+    hover: "Balanced build — enough craft to feel considered, manageable at most factory tiers.",
+    why: "The sweet spot for this category — executes well without adding factory constraints.",
+  },
+  high: {
+    hover: "Full construction — hardware, tailoring, structural seaming. Adds real labor cost; plan margin accordingly.",
+    why: "Delivers the craft your concept signals — construction becomes part of the identity.",
   },
 };
 
@@ -348,15 +403,15 @@ function toSlug(name: string): string {
 
 /* ─── Fallback concept data ─── */
 const FALLBACK_CONCEPT: ConceptContextType = {
-  aestheticName: "Refined Clarity",
-  aestheticMatchedId: "refined-clarity",
+  aestheticName: "Quiet Structure",
+  aestheticMatchedId: "quiet-structure",
   identityScore: 88,
   resonanceScore: 92,
   moodboardImages: [],
   recommendedPalette: [],
 };
 const FALLBACK_REFINEMENT = {
-  base: "Refined Clarity",
+  base: "Quiet Structure",
   modifiers: [] as string[],
 };
 
@@ -465,15 +520,14 @@ function compactDeltaCluster({
 export default function SpecStudioPage() {
   const router = useRouter();
   const { setCategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep } = useSessionStore();
-  const categories: Category[] = categoriesData.categories as Category[];
-  const materials: Material[] = materialsData.materials;
+  const categories: Category[] = categoriesData.categories as unknown as Category[];
+  const materials: Material[] = materialsData as unknown as Material[];
 
   const [categoryId, setCategoryId] = useState(categories[0].id);
   const [targetMSRP, setTargetMSRP] = useState(450);
   const [materialId, setMaterialId] = useState("");
   const [silhouetteId, setSilhouetteId] = useState("");
   const [constructionTier, setConstructionTier] = useState<ConstructionTier>("high");
-  const [addLining, setAddLining] = useState(false);
   const [overrideWarning, setOverrideWarning] = useState<string | null>(null);
   const [pulseUpdated, setPulseUpdated] = useState(false);
   const [selectedPaletteIdx, setSelectedPaletteIdx] = useState(0);
@@ -486,6 +540,7 @@ export default function SpecStudioPage() {
   const storeAesthetic = useSessionStore((s) => s.aestheticMatchedId);
   const storeModifiers = useSessionStore((s) => s.refinementModifiers);
   const storeMoodboard = useSessionStore((s) => s.moodboardImages);
+  const chipSelection = useSessionStore((s) => s.chipSelection);
 
   const conceptContext = useMemo<ConceptContextType>(() => {
     if (!storeAesthetic) return FALLBACK_CONCEPT;
@@ -502,8 +557,8 @@ export default function SpecStudioPage() {
 
   const refinement = useMemo(() => {
     if (!storeAesthetic) return FALLBACK_REFINEMENT;
-    return { base: storeAesthetic, modifiers: storeModifiers || [] };
-  }, [storeAesthetic, storeModifiers]);
+    return { base: storeAesthetic, modifiers: [] as string[] };
+  }, [storeAesthetic]);
   const brandTargetMargin = 0.60;
 
   const storeCollectionName = useSessionStore((s) => s.collectionName);
@@ -539,17 +594,13 @@ export default function SpecStudioPage() {
     [materialId, materials]
   );
   const selectedSilhouette = useMemo(
-    () => selectedCategory.silhouettes.find((s) => s.id === silhouetteId) || null,
+    () => (selectedCategory.silhouettes || []).find((s) => s.id === silhouetteId) || null,
     [silhouetteId, selectedCategory]
   );
 
   const paletteOptions =
     AESTHETIC_PALETTE_OPTIONS[conceptContext.aestheticMatchedId] ||
     AESTHETIC_PALETTE_OPTIONS.default;
-
-  const tierCtx = COMPLEXITY_CONTEXT[constructionTier];
-  const effectiveLined =
-    tierCtx.includesLining || (tierCtx.liningOptional && addLining);
 
   const silhouetteAffinity = useMemo(() => {
     if (!silhouetteId) return null;
@@ -560,10 +611,33 @@ export default function SpecStudioPage() {
     AESTHETIC_KEYWORDS[conceptContext.aestheticMatchedId] ||
     AESTHETIC_KEYWORDS.default;
 
-  const recommendedPaletteIdx =
-    conceptContext.aestheticMatchedId === "refined-clarity" ? 2 : 0;
+  const recommendedPaletteIdx = useMemo(() => {
+    // If a chip targets a palette, find the first matching palette option
+    if (chipSelection?.activatedChips) {
+      const opts = AESTHETIC_PALETTE_OPTIONS[conceptContext.aestheticMatchedId] || AESTHETIC_PALETTE_OPTIONS.default;
+      for (let idx = 0; idx < opts.length; idx++) {
+        const opt = opts[idx];
+        for (const chip of chipSelection.activatedChips) {
+          if (!chip.palette || chip.isCustom) continue;
+          const chipTerms = chip.palette.toLowerCase().split(/[\s,]+/).filter((w) => w.length > 2);
+          const nameWords = opt.name.toLowerCase().split(/\s+/);
+          const colorNames = opt.palette.map((c) => c.name.toLowerCase());
+          if (chipTerms.some((t) => nameWords.some((w) => w.includes(t) || t.includes(w)) || colorNames.some((c) => c.includes(t)))) {
+            return idx;
+          }
+        }
+      }
+    }
+    return conceptContext.aestheticMatchedId === "quiet-structure" ? 2 : 0;
+  }, [chipSelection, conceptContext.aestheticMatchedId]);
 
   const recommendedMaterialId = useMemo(() => {
+    // If a chip specifies a material, prefer it (first chip with a material wins)
+    const chipMaterial = chipSelection?.activatedChips.find((c) => c.material != null)?.material;
+    if (chipMaterial && materials.find((m) => m.id === chipMaterial)) {
+      return chipMaterial;
+    }
+
     const mats = materials.slice();
     const score = (m: Material) => {
       const cost = m.cost_per_yard || 0;
@@ -585,10 +659,22 @@ export default function SpecStudioPage() {
 
     mats.sort((a, b) => score(b) - score(a));
     return mats[0]?.id || "";
-  }, [materials, aestheticKws]);
+  }, [materials, aestheticKws, chipSelection]);
 
   const recommendedSilhouetteId = useMemo(() => {
     const silhouettes = selectedCategory.silhouettes || [];
+    const silhouetteIds = silhouettes.map((s) => s.id);
+
+    // If a chip targets the current category's silhouette, prefer it
+    if (chipSelection?.activatedChips) {
+      for (const chip of chipSelection.activatedChips) {
+        if (chip.silhouette) {
+          const chipSil = chip.silhouette[categoryId];
+          if (chipSil && silhouetteIds.includes(chipSil)) return chipSil;
+        }
+      }
+    }
+
     const rank = (sid: string) => {
       const aff = SILHOUETTE_AFFINITY[sid] || [];
       const overlap = aff.filter((kw) => aestheticKws.includes(kw)).length;
@@ -598,12 +684,62 @@ export default function SpecStudioPage() {
       .map((s) => ({ id: s.id, score: rank(s.id) }))
       .sort((a, b) => b.score - a.score);
     return ranked[0]?.id || "";
-  }, [selectedCategory.silhouettes, aestheticKws]);
+  }, [selectedCategory.silhouettes, aestheticKws, chipSelection]);
 
   const alternativeMaterial = useMemo(
     () => (selectedMaterial ? findAlternativeMaterial(selectedMaterial, materials) : null),
     [selectedMaterial, materials]
   );
+
+  // ─── Chip match lookups for spec indicators ───────────────────────────────
+  const chipsByMaterial = useMemo((): Record<string, ActivatedChip[]> => {
+    const map: Record<string, ActivatedChip[]> = {};
+    if (!chipSelection) return map;
+    for (const chip of chipSelection.activatedChips) {
+      if (chip.material && !chip.isCustom) {
+        map[chip.material] = [...(map[chip.material] || []), chip];
+      }
+    }
+    return map;
+  }, [chipSelection]);
+
+  const chipsBySilhouette = useMemo((): Record<string, ActivatedChip[]> => {
+    const map: Record<string, ActivatedChip[]> = {};
+    if (!chipSelection) return map;
+    for (const chip of chipSelection.activatedChips) {
+      if (chip.silhouette && !chip.isCustom) {
+        // Only use the silhouette value for the current category — no cross-category bleed
+        const silId = chip.silhouette[categoryId];
+        if (silId) {
+          map[silId] = [...(map[silId] || []), chip];
+        }
+      }
+    }
+    return map;
+  }, [chipSelection, categoryId]);
+
+  const chipsByPaletteIdx = useMemo((): Record<number, ActivatedChip[]> => {
+    const map: Record<number, ActivatedChip[]> = {};
+    if (!chipSelection) return map;
+    for (const chip of chipSelection.activatedChips) {
+      if (!chip.palette || chip.isCustom) continue;
+      const chipTerms = chip.palette.toLowerCase().split(/[\s,]+/).filter((w) => w.length > 2);
+      paletteOptions.forEach((opt, idx) => {
+        const nameWords = opt.name.toLowerCase().split(/\s+/);
+        const colorNames = opt.palette.map((c) => c.name.toLowerCase());
+        const matches = chipTerms.some(
+          (t) => nameWords.some((w) => w.includes(t) || t.includes(w)) || colorNames.some((c) => c.includes(t))
+        );
+        if (matches) map[idx] = [...(map[idx] || []), chip];
+      });
+    }
+    return map;
+  }, [chipSelection, paletteOptions]);
+
+  const chipsForHighComplexity = useMemo((): ActivatedChip[] => {
+    if (!chipSelection) return [];
+    return chipSelection.activatedChips.filter((c) => c.complexity_mod > 0 && !c.isCustom);
+  }, [chipSelection]);
 
   const insight = useMemo(() => {
     if (!selectedMaterial || !selectedSilhouette) return null;
@@ -611,7 +747,7 @@ export default function SpecStudioPage() {
       selectedMaterial,
       selectedSilhouette.yardage,
       constructionTier,
-      effectiveLined,
+      false,
       targetMSRP,
       brandTargetMargin
     );
@@ -620,7 +756,7 @@ export default function SpecStudioPage() {
       selectedMaterial,
       selectedSilhouette.name,
       constructionTier,
-      effectiveLined,
+      false,
       selectedSilhouette.yardage,
       alternativeMaterial
     );
@@ -628,7 +764,6 @@ export default function SpecStudioPage() {
     selectedMaterial,
     selectedSilhouette,
     constructionTier,
-    effectiveLined,
     targetMSRP,
     brandTargetMargin,
     alternativeMaterial,
@@ -664,12 +799,10 @@ export default function SpecStudioPage() {
     setSilhouetteId("");
     setConstructionTier(SMART_DEFAULTS[newId] || "moderate");
     setOverrideWarning(null);
-    setAddLining(false);
   };
 
   const handleComplexityChange = (tier: ConstructionTier) => {
     setConstructionTier(tier);
-    setAddLining(false);
     setOverrideWarning(
       getOverrideWarning(
         categoryId,
@@ -683,8 +816,14 @@ export default function SpecStudioPage() {
   const isComplete = materialId && silhouetteId && constructionTier;
   const marginCeiling = Math.round(targetMSRP * (1 - brandTargetMargin));
 
-  const baselineComplexity: ConstructionTier =
-    SMART_DEFAULTS[categoryId] || "moderate";
+  const baselineComplexity: ConstructionTier = useMemo(() => {
+    const base: ConstructionTier = SMART_DEFAULTS[categoryId] || "moderate";
+    // If any complexity chip is active, recommend High
+    if (chipSelection?.activatedChips.some((c) => c.complexity_mod > 0 && !c.isCustom)) {
+      return "high";
+    }
+    return base;
+  }, [categoryId, chipSelection]);
 
   const baselineMaterial = useMemo(() => {
     const id = recommendedMaterialId || materialId || "";
@@ -693,7 +832,7 @@ export default function SpecStudioPage() {
 
   const baselineSilhouette = useMemo(() => {
     const id = recommendedSilhouetteId || silhouetteId || "";
-    return selectedCategory.silhouettes.find((s) => s.id === id) || null;
+    return (selectedCategory.silhouettes || []).find((s) => s.id === id) || null;
   }, [selectedCategory.silhouettes, recommendedSilhouetteId, silhouetteId]);
 
   function getBaselineMaterialCost() {
@@ -706,7 +845,7 @@ export default function SpecStudioPage() {
 
   function getBaselineSilhouetteYardage() {
     if (!baselineSilhouette) {
-      const recSil = selectedCategory.silhouettes.find(
+      const recSil = (selectedCategory.silhouettes || []).find(
         (s) => s.id === recommendedSilhouetteId
       );
       return recSil?.yardage || 3;
@@ -752,7 +891,7 @@ export default function SpecStudioPage() {
     const id = clamp(overlap >= 3 ? 3 : overlap >= 2 ? 2 : overlap >= 1 ? 1 : -1, -2, 4);
     const res = clamp(overlap >= 3 ? 2 : overlap >= 2 ? 1 : 0, -1, 3);
 
-    const sil = selectedCategory.silhouettes.find((x) => x.id === sid) || null;
+    const sil = (selectedCategory.silhouettes || []).find((x) => x.id === sid) || null;
     const baseY = getBaselineSilhouetteYardage();
     const y = sil?.yardage || 0;
     const yDiff = y - baseY;
@@ -773,7 +912,9 @@ export default function SpecStudioPage() {
     const id = clamp(d, -2, 2);
     const res = clamp(0, -1, 1);
     const exec = clamp(-d * 2, -4, 4);
-    return { identity: id, resonance: res, execution: exec };
+    // Each chip with complexity_mod > 0 adds overhead (execution cost)
+    const chipComplexityCount = chipSelection?.activatedChips.filter((c) => c.complexity_mod > 0).length ?? 0;
+    return { identity: id, resonance: res, execution: clamp(exec - chipComplexityCount, -6, 4) };
   }
 
   function addDeltas(a: Deltas, b: Deltas): Deltas {
@@ -972,7 +1113,7 @@ export default function SpecStudioPage() {
 
       if (!isOnRecommendedSilhouette) {
         const currentY = selectedSilhouette.yardage || 0;
-        const candidates = selectedCategory.silhouettes
+        const candidates = (selectedCategory.silhouettes || [])
           .map((s) => ({
             id: s.id,
             name: s.name,
@@ -1373,6 +1514,30 @@ export default function SpecStudioPage() {
                   ))}
                 </div>
               )}
+
+              {chipSelection && chipSelection.activatedChips.length > 0 && (
+                <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" as const }}>
+                  {chipSelection.activatedChips.map((chip) => (
+                    <span
+                      key={chip.label}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 550,
+                        color: "#6B7040",
+                        background: "rgba(171, 171, 99, 0.14)",
+                        border: chip.isCustom
+                          ? "1.5px dashed rgba(171, 171, 99, 0.40)"
+                          : "1.5px solid rgba(171, 171, 99, 0.40)",
+                        fontFamily: "var(--font-inter), system-ui, sans-serif",
+                      }}
+                    >
+                      {chip.label}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1528,6 +1693,7 @@ export default function SpecStudioPage() {
                     const isRec = mat.id === recommendedMaterialId;
                     const isHover = hoveredMaterialId === mat.id;
                     const deltas = scoreMaterialDeltas(mat);
+                    const matchingChips = chipsByMaterial[mat.id] || [];
 
                     const roseGlow = isRec
                       ? {
@@ -1609,6 +1775,28 @@ export default function SpecStudioPage() {
                           ${mat.cost_per_yard}/yd · {mat.lead_time_weeks}wk
                         </div>
 
+                        {matchingChips.length > 0 && (
+                          <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            {matchingChips.map((chip) => (
+                              <span
+                                key={chip.label}
+                                style={{
+                                  padding: "3px 8px",
+                                  borderRadius: 999,
+                                  fontSize: 10,
+                                  fontWeight: 550,
+                                  color: "#6B7040",
+                                  background: "rgba(171, 171, 99, 0.14)",
+                                  border: "1.5px solid rgba(171, 171, 99, 0.40)",
+                                  fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                }}
+                              >
+                                {chip.label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
                         {(isHover || isSel) && (
                           <div style={{ marginTop: 10 }}>
                             <div
@@ -1619,9 +1807,7 @@ export default function SpecStudioPage() {
                                 fontFamily: "var(--font-inter), system-ui, sans-serif",
                               }}
                             >
-                              {isRec
-                                ? "Clean structure with an elevated handfeel — reads refined without feeling precious."
-                                : "Shifts weight, drape, and finish — this choice will quietly define the piece’s tone."}
+                              {MATERIAL_DESCRIPTIONS[mat.id] || "Shifts weight, drape, and finish — this choice will quietly define the piece's tone."}
                             </div>
 
                             {isRec && (
@@ -1648,8 +1834,7 @@ export default function SpecStudioPage() {
                                     fontFamily: "var(--font-inter), system-ui, sans-serif",
                                   }}
                                 >
-                                  Supports your direction while keeping execution flexible — easier to hit
-                                  margin without losing polish.
+                                  Scores highest against your direction — fabric choice is the fastest way to signal intent before the garment is even worn.
                                 </div>
                               </div>
                             )}
@@ -1678,11 +1863,12 @@ export default function SpecStudioPage() {
                 </div>
 
                 <div style={{ display: "flex", gap: 10 }}>
-                  {selectedCategory.silhouettes.map((sil) => {
+                  {(selectedCategory.silhouettes || []).map((sil) => {
                     const isSel = silhouetteId === sil.id;
                     const isRec = sil.id === recommendedSilhouetteId;
                     const isHover = hoveredSilhouetteId === sil.id;
                     const deltas = scoreSilhouetteDeltas(sil.id);
+                    const matchingChips = chipsBySilhouette[sil.id] || [];
 
                     const roseGlow = isRec
                       ? {
@@ -1746,6 +1932,28 @@ export default function SpecStudioPage() {
                             >
                               ~{sil.yardage} yards
                             </div>
+
+                            {matchingChips.length > 0 && (
+                              <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                {matchingChips.map((chip) => (
+                                  <span
+                                    key={chip.label}
+                                    style={{
+                                      padding: "3px 8px",
+                                      borderRadius: 999,
+                                      fontSize: 10,
+                                      fontWeight: 550,
+                                      color: BRAND.oliveInk,
+                                      background: "rgba(171, 171, 99, 0.14)",
+                                      border: "1.5px solid rgba(171, 171, 99, 0.40)",
+                                      fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                    }}
+                                  >
+                                    {chip.label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
 
                           {isHover || isSel ? (
@@ -1769,9 +1977,7 @@ export default function SpecStudioPage() {
                                 fontFamily: "var(--font-inter), system-ui, sans-serif",
                               }}
                             >
-                              {isRec
-                                ? "Gives the concept its ‘read’ immediately — sharp enough to feel intentional."
-                                : "Sets proportion and posture — this will drive both fabric behavior and cost."}
+                              {SILHOUETTE_DESCRIPTIONS[sil.id] || "Sets proportion and posture — this will drive both fabric behavior and cost."}
                             </div>
 
                             {isRec && (
@@ -1798,8 +2004,7 @@ export default function SpecStudioPage() {
                                     fontFamily: "var(--font-inter), system-ui, sans-serif",
                                   }}
                                 >
-                                  Reinforces your direction&apos;s silhouette language — feels cohesive with
-                                  the concept you locked.
+                                  Aligns with your direction&apos;s visual language — feels cohesive with the concept and keeps proportion reads consistent across the collection.
                                 </div>
                               </div>
                             )}
@@ -1866,6 +2071,7 @@ export default function SpecStudioPage() {
                     const isRec = idx === recommendedPaletteIdx;
                     const isHover = hoveredPaletteIdx === idx;
                     const deltas = scorePaletteDeltas(idx);
+                    const matchingChips = chipsByPaletteIdx[idx] || [];
 
                     const roseGlow = isRec
                       ? {
@@ -1941,6 +2147,28 @@ export default function SpecStudioPage() {
                             >
                               {opt.name}
                             </div>
+
+                            {matchingChips.length > 0 && (
+                              <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                {matchingChips.map((chip) => (
+                                  <span
+                                    key={chip.label}
+                                    style={{
+                                      padding: "3px 8px",
+                                      borderRadius: 999,
+                                      fontSize: 10,
+                                      fontWeight: 550,
+                                      color: BRAND.oliveInk,
+                                      background: "rgba(171, 171, 99, 0.14)",
+                                      border: "1.5px solid rgba(171, 171, 99, 0.40)",
+                                      fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                    }}
+                                  >
+                                    {chip.label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
 
                           {isHover || isSel ? (
@@ -1964,9 +2192,7 @@ export default function SpecStudioPage() {
                                 fontFamily: "var(--font-inter), system-ui, sans-serif",
                               }}
                             >
-                              {isRec
-                                ? "Makes the concept instantly legible — cool restraint with quiet authority."
-                                : "Shifts mood and perceived value — palette is one of your strongest ‘intent’ levers."}
+                              {PALETTE_DESCRIPTIONS[opt.name] || "Shifts mood and perceived value — palette is one of your strongest 'intent' levers."}
                             </div>
 
                             {isRec && (
@@ -1993,7 +2219,7 @@ export default function SpecStudioPage() {
                                     fontFamily: "var(--font-inter), system-ui, sans-serif",
                                   }}
                                 >
-                                  Aligns to your direction while staying flexible across product and styling.
+                                  Best color coherence with your locked direction — consistent palette reduces sampling rounds and tightens seasonal storytelling.
                                 </div>
                               </div>
                             )}
@@ -2090,6 +2316,7 @@ export default function SpecStudioPage() {
                     const isRec = tier === baselineComplexity;
                     const isHover = hoveredComplexity === tier;
                     const deltas = scoreComplexityDeltas(tier);
+                    const matchingChips = tier === "high" ? chipsForHighComplexity : [];
 
                     const roseGlow = isRec
                       ? {
@@ -2174,14 +2401,36 @@ export default function SpecStudioPage() {
                             padding: "3px 8px",
                             borderRadius: 999,
                             display: "inline-block",
-                            color: info.includesLining ? BRAND.chartreuse : "rgba(67,67,43,0.45)",
-                            background: info.includesLining ? "rgba(171,171,99,0.10)" : "rgba(67,67,43,0.04)",
+                            color: "rgba(67,67,43,0.45)",
+                            background: "rgba(67,67,43,0.04)",
                             fontFamily: "var(--font-inter), system-ui, sans-serif",
                             fontWeight: 600,
                           }}
                         >
                           {info.note}
                         </div>
+
+                        {matchingChips.length > 0 && (
+                          <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            {matchingChips.map((chip) => (
+                              <span
+                                key={chip.label}
+                                style={{
+                                  padding: "3px 8px",
+                                  borderRadius: 999,
+                                  fontSize: 10,
+                                  fontWeight: 550,
+                                  color: "#6B7040",
+                                  background: "rgba(171, 171, 99, 0.14)",
+                                  border: "1.5px solid rgba(171, 171, 99, 0.40)",
+                                  fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                }}
+                              >
+                                {chip.label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
 
                         {(isHover || isSel) && (
                           <div style={{ marginTop: 10 }}>
@@ -2193,9 +2442,7 @@ export default function SpecStudioPage() {
                                 fontFamily: "var(--font-inter), system-ui, sans-serif",
                               }}
                             >
-                              {isRec
-                                ? "The most ‘safe’ complexity for this category — reads intentional without blowing up cost."
-                                : "Changes finishing + labor — this is the most direct margin lever after fabric."}
+                              {COMPLEXITY_DESCRIPTIONS[tier].hover}
                             </div>
 
                             {isRec && (
@@ -2222,7 +2469,7 @@ export default function SpecStudioPage() {
                                     fontFamily: "var(--font-inter), system-ui, sans-serif",
                                   }}
                                 >
-                                  Keeps the piece executable while preserving a premium read.
+                                  {COMPLEXITY_DESCRIPTIONS[tier].why}
                                 </div>
                               </div>
                             )}
@@ -2233,58 +2480,6 @@ export default function SpecStudioPage() {
                   })}
                 </div>
 
-                {COMPLEXITY_CONTEXT[constructionTier].liningOptional && (
-                  <div
-                    style={{
-                      marginTop: 10,
-                      padding: "12px 16px",
-                      borderRadius: 12,
-                      background: "rgba(255,255,255,0.60)",
-                      border: "1px solid rgba(67,67,43,0.10)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      animation: "fadeIn 300ms ease-out",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 13,
-                        color: "rgba(67,67,43,0.65)",
-                        fontFamily: "var(--font-inter), system-ui, sans-serif",
-                      }}
-                    >
-                      Add lining? <span style={{ color: "rgba(67,67,43,0.40)" }}>+$18 COGS</span>
-                    </span>
-                    <button
-                      onClick={() => setAddLining(!addLining)}
-                      style={{
-                        width: 44,
-                        height: 24,
-                        borderRadius: 999,
-                        border: "none",
-                        cursor: "pointer",
-                        position: "relative",
-                        background: addLining ? BRAND.chartreuse : "rgba(67,67,43,0.15)",
-                        transition: "background 200ms ease",
-                      }}
-                    >
-                      <span
-                        style={{
-                          position: "absolute",
-                          top: 2,
-                          left: addLining ? 22 : 2,
-                          width: 20,
-                          height: 20,
-                          borderRadius: 999,
-                          background: "white",
-                          boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-                          transition: "left 200ms ease",
-                        }}
-                      />
-                    </button>
-                  </div>
-                )}
 
                 {overrideWarning && (
                   <div

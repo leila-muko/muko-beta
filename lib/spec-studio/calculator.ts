@@ -1,4 +1,4 @@
-import type { Material, Category, Silhouette, ConstructionTier } from '@/types/spec-studio';
+import type { Material, Category, Silhouette, ConstructionTier } from '@/lib/types/spec-studio';
 
 // Labor multipliers by construction tier
 const LABOR_BASE = 35;
@@ -83,7 +83,7 @@ export function generateInsight(
     : 0;
 
   const sharedProps = alternativeMaterial
-    ? material.properties.filter(p => alternativeMaterial.properties.includes(p))
+    ? (material.properties ?? []).filter(p => (alternativeMaterial.properties ?? []).includes(p))
     : [];
 
   const biggestDriver: 'material' | 'construction' | 'lining' =

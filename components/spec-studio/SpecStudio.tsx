@@ -41,8 +41,8 @@ export default function SpecStudio({
   collectionName,
   onRunAnalysis,
 }: SpecStudioProps) {
-  const categories: Category[] = categoriesData.categories as Category[];
-  const materials: Material[] = materialsData.materials;
+  const categories: Category[] = categoriesData.categories as unknown as Category[];
+  const materials: Material[] = materialsData as unknown as Material[];
 
   // ============================================
   // State

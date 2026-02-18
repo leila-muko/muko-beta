@@ -1,6 +1,6 @@
 'use client';
 
-import type { Silhouette } from '@/types/spec-studio';
+import type { Silhouette } from '@/lib/types/spec-studio';
 
 interface SilhouetteSelectorProps {
   silhouettes: Silhouette[];

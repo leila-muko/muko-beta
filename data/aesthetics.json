@@ -1,0 +1,796 @@
+[
+  {
+    "id": "terrain-luxe",
+    "name": "Terrain Luxe",
+    "description": "Elevated outdoor utility meets refined tailoring — guardian details, resilient hardware, and grounded earthy tones that signal protection without sacrificing contemporary polish.",
+    "keywords": ["Technical", "Rustic", "Sustainable", "Premium", "Masculine", "Sophisticated", "Timeless", "Utilitarian", "Functional", "Protective"],
+    "custom_keywords": ["Utilitarian", "Functional", "Protective"],
+    "tension_keywords": ["Feminine", "Playful", "Dramatic", "Vibrant"],
+    "saturation_score": 42,
+    "saturation_basis": "Post-gorpcore evolution with growing but not yet mainstream adoption. Aritzia and Everlane both launched dedicated utility collections for SS26. Ascending presence in runway-to-retail coverage; utility references broadening beyond outdoor niche into office-ready tailoring.",
+    "trend_velocity": "ascending",
+    "seasonal_relevance": {
+      "ss26": 4,
+      "fw26": 5
+    },
+    "collections_analyzed": 187,
+    "seen_in": ["Aritzia", "Everlane", "COS", "Napapijri x Martine Rose", "Barbour"],
+    "consumer_insight": "Driven by the search for self-preservation in an unpredictable world. Consumers want cost-per-wear value where durability justifies the bridge price point, and clothing functions as both a physical and psychological shield against instability.",
+    "adjacent_directions": ["quiet-structure", "heritage-hand"],
+    "confidence": 0.85,
+    "evidence": [
+      {
+        "claim": "Aritzia Pre-Spring 2026 Soundwave Waxed Trench Coat and Strobe Cargo Pants as key executions",
+        "source": "Marie Claire",
+        "type": "editorial",
+        "url": "https://www.marieclaire.com/fashion/winter-fashion/aritzia-pre-spring-2026-collection/",
+        "verified": true
+      },
+      {
+        "claim": "Everlane Modern Utility collection with organic cotton herringbone jackets",
+        "source": "Everlane",
+        "type": "retail",
+        "url": "https://blog.everlane.com/everworld/modern-utility-fashion",
+        "verified": true
+      }
+    ],
+    "risk_factors": [
+      "High-performance technical fabrics can push COGS above contemporary price ceilings",
+      "Over-engineering risks losing the effortlessness contemporary consumers expect",
+      "Gorpcore fatigue if utility references feel too literal or costume-like"
+    ],
+    "moodboard_images": [],
+    "chips": [
+      {
+        "label": "waxed cotton",
+        "type": "spec",
+        "material": "cotton-twill",
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "shearling trim",
+        "type": "spec",
+        "material": "wool",
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": null
+      },
+      {
+        "label": "cargo detailing",
+        "type": "spec",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": null
+      },
+      {
+        "label": "earthy neutrals",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": "earth tones"
+      },
+      {
+        "label": "utility hardware",
+        "type": "spec",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": null
+      },
+      {
+        "label": "weather-ready knits",
+        "type": "spec",
+        "material": "merino-wool",
+        "silhouette": {
+          "knitwear": "oversized"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      }
+    ]
+  },
+  {
+    "id": "quiet-structure",
+    "name": "Quiet Structure",
+    "description": "Architectural restraint elevated — column silhouettes, tonal layering, and matte fabrication that signals value through expert fit and deliberate form rather than surface decoration.",
+    "keywords": ["Minimalist", "Sophisticated", "Premium", "Timeless", "Urban", "Serene", "Luxe", "Architectural", "Restrained", "Intentional"],
+    "custom_keywords": ["Architectural", "Restrained", "Intentional"],
+    "tension_keywords": ["Bohemian", "Maximalist", "Playful", "Vibrant", "Grunge"],
+    "saturation_score": 72,
+    "saturation_basis": "Dominant direction across Toteme, Khaite, COS, The Row with high runway-to-retail conversion. Column silhouettes and architectural tailoring visible in both Michael Kors and Ralph Lauren SS26. Multi-season presence creates real consumer fatigue risk.",
+    "trend_velocity": "peak",
+    "seasonal_relevance": {
+      "ss26": 5,
+      "fw26": 5
+    },
+    "collections_analyzed": 243,
+    "seen_in": ["Toteme", "Khaite", "COS", "Rohe", "The Row"],
+    "consumer_insight": "Driven by the desire for visual silence and internal authority in a world of algorithm fatigue. These clothes provide calm and control, allowing the wearer to feel composed and intentional without dressing for external approval.",
+    "adjacent_directions": ["terrain-luxe", "high-voltage"],
+    "confidence": 0.9,
+    "evidence": [
+      {
+        "claim": "Toteme architectural capes and Khaite simplistic white dresses as category-defining executions",
+        "source": "Who What Wear",
+        "type": "editorial",
+        "url": "https://www.whowhatwear.com/fashion/shopping/luxury-fashion-trends-2026",
+        "verified": true
+      },
+      {
+        "claim": "80s tailoring influence with sharp shoulders and funnel necks across SS26 runways",
+        "source": "Who What Wear",
+        "type": "editorial",
+        "url": "https://www.whowhatwear.com/fashion/trends/minimalist-fashion-trends-2026",
+        "verified": true
+      }
+    ],
+    "risk_factors": [
+      "High saturation means consumer fatigue is a real threat unless differentiated through superior fit",
+      "Risk of being perceived as generic or safe if not executed with visible quality",
+      "Brands at lower contemporary price points may struggle to convey value in simple silhouettes"
+    ],
+    "moodboard_images": [],
+    "chips": [
+      {
+        "label": "column silhouettes",
+        "type": "spec",
+        "material": null,
+        "silhouette": {
+          "outerwear": "straight",
+          "bottoms": "straight",
+          "dresses": "column"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "soft suiting",
+        "type": "spec",
+        "material": "modal",
+        "silhouette": {
+          "outerwear": "belted",
+          "tops": "fitted",
+          "bottoms": "straight",
+          "knitwear": "fitted"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "matte fabrics",
+        "type": "spec",
+        "material": "tencel",
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "tonal layering",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "architectural draping",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": null
+      },
+      {
+        "label": "bone & ivory",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": "bone, ivory, cream"
+      }
+    ]
+  },
+  {
+    "id": "romantic-analog",
+    "name": "Romantic Analog",
+    "description": "Cinematic nostalgia meets tactile heritage — vintage blazers, oversized knits, and analog intention that celebrates patina, imperfection, and the beauty of things that feel earned rather than new.",
+    "keywords": ["Romantic", "Artisanal", "Moody", "Rustic", "Bohemian", "Feminine", "Soft", "Timeless", "Vintage", "Tactile", "Cinematic"],
+    "custom_keywords": ["Vintage", "Tactile", "Cinematic"],
+    "tension_keywords": ["Technical", "Innovative", "Minimalist", "Urban", "Vibrant"],
+    "saturation_score": 35,
+    "saturation_basis": "Growing momentum from academia-core and analog-nostalgia movements. Strong at Sezane and Bode but limited mainstream penetration. 136% increase in analog hobby searches signals ascending consumer interest.",
+    "trend_velocity": "ascending",
+    "seasonal_relevance": {
+      "ss26": 3,
+      "fw26": 5
+    },
+    "collections_analyzed": 156,
+    "seen_in": ["Sezane", "Bode", "Sandy Liang", "Barbour x Kaptain Sunshine", "Doen"],
+    "consumer_insight": "Driven by affective familiarity — using clothing as a form of emotional continuity in an unstable world. Consumers are longing for things they can touch and feel, reflected in a 136% increase in searches for analog hobbies. The appeal is in garments that feel collected over time rather than purchased.",
+    "adjacent_directions": ["heritage-hand", "undone-glam"],
+    "confidence": 0.8,
+    "evidence": [
+      {
+        "claim": "136% increase in searches for analog hobbies",
+        "source": "Highsnobiety",
+        "type": "editorial",
+        "url": "https://www.highsnobiety.com/p/fashion-in-its-try-hard-era-bottega-prada/",
+        "verified": true
+      }
+    ],
+    "risk_factors": [
+      "The costume effect if heritage references are too literal or themed",
+      "Requires blending vintage textures with contemporary cuts to avoid looking dated",
+      "Limited SS26 relevance may reduce year-round utility for brands"
+    ],
+    "moodboard_images": [],
+    "chips": [
+      {
+        "label": "vintage knitwear",
+        "type": "spec",
+        "material": "merino-wool",
+        "silhouette": {
+          "knitwear": "relaxed"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "lace detailing",
+        "type": "spec",
+        "material": "silk-blend",
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": null
+      },
+      {
+        "label": "oversized blazers",
+        "type": "spec",
+        "material": null,
+        "silhouette": {
+          "outerwear": "cocoon",
+          "tops": "oversized",
+          "knitwear": "oversized"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "sheer layers",
+        "type": "spec",
+        "material": "silk",
+        "silhouette": {
+          "tops": "relaxed",
+          "dresses": "column"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "warm yellow",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": "butter yellow, soft gold"
+      },
+      {
+        "label": "prairie references",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": null
+      }
+    ]
+  },
+  {
+    "id": "heritage-hand",
+    "name": "Heritage Hand",
+    "description": "Story-and-soul design where craft provenance is visible — natural fibers, hand-woven textures, and artisan processes that move sustainability from claimed to proven, making the garment's origin part of its value.",
+    "keywords": ["Artisanal", "Sustainable", "Ethical", "Rustic", "Feminine", "Bohemian", "Soft", "Timeless", "Natural", "Handcrafted", "Raw"],
+    "custom_keywords": ["Natural", "Handcrafted", "Raw"],
+    "tension_keywords": ["Technical", "Urban", "Trendy", "Edgy", "Bold"],
+    "saturation_score": 52,
+    "saturation_basis": "Established through sustainability-forward brands (Reformation, Gabriela Hearst, Bode). +200% growth in raw denim runway visibility. Artisanal positioning now expected rather than differentiating in contemporary segment.",
+    "trend_velocity": "ascending",
+    "seasonal_relevance": {
+      "ss26": 5,
+      "fw26": 4
+    },
+    "collections_analyzed": 198,
+    "seen_in": ["Reformation", "Sezane", "Gabriela Hearst", "Bode", "Doen", "St. Agni"],
+    "consumer_insight": "Consumers increasingly demand proof of durability and verified impact — sustainability is no longer optional but a critical factor in brand strategy by 2026. The psychological driver is the search for authenticity as a counterweight to AI-generated and mass-produced design.",
+    "adjacent_directions": ["romantic-analog", "sweet-subversion"],
+    "confidence": 0.85,
+    "evidence": [
+      {
+        "claim": "+200% growth in raw denim runway visibility",
+        "source": "Heuritech",
+        "type": "analytics",
+        "url": "https://heuritech.com/fashion-trends-2026/",
+        "verified": true
+      },
+      {
+        "claim": "Sezane basket bags ($245-$310) demonstrate commercial scalability of hand-woven trend",
+        "source": "Sezane",
+        "type": "retail",
+        "url": "https://www.sezane.com/us-en/lookbook-spring-2026-pre-collection",
+        "verified": true
+      }
+    ],
+    "risk_factors": [
+      "Artisanal production is inherently more expensive, challenging contemporary price ceilings",
+      "Cultural sensitivity required when referencing specific regional craft traditions",
+      "Handcraft details may read as costumey if not paired with clean, modern silhouettes"
+    ],
+    "moodboard_images": [],
+    "chips": [
+      {
+        "label": "hand-woven texture",
+        "type": "spec",
+        "material": "linen",
+        "silhouette": {
+          "tops": "relaxed",
+          "knitwear": "relaxed"
+        },
+        "complexity_mod": 1,
+        "palette": null
+      },
+      {
+        "label": "natural dyes",
+        "type": "spec",
+        "material": "organic-cotton",
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": "earth tones"
+      },
+      {
+        "label": "shibori",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": "indigo, blue"
+      },
+      {
+        "label": "fringe detailing",
+        "type": "spec",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": null
+      },
+      {
+        "label": "artisan patchwork",
+        "type": "spec",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": null
+      },
+      {
+        "label": "raw edge finishing",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": null
+      }
+    ]
+  },
+  {
+    "id": "undone-glam",
+    "name": "Undone Glam",
+    "description": "Intentional imperfection as a design language — asymmetric cuts, anti-fit tailoring, and personality-forward layering that rejects clean-girl sameness in favor of messy, liberated self-expression.",
+    "keywords": ["Edgy", "Rebellious", "Bold", "Moody", "Grunge", "Urban", "Dramatic", "Deconstructed", "Asymmetrical", "Nonchalant"],
+    "custom_keywords": ["Deconstructed", "Asymmetrical", "Nonchalant"],
+    "tension_keywords": ["Minimalist", "Sophisticated", "Timeless", "Serene", "Preppy"],
+    "saturation_score": 28,
+    "saturation_basis": "Early-stage counter-reaction to clean-girl dominance. Led by Prada SS26 and Collina Strada but minimal contemporary-segment adoption yet. +270% search increase in asymmetric beauty signals emerging consumer appetite.",
+    "trend_velocity": "emerging",
+    "seasonal_relevance": {
+      "ss26": 4,
+      "fw26": 5
+    },
+    "collections_analyzed": 134,
+    "seen_in": ["Prada", "Collina Strada", "Area", "Victoria Beckham", "Dries Van Noten"],
+    "consumer_insight": "The search for recognition and agency in an absurd world — error and noise become language rather than mistakes. Consumers want to look like they chose their own life rather than followed an algorithm, using disorder as self-expression and emotional regulation.",
+    "adjacent_directions": ["haptic-play", "romantic-analog"],
+    "confidence": 0.7,
+    "evidence": [
+      {
+        "claim": "+270% search increase in asymmetric beauty (asymmetrical lobs, mismatched nails)",
+        "source": "Who What Wear",
+        "type": "editorial",
+        "url": "https://www.whowhatwear.com/beauty/pinterest-predicts-glitchy-glam-trend",
+        "verified": true
+      },
+      {
+        "claim": "Prada SS26 as definitive reference for undone styling",
+        "source": "The Guardian",
+        "type": "editorial",
+        "url": "https://www.rokytnice.com/en/efdbbamshop/uk/fashion/a69818811/spring-summer-2025-undone-fashion-trend/",
+        "verified": true
+      }
+    ],
+    "risk_factors": [
+      "If pieces look too undone, average consumers may perceive poor quality",
+      "Requires careful styling with high-end basics to anchor the look for professional settings",
+      "Early-stage trend with limited commercial proof at contemporary price points"
+    ],
+    "moodboard_images": [],
+    "chips": [
+      {
+        "label": "distressed leather",
+        "type": "spec",
+        "material": "leather",
+        "silhouette": {
+          "outerwear": "straight",
+          "bottoms": "slim"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "metallic fabrics",
+        "type": "spec",
+        "material": "silk-blend",
+        "silhouette": {
+          "tops": "fitted",
+          "dresses": "column"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "raw print",
+        "type": "spec",
+        "material": "organic-cotton",
+        "silhouette": {
+          "tops": "boxy"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "anti-fit tailoring",
+        "type": "spec",
+        "material": null,
+        "silhouette": {
+          "outerwear": "cocoon",
+          "tops": "oversized",
+          "bottoms": "wide-leg",
+          "dresses": "shift",
+          "knitwear": "oversized"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "layered chains",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "fringe",
+        "type": "spec",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": null
+      }
+    ]
+  },
+  {
+    "id": "haptic-play",
+    "name": "Haptic Play",
+    "description": "Material innovation as emotional design — tactile surfaces, inflated volumes, and sensory finishes that prioritize physical experience over visual decoration, grounding digital-age consumers in touch.",
+    "keywords": ["Innovative", "Playful", "Vibrant", "Soft", "Trendy", "Bold", "Youthful", "Tactile", "Sensory", "Inflated"],
+    "custom_keywords": ["Youthful", "Tactile", "Sensory", "Inflated"],
+    "tension_keywords": ["Timeless", "Rustic", "Minimalist", "Sophisticated", "Masculine"],
+    "saturation_score": 32,
+    "saturation_basis": "Designer-led innovation (Loewe, Coperni, JW Anderson) with growing commercial translation through UGG and Melissa. Strong in accessories but limited ready-to-wear adoption at contemporary price points.",
+    "trend_velocity": "ascending",
+    "seasonal_relevance": {
+      "ss26": 5,
+      "fw26": 3
+    },
+    "collections_analyzed": 142,
+    "seen_in": ["Loewe", "UGG", "Coperni", "JW Anderson", "Melissa"],
+    "consumer_insight": "Physical experience is becoming the new measure of product value as consumers seek counterbalances to constant digital stimulation. Tactile richness and dimensional form signal material innovation, with soft-touch and inflated textures driving premiumization across categories.",
+    "adjacent_directions": ["sweet-subversion", "undone-glam"],
+    "confidence": 0.75,
+    "evidence": [
+      {
+        "claim": "Loewe Pre-Spring 2026 sculptural accessories as pioneer of art-literate tactile design",
+        "source": "The Impression",
+        "type": "editorial",
+        "url": "https://theimpression.com/loewe-pre-spring-2026-accessories-ad-campaign-review/",
+        "verified": true
+      },
+      {
+        "claim": "Covacryl and Sensibead technologies creating mochi-like bouncy textures in beauty/textile",
+        "source": "Sensient Beauty",
+        "type": "industry",
+        "url": "https://sensient-beauty.com/insights/beauty-trends-2026-good-formulations-sensorial-innovations/",
+        "verified": true
+      }
+    ],
+    "risk_factors": [
+      "Risk of perceived immaturity or fast-fashion quality at bridge price points",
+      "Sensory materials must be grounded in sophisticated design to justify pricing",
+      "Limited FW26 relevance may reduce commercial viability for fall collections"
+    ],
+    "moodboard_images": [],
+    "chips": [
+      {
+        "label": "rubberized finishes",
+        "type": "spec",
+        "material": "technical-nylon",
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": null
+      },
+      {
+        "label": "translucent layers",
+        "type": "spec",
+        "material": "technical-nylon",
+        "silhouette": {
+          "tops": "relaxed",
+          "dresses": "shift"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "inflated forms",
+        "type": "spec",
+        "material": null,
+        "silhouette": {
+          "outerwear": "cocoon",
+          "tops": "oversized",
+          "bottoms": "wide-leg",
+          "knitwear": "oversized"
+        },
+        "complexity_mod": 1,
+        "palette": null
+      },
+      {
+        "label": "gel forms",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "saturated pastel",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": "sweetened pastels, digital brights"
+      },
+      {
+        "label": "molded details",
+        "type": "spec",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": null
+      }
+    ]
+  },
+  {
+    "id": "high-voltage",
+    "name": "High Voltage",
+    "description": "Maximum impact as everyday language — sequin saturation, liquid-metal finishes, bold shoulders, and power colors that make shine a wardrobe staple rather than a one-night occasion.",
+    "keywords": ["Bold", "Dramatic", "Sophisticated", "Luxe", "Vibrant", "Maximalist", "Feminine", "Premium", "Confident", "Expressive"],
+    "custom_keywords": ["Confident", "Expressive"],
+    "tension_keywords": ["Minimalist", "Serene", "Soft", "Rustic", "Accessible"],
+    "saturation_score": 48,
+    "saturation_basis": "Ascending from occasion-only to everyday positioning. Michael Kors and Ralph Lauren integrating metallics into SS26 daywear. Area making crystal details commercially accessible. Silver treated as new neutral signals broadening adoption.",
+    "trend_velocity": "ascending",
+    "seasonal_relevance": {
+      "ss26": 5,
+      "fw26": 5
+    },
+    "collections_analyzed": 176,
+    "seen_in": ["The Attico", "Area", "Michael Kors", "Rabanne", "Ralph Lauren"],
+    "consumer_insight": "The search for recognition and aesthetic affirmation after years of minimalist hiding. Consumers want to displace the body from normative frameworks — aesthetics as a request for visibility becomes a powerful emotional driver, making shine part of daily self-expression rather than reserved for special occasions.",
+    "adjacent_directions": ["quiet-structure", "haptic-play"],
+    "confidence": 0.8,
+    "evidence": [
+      {
+        "claim": "Metallic coated denim and daytime silver positioning in Michael Kors and Ralph Lauren SS26",
+        "source": "Who What Wear",
+        "type": "editorial",
+        "url": "https://www.whowhatwear.com/fashion/trends/minimalist-fashion-trends-2026",
+        "verified": true
+      },
+      {
+        "claim": "Micro-sequins now stretchable and breathable, enabling everyday metallic wear",
+        "source": "Rue Sophie",
+        "type": "retail",
+        "url": "https://ruesophie.com/blogs/the-style-edit/metallic-trend-2026",
+        "verified": true
+      },
+      {
+        "claim": "Power Chokers and Impact Cuffs as anchor accessories for SS26",
+        "source": "Harper's Bazaar",
+        "type": "editorial",
+        "url": "https://harpersbazaar.com.au/spring-summer-jewellery-trends-2026/",
+        "verified": true
+      }
+    ],
+    "risk_factors": [
+      "Costume effect if metallic pieces aren't balanced with structured neutrals",
+      "Sequin and metallic foil production often involves non-biodegradable materials",
+      "Risk of pieces being perceived as single-use rather than investment staples"
+    ],
+    "moodboard_images": [],
+    "chips": [
+      {
+        "label": "metallic knits",
+        "type": "spec",
+        "material": "silk-blend",
+        "silhouette": {
+          "knitwear": "fitted"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "sequin saturation",
+        "type": "spec",
+        "material": "silk",
+        "silhouette": {
+          "tops": "fitted",
+          "dresses": "column"
+        },
+        "complexity_mod": 1,
+        "palette": null
+      },
+      {
+        "label": "bold shoulders",
+        "type": "spec",
+        "material": null,
+        "silhouette": {
+          "outerwear": "belted",
+          "tops": "boxy"
+        },
+        "complexity_mod": 1,
+        "palette": null
+      },
+      {
+        "label": "high-shine fabrication",
+        "type": "spec",
+        "material": "vegan-leather",
+        "silhouette": {
+          "bottoms": "slim"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "statement jewelry",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "statement red",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": "lava red, crimson, amber"
+      }
+    ]
+  },
+  {
+    "id": "sweet-subversion",
+    "name": "Sweet Subversion",
+    "description": "Childhood references refined for adult sophistication — deliberate scale play, bold color blocking, and nostalgic detailing that channels warmth and imagination without sacrificing wearability.",
+    "keywords": ["Playful", "Feminine", "Soft", "Vibrant", "Trendy", "Bold", "Romantic", "Nostalgic", "Whimsical", "Imaginative"],
+    "custom_keywords": ["Nostalgic", "Whimsical", "Imaginative"],
+    "tension_keywords": ["Minimalist", "Sophisticated", "Masculine", "Technical", "Timeless"],
+    "saturation_score": 31,
+    "saturation_basis": "Niche but growing, anchored by Sandy Liang SS26 and Ganni's brand codes. Crossover from toy-industry cozy-culture trend into fashion. Limited mainstream adoption keeps saturation low despite strong press coverage.",
+    "trend_velocity": "ascending",
+    "seasonal_relevance": {
+      "ss26": 5,
+      "fw26": 4
+    },
+    "collections_analyzed": 128,
+    "seen_in": ["Sandy Liang", "Ganni", "Cecilie Bahnsen", "Staud", "Simone Rocha"],
+    "consumer_insight": "Driven by escapism and self-preservation through childhood memories — people still want to feel playful and yearn for childlike nostalgia as a source of comfort. The throwback-kid aesthetic works because pieces feel loaded with history and immediate recognition, providing emotional regulation through familiar warmth.",
+    "adjacent_directions": ["heritage-hand", "haptic-play"],
+    "confidence": 0.75,
+    "evidence": [
+      {
+        "claim": "Sandy Liang Spring 2026 collection as definitive execution — PVC skirts, sticker-covered slippers, doll-clothes dresses",
+        "source": "Fashionista",
+        "type": "editorial",
+        "url": "https://fashionista.com/2025/09/sandy-liang-spring-2026-review",
+        "verified": true
+      },
+      {
+        "claim": "Cozy Culture toy industry trend supporting crossover into fashion lifestyle products",
+        "source": "Global Toy News",
+        "type": "industry",
+        "url": "https://globaltoynews.com/2026/01/03/designing-play-toy-industry-trends-for-2026/",
+        "verified": true
+      }
+    ],
+    "risk_factors": [
+      "Must be sophisticated enough for a 32-year-old in a professional setting",
+      "Risk of the Miss Havisham trap — looking stuck in the past rather than playfully referencing it",
+      "Novelty pieces may be perceived as low cost-per-wear at contemporary price points"
+    ],
+    "moodboard_images": [],
+    "chips": [
+      {
+        "label": "charm-loaded accessories",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "bold color blocking",
+        "type": "spec",
+        "material": "recycled-poly",
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": "bold multi-color"
+      },
+      {
+        "label": "micro scale",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "novelty prints",
+        "type": "spec",
+        "material": "organic-cotton",
+        "silhouette": {
+          "tops": "boxy",
+          "dresses": "a-line"
+        },
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "exaggerated scale",
+        "type": "mood",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 0,
+        "palette": null
+      },
+      {
+        "label": "jewel encrusting",
+        "type": "spec",
+        "material": null,
+        "silhouette": null,
+        "complexity_mod": 1,
+        "palette": null
+      }
+    ]
+  }
+]

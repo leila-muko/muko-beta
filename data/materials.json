@@ -1,154 +1,387 @@
-{
-  "materials": [
-    {
-      "id": "organic-cotton",
-      "name": "Organic Cotton",
-      "cost_per_yard": 18,
-      "lead_time_weeks": 3,
-      "complexity_tier": "low",
-      "properties": ["breathable", "versatile", "sustainable"],
-      "hand_feel": "soft",
-      "weight": "medium"
-    },
-    {
-      "id": "tencel",
-      "name": "Tencel",
-      "cost_per_yard": 22,
-      "lead_time_weeks": 4,
-      "complexity_tier": "low",
-      "properties": ["luxe-drape", "lightweight", "sustainable", "breathable"],
-      "hand_feel": "silky",
-      "weight": "light"
-    },
-    {
-      "id": "linen",
-      "name": "Linen",
-      "cost_per_yard": 28,
-      "lead_time_weeks": 4,
-      "complexity_tier": "low",
-      "properties": ["breathable", "textured", "natural"],
-      "hand_feel": "crisp",
-      "weight": "medium"
-    },
-    {
-      "id": "recycled-poly",
-      "name": "Recycled Poly",
-      "cost_per_yard": 12,
-      "lead_time_weeks": 3,
-      "complexity_tier": "low",
-      "properties": ["durable", "lightweight", "sustainable", "versatile"],
-      "hand_feel": "smooth",
-      "weight": "light"
-    },
-    {
-      "id": "cotton-twill",
-      "name": "Cotton Twill",
-      "cost_per_yard": 20,
-      "lead_time_weeks": 3,
-      "complexity_tier": "low",
-      "properties": ["durable", "structured", "versatile"],
-      "hand_feel": "sturdy",
-      "weight": "medium-heavy"
-    },
-    {
-      "id": "modal",
-      "name": "Modal",
-      "cost_per_yard": 24,
-      "lead_time_weeks": 4,
-      "complexity_tier": "low",
-      "properties": ["luxe-drape", "lightweight", "breathable"],
-      "hand_feel": "silky",
-      "weight": "light"
-    },
-    {
-      "id": "wool",
-      "name": "Wool",
-      "cost_per_yard": 56,
-      "lead_time_weeks": 6,
-      "complexity_tier": "moderate",
-      "properties": ["warm", "structured", "luxe", "durable"],
-      "hand_feel": "textured",
-      "weight": "heavy"
-    },
-    {
-      "id": "merino-wool",
-      "name": "Merino Wool",
-      "cost_per_yard": 68,
-      "lead_time_weeks": 6,
-      "complexity_tier": "moderate",
-      "properties": ["warm", "luxe", "lightweight", "breathable"],
-      "hand_feel": "soft",
-      "weight": "medium"
-    },
-    {
-      "id": "silk",
-      "name": "Silk",
-      "cost_per_yard": 84,
-      "lead_time_weeks": 8,
-      "complexity_tier": "moderate",
-      "properties": ["luxe-drape", "lightweight", "luxe"],
-      "hand_feel": "silky",
-      "weight": "light"
-    },
-    {
-      "id": "silk-blend",
-      "name": "Silk Blend",
-      "cost_per_yard": 48,
-      "lead_time_weeks": 6,
-      "complexity_tier": "moderate",
-      "properties": ["luxe-drape", "lightweight", "luxe"],
-      "hand_feel": "silky",
-      "weight": "light"
-    },
-    {
-      "id": "denim",
-      "name": "Denim",
-      "cost_per_yard": 22,
-      "lead_time_weeks": 4,
-      "complexity_tier": "moderate",
-      "properties": ["durable", "structured", "versatile"],
-      "hand_feel": "sturdy",
-      "weight": "heavy"
-    },
-    {
-      "id": "leather",
-      "name": "Leather",
-      "cost_per_yard": 120,
-      "lead_time_weeks": 10,
-      "complexity_tier": "high",
-      "properties": ["structured", "luxe", "durable"],
-      "hand_feel": "smooth",
-      "weight": "heavy"
-    },
-    {
-      "id": "vegan-leather",
-      "name": "Vegan Leather",
-      "cost_per_yard": 35,
-      "lead_time_weeks": 4,
-      "complexity_tier": "moderate",
-      "properties": ["structured", "sustainable", "durable"],
-      "hand_feel": "smooth",
-      "weight": "medium-heavy"
-    },
-    {
-      "id": "cashmere",
-      "name": "Cashmere",
-      "cost_per_yard": 145,
-      "lead_time_weeks": 10,
-      "complexity_tier": "high",
-      "properties": ["luxe", "lightweight", "warm"],
-      "hand_feel": "soft",
-      "weight": "light"
-    },
-    {
-      "id": "nylon",
-      "name": "Technical Nylon",
-      "cost_per_yard": 16,
-      "lead_time_weeks": 3,
-      "complexity_tier": "low",
-      "properties": ["durable", "lightweight", "versatile"],
-      "hand_feel": "smooth",
-      "weight": "light"
-    }
-  ]
-}
+[
+  {
+    "id": "organic-cotton",
+    "name": "Organic Cotton",
+    "fiber_type": "Natural",
+    "cost_per_yard": 14.00,
+    "cost_range_note": "$12â€“18/yd mid-market wholesale (300â€“500 yd MOQ, GOTS certified)",
+    "complexity_tier": "low",
+    "lead_time_weeks": 12,
+    "sustainability_score": 8.5,
+    "sustainability_flags": [
+      "GOTS Certified",
+      "Biodegradable",
+      "Low Water Use"
+    ],
+    "drape_quality": "medium",
+    "typical_aesthetics": [
+      "Refined Clarity",
+      "Poetcore",
+      "Modern Craft"
+    ],
+    "redirect_compatible": [
+      "conventional-cotton",
+      "tencel",
+      "hemp"
+    ]
+  },
+  {
+    "id": "conventional-cotton",
+    "name": "Conventional Cotton",
+    "fiber_type": "Natural",
+    "cost_per_yard": 7.50,
+    "cost_range_note": "$6â€“10/yd mid-market wholesale; volatile due to US-China tariffs",
+    "complexity_tier": "low",
+    "lead_time_weeks": 10,
+    "sustainability_score": 3.0,
+    "sustainability_flags": [
+      "High Water Use",
+      "Pesticide Heavy",
+      "Biodegradable"
+    ],
+    "drape_quality": "medium",
+    "typical_aesthetics": [
+      "Indie Chic Grunge",
+      "Rugged Luxury",
+      "Refined Clarity"
+    ],
+    "redirect_compatible": [
+      "organic-cotton",
+      "hemp",
+      "recycled-polyester"
+    ]
+  },
+  {
+    "id": "tencel",
+    "name": "Tencel (Lyocell)",
+    "fiber_type": "Semi-Synthetic",
+    "cost_per_yard": 17.00,
+    "cost_range_note": "$14â€“22/yd mid-market wholesale; Lenzing trademark premium applies",
+    "complexity_tier": "moderate",
+    "lead_time_weeks": 12,
+    "sustainability_score": 9.0,
+    "sustainability_flags": [
+      "Closed-Loop Process",
+      "FSC Certified Feedstock",
+      "Biodegradable"
+    ],
+    "drape_quality": "fluid",
+    "typical_aesthetics": [
+      "Refined Clarity",
+      "Poetcore"
+    ],
+    "redirect_compatible": [
+      "rayon-viscose",
+      "organic-cotton",
+      "linen"
+    ]
+  },
+  {
+    "id": "linen",
+    "name": "Linen",
+    "fiber_type": "Natural",
+    "cost_per_yard": 15.00,
+    "cost_range_note": "$12â€“20/yd mid-market wholesale; +18% due to 2024 Normandy crop failure",
+    "complexity_tier": "moderate",
+    "lead_time_weeks": 13,
+    "sustainability_score": 9.0,
+    "sustainability_flags": [
+      "Rain-Fed",
+      "High Durability",
+      "Biodegradable"
+    ],
+    "drape_quality": "medium",
+    "typical_aesthetics": [
+      "Modern Craft",
+      "Poetcore",
+      "Rugged Luxury"
+    ],
+    "redirect_compatible": [
+      "hemp",
+      "organic-cotton",
+      "tencel"
+    ]
+  },
+  {
+    "id": "silk",
+    "name": "Silk",
+    "fiber_type": "Natural",
+    "cost_per_yard": 38.00,
+    "cost_range_note": "$28â€“55/yd mid-market wholesale (16â€“19mm charmeuse); subject to exchange rate volatility",
+    "complexity_tier": "high",
+    "lead_time_weeks": 15,
+    "sustainability_score": 6.5,
+    "sustainability_flags": [
+      "Biodegradable",
+      "High Skill Requirement"
+    ],
+    "drape_quality": "fluid",
+    "typical_aesthetics": [
+      "Glamoratti",
+      "Poetcore",
+      "Indie Chic Grunge"
+    ],
+    "redirect_compatible": [
+      "tencel",
+      "rayon-viscose"
+    ]
+  },
+  {
+    "id": "wool-merino",
+    "name": "Wool (Merino)",
+    "fiber_type": "Natural",
+    "cost_per_yard": 26.00,
+    "cost_range_note": "$20â€“34/yd mid-market wholesale (Super 100s); RWS certification adds premium",
+    "complexity_tier": "moderate",
+    "lead_time_weeks": 16,
+    "sustainability_score": 7.5,
+    "sustainability_flags": [
+      "RWS Certified",
+      "Biodegradable",
+      "Animal Welfare Sensitive"
+    ],
+    "drape_quality": "medium",
+    "typical_aesthetics": [
+      "Rugged Luxury",
+      "Refined Clarity",
+      "Modern Craft"
+    ],
+    "redirect_compatible": [
+      "cashmere-blend",
+      "deadstock-fabric",
+      "organic-cotton"
+    ]
+  },
+  {
+    "id": "cashmere-blend",
+    "name": "Cashmere Blend",
+    "fiber_type": "Blended",
+    "cost_per_yard": 40.00,
+    "cost_range_note": "$32â€“52/yd mid-market wholesale (30/70 cashmere/wool); GCS certification adds ~10%",
+    "complexity_tier": "moderate",
+    "lead_time_weeks": 18,
+    "sustainability_score": 5.5,
+    "sustainability_flags": [
+      "High Land Impact",
+      "Ethical Sourcing Required",
+      "Biodegradable"
+    ],
+    "drape_quality": "fluid",
+    "typical_aesthetics": [
+      "Rugged Luxury",
+      "Refined Clarity",
+      "Glamoratti"
+    ],
+    "redirect_compatible": [
+      "wool-merino",
+      "deadstock-fabric"
+    ]
+  },
+  {
+    "id": "recycled-polyester",
+    "name": "Recycled Polyester",
+    "fiber_type": "Recycled",
+    "cost_per_yard": 8.00,
+    "cost_range_note": "$6â€“11/yd mid-market wholesale; sustainability premium over virgin due to PET feedstock competition",
+    "complexity_tier": "moderate",
+    "lead_time_weeks": 12,
+    "sustainability_score": 6.0,
+    "sustainability_flags": [
+      "GRS Certified",
+      "Microplastic Risk",
+      "Recycled Content"
+    ],
+    "drape_quality": "medium",
+    "typical_aesthetics": [
+      "Gummy",
+      "Rugged Luxury",
+      "Cult of Cute"
+    ],
+    "redirect_compatible": [
+      "virgin-polyester",
+      "nylon",
+      "tencel"
+    ]
+  },
+  {
+    "id": "virgin-polyester",
+    "name": "Virgin Polyester",
+    "fiber_type": "Synthetic",
+    "cost_per_yard": 4.25,
+    "cost_range_note": "$2.50â€“6.75/yd mid-market wholesale; price tied to petroleum benchmarks",
+    "complexity_tier": "low",
+    "lead_time_weeks": 8,
+    "sustainability_score": 1.0,
+    "sustainability_flags": [
+      "Petrochemical Based",
+      "High Carbon Footprint",
+      "Microplastic Risk"
+    ],
+    "drape_quality": "fluid",
+    "typical_aesthetics": [
+      "Glamoratti",
+      "Gummy"
+    ],
+    "redirect_compatible": [
+      "recycled-polyester",
+      "rayon-viscose",
+      "nylon"
+    ]
+  },
+  {
+    "id": "nylon",
+    "name": "Nylon",
+    "fiber_type": "Synthetic",
+    "cost_per_yard": 9.50,
+    "cost_range_note": "$7â€“14/yd mid-market wholesale; Econyl/recycled variants at premium",
+    "complexity_tier": "moderate",
+    "lead_time_weeks": 13,
+    "sustainability_score": 3.5,
+    "sustainability_flags": [
+      "Microplastic Risk",
+      "High Chemical Input"
+    ],
+    "drape_quality": "structured",
+    "typical_aesthetics": [
+      "Rugged Luxury",
+      "Indie Chic Grunge",
+      "Gummy"
+    ],
+    "redirect_compatible": [
+      "recycled-polyester",
+      "virgin-polyester",
+      "deadstock-fabric"
+    ]
+  },
+  {
+    "id": "leather",
+    "name": "Leather (Genuine)",
+    "fiber_type": "Natural",
+    "cost_per_yard": 34.00,
+    "cost_range_note": "$25â€“45/yd equivalent (converted from $5â€“9/sq ft at ~5 sq ft per linear yard, LWG-rated hides)",
+    "complexity_tier": "high",
+    "lead_time_weeks": 15,
+    "sustainability_score": 4.0,
+    "sustainability_flags": [
+      "Deforestation Risk",
+      "Heavy Metal Tanning",
+      "High Chemical Input"
+    ],
+    "drape_quality": "structured",
+    "typical_aesthetics": [
+      "Rugged Luxury",
+      "Indie Chic Grunge",
+      "Glamoratti"
+    ],
+    "redirect_compatible": [
+      "vegan-leather",
+      "deadstock-fabric"
+    ],
+    "pricing_note": "Converted from sq ft price. Mid-market LWG Silver/Gold rated bovine hide benchmark."
+  },
+  {
+    "id": "vegan-leather",
+    "name": "Vegan Leather (PU)",
+    "fiber_type": "Synthetic",
+    "cost_per_yard": 13.00,
+    "cost_range_note": "$9â€“18/yd mid-market wholesale; +7% due to rising polyurethane precursor costs",
+    "complexity_tier": "high",
+    "lead_time_weeks": 10,
+    "sustainability_score": 2.5,
+    "sustainability_flags": [
+      "Petrochemical Based",
+      "Not Biodegradable",
+      "Microplastic Risk"
+    ],
+    "drape_quality": "structured",
+    "typical_aesthetics": [
+      "Gummy",
+      "Glamoratti",
+      "Cult of Cute"
+    ],
+    "redirect_compatible": [
+      "recycled-polyester",
+      "deadstock-fabric",
+      "nylon"
+    ]
+  },
+  {
+    "id": "rayon-viscose",
+    "name": "Rayon / Viscose",
+    "fiber_type": "Semi-Synthetic",
+    "cost_per_yard": 11.00,
+    "cost_range_note": "$9â€“15/yd mid-market wholesale; EcoVero variants at top of range",
+    "complexity_tier": "moderate",
+    "lead_time_weeks": 12,
+    "sustainability_score": 5.0,
+    "sustainability_flags": [
+      "Deforestation Risk",
+      "Chemical Heavy",
+      "Biodegradable"
+    ],
+    "drape_quality": "fluid",
+    "typical_aesthetics": [
+      "Poetcore",
+      "Indie Chic Grunge"
+    ],
+    "redirect_compatible": [
+      "tencel",
+      "organic-cotton",
+      "linen",
+      "recycled-polyester"
+    ]
+  },
+  {
+    "id": "deadstock-fabric",
+    "name": "Deadstock Material (Lot-Based)",
+    "fiber_type": "Varies",
+    "cost_per_yard": 12.50,
+    "cost_range_note": "$5â€“75/yd highly variable by lot; $12.50 is a reasonable mid-market average benchmark only",
+    "complexity_tier": "moderate",
+    "lead_time_weeks": 2,
+    "sustainability_score": 7.0,
+    "sustainability_flags": [
+      "Waste Reduction",
+      "No Traceability",
+      "Lot-Specific Composition"
+    ],
+    "drape_quality": "varies",
+    "typical_aesthetics": [
+      "Indie Chic Grunge",
+      "Modern Craft"
+    ],
+    "redirect_compatible": [
+      "recycled-polyester",
+      "organic-cotton",
+      "linen",
+      "rayon-viscose"
+    ],
+    "pricing_note": "Highly variable based on lot availability. Reorders not guaranteed."
+  },
+  {
+    "id": "hemp",
+    "name": "Hemp",
+    "fiber_type": "Natural",
+    "cost_per_yard": 18.00,
+    "cost_range_note": "$13â€“24/yd mid-market wholesale; costs declining as production scales",
+    "complexity_tier": "moderate",
+    "lead_time_weeks": 15,
+    "sustainability_score": 9.5,
+    "sustainability_flags": [
+      "Carbon Sequestration",
+      "Soil Regenerative",
+      "Biodegradable",
+      "Low Water Use"
+    ],
+    "drape_quality": "structured",
+    "typical_aesthetics": [
+      "Modern Craft",
+      "Rugged Luxury"
+    ],
+    "redirect_compatible": [
+      "linen",
+      "organic-cotton",
+      "deadstock-fabric"
+    ]
+  }
+]

@@ -16,6 +16,7 @@ import {
   generateMukoInsight,
 } from "../../lib/concept-studio/utils";
 import AskMuko from "@/components/AskMuko";
+import aestheticsData from "@/data/aesthetics.json";
 
 /* ─── Icons: matched to Report page (star, users, cog) ─── */
 function IconIdentity({ size = 16 }: { size?: number }) {
@@ -144,6 +145,140 @@ function boldParts({
   );
 }
 
+// ─── Free-form aesthetic matcher ───
+function matchFreeFormToAesthetic(input: string): string | null {
+  if (!input.trim() || input.trim().length < 2) return null;
+  const normalized = input.toLowerCase().trim();
+
+  // Direct name match
+  for (const aesthetic of AESTHETICS) {
+    const aLower = aesthetic.toLowerCase();
+    if (aLower === normalized || normalized.includes(aLower)) return aesthetic;
+  }
+
+  // Keyword/synonym scoring
+  const keywordMap: Array<{ keywords: string[]; aesthetic: string }> = [
+    {
+      keywords: ["quiet luxury", "minimal", "minimalist", "clean", "sleek", "structural", "monochrome", "old money", "column silhouette", "tonal", "matte", "architectural", "refined", "precision", "crisp", "pared", "understated"],
+      aesthetic: "Quiet Structure",
+    },
+    {
+      keywords: ["rugged", "outdoor", "gorpcore", "utility", "durable", "earthy", "adventure", "workwear", "tactical", "mountain", "trail", "protection", "terrain", "technical"],
+      aesthetic: "Terrain Luxe",
+    },
+    {
+      keywords: ["academic", "poetry", "poet", "romantic", "bookish", "literary", "vintage knit", "blazer", "dark academia", "cinematic", "analog", "nostalgic romance", "literary romance", "knitwear"],
+      aesthetic: "Romantic Analog",
+    },
+    {
+      keywords: ["craft", "artisan", "handmade", "sustainable", "woven", "natural", "organic", "fiber", "handcraft", "textile", "loom", "slow fashion", "heritage", "heirloom", "circularity"],
+      aesthetic: "Heritage Hand",
+    },
+    {
+      keywords: ["grunge", "indie", "punk", "edgy", "distressed", "90s", "nineties", "sleaze", "raw", "worn", "grungy", "garage", "undone", "anti-polish", "messy"],
+      aesthetic: "Undone Glam",
+    },
+    {
+      keywords: ["gummy", "jelly", "squishy", "haptic", "rubber", "bouncy", "inflated", "asmr", "sensory", "tactile softness", "haptic play"],
+      aesthetic: "Haptic Play",
+    },
+    {
+      keywords: ["glam", "glamour", "sequin", "power dressing", "bold shoulders", "metallic", "80s", "gold", "maximalist", "bold", "diva", "extra", "opulent", "eighties", "high shine", "showstopper", "voltage"],
+      aesthetic: "High Voltage",
+    },
+    {
+      keywords: ["cute", "kawaii", "adorable", "sweet", "pastel", "whimsy", "cartoon", "childlike", "precious", "toy", "bubbly", "saccharine", "subversion", "chunky", "color blocking"],
+      aesthetic: "Sweet Subversion",
+    },
+  ];
+
+  let bestMatch: string | null = null;
+  let bestScore = 0;
+
+  for (const { keywords, aesthetic } of keywordMap) {
+    let score = 0;
+    for (const keyword of keywords) {
+      if (normalized.includes(keyword)) {
+        score += keyword.split(" ").length * 2;
+      }
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = aesthetic;
+    }
+  }
+
+  // Fallback: word-level matching against names and descriptions
+  if (bestScore < 2) {
+    const words = normalized.split(/\s+/).filter((w) => w.length > 3);
+    for (const aesthetic of AESTHETICS) {
+      const content = AESTHETIC_CONTENT[aesthetic];
+      const description = (content?.description ?? "").toLowerCase();
+      const aLower = aesthetic.toLowerCase();
+      let score = 0;
+      for (const word of words) {
+        if (aLower.includes(word)) score += 3;
+        if (description.includes(word)) score += 1;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = aesthetic;
+      }
+    }
+  }
+
+  return bestScore >= 2 ? bestMatch : null;
+}
+
+// ─── Chip data types & loader ─────────────────────────────────────────────────
+interface AestheticChip {
+  label: string;
+  type: "spec" | "mood";
+  material: string | null;
+  silhouette: Record<string, string> | null;
+  complexity_mod: number;
+  palette: string | null;
+  isCustom?: boolean;
+}
+
+function getAestheticChips(aestheticName: string): AestheticChip[] {
+  const slug = aestheticName.toLowerCase().replace(/\s+/g, "-");
+  const entry = (aestheticsData as unknown as Array<{ id: string; name: string; chips: AestheticChip[] }>)
+    .find((a) => a.id === slug || a.name === aestheticName);
+  return entry?.chips ?? [];
+}
+
+/* Small clickable chip used inside the Muko Insight panel */
+function InsightChip({ label, onClick }: { label: string; onClick: () => void }) {
+  const [hovered, setHovered] = React.useState(false);
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
+      style={{
+        padding: "5px 10px",
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 550,
+        fontFamily: "var(--font-inter), system-ui, sans-serif",
+        cursor: "pointer",
+        userSelect: "none",
+        display: "inline-block",
+        transition: "all 150ms ease",
+        color: hovered ? "#43432B" : "rgba(67,67,43,0.72)",
+        background: hovered ? "rgba(171,171,99,0.14)" : "rgba(171,171,99,0.08)",
+        border: `1.5px solid rgba(171,171,99,${hovered ? "0.55" : "0.35"})`,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
 export default function ConceptStudioPage() {
   const router = useRouter();
   const {
@@ -205,6 +340,53 @@ export default function ConceptStudioPage() {
     : null;
   const previewAesthetic = hoveredAesthetic || selectedAesthetic || "";
   const moodboardTitle = previewAesthetic || "";
+
+  const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set());
+  const [hoveredElement, setHoveredElement] = useState<string | null>(null);
+
+  const toggleElement = (key: string) => {
+    setSelectedElements((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  const [customChips, setCustomChips] = useState<Record<string, AestheticChip[]>>({});
+  const [customInputOpen, setCustomInputOpen] = useState<string | null>(null);
+  const [customInputDraft, setCustomInputDraft] = useState("");
+
+  const [freeFormDraft, setFreeFormDraft] = useState("");
+  const [freeFormMatch, setFreeFormMatch] = useState<string | null>(null);
+  const [freeFormLoading, setFreeFormLoading] = useState(false);
+
+  useEffect(() => {
+    const trimmed = freeFormDraft.trim();
+    if (trimmed.length < 2) {
+      setFreeFormMatch(null);
+      setFreeFormLoading(false);
+      return;
+    }
+
+    setFreeFormLoading(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch("/api/match-aesthetic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input: trimmed }),
+        });
+        const data = await res.json();
+        setFreeFormMatch(data.match ?? null);
+      } catch {
+        setFreeFormMatch(null);
+      } finally {
+        setFreeFormLoading(false);
+      }
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [freeFormDraft]);
 
   const [refineText, setRefineText] = useState("");
   const [refineDraft, setRefineDraft] = useState("");
@@ -306,6 +488,12 @@ export default function ConceptStudioPage() {
   }, [identityPulse?.score, resonancePulse?.score]);
 
   const handleSelectAesthetic = (aesthetic: string) => {
+    if (aesthetic !== aestheticInput) {
+      setSelectedElements(new Set());
+      setCustomChips({});
+      setCustomInputOpen(null);
+      setCustomInputDraft("");
+    }
     setHoveredAesthetic(null);
     setAestheticInput(aesthetic);
 
@@ -347,102 +535,104 @@ export default function ConceptStudioPage() {
     window.setTimeout(() => setPulseUpdated(false), 1100);
   };
 
+  const [isInterpreting, setIsInterpreting] = useState(false);
+
   useEffect(() => {
     if (!selectedAesthetic) return;
     if (!refineText || refineText.trim().length < 2) return;
 
     const base = baseOverride || selectedAesthetic;
-    const interp = interpretRefine(base, refineText);
-    setInterpretation(interp);
-  }, [refineText, selectedAesthetic, baseOverride]);
 
-  useEffect(() => {
-    if (!selectedAesthetic) return;
-    if (!refineText || refineText.trim().length < 2) return;
-
-    const timer = window.setTimeout(() => {
-      const baseScores = AESTHETIC_CONTENT[selectedAesthetic];
-      if (!baseScores) return;
-
-      const base = baseOverride || selectedAesthetic;
-      const interp = interpretRefine(base, refineText);
-
-      // ✅ NEW: Enhanced modifier impact on scores based on texture, mood, and constraint
-      let identityDelta = 0;
-      let resonanceDelta = 0;
-
-      // Texture modifiers (affect identity more)
-      if (interp.modifiers.includes("Refined")) identityDelta += 3;
-      if (interp.modifiers.includes("Textured")) identityDelta += 2;
-      if (interp.modifiers.includes("Sculptural")) identityDelta += 2;
-      if (interp.modifiers.includes("Soft")) identityDelta += 1;
-      if (interp.modifiers.includes("Structured")) identityDelta += 2;
-      if (interp.modifiers.includes("Fluid")) identityDelta += 1;
-      if (interp.modifiers.includes("Raw")) identityDelta -= 1;
-      if (interp.modifiers.includes("Polished")) identityDelta += 2;
-
-      // Mood modifiers (affect both identity and resonance)
-      if (interp.modifiers.includes("Romantic")) {
-        identityDelta += 1;
-        resonanceDelta += 2;
-      }
-      if (interp.modifiers.includes("Moody")) {
-        identityDelta += 1;
-        resonanceDelta += 1;
-      }
-      if (interp.modifiers.includes("Playful")) {
-        resonanceDelta += 3;
-      }
-      if (interp.modifiers.includes("Serious")) {
-        identityDelta += 1;
-        resonanceDelta -= 1;
-      }
-      if (interp.modifiers.includes("Ethereal")) {
-        identityDelta += 2;
-        resonanceDelta += 1;
-      }
-      if (interp.modifiers.includes("Grounded")) {
-        identityDelta += 1;
-      }
-
-      // Constraint modifiers (affect resonance more - market positioning)
-      if (interp.modifiers.includes("Minimal")) resonanceDelta += 2;
-      if (interp.modifiers.includes("Maximal")) resonanceDelta -= 1;
-      if (interp.modifiers.includes("Utility")) resonanceDelta += 2;
-      if (interp.modifiers.includes("Decorative")) resonanceDelta -= 1;
-      if (interp.modifiers.includes("Nostalgic")) resonanceDelta -= 2;
-      if (interp.modifiers.includes("Contemporary")) resonanceDelta += 2;
-      if (interp.modifiers.includes("Timeless")) {
-        identityDelta += 2;
-        resonanceDelta += 1;
-      }
-      if (interp.modifiers.includes("Trend-forward")) {
-        resonanceDelta += 3;
-      }
-
-      const newIdentity = Math.max(
-        0,
-        Math.min(100, baseScores.identityScore + identityDelta),
-      );
-      const newResonance = Math.max(
-        0,
-        Math.min(100, baseScores.resonanceScore + resonanceDelta),
-      );
-
-      useSessionStore.setState({
-        identityPulse: {
-          score: newIdentity,
-          status: newIdentity >= 80 ? "green" : newIdentity >= 60 ? "yellow" : "red",
-          message: "",
-        },
-        resonancePulse: {
-          score: newResonance,
-          status:
-            newResonance >= 80 ? "green" : newResonance >= 60 ? "yellow" : "red",
-          message: "",
-        },
+    // If still at the seeded default, show base interpretation immediately
+    const seeded = `${selectedAesthetic}, but…`;
+    if (refineText === seeded) {
+      setInterpretation({
+        base,
+        modifiers: [],
+        note: `Interpreting this as: ${base}`,
+        confidence: "high",
+        unsupportedHits: [],
       });
-    }, 350);
+      return;
+    }
+
+    setIsInterpreting(true);
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch("/api/interpret-refine", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base, text: refineText }),
+        });
+        const data = await res.json();
+        const modifiers: string[] = data.modifiers ?? [];
+        const confidence: "high" | "med" | "low" = data.confidence ?? "med";
+
+        setInterpretation({
+          base,
+          modifiers,
+          note:
+            modifiers.length > 0
+              ? `Interpreting this as: ${base} → ${modifiers.join(" / ")}`
+              : `Interpreting this as: ${base}`,
+          confidence,
+          unsupportedHits: [],
+        });
+
+        // Update pulse scores based on returned modifiers
+        const baseScores = AESTHETIC_CONTENT[selectedAesthetic];
+        if (baseScores) {
+          let identityDelta = 0;
+          let resonanceDelta = 0;
+
+          if (modifiers.includes("Refined")) identityDelta += 3;
+          if (modifiers.includes("Textured")) identityDelta += 2;
+          if (modifiers.includes("Sculptural")) identityDelta += 2;
+          if (modifiers.includes("Soft")) identityDelta += 1;
+          if (modifiers.includes("Structured")) identityDelta += 2;
+          if (modifiers.includes("Fluid")) identityDelta += 1;
+          if (modifiers.includes("Raw")) identityDelta -= 1;
+          if (modifiers.includes("Polished")) identityDelta += 2;
+          if (modifiers.includes("Romantic")) { identityDelta += 1; resonanceDelta += 2; }
+          if (modifiers.includes("Moody")) { identityDelta += 1; resonanceDelta += 1; }
+          if (modifiers.includes("Playful")) resonanceDelta += 3;
+          if (modifiers.includes("Serious")) { identityDelta += 1; resonanceDelta -= 1; }
+          if (modifiers.includes("Ethereal")) { identityDelta += 2; resonanceDelta += 1; }
+          if (modifiers.includes("Grounded")) identityDelta += 1;
+          if (modifiers.includes("Minimal")) resonanceDelta += 2;
+          if (modifiers.includes("Maximal")) resonanceDelta -= 1;
+          if (modifiers.includes("Utility")) resonanceDelta += 2;
+          if (modifiers.includes("Decorative")) resonanceDelta -= 1;
+          if (modifiers.includes("Nostalgic")) resonanceDelta -= 2;
+          if (modifiers.includes("Contemporary")) resonanceDelta += 2;
+          if (modifiers.includes("Timeless")) { identityDelta += 2; resonanceDelta += 1; }
+          if (modifiers.includes("Trend-forward")) resonanceDelta += 3;
+
+          const newIdentity = Math.max(0, Math.min(100, baseScores.identityScore + identityDelta));
+          const newResonance = Math.max(0, Math.min(100, baseScores.resonanceScore + resonanceDelta));
+
+          useSessionStore.setState({
+            identityPulse: {
+              score: newIdentity,
+              status: newIdentity >= 80 ? "green" : newIdentity >= 60 ? "yellow" : "red",
+              message: "",
+            },
+            resonancePulse: {
+              score: newResonance,
+              status: newResonance >= 80 ? "green" : newResonance >= 60 ? "yellow" : "red",
+              message: "",
+            },
+          });
+        }
+      } catch {
+        // Fallback to local interpreter
+        const interp = interpretRefine(base, refineText);
+        setInterpretation(interp);
+      } finally {
+        setIsInterpreting(false);
+      }
+    }, 400);
 
     return () => window.clearTimeout(timer);
   }, [refineText, selectedAesthetic, baseOverride]);
@@ -518,9 +708,12 @@ export default function ConceptStudioPage() {
     ...TOP_SUGGESTED,
     ...AESTHETICS.filter((a) => !TOP_SUGGESTED.includes(a)),
   ];
+  const sortedAesthetics = selectedAesthetic
+    ? [selectedAesthetic, ...orderedAesthetics.filter((a) => a !== selectedAesthetic)]
+    : orderedAesthetics;
   const visibleAesthetics = showAllAesthetics
-    ? orderedAesthetics
-    : orderedAesthetics.slice(0, 4);
+    ? sortedAesthetics
+    : sortedAesthetics.slice(0, 4);
 
   const topSuggestedTwo = TOP_SUGGESTED.slice(0, 2);
 
@@ -1119,7 +1312,7 @@ export default function ConceptStudioPage() {
                     marginBottom: 6,
                   }}
                 >
-                  Start with a direction
+                  Start with a direction — what moment are you leaning into right now?
                 </div>
                 <div
                   style={{
@@ -1130,8 +1323,130 @@ export default function ConceptStudioPage() {
                     marginBottom: 16,
                   }}
                 >
-                  {/* ✅ NEW: Updated copy to mention rose glow */}
-                  Look for the rose glow — that's Muko's top recommendation for your brand.
+                  Select a signal — or enter a direction — and we'll match it to the closest market movement.
+                </div>
+
+                {/* Free-form direction input */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ position: "relative", width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
+                    <input
+                      type="text"
+                      value={freeFormDraft}
+                      onChange={(e) => setFreeFormDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && freeFormMatch) {
+                          handleSelectAesthetic(freeFormMatch);
+                          setFreeFormDraft("");
+                        }
+                      }}
+                      placeholder="e.g. quiet luxury with edge, grunge romance, coastal dark…"
+                      style={{
+                        width: "100%",
+                        maxWidth: "100%",
+                        boxSizing: "border-box",
+                        padding: "14px 52px 14px 16px",
+                        fontSize: "14px",
+                        borderRadius: "14px",
+                        border: "1px solid rgba(67, 67, 43, 0.12)",
+                        background: "rgba(255,255,255,0.78)",
+                        color: BRAND.oliveInk,
+                        fontFamily: "var(--font-inter), system-ui, sans-serif",
+                        outline: "none",
+                        boxShadow: "0 14px 40px rgba(67, 67, 43, 0.06)",
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        if (freeFormMatch) {
+                          handleSelectAesthetic(freeFormMatch);
+                          setFreeFormDraft("");
+                        }
+                      }}
+                      disabled={!freeFormMatch || !freeFormDraft.trim()}
+                      aria-label="Match direction"
+                      style={{
+                        position: "absolute",
+                        right: 10,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: 36,
+                        height: 36,
+                        borderRadius: 999,
+                        border: "1px solid rgba(67, 67, 43, 0.12)",
+                        background: "rgba(255,255,255,0.86)",
+                        boxShadow: "0 10px 24px rgba(67, 67, 43, 0.08)",
+                        cursor: !freeFormMatch || !freeFormDraft.trim() ? "not-allowed" : "pointer",
+                        opacity: !freeFormMatch || !freeFormDraft.trim() ? 0.5 : 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "rgba(67, 67, 43, 0.70)",
+                      }}
+                    >
+                      →
+                    </button>
+                  </div>
+
+                  {freeFormLoading && freeFormDraft.trim().length > 1 && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        fontSize: 11,
+                        color: "rgba(67,67,43,0.38)",
+                        fontFamily: "var(--font-inter), system-ui, sans-serif",
+                      }}
+                    >
+                      Interpreting…
+                    </div>
+                  )}
+
+                  {!freeFormLoading && freeFormMatch && freeFormDraft.trim().length > 1 && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "rgba(67,67,43,0.42)",
+                          fontFamily: "var(--font-inter), system-ui, sans-serif",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Closest match:
+                      </span>
+                      <button
+                        onClick={() => {
+                          handleSelectAesthetic(freeFormMatch);
+                          setFreeFormDraft("");
+                        }}
+                        style={{
+                          padding: "5px 12px",
+                          borderRadius: 999,
+                          fontSize: 12,
+                          fontWeight: 650,
+                          background: "rgba(169,123,143,0.08)",
+                          border: "1px solid rgba(169,123,143,0.22)",
+                          color: BRAND.rose,
+                          cursor: "pointer",
+                          fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                          transition: "all 160ms ease",
+                        }}
+                      >
+                        {freeFormMatch}
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                          <path d="M2.5 5H7.5M7.5 5L5 2.5M7.5 5L5 7.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div
@@ -1345,41 +1660,268 @@ export default function ConceptStudioPage() {
                                 lineHeight: 1.5,
                               }}
                             >
-                              {/* ✅ NEW: Show recommended insight or default description */}
-                              {isRecommended
-                                ? "Strongest alignment with your brand DNA — clear, intentional, and room to make it your own."
-                                : content?.description ?? " "}
+                              {content?.description ?? " "}
                             </div>
 
-                            {/* ✅ NEW: "Why This Works" section for recommended */}
-                            {isRecommended && (
-                              <div style={{ marginTop: 10 }}>
-                                <div
-                                  style={{
-                                    fontSize: 10,
-                                    fontWeight: 800,
-                                    letterSpacing: "0.08em",
-                                    textTransform: "uppercase" as const,
-                                    color: "rgba(67,67,43,0.50)",
-                                    fontFamily:
-                                      "var(--font-sohne-breit), system-ui, sans-serif",
-                                    marginBottom: 4,
-                                  }}
-                                >
-                                  Why This Works
+                            {/* Key elements chips — from aesthetics.json */}
+                            {(() => {
+                              const libraryChips = getAestheticChips(aesthetic);
+                              const customChipsForAesthetic = customChips[aesthetic] ?? [];
+                              const isInputOpen = customInputOpen === aesthetic;
+                              const canAddMore = customChipsForAesthetic.length < 3;
+                              if (libraryChips.length === 0 && customChipsForAesthetic.length === 0 && !isInputOpen) return null;
+                              return (
+                                <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                                  {/* Library chips */}
+                                  {libraryChips.map((chip) => {
+                                    const key = `${aesthetic}::${chip.label}`;
+                                    const isChipSelected = selectedElements.has(key);
+                                    const isChipHovered = hoveredElement === key && isSelected;
+                                    const interactive = isSelected;
+                                    return (
+                                      <span
+                                        key={chip.label}
+                                        role={interactive ? "button" : undefined}
+                                        tabIndex={interactive ? 0 : undefined}
+                                        onClick={interactive ? (e) => { e.stopPropagation(); toggleElement(key); } : undefined}
+                                        onMouseEnter={interactive ? () => setHoveredElement(key) : undefined}
+                                        onMouseLeave={interactive ? () => setHoveredElement(null) : undefined}
+                                        onKeyDown={interactive ? (e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); toggleElement(key); } } : undefined}
+                                        style={{
+                                          padding: "6px 12px",
+                                          borderRadius: 999,
+                                          fontSize: 11,
+                                          fontWeight: 550,
+                                          fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                          whiteSpace: "nowrap",
+                                          cursor: interactive ? "pointer" : "default",
+                                          userSelect: "none",
+                                          display: "inline-block",
+                                          transition: "all 150ms ease",
+                                          color: isChipSelected
+                                            ? BRAND.oliveInk
+                                            : isChipHovered
+                                              ? "rgba(67, 67, 43, 0.82)"
+                                              : interactive
+                                                ? "rgba(67, 67, 43, 0.62)"
+                                                : "rgba(67, 67, 43, 0.42)",
+                                          background: isChipSelected
+                                            ? "rgba(171, 171, 99, 0.16)"
+                                            : isChipHovered
+                                              ? "rgba(171, 171, 99, 0.10)"
+                                              : "transparent",
+                                          border: isChipSelected
+                                            ? `1.5px solid ${BRAND.chartreuse}`
+                                            : isChipHovered
+                                              ? "1.5px solid rgba(171, 171, 99, 0.55)"
+                                              : interactive
+                                                ? "1.5px solid rgba(171, 171, 99, 0.30)"
+                                                : "1.5px solid rgba(67, 67, 43, 0.10)",
+                                          boxShadow: isChipSelected
+                                            ? "0 2px 8px rgba(171, 171, 99, 0.18)"
+                                            : "none",
+                                        }}
+                                      >
+                                        {chip.label}
+                                      </span>
+                                    );
+                                  })}
+
+                                  {/* Custom chips — dashed border, deletable */}
+                                  {isSelected && customChipsForAesthetic.map((chip) => {
+                                    const key = `${aesthetic}::${chip.label}`;
+                                    const isChipSelected = selectedElements.has(key);
+                                    const isChipHovered = hoveredElement === key;
+                                    return (
+                                      <span
+                                        key={`custom-${chip.label}`}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={(e) => { e.stopPropagation(); toggleElement(key); }}
+                                        onMouseEnter={() => setHoveredElement(key)}
+                                        onMouseLeave={() => setHoveredElement(null)}
+                                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); toggleElement(key); } }}
+                                        style={{
+                                          padding: "6px 8px 6px 12px",
+                                          borderRadius: 999,
+                                          fontSize: 11,
+                                          fontWeight: 550,
+                                          fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                          whiteSpace: "nowrap",
+                                          cursor: "pointer",
+                                          userSelect: "none",
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          gap: 4,
+                                          transition: "all 150ms ease",
+                                          color: isChipSelected
+                                            ? BRAND.oliveInk
+                                            : isChipHovered
+                                              ? "rgba(67, 67, 43, 0.82)"
+                                              : "rgba(67, 67, 43, 0.62)",
+                                          background: isChipSelected
+                                            ? "rgba(171, 171, 99, 0.16)"
+                                            : isChipHovered
+                                              ? "rgba(171, 171, 99, 0.10)"
+                                              : "transparent",
+                                          border: isChipSelected
+                                            ? `1.5px dashed ${BRAND.chartreuse}`
+                                            : isChipHovered
+                                              ? "1.5px dashed rgba(171, 171, 99, 0.55)"
+                                              : "1.5px dashed rgba(171, 171, 99, 0.30)",
+                                          boxShadow: isChipSelected
+                                            ? "0 2px 8px rgba(171, 171, 99, 0.18)"
+                                            : "none",
+                                        }}
+                                      >
+                                        {chip.label}
+                                        {/* × delete — only visible on hover */}
+                                        {isChipHovered && (
+                                          <span
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedElements((prev) => { const n = new Set(prev); n.delete(key); return n; });
+                                              setCustomChips((prev) => ({ ...prev, [aesthetic]: (prev[aesthetic] ?? []).filter((c) => c.label !== chip.label) }));
+                                            }}
+                                            onKeyDown={(e) => {
+                                              if (e.key === "Enter" || e.key === " ") {
+                                                e.stopPropagation();
+                                                setSelectedElements((prev) => { const n = new Set(prev); n.delete(key); return n; });
+                                                setCustomChips((prev) => ({ ...prev, [aesthetic]: (prev[aesthetic] ?? []).filter((c) => c.label !== chip.label) }));
+                                              }
+                                            }}
+                                            style={{ fontSize: 12, lineHeight: 1, color: "rgba(67,67,43,0.45)", padding: "1px 2px", borderRadius: 3 }}
+                                          >
+                                            ×
+                                          </span>
+                                        )}
+                                      </span>
+                                    );
+                                  })}
+
+                                  {/* "+" add custom chip button */}
+                                  {isSelected && canAddMore && !isInputOpen && (
+                                    <span
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={(e) => { e.stopPropagation(); setCustomInputOpen(aesthetic); setCustomInputDraft(""); }}
+                                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setCustomInputOpen(aesthetic); setCustomInputDraft(""); } }}
+                                      style={{
+                                        padding: "6px 10px",
+                                        borderRadius: 999,
+                                        fontSize: 11,
+                                        fontWeight: 550,
+                                        fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                        cursor: "pointer",
+                                        userSelect: "none",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 3,
+                                        transition: "all 150ms ease",
+                                        color: "rgba(67, 67, 43, 0.38)",
+                                        background: "transparent",
+                                        border: "1.5px dashed rgba(67, 67, 43, 0.20)",
+                                      }}
+                                    >
+                                      + add
+                                    </span>
+                                  )}
+
+                                  {/* Inline custom chip input */}
+                                  {isSelected && isInputOpen && (
+                                    <input
+                                      autoFocus
+                                      maxLength={30}
+                                      value={customInputDraft}
+                                      onChange={(e) => setCustomInputDraft(e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onKeyDown={(e) => {
+                                        e.stopPropagation();
+                                        if (e.key === "Enter" && customInputDraft.trim()) {
+                                          const label = customInputDraft.trim();
+                                          const newChip: AestheticChip = { label, type: "mood", material: null, silhouette: null, complexity_mod: 0, palette: null, isCustom: true };
+                                          setCustomChips((prev) => ({ ...prev, [aesthetic]: [...(prev[aesthetic] ?? []), newChip] }));
+                                          setSelectedElements((prev) => { const n = new Set(prev); n.add(`${aesthetic}::${label}`); return n; });
+                                          setCustomInputOpen(null);
+                                          setCustomInputDraft("");
+                                        } else if (e.key === "Escape") {
+                                          setCustomInputOpen(null);
+                                          setCustomInputDraft("");
+                                        }
+                                      }}
+                                      onBlur={() => {
+                                        if (customInputDraft.trim()) {
+                                          const label = customInputDraft.trim();
+                                          const newChip: AestheticChip = { label, type: "mood", material: null, silhouette: null, complexity_mod: 0, palette: null, isCustom: true };
+                                          setCustomChips((prev) => ({ ...prev, [aesthetic]: [...(prev[aesthetic] ?? []), newChip] }));
+                                          setSelectedElements((prev) => { const n = new Set(prev); n.add(`${aesthetic}::${label}`); return n; });
+                                        }
+                                        setCustomInputOpen(null);
+                                        setCustomInputDraft("");
+                                      }}
+                                      placeholder="add a detail…"
+                                      style={{
+                                        padding: "6px 12px",
+                                        borderRadius: 999,
+                                        fontSize: 11,
+                                        fontWeight: 550,
+                                        fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                        width: 130,
+                                        color: "rgba(67, 67, 43, 0.82)",
+                                        background: "rgba(255, 255, 255, 0.80)",
+                                        border: "1.5px dashed rgba(171, 171, 99, 0.60)",
+                                        outline: "none",
+                                      }}
+                                    />
+                                  )}
                                 </div>
-                                <div
-                                  style={{
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    color: "rgba(67,67,43,0.62)",
-                                    fontFamily: "var(--font-inter), system-ui, sans-serif",
-                                  }}
-                                >
-                                  Supports your direction while staying flexible across product categories — easier to execute without losing brand clarity.
+                              );
+                            })()}
+
+                            {/* "Why This Works" — brand alignment rationale for recommended */}
+                            {isRecommended && (() => {
+                              const iScore = content?.identityScore ?? 0;
+                              const rScore = content?.resonanceScore ?? 0;
+                              let rationale = "";
+                              if (iScore >= 85 && rScore >= 85) {
+                                rationale = `Highest combined score across all directions — your brand's natural vocabulary maps cleanly onto this aesthetic and the market appetite is there to meet it.`;
+                              } else if (iScore >= 85) {
+                                rationale = `Strongest brand fit of all options — this direction draws on your existing codes without forcing the hand. The identity clarity reduces execution risk significantly.`;
+                              } else if (rScore >= 85) {
+                                rationale = `Strongest market opportunity in your range — consumer demand is high and the direction gives your brand room to establish a clear POV within it.`;
+                              } else {
+                                rationale = `Best balance of brand authenticity and market demand across your options — a stronger foundation than the alternatives for building a coherent collection.`;
+                              }
+                              return (
+                                <div style={{ marginTop: 10 }}>
+                                  <div
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 800,
+                                      letterSpacing: "0.08em",
+                                      textTransform: "uppercase" as const,
+                                      color: "rgba(67,67,43,0.50)",
+                                      fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                                      marginBottom: 4,
+                                    }}
+                                  >
+                                    Why This Works
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: 12,
+                                      lineHeight: 1.5,
+                                      color: "rgba(67,67,43,0.62)",
+                                      fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                    }}
+                                  >
+                                    {rationale}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })()}
                           </div>
                         )}
                       </button>
@@ -1405,311 +1947,9 @@ export default function ConceptStudioPage() {
                 </button>
               </div>
 
-              {/* Refine — only after selection */}
+              {/* Confirm direction */}
               {selectedAesthetic && (
-                <div style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
-                  <label
-                    style={{
-                      fontSize: "18px",
-                      fontWeight: 650,
-                      color: BRAND.oliveInk,
-                      marginBottom: "10px",
-                      display: "block",
-                      fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                    }}
-                  >
-                    Add texture, mood, references, or constraint{" "}
-                    <span style={{ color: "rgba(67, 67, 43, 0.45)", fontWeight: 400, fontSize: "14px" }}>
-                      (optional)
-                    </span>
-                  </label>
-
-                  <div style={{ position: "relative", width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
-                    <input
-                      ref={refineInputRef}
-                      type="text"
-                      value={refineDraft}
-                      onChange={(e) => setRefineDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          submitRefine();
-                        }
-                      }}
-                      style={{
-                        width: "100%",
-                        maxWidth: "100%",
-                        boxSizing: "border-box",
-                        padding: "14px 52px 14px 16px",
-                        fontSize: "14px",
-                        borderRadius: "14px",
-                        border: "1px solid rgba(67, 67, 43, 0.12)",
-                        background: "rgba(255,255,255,0.78)",
-                        color: BRAND.oliveInk,
-                        fontFamily: "var(--font-inter), system-ui, sans-serif",
-                        outline: "none",
-                        boxShadow: "0 14px 40px rgba(67, 67, 43, 0.06)",
-                      }}
-                      placeholder="e.g., more refined, ethereal, minimal"
-                    />
-
-                    <button
-                      onClick={submitRefine}
-                      disabled={!selectedAesthetic || !refineDraft.trim()}
-                      aria-label="Submit refinement"
-                      style={{
-                        position: "absolute",
-                        right: 10,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        width: 36,
-                        height: 36,
-                        borderRadius: 999,
-                        border: "1px solid rgba(67, 67, 43, 0.12)",
-                        background: "rgba(255,255,255,0.86)",
-                        boxShadow: "0 10px 24px rgba(67, 67, 43, 0.08)",
-                        cursor: !selectedAesthetic || !refineDraft.trim() ? "not-allowed" : "pointer",
-                        opacity: !selectedAesthetic || !refineDraft.trim() ? 0.5 : 1,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "rgba(67, 67, 43, 0.70)",
-                      }}
-                    >
-                      →
-                    </button>
-                  </div>
-
-                  {interpretation && (
-                    <div
-                      style={{
-                        marginTop: "12px",
-                        padding: "14px 16px",
-                        borderRadius: "14px",
-                        background: "rgba(255,255,255,0.60)",
-                        border: "1px solid rgba(67, 67, 43, 0.10)",
-                        boxShadow: "0 10px 26px rgba(67, 67, 43, 0.06)",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            fontWeight: 800,
-                            letterSpacing: "0.10em",
-                            textTransform: "uppercase",
-                            color: "rgba(67, 67, 43, 0.38)",
-                            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                          }}
-                        >
-                          Interpretation
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 650,
-                            color:
-                              interpretation.confidence === "high"
-                                ? "rgba(67, 67, 43, 0.60)"
-                                : interpretation.confidence === "med"
-                                  ? "rgba(169, 123, 143, 0.85)"
-                                  : "rgba(181, 141, 94, 0.95)",
-                            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                          }}
-                        >
-                          {interpretation.confidence === "high"
-                            ? "High confidence"
-                            : interpretation.confidence === "med"
-                              ? "Medium confidence"
-                              : "Low confidence"}
-                        </div>
-                      </div>
-
-                      <div style={{ marginTop: 10 }}>
-                        {boldParts({
-                          base: interpretation.base,
-                          modifiers: interpretation.modifiers ?? [],
-                        })}
-                      </div>
-
-                      {/* ✅ NEW: Detailed insight about interpretation */}
-                      {interpretation.modifiers?.length > 0 && (
-                        <>
-                          <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                            {interpretation.modifiers.map((m) => (
-                              <span
-                                key={m}
-                                style={{
-                                  padding: "6px 10px",
-                                  borderRadius: 999,
-                                  fontSize: 12,
-                                  fontWeight: 650,
-                                  color: "rgba(67, 67, 43, 0.66)",
-                                  background: "rgba(171, 171, 99, 0.10)",
-                                  border: "1px solid rgba(171, 171, 99, 0.18)",
-                                  fontFamily: "var(--font-inter), system-ui, sans-serif",
-                                }}
-                              >
-                                {m}
-                              </span>
-                            ))}
-                          </div>
-
-                          <div style={{ marginTop: 10 }}>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                lineHeight: 1.5,
-                                color: "rgba(67,67,43,0.62)",
-                                fontFamily: "var(--font-inter), system-ui, sans-serif",
-                              }}
-                            >
-                              These modifiers add specificity — they'll influence how materials, silhouettes, and palette read in the next step.
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {interpretation.confidence === "low" && !acceptedInterpretation && (
-                        <div style={{ marginTop: 12 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                            <button
-                              onClick={() => setAcceptedInterpretation(true)}
-                              style={{
-                                padding: "8px 12px",
-                                borderRadius: 999,
-                                border: "1px solid rgba(67, 67, 43, 0.14)",
-                                background: "rgba(255,255,255,0.84)",
-                                fontSize: 12,
-                                fontWeight: 650,
-                                cursor: "pointer",
-                                color: "rgba(67, 67, 43, 0.75)",
-                                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                              }}
-                            >
-                              Accept
-                            </button>
-
-                            <button
-                              onClick={() => setShowAdjust((v) => !v)}
-                              style={{
-                                padding: "8px 12px",
-                                borderRadius: 999,
-                                border: "1px solid rgba(181, 141, 94, 0.30)",
-                                background: "rgba(181, 141, 94, 0.10)",
-                                fontSize: 12,
-                                fontWeight: 650,
-                                cursor: "pointer",
-                                color: "rgba(67, 67, 43, 0.74)",
-                                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                              }}
-                            >
-                              Adjust
-                            </button>
-                          </div>
-
-                          {showAdjust && (
-                            <div
-                              style={{
-                                marginTop: 10,
-                                padding: 12,
-                                borderRadius: 14,
-                                background: "rgba(255,255,255,0.74)",
-                                border: "1px solid rgba(67, 67, 43, 0.10)",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: 650,
-                                  color: "rgba(67, 67, 43, 0.70)",
-                                  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                                  marginBottom: 8,
-                                }}
-                              >
-                                Adjust interpretation
-                              </div>
-
-                              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                                <span
-                                  style={{
-                                    fontSize: 12,
-                                    color: "rgba(67, 67, 43, 0.55)",
-                                    fontFamily: "var(--font-inter), system-ui, sans-serif",
-                                  }}
-                                >
-                                  Closest base:
-                                </span>
-
-                                <select
-                                  value={baseOverride ?? selectedAesthetic ?? ""}
-                                  onChange={(e) => setBaseOverride(e.target.value)}
-                                  style={{
-                                    padding: "8px 10px",
-                                    fontSize: 12,
-                                    fontWeight: 650,
-                                    color: "rgba(67, 67, 43, 0.78)",
-                                    background: "rgba(255,255,255,0.85)",
-                                    border: "1px solid rgba(67, 67, 43, 0.14)",
-                                    borderRadius: 10,
-                                    fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                                    outline: "none",
-                                  }}
-                                >
-                                  {AESTHETICS.map((a) => (
-                                    <option key={a} value={a}>
-                                      {a}
-                                    </option>
-                                  ))}
-                                </select>
-
-                                <button
-                                  onClick={() => {
-                                    const nextBase = baseOverride ?? selectedAesthetic;
-                                    if (nextBase && nextBase !== selectedAesthetic) {
-                                      handleSelectAesthetic(nextBase);
-                                    }
-                                    setAcceptedInterpretation(true);
-                                    setShowAdjust(false);
-                                  }}
-                                  style={{
-                                    padding: "8px 12px",
-                                    fontSize: 12,
-                                    fontWeight: 650,
-                                    color: "rgba(67, 67, 43, 0.78)",
-                                    background: "rgba(171, 171, 99, 0.12)",
-                                    border: "1px solid rgba(171, 171, 99, 0.32)",
-                                    borderRadius: 999,
-                                    cursor: "pointer",
-                                    fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                                  }}
-                                >
-                                  Apply
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {interpretation.confidence === "low" && acceptedInterpretation && (
-                        <div
-                          style={{
-                            marginTop: 10,
-                            fontSize: 12,
-                            color: "rgba(67, 67, 43, 0.45)",
-                            fontFamily: "var(--font-inter), system-ui, sans-serif",
-                          }}
-                        >
-                          Interpretation accepted — you can keep refining anytime.
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Confirm direction */}
-                  <div style={{ marginTop: "20px" }}>
+                <div style={{ marginTop: "20px" }}>
                     <button
                       onClick={handleConfirmClick}
                       disabled={!confirmClickable}
@@ -1763,7 +2003,6 @@ export default function ConceptStudioPage() {
                     >
                       If you edit the direction, you'll confirm again.
                     </div>
-                  </div>
                 </div>
               )}
             </div>
@@ -2101,6 +2340,83 @@ export default function ConceptStudioPage() {
                       }
                     </div>
 
+                    {/* ─── Chip suggestions ─── */}
+                    {selectedAesthetic && (() => {
+                      const activeKeys = Array.from(selectedElements).filter((k) => k.startsWith(`${selectedAesthetic}::`));
+                      const activeLabels = activeKeys.map((k) => k.replace(`${selectedAesthetic}::`, ""));
+                      const dirChips = getAestheticChips(selectedAesthetic);
+                      const specChips = dirChips.filter((c) => c.type === "spec");
+                      const unselectedSpec = specChips.filter((c) => !activeLabels.includes(c.label));
+                      const complexityChip = dirChips.find((c) => activeLabels.includes(c.label) && c.complexity_mod > 0);
+                      if (dirChips.length === 0) return null;
+
+                      const miniChipStyle = (hovered: boolean): React.CSSProperties => ({
+                        padding: "5px 10px",
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 550,
+                        fontFamily: "var(--font-inter), system-ui, sans-serif",
+                        cursor: "pointer",
+                        userSelect: "none",
+                        display: "inline-block",
+                        transition: "all 150ms ease",
+                        color: hovered ? BRAND.oliveInk : "rgba(67,67,43,0.72)",
+                        background: hovered ? "rgba(171,171,99,0.14)" : "rgba(171,171,99,0.08)",
+                        border: `1.5px solid rgba(171,171,99,${hovered ? "0.55" : "0.35"})`,
+                      });
+
+                      return (
+                        <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(67,67,43,0.08)" }}>
+                          {activeKeys.length === 0 ? (
+                            <>
+                              <div style={{ fontSize: 12, color: "rgba(67,67,43,0.58)", fontFamily: "var(--font-inter), system-ui, sans-serif", marginBottom: 8 }}>
+                                Sharpen your direction — try adding:
+                              </div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                {specChips.slice(0, 3).map((chip) => {
+                                  const key = `${selectedAesthetic}::${chip.label}`;
+                                  return (
+                                    <InsightChip
+                                      key={chip.label}
+                                      label={`+ ${chip.label}`}
+                                      onClick={() => toggleElement(key)}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </>
+                          ) : unselectedSpec.length === 0 ? (
+                            <div style={{ fontSize: 12, lineHeight: 1.55, color: "rgba(67,67,43,0.58)", fontFamily: "var(--font-inter), system-ui, sans-serif" }}>
+                              Looking strong. Add texture or mood with custom chips, or continue to Spec Studio.
+                            </div>
+                          ) : (
+                            <>
+                              <div style={{ fontSize: 12, lineHeight: 1.5, color: "rgba(67,67,43,0.58)", fontFamily: "var(--font-inter), system-ui, sans-serif", marginBottom: 8 }}>
+                                Your <strong style={{ fontWeight: 650, color: "rgba(67,67,43,0.80)" }}>{selectedAesthetic}</strong> direction is taking shape. Consider adding:
+                              </div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                {unselectedSpec.slice(0, 2).map((chip) => {
+                                  const key = `${selectedAesthetic}::${chip.label}`;
+                                  return (
+                                    <InsightChip
+                                      key={chip.label}
+                                      label={`+ ${chip.label}`}
+                                      onClick={() => toggleElement(key)}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                          {complexityChip && (
+                            <div style={{ marginTop: 10, fontSize: 11.5, lineHeight: 1.5, color: "rgba(184,135,107,0.90)", fontFamily: "var(--font-inter), system-ui, sans-serif", padding: "8px 10px", borderRadius: 8, background: "rgba(184,135,107,0.08)", border: "1px solid rgba(184,135,107,0.20)" }}>
+                              Heads up — <strong style={{ fontWeight: 650 }}>{complexityChip.label}</strong> adds construction complexity. This will be factored into your execution score.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* ✅ NEW: Suggestions section */}
                     {selectedAesthetic && generateSuggestions().length > 0 && (
                       <div style={{ marginTop: 16 }}>
@@ -2211,11 +2527,28 @@ export default function ConceptStudioPage() {
                   onClick={() => {
                     if (!canContinue) return;
 
+                    // Build chip selection from current state
+                    const activeKeys = Array.from(selectedElements).filter((k) => k.startsWith(`${selectedAesthetic}::`));
+                    const libraryChips = getAestheticChips(selectedAesthetic!);
+                    const customChipsForDir = customChips[selectedAesthetic!] ?? [];
+                    const activatedChips = activeKeys.map((k) => {
+                      const label = k.replace(`${selectedAesthetic}::`, "");
+                      const lib = libraryChips.find((c) => c.label === label);
+                      if (lib) return { ...lib, isCustom: false as const };
+                      const custom = customChipsForDir.find((c) => c.label === label);
+                      if (custom) return { ...custom, isCustom: true as const };
+                      return { label, type: "mood" as const, material: null, silhouette: null, complexity_mod: 0, palette: null, isCustom: false as const };
+                    });
+
                     // Persist concept context to store
                     useSessionStore.setState({
                       aestheticMatchedId: selectedAesthetic,
                       refinementModifiers: interpretation?.modifiers ?? [],
                       moodboardImages,
+                      chipSelection: {
+                        directionId: selectedAesthetic!.toLowerCase().replace(/\s+/g, "-"),
+                        activatedChips,
+                      },
                     });
 
                     setCurrentStep(3);

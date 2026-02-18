@@ -1,4 +1,4 @@
-import type { ConstructionTier } from '@/types/spec-studio';
+import type { ConstructionTier } from '@/lib/types/spec-studio';
 
 // Maps category ID to recommended default construction tier
 export const SMART_DEFAULTS: Record<string, ConstructionTier> = {

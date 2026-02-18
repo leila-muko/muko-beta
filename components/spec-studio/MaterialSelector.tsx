@@ -1,6 +1,6 @@
 'use client';
 
-import type { Material } from '@/types/spec-studio';
+import type { Material } from '@/lib/types/spec-studio';
 
 // Visual indicators for material character
 const MATERIAL_ICONS: Record<string, string> = {

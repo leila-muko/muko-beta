@@ -388,12 +388,14 @@ export default function IntentCalibrationPage() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {[
-                { label: "Intent", state: "active" as const },
-                { label: "Concept", state: "idle" as const },
-                { label: "Spec", state: "idle" as const },
-                { label: "Report", state: "idle" as const },
-              ].map((s) => {
+              {(
+                [
+                  { label: "Intent", state: "active" },
+                  { label: "Concept", state: "idle" },
+                  { label: "Spec", state: "idle" },
+                  { label: "Report", state: "idle" },
+                ] as { label: string; state: "active" | "idle" | "done" }[]
+              ).map((s) => {
                 const isActive = s.state === "active";
                 const isDone = s.state === "done";
 

@@ -6,11 +6,26 @@ interface PulseState {
   message: string;
 }
 
+export interface ActivatedChip {
+  label: string;
+  type: 'spec' | 'mood';
+  material: string | null;
+  silhouette: Record<string, string> | null;
+  complexity_mod: number;
+  palette: string | null;
+  isCustom: boolean;
+}
+
+export interface ChipSelection {
+  directionId: string;
+  activatedChips: ActivatedChip[];
+}
+
 interface SessionState {
   // Step 1: Entry
   season: string;
   collectionName: string;
-  
+
   // Step 2: Concept Studio
   aestheticInput: string;
   aestheticMatchedId: string | null;
@@ -18,7 +33,8 @@ interface SessionState {
   moodboardImages: string[];
   colorPalette: string[];
   colorPaletteName: string; // e.g., 'Earth Tones'
-  
+  chipSelection: ChipSelection | null;
+
   // Step 3: Spec Studio
   category: string;
   targetMsrp: number | null;
@@ -26,12 +42,12 @@ interface SessionState {
   silhouette: string;
   constructionTier: 'low' | 'moderate' | 'high';
   constructionTierOverride: boolean;
-  
+
   // Pulse states
   identityPulse: PulseState | null;
   resonancePulse: PulseState | null;
   executionPulse: PulseState | null;
-  
+
   // Navigation state
   currentStep: 1 | 2 | 3 | 4;
   conceptLocked: boolean;
@@ -45,23 +61,24 @@ interface SessionState {
   setCollectionName: (name: string) => void;
   setAestheticInput: (input: string) => void;
   setColorPalette: (colors: string[], name: string) => void;
+  setChipSelection: (selection: ChipSelection | null) => void;
   setCategory: (category: string) => void;
   setTargetMsrp: (msrp: number) => void;
   setMaterial: (id: string) => void;
   setSilhouette: (silhouette: string) => void;
   setConstructionTier: (tier: 'low' | 'moderate' | 'high', override?: boolean) => void;
-  
+
   updateIdentityPulse: (pulse: PulseState | null) => void;
   updateResonancePulse: (pulse: PulseState | null) => void;
   updateExecutionPulse: (pulse: PulseState | null) => void;
-  
+
   setIntentGoals: (goals: string[]) => void;
   setIntentTradeoff: (tradeoff: string) => void;
 
   lockConcept: () => void;
   unlockConcept: () => void;
   setCurrentStep: (step: 1 | 2 | 3 | 4) => void;
-  
+
   resetSession: () => void;
 }
 
@@ -75,6 +92,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   moodboardImages: [],
   colorPalette: [],
   colorPaletteName: '',
+  chipSelection: null,
   category: '',
   targetMsrp: null,
   materialId: '',
@@ -93,26 +111,27 @@ export const useSessionStore = create<SessionState>((set) => ({
   setSeason: (season) => set({ season }),
   setCollectionName: (collectionName) => set({ collectionName }),
   setAestheticInput: (aestheticInput) => set({ aestheticInput }),
-  setColorPalette: (colorPalette, colorPaletteName) => 
+  setColorPalette: (colorPalette, colorPaletteName) =>
     set({ colorPalette, colorPaletteName }),
+  setChipSelection: (chipSelection) => set({ chipSelection }),
   setCategory: (category) => set({ category }),
   setTargetMsrp: (targetMsrp) => set({ targetMsrp }),
   setMaterial: (materialId) => set({ materialId }),
   setSilhouette: (silhouette) => set({ silhouette }),
-  setConstructionTier: (tier, override = false) => 
+  setConstructionTier: (tier, override = false) =>
     set({ constructionTier: tier, constructionTierOverride: override }),
-  
+
   updateIdentityPulse: (pulse) => set({ identityPulse: pulse }),
   updateResonancePulse: (pulse) => set({ resonancePulse: pulse }),
   updateExecutionPulse: (pulse) => set({ executionPulse: pulse }),
-  
+
   setIntentGoals: (intentGoals) => set({ intentGoals }),
   setIntentTradeoff: (intentTradeoff) => set({ intentTradeoff }),
 
   lockConcept: () => set({ conceptLocked: true }),
   unlockConcept: () => set({ conceptLocked: false }),
   setCurrentStep: (step) => set({ currentStep: step }),
-  
+
   resetSession: () => set({
     season: '',
     collectionName: '',
@@ -122,6 +141,7 @@ export const useSessionStore = create<SessionState>((set) => ({
     moodboardImages: [],
     colorPalette: [],
     colorPaletteName: '',
+    chipSelection: null,
     category: '',
     targetMsrp: null,
     materialId: '',

@@ -42,6 +42,7 @@ export const seededShuffle = (arr: string[], seed: string) => {
 export const matchAestheticToFolder = (input: string): string | null => {
   const normalized = input.toLowerCase().trim();
   const map: Record<string, string> = {
+    'romantic analog': 'poetcore',
     poetcore: 'poetcore',
     poet: 'poetcore',
     academic: 'poetcore',
@@ -49,34 +50,41 @@ export const matchAestheticToFolder = (input: string): string | null => {
     literary: 'poetcore',
     'dark academia': 'poetcore',
 
+    'terrain luxe': 'rugged-luxury',
     'rugged luxury': 'rugged-luxury',
     rugged: 'rugged-luxury',
     gorpcore: 'rugged-luxury',
     outdoor: 'rugged-luxury',
 
+    'high voltage': 'glamoratti',
     glamoratti: 'glamoratti',
     '80s': 'glamoratti',
     eighties: 'glamoratti',
     'power suit': 'glamoratti',
 
+    'quiet structure': 'refined-clarity',
     'refined clarity': 'refined-clarity',
     minimal: 'refined-clarity',
     minimalist: 'refined-clarity',
     'quiet luxury': 'refined-clarity',
 
+    'heritage hand': 'modern-craft',
     'modern craft': 'modern-craft',
     artisan: 'modern-craft',
     heritage: 'modern-craft',
     sustainable: 'modern-craft',
 
+    'undone glam': 'indie-chic-grunge',
     'indie chic grunge': 'indie-chic-grunge',
     grunge: 'indie-chic-grunge',
     'indie sleaze': 'indie-chic-grunge',
 
+    'haptic play': 'gummy-aesthetic',
     gummy: 'gummy-aesthetic',
     jelly: 'gummy-aesthetic',
     squishy: 'gummy-aesthetic',
 
+    'sweet subversion': 'cult-of-cute',
     'cult of cute': 'cult-of-cute',
     kawaii: 'cult-of-cute',
     cute: 'cult-of-cute',

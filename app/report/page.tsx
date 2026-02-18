@@ -591,7 +591,6 @@ const DIM_TAG_COLORS: Record<string, { bg: string; text: string }> = {
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════ */
 export default function StandardReportPage() {
-  const router = useRouter();
   const {
     collectionName: storeCollection,
     season: storeSeason,
@@ -1666,13 +1665,12 @@ export default function StandardReportPage() {
             </div>
             <div style={{ position: "relative", display: "flex", gap: 8 }}>
               {[
-                { label: "Revise Design", primary: false, onClick: () => router.push("/spec") },
-                { label: "Export PDF", primary: false, onClick: () => {} },
-                { label: "Save to Collection", primary: true, onClick: () => {} },
+                { label: "Branch Design", primary: false },
+                { label: "Export PDF", primary: false },
+                { label: "Save to Collection", primary: true },
               ].map((btn) => (
                 <button
                   key={btn.label}
-                  onClick={btn.onClick}
                   style={{
                     padding: "12px 22px",
                     borderRadius: 12,

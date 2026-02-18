@@ -1,6 +1,6 @@
 'use client';
 
-import type { PaletteColor } from '@/types/spec-studio';
+import type { PaletteColor } from '@/lib/types/spec-studio';
 
 interface PaletteReferenceProps {
   aestheticName: string;
