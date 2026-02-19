@@ -17,6 +17,11 @@ import {
 } from "../../lib/concept-studio/utils";
 import AskMuko from "@/components/AskMuko";
 import aestheticsData from "@/data/aesthetics.json";
+import { PulseChip } from "@/components/ui/PulseChip";
+import type { PulseChipProps } from "@/components/ui/PulseChip";
+import { InsightPanel } from "@/components/ui/InsightPanel";
+import { SuggestionCard } from "@/components/ui/SuggestionCard";
+import type { InsightData, ConceptInsightMode } from "@/lib/types/insight";
 
 /* ─── Icons: matched to Report page (star, users, cog) ─── */
 function IconIdentity({ size = 16 }: { size?: number }) {
@@ -278,6 +283,80 @@ function InsightChip({ label, onClick }: { label: string; onClick: () => void })
     </span>
   );
 }
+
+// ─── Concept insight mode helper — Synthesizer replaces in Week 5 ────────────
+function getConceptInsightData(
+  identityScore: number,
+  resonanceScore: number,
+  trendVelocity: string,
+  sharpenChips?: string[]
+): InsightData {
+  let mode: ConceptInsightMode;
+
+  if (identityScore < 50) {
+    mode = 'reconsider';
+  } else if (identityScore >= 70 && resonanceScore >= 65 && trendVelocity === 'emerging') {
+    mode = 'amplify';
+  } else if (trendVelocity === 'peak' || resonanceScore < 50) {
+    mode = 'differentiate';
+  } else {
+    mode = 'differentiate';
+  }
+
+  if (mode === 'amplify') {
+    return {
+      mode,
+      editLabel: 'THE OPPORTUNITY',
+      statements: [
+        'Strong brand fit and a real market window — this direction has momentum.',
+        'Ascending adoption means you are moving with the market, not against it.',
+        'This is the moment to invest fully, not hedge.',
+      ],
+      edit: [
+        'Lean into the most distinctive element, not the most accessible',
+        'This is the moment to invest in the hero fabrication',
+        'Own the aesthetic fully — half-measures will not land',
+      ],
+      sharpenChips: sharpenChips ?? ['hand-woven texture', 'natural dyes', 'fringe detailing'],
+    };
+  }
+
+  if (mode === 'reconsider') {
+    return {
+      mode,
+      editLabel: 'THE EDIT',
+      statements: [
+        'This direction pulls against your brand DNA.',
+        'Proceeding risks confusing your customer and diluting brand equity.',
+        'A closer direction exists with stronger commercial alignment.',
+      ],
+      edit: [
+        'Consider an adjacent direction with stronger brand fit',
+        'If you proceed, anchor in your core silhouette language',
+        'Avoid leaning into the trend signals that conflict most with your DNA',
+      ],
+      sharpenChips: [],
+    };
+  }
+
+  // differentiate (default)
+  return {
+    mode: 'differentiate',
+    editLabel: 'THE EDIT',
+    statements: [
+      'Strong brand fit, but this space is getting crowded.',
+      'The market window is narrowing — differentiation is now required.',
+      'Proceed with conviction or risk blending into the category.',
+    ],
+    edit: [
+      'Avoid the obvious heritage references — the market is already there',
+      'Push silhouette further than the category expects',
+      'Find the unexpected material within the aesthetic',
+    ],
+    sharpenChips: sharpenChips ?? ['hand-woven texture', 'natural dyes', 'fringe detailing'],
+  };
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ConceptStudioPage() {
   const router = useRouter();
@@ -699,6 +778,63 @@ export default function ConceptStudioPage() {
           ? BRAND.camel
           : BRAND.rose
       : "rgba(67, 67, 43, 0.75)";
+
+  // ─── Pulse chip data ───────────────────────────────────────────────────────
+  const identityChipData: PulseChipProps | null =
+    typeof identityScore === "number" && selectedAesthetic
+      ? identityScore >= 80
+        ? { variant: "green", status: "On-brand", consequence: "Reinforces core DNA" }
+        : identityScore >= 60
+          ? { variant: "amber", status: "Adjacent", consequence: "Not core territory" }
+          : { variant: "red", status: "Misaligned", consequence: "Review brand fit" }
+      : null;
+
+  const selectedAestheticEntry = selectedAesthetic
+    ? (aestheticsData as Array<{ id: string; name: string; trend_velocity: string; saturation_score: number }>)
+        .find((a) => a.name === selectedAesthetic)
+    : null;
+
+  const resonanceChipData: PulseChipProps | null = selectedAestheticEntry
+    ? selectedAestheticEntry.trend_velocity === "emerging"
+      ? { variant: "green", status: "Ascending", consequence: "Differentiation window open" }
+      : selectedAestheticEntry.trend_velocity === "peak"
+        ? selectedAestheticEntry.saturation_score < 60
+          ? { variant: "amber", status: "Peak saturation", consequence: "Differentiation required" }
+          : { variant: "red", status: "Peak saturation", consequence: "High risk of blending" }
+        : selectedAestheticEntry.trend_velocity === "declining"
+          ? { variant: "red", status: "Declining", consequence: "High risk of feeling dated" }
+          : null
+    : null;
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ─── Concept InsightPanel data (placeholder — Synthesizer replaces in Week 5) ───
+  const conceptInsightData = useMemo<InsightData>(() => {
+    const activeKeys = Array.from(selectedElements).filter((k) =>
+      k.startsWith(`${selectedAesthetic}::`)
+    );
+    const activeLabels = activeKeys.map((k) =>
+      k.replace(`${selectedAesthetic}::`, "")
+    );
+    const dirChips = getAestheticChips(selectedAesthetic ?? "");
+    const specChips = dirChips.filter((c) => c.type === "spec");
+    const unselectedSpec = specChips.filter(
+      (c) => !activeLabels.includes(c.label)
+    );
+    const chips =
+      unselectedSpec.length > 0
+        ? unselectedSpec.slice(0, 3).map((c) => c.label)
+        : undefined;
+
+    const trendVelocity = selectedAestheticEntry?.trend_velocity ?? "emerging";
+
+    return getConceptInsightData(
+      identityScore ?? 0,
+      resonanceScore ?? 0,
+      trendVelocity,
+      chips
+    );
+  }, [selectedAesthetic, selectedElements, identityScore, resonanceScore, selectedAestheticEntry]);
+  // ─────────────────────────────────────────────────────────────────────────
 
   const confirmEnabledBySelection = Boolean(selectedAesthetic);
   const confirmClickable =
@@ -1312,7 +1448,7 @@ export default function ConceptStudioPage() {
                     marginBottom: 6,
                   }}
                 >
-                  Start with a direction — what moment are you leaning into right now?
+                  Choose your direction.
                 </div>
                 <div
                   style={{
@@ -1990,7 +2126,7 @@ export default function ConceptStudioPage() {
                       >
                         ✓
                       </span>
-                      <span>{isConfirmed ? "Confirmed" : "Confirm direction"}</span>
+                      <span>{isConfirmed ? "Confirmed" : selectedAesthetic ? `Commit to ${selectedAesthetic}` : "Commit to direction"}</span>
                     </button>
 
                     <div
@@ -2001,7 +2137,7 @@ export default function ConceptStudioPage() {
                         fontFamily: "var(--font-inter), system-ui, sans-serif",
                       }}
                     >
-                      If you edit the direction, you'll confirm again.
+                      Once locked, specs build from this direction.
                     </div>
                 </div>
               )}
@@ -2219,6 +2355,7 @@ export default function ConceptStudioPage() {
                         score: typeof identityScore === "number" ? `${identityScore}` : "—",
                         accent:
                           typeof identityScore === "number" ? identityColor : "rgba(67, 67, 43, 0.30)",
+                        chip: identityChipData,
                       },
                       {
                         label: "Resonance",
@@ -2230,6 +2367,7 @@ export default function ConceptStudioPage() {
                         score: typeof resonanceScore === "number" ? `${resonanceScore}` : "—",
                         accent:
                           typeof resonanceScore === "number" ? resonanceColor : "rgba(67, 67, 43, 0.30)",
+                        chip: resonanceChipData,
                       },
                       {
                         label: "Execution",
@@ -2237,14 +2375,14 @@ export default function ConceptStudioPage() {
                         icon: <IconExecution size={16} />,
                         score: "Pending",
                         accent: "rgba(67, 67, 43, 0.32)",
+                        chip: null,
                       },
                     ].map((row) => (
                       <div
                         key={row.label}
                         style={{
                           display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
+                          flexDirection: "column",
                           padding: "14px 14px",
                           borderRadius: 14,
                           border: "1px solid rgba(255, 255, 255, 0.30)",
@@ -2252,41 +2390,50 @@ export default function ConceptStudioPage() {
                           backdropFilter: "blur(12px)",
                           WebkitBackdropFilter: "blur(12px)",
                           marginBottom: 10,
+                          gap: row.chip ? 8 : 0,
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span
-                            style={{
-                              width: 10,
-                              height: 10,
-                              borderRadius: 999,
-                              background: row.dot,
-                              boxShadow:
-                                row.label !== "Execution" && (conceptLocked || isConfirmed)
-                                  ? "0 0 0 4px rgba(171, 171, 99, 0.14)"
-                                  : "none",
-                            }}
-                          />
-                          <div
-                            style={{
-                              fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                              fontWeight: 750,
-                              fontSize: 12,
-                              letterSpacing: "0.06em",
-                              textTransform: "uppercase",
-                              color: "rgba(67, 67, 43, 0.74)",
-                            }}
-                          >
-                            {row.label}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span
+                              style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: 999,
+                                background: row.dot,
+                                boxShadow:
+                                  row.label !== "Execution" && (conceptLocked || isConfirmed)
+                                    ? "0 0 0 4px rgba(171, 171, 99, 0.14)"
+                                    : "none",
+                              }}
+                            />
+                            <div
+                              style={{
+                                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                                fontWeight: 750,
+                                fontSize: 12,
+                                letterSpacing: "0.06em",
+                                textTransform: "uppercase",
+                                color: "rgba(67, 67, 43, 0.74)",
+                              }}
+                            >
+                              {row.label}
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ ...scoreIconWrapStyle, color: row.accent }}>
+                              {row.icon}
+                            </span>
+                            <span style={scoreTextStyle}>{row.score}</span>
                           </div>
                         </div>
 
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ ...scoreIconWrapStyle, color: row.accent }}>
-                            {row.icon}
-                          </span>
-                          <span style={scoreTextStyle}>{row.score}</span>
-                        </div>
+                        {row.chip && (
+                          <div style={{ paddingLeft: 20 }}>
+                            <PulseChip {...row.chip} />
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -2325,181 +2472,114 @@ export default function ConceptStudioPage() {
                       Muko Insight
                     </div>
 
-                    <div
-                      style={{
-                        fontSize: 13,
-                        lineHeight: 1.58,
-                        color: "rgba(67, 67, 43, 0.88)",
-                        fontFamily: "var(--font-inter), system-ui, sans-serif",
-                      }}
-                    >
-                      {/* ✅ NEW: Use enhanced insight generator - handles both JSX and string */}
-                      {typeof generateEnhancedMukoInsight() === 'string' 
-                        ? generateEnhancedMukoInsight()
-                        : generateEnhancedMukoInsight()
-                      }
-                    </div>
+                    {!selectedAesthetic ? (
+                      <div>
+                        <div
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 650,
+                            lineHeight: 1.5,
+                            color: "rgba(67, 67, 43, 0.88)",
+                            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                            marginBottom: 12,
+                          }}
+                        >
+                          Start by selecting a direction
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            lineHeight: 1.58,
+                            color: "rgba(67, 67, 43, 0.66)",
+                            fontFamily: "var(--font-inter), system-ui, sans-serif",
+                            marginBottom: 12,
+                          }}
+                        >
+                          Look for the subtle rose glow — those are Muko's recommendations for your brand DNA.
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            lineHeight: 1.58,
+                            color: "rgba(67, 67, 43, 0.60)",
+                            fontFamily: "var(--font-inter), system-ui, sans-serif",
+                          }}
+                        >
+                          After selecting, refine with texture, mood, or constraint to see how it shifts identity and resonance.
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 650,
+                            lineHeight: 1.45,
+                            color: "rgba(67,67,43,0.88)",
+                            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                            marginBottom: 14,
+                          }}
+                        >
+                          {(identityScore ?? 0) >= 80 && (resonanceScore ?? 0) >= 80
+                            ? "Strong direction — ready for specs"
+                            : (identityScore ?? 0) >= 75
+                              ? "Brand-aligned — develop resonance"
+                              : (resonanceScore ?? 0) >= 75
+                                ? "High demand — build brand ownership"
+                                : selectedAesthetic}
+                        </div>
 
-                    {/* ─── Chip suggestions ─── */}
-                    {selectedAesthetic && (() => {
-                      const activeKeys = Array.from(selectedElements).filter((k) => k.startsWith(`${selectedAesthetic}::`));
-                      const activeLabels = activeKeys.map((k) => k.replace(`${selectedAesthetic}::`, ""));
-                      const dirChips = getAestheticChips(selectedAesthetic);
-                      const specChips = dirChips.filter((c) => c.type === "spec");
-                      const unselectedSpec = specChips.filter((c) => !activeLabels.includes(c.label));
-                      const complexityChip = dirChips.find((c) => activeLabels.includes(c.label) && c.complexity_mod > 0);
-                      if (dirChips.length === 0) return null;
+                        <InsightPanel
+                          data={conceptInsightData}
+                          onChipApply={(chip) => {
+                            const key = `${selectedAesthetic}::${chip}`;
+                            toggleElement(key);
+                          }}
+                        />
 
-                      const miniChipStyle = (hovered: boolean): React.CSSProperties => ({
-                        padding: "5px 10px",
-                        borderRadius: 999,
-                        fontSize: 11,
-                        fontWeight: 550,
-                        fontFamily: "var(--font-inter), system-ui, sans-serif",
-                        cursor: "pointer",
-                        userSelect: "none",
-                        display: "inline-block",
-                        transition: "all 150ms ease",
-                        color: hovered ? BRAND.oliveInk : "rgba(67,67,43,0.72)",
-                        background: hovered ? "rgba(171,171,99,0.14)" : "rgba(171,171,99,0.08)",
-                        border: `1.5px solid rgba(171,171,99,${hovered ? "0.55" : "0.35"})`,
-                      });
-
-                      return (
-                        <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(67,67,43,0.08)" }}>
-                          {activeKeys.length === 0 ? (
-                            <>
-                              <div style={{ fontSize: 12, color: "rgba(67,67,43,0.58)", fontFamily: "var(--font-inter), system-ui, sans-serif", marginBottom: 8 }}>
-                                Sharpen your direction — try adding:
-                              </div>
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                {specChips.slice(0, 3).map((chip) => {
-                                  const key = `${selectedAesthetic}::${chip.label}`;
-                                  return (
-                                    <InsightChip
-                                      key={chip.label}
-                                      label={`+ ${chip.label}`}
-                                      onClick={() => toggleElement(key)}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            </>
-                          ) : unselectedSpec.length === 0 ? (
-                            <div style={{ fontSize: 12, lineHeight: 1.55, color: "rgba(67,67,43,0.58)", fontFamily: "var(--font-inter), system-ui, sans-serif" }}>
-                              Looking strong. Add texture or mood with custom chips, or continue to Spec Studio.
-                            </div>
-                          ) : (
-                            <>
-                              <div style={{ fontSize: 12, lineHeight: 1.5, color: "rgba(67,67,43,0.58)", fontFamily: "var(--font-inter), system-ui, sans-serif", marginBottom: 8 }}>
-                                Your <strong style={{ fontWeight: 650, color: "rgba(67,67,43,0.80)" }}>{selectedAesthetic}</strong> direction is taking shape. Consider adding:
-                              </div>
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                {unselectedSpec.slice(0, 2).map((chip) => {
-                                  const key = `${selectedAesthetic}::${chip.label}`;
-                                  return (
-                                    <InsightChip
-                                      key={chip.label}
-                                      label={`+ ${chip.label}`}
-                                      onClick={() => toggleElement(key)}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            </>
-                          )}
-                          {complexityChip && (
+                        {/* Complexity chip warning — shown when a high-complexity chip is active */}
+                        {(() => {
+                          const activeKeys = Array.from(selectedElements).filter((k) => k.startsWith(`${selectedAesthetic}::`));
+                          const activeLabels = activeKeys.map((k) => k.replace(`${selectedAesthetic}::`, ""));
+                          const dirChips = getAestheticChips(selectedAesthetic);
+                          const complexityChip = dirChips.find((c) => activeLabels.includes(c.label) && c.complexity_mod > 0);
+                          if (!complexityChip) return null;
+                          return (
                             <div style={{ marginTop: 10, fontSize: 11.5, lineHeight: 1.5, color: "rgba(184,135,107,0.90)", fontFamily: "var(--font-inter), system-ui, sans-serif", padding: "8px 10px", borderRadius: 8, background: "rgba(184,135,107,0.08)", border: "1px solid rgba(184,135,107,0.20)" }}>
                               Heads up — <strong style={{ fontWeight: 650 }}>{complexityChip.label}</strong> adds construction complexity. This will be factored into your execution score.
                             </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                          );
+                        })()}
 
-                    {/* ✅ NEW: Suggestions section */}
-                    {selectedAesthetic && generateSuggestions().length > 0 && (
-                      <div style={{ marginTop: 16 }}>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 800,
-                            letterSpacing: "0.10em",
-                            textTransform: "uppercase",
-                            color: "rgba(67, 67, 43, 0.42)",
-                            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                            marginBottom: 10,
-                          }}
-                        >
-                          Suggestions
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                          {generateSuggestions().map((sug, i) => (
+                        {/* Suggestions */}
+                        {generateSuggestions().length > 0 && (
+                          <div style={{ marginTop: 16 }}>
                             <div
-                              key={i}
                               style={{
-                                padding: "14px 16px",
-                                borderRadius: 14,
-                                background: "rgba(255,255,255,0.46)",
-                                border: "1px solid rgba(67,67,43,0.10)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                gap: 12,
+                                fontSize: 11,
+                                fontWeight: 800,
+                                letterSpacing: "0.10em",
+                                textTransform: "uppercase",
+                                color: "rgba(67, 67, 43, 0.42)",
+                                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                                marginBottom: 10,
                               }}
                             >
-                              <div>
-                                <div
-                                  style={{
-                                    fontSize: 13,
-                                    fontWeight: 650,
-                                    color: "rgba(67,67,43,0.82)",
-                                    fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                                    marginBottom: 4,
-                                  }}
-                                >
-                                  {sug.label}
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: 12,
-                                    lineHeight: 1.45,
-                                    color: "rgba(67,67,43,0.55)",
-                                    fontFamily: "var(--font-inter), system-ui, sans-serif",
-                                  }}
-                                >
-                                  {sug.sub}
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={sug.action}
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: 650,
-                                  color: BRAND.chartreuse,
-                                  border: `1px solid ${BRAND.chartreuse}`,
-                                  borderRadius: 999,
-                                  padding: "8px 16px",
-                                  background: "rgba(171,171,99,0.08)",
-                                  cursor: "pointer",
-                                  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                                  flex: "0 0 auto",
-                                  transition: "all 180ms ease",
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = "rgba(171,171,99,0.14)";
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = "rgba(171,171,99,0.08)";
-                                }}
-                              >
-                                Apply
-                              </button>
+                              Suggestions
                             </div>
-                          ))}
-                        </div>
-                      </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                              {generateSuggestions().map((sug, i) => (
+                                <SuggestionCard
+                                  key={i}
+                                  title={sug.label}
+                                  description={sug.sub}
+                                  onApply={sug.action}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -2583,7 +2663,7 @@ export default function ConceptStudioPage() {
                     animation: canContinue ? "continueReady 600ms ease-out 1" : "none",
                   }}
                 >
-                  <span>Continue to Spec Studio</span>
+                  <span>Lock direction &amp; build specs</span>
                   <svg
                     width="16"
                     height="16"

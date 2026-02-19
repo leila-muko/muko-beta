@@ -123,7 +123,7 @@ export function PulseRail({
           opacity: canContinue ? 1 : 0.55,
         }}
       >
-        Continue to Spec Studio →
+        Lock direction &amp; build specs →
       </button>
     </div>
   );
