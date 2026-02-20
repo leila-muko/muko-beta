@@ -90,116 +90,139 @@ export default function AskMuko({ step, suggestedQuestions, context, brand: bran
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(inputValue); }
   };
 
-  const glassPanelBase: React.CSSProperties = {
-    borderRadius: 20,
-    border: "1px solid rgba(255, 255, 255, 0.35)",
-    background: "rgba(255, 255, 255, 0.25)",
-    backdropFilter: "blur(40px) saturate(180%)",
-    WebkitBackdropFilter: "blur(40px) saturate(180%)",
-    boxShadow: "0 24px 80px rgba(0,0,0,0.05), 0 8px 32px rgba(67,67,43,0.04), inset 0 1px 0 rgba(255,255,255,0.60), inset 0 -1px 0 rgba(255,255,255,0.12)",
-    overflow: "hidden",
-    position: "relative" as const,
-  };
-
-  const glassSheen: React.CSSProperties = {
-    position: "absolute" as const, inset: 0, pointerEvents: "none" as const,
-    background: "radial-gradient(ellipse 280px 120px at 15% -5%, rgba(255,255,255,0.35), transparent 65%), radial-gradient(ellipse 200px 100px at 90% 10%, rgba(255,255,255,0.15), transparent 60%)",
-  };
-
   const askedQuestions = messages.filter(m => m.role === "user").map(m => m.content);
   const remainingChips = suggestedQuestions.filter(q => !askedQuestions.includes(q));
 
+  const inter = "var(--font-inter), system-ui, sans-serif";
+  const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
+
   return (
-    <div style={{ ...glassPanelBase, marginTop: 16, padding: 0, transition: "all 400ms cubic-bezier(0.4, 0, 0.2, 1)" }}>
-      <div style={glassSheen} />
-      <div style={{ position: "relative" }}>
+    <div style={{
+      marginTop: 24,
+      borderRadius: 12,
+      border: "1px solid rgba(67,67,43,0.08)",
+      borderTop: `2px solid rgba(169,123,143,0.32)`,
+      background: "rgba(250,249,246,0.97)",
+      overflow: "hidden",
+    }}>
 
-        {/* ─── Collapsed trigger ─── */}
-        {!isExpanded && (
-          <button
-            onClick={() => setIsExpanded(true)}
-            style={{ width: "100%", padding: "20px 22px", background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 200ms ease" }}
-            onMouseEnter={e => { e.currentTarget.style.background = "rgba(169,123,143,0.04)"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
-          >
-            <span style={{ position: "relative", width: 8, height: 8 }}>
-  {/* Ping ring */}
-  <span style={{
-    position: "absolute",
-    inset: 0,
-    borderRadius: "50%",
-    background: BRAND.rose,
-    animation: "askMukoRadarPing 2.4s ease-out infinite",
-  }} />
-  {/* Solid dot */}
-  <span style={{
-    position: "relative",
-    display: "block",
-    width: 8,
-    height: 8,
-    borderRadius: "50%",
-    background: BRAND.rose,
-    boxShadow: "0 0 0 3px rgba(169,123,143,0.15)",
-  }} />
-</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(67,67,43,0.72)", fontFamily: "var(--font-sohne-breit), system-ui, sans-serif", letterSpacing: "0.01em" }}>Ask Muko</span>
-          </button>
-        )}
+      {/* ─── Collapsed trigger ─── */}
+      {!isExpanded && (
+        <button
+          onClick={() => setIsExpanded(true)}
+          style={{ width: "100%", padding: "16px 20px", background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(169,123,143,0.02)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+        >
+          {/* Rose dot with ping */}
+          <span style={{ position: "relative", width: 7, height: 7, flexShrink: 0 }}>
+            <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: BRAND.rose, animation: "askMukoRadarPing 2.4s ease-out infinite" }} />
+            <span style={{ position: "relative", display: "block", width: 7, height: 7, borderRadius: "50%", background: BRAND.rose }} />
+          </span>
+          <span style={{ fontFamily: sohne, fontSize: 12, fontWeight: 500, letterSpacing: "0.01em", color: "rgba(67,67,43,0.78)" }}>Muko</span>
+          <span style={{
+            fontSize: 8.5,
+            fontWeight: 700,
+            letterSpacing: "0.10em",
+            textTransform: "uppercase" as const,
+            color: BRAND.rose,
+            background: "rgba(169,123,143,0.08)",
+            border: "1px solid rgba(169,123,143,0.22)",
+            borderRadius: 4,
+            padding: "2px 6px",
+            fontFamily: inter,
+          }}>AI</span>
+          <span style={{ marginLeft: "auto", fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.35)" }}>Ask anything about this direction</span>
+          <span style={{ color: BRAND.rose, fontSize: 14, lineHeight: 1 }}>›</span>
+        </button>
+      )}
 
-        {/* ─── Expanded ─── */}
-        {isExpanded && (
-          <div style={{ padding: "20px 22px" }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: BRAND.rose, boxShadow: "0 0 0 3px rgba(169,123,143,0.15)" }} />
-                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.42)", fontFamily: "var(--font-sohne-breit), system-ui, sans-serif" }}>Ask Muko</span>
-              </div>
-              <button
-                onClick={() => setIsExpanded(false)}
-                aria-label="Collapse"
-                style={{ width: 28, height: 28, borderRadius: 999, border: "1px solid rgba(67,67,43,0.10)", background: "rgba(255,255,255,0.50)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(67,67,43,0.45)", fontSize: 14, transition: "all 180ms ease" }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.80)"; e.currentTarget.style.color = "rgba(67,67,43,0.70)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.50)"; e.currentTarget.style.color = "rgba(67,67,43,0.45)"; }}
-              >&times;</button>
+      {/* ─── Expanded ─── */}
+      {isExpanded && (
+        <div>
+          {/* Header */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "16px 20px",
+            borderBottom: "1px solid rgba(67,67,43,0.07)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ position: "relative", width: 7, height: 7, flexShrink: 0 }}>
+                <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: BRAND.rose, animation: "askMukoRadarPing 2.4s ease-out infinite" }} />
+                <span style={{ position: "relative", display: "block", width: 7, height: 7, borderRadius: "50%", background: BRAND.rose }} />
+              </span>
+              <span style={{ fontFamily: sohne, fontSize: 13, fontWeight: 500, letterSpacing: "0.01em", color: "rgba(67,67,43,0.82)" }}>Muko</span>
+              <span style={{
+                fontSize: 8.5,
+                fontWeight: 700,
+                letterSpacing: "0.10em",
+                textTransform: "uppercase" as const,
+                color: BRAND.rose,
+                background: "rgba(169,123,143,0.08)",
+                border: "1px solid rgba(169,123,143,0.22)",
+                borderRadius: 4,
+                padding: "2px 6px",
+                fontFamily: inter,
+              }}>AI</span>
             </div>
+            <button
+              onClick={() => setIsExpanded(false)}
+              aria-label="Collapse"
+              style={{ width: 24, height: 24, borderRadius: 999, border: "1px solid rgba(67,67,43,0.10)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(67,67,43,0.35)", fontSize: 14, transition: "all 150ms ease" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(67,67,43,0.04)"; e.currentTarget.style.color = "rgba(67,67,43,0.55)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(67,67,43,0.35)"; }}
+            >&times;</button>
+          </div>
 
-            {/* Suggested question chips */}
+          <div style={{ padding: "16px 20px" }}>
+            {/* Suggested questions */}
             {remainingChips.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column" as const, gap: 10, marginBottom: messages.length > 0 ? 16 : 0 }}>
-                {remainingChips.map((q, i) => (
-                  <button
-                    key={i} onClick={() => handleSend(q)} disabled={isTyping}
-                    style={{ textAlign: "left" as const, padding: "10px 14px", borderRadius: 12, border: "1px solid rgba(169,123,143,0.20)", background: "rgba(169,123,143,0.04)", cursor: isTyping ? "not-allowed" : "pointer", opacity: isTyping ? 0.5 : 1, fontSize: 13, fontWeight: 500, color: "rgba(67,67,43,0.72)", fontFamily: "var(--font-inter), system-ui, sans-serif", lineHeight: 1.4, transition: "all 180ms ease" }}
-                    onMouseEnter={e => { if (!isTyping) { e.currentTarget.style.background = "rgba(169,123,143,0.08)"; e.currentTarget.style.borderColor = "rgba(169,123,143,0.30)"; }}}
-                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(169,123,143,0.04)"; e.currentTarget.style.borderColor = "rgba(169,123,143,0.20)"; }}
-                  >{q}</button>
-                ))}
+              <div style={{ marginBottom: messages.length > 0 ? 20 : 0 }}>
+                <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.30)", marginBottom: 10 }}>
+                  Suggested
+                </div>
+                <div style={{ display: "flex", flexDirection: "column" as const, gap: 0 }}>
+                  {remainingChips.map((q, i) => (
+                    <AskMukoQuestion key={i} question={q} onSend={() => handleSend(q)} disabled={isTyping} rose={BRAND.rose} inter={inter} />
+                  ))}
+                </div>
               </div>
             )}
 
             {/* Conversation */}
             {messages.length > 0 && (
-              <div style={{ maxHeight: 320, overflowY: "auto" as const, display: "flex", flexDirection: "column" as const, gap: 12, marginBottom: 18, paddingRight: 4, scrollbarWidth: "thin" as const, scrollbarColor: "rgba(67,67,43,0.12) transparent" }}>
+              <div style={{ maxHeight: 300, overflowY: "auto" as const, display: "flex", flexDirection: "column" as const, gap: 14, marginBottom: 16, paddingRight: 2, scrollbarWidth: "thin" as const, scrollbarColor: "rgba(67,67,43,0.08) transparent" }}>
                 {messages.map((msg, i) => (
-                  <div key={i} style={{ animation: "askMukoFadeIn 300ms ease-out both" }}>
+                  <div key={i} style={{ animation: "askMukoFadeIn 280ms ease-out both" }}>
                     {msg.role === "user" ? (
                       <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                        <div style={{ maxWidth: "88%", padding: "10px 14px", borderRadius: "14px 14px 4px 14px", background: "rgba(67,67,43,0.06)", border: "1px solid rgba(67,67,43,0.08)", fontSize: 13, lineHeight: 1.5, color: "rgba(67,67,43,0.78)", fontFamily: "var(--font-inter), system-ui, sans-serif" }}>{msg.content}</div>
+                        <div style={{
+                          maxWidth: "84%",
+                          padding: "9px 14px",
+                          borderRadius: "10px 10px 3px 10px",
+                          background: "rgba(67,67,43,0.04)",
+                          border: "1px solid rgba(67,67,43,0.08)",
+                          fontSize: 12.5,
+                          lineHeight: 1.55,
+                          color: "rgba(67,67,43,0.70)",
+                          fontFamily: inter,
+                        }}>{msg.content}</div>
                       </div>
                     ) : (
-                      <div>
-                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: BRAND.rose, fontFamily: "var(--font-sohne-breit), system-ui, sans-serif", marginBottom: 6, opacity: 0.7 }}>Muko</div>
-                        <div style={{ padding: "12px 14px", borderRadius: "14px 14px 14px 4px", background: "rgba(255,255,255,0.50)", border: "1px solid rgba(169,123,143,0.12)", fontSize: 13, lineHeight: 1.6, color: "rgba(67,67,43,0.82)", fontFamily: "var(--font-inter), system-ui, sans-serif" }}>{msg.content}</div>
+                      <div style={{ paddingLeft: 12, borderLeft: `2px solid rgba(169,123,143,0.30)` }}>
+                        <div style={{ fontFamily: sohne, fontSize: 9.5, fontWeight: 500, letterSpacing: "0.06em", color: BRAND.rose, marginBottom: 5 }}>Muko</div>
+                        <div style={{ fontSize: 12.5, lineHeight: 1.7, color: "rgba(67,67,43,0.72)", fontFamily: inter }}>{msg.content}</div>
                       </div>
                     )}
                   </div>
                 ))}
                 {isTyping && (
-                  <div style={{ animation: "askMukoFadeIn 200ms ease-out both" }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: BRAND.rose, fontFamily: "var(--font-sohne-breit), system-ui, sans-serif", marginBottom: 6, opacity: 0.7 }}>Muko</div>
-                    <div style={{ padding: "12px 14px", borderRadius: "14px 14px 14px 4px", background: "rgba(255,255,255,0.50)", border: "1px solid rgba(169,123,143,0.12)", display: "flex", gap: 4, alignItems: "center" }}>
-                      {[0,1,2].map(d => <span key={d} style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(67,67,43,0.25)", animation: `askMukoDotPulse 1.2s ease-in-out ${d*0.15}s infinite` }} />)}
+                  <div style={{ animation: "askMukoFadeIn 200ms ease-out both", paddingLeft: 12, borderLeft: `2px solid rgba(169,123,143,0.30)` }}>
+                    <div style={{ fontFamily: sohne, fontSize: 9.5, fontWeight: 500, letterSpacing: "0.06em", color: BRAND.rose, marginBottom: 6 }}>Muko</div>
+                    <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                      {[0, 1, 2].map(d => <span key={d} style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(169,123,143,0.45)", animation: `askMukoDotPulse 1.2s ease-in-out ${d * 0.15}s infinite` }} />)}
                     </div>
                   </div>
                 )}
@@ -208,35 +231,108 @@ export default function AskMuko({ step, suggestedQuestions, context, brand: bran
             )}
 
             {/* Input */}
-            <div style={{ position: "relative" as const, marginTop: messages.length > 0 ? 0 : 14 }}>
+            <div style={{ position: "relative" as const, marginTop: messages.length > 0 ? 0 : 8 }}>
               <input
-                ref={inputRef} type="text" value={inputValue}
-                onChange={e => setInputValue(e.target.value)} onKeyDown={handleKeyDown}
-                placeholder={messages.length === 0 ? "Ask about tradeoffs, scores, alternatives..." : "Follow up..."}
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={e => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={messages.length === 0 ? "Ask about scores, timing, tradeoffs…" : "Follow up…"}
                 disabled={isTyping}
-                style={{ width: "100%", boxSizing: "border-box" as const, padding: "12px 44px 12px 14px", fontSize: 13, borderRadius: 12, border: "1px solid rgba(67,67,43,0.10)", background: "rgba(255,255,255,0.60)", color: "rgba(67,67,43,0.85)", fontFamily: "var(--font-inter), system-ui, sans-serif", outline: "none", transition: "all 200ms ease", opacity: isTyping ? 0.5 : 1 }}
-                onFocus={e => { e.currentTarget.style.borderColor = "rgba(169,123,143,0.25)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(169,123,143,0.06)"; }}
-                onBlur={e => { e.currentTarget.style.borderColor = "rgba(67,67,43,0.10)"; e.currentTarget.style.boxShadow = "none"; }}
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box" as const,
+                  padding: "11px 44px 11px 14px",
+                  fontSize: 12.5,
+                  borderRadius: 8,
+                  border: "1px solid rgba(67,67,43,0.11)",
+                  background: "rgba(255,255,255,0.80)",
+                  color: "rgba(67,67,43,0.82)",
+                  fontFamily: inter,
+                  outline: "none",
+                  transition: "border-color 180ms ease",
+                  opacity: isTyping ? 0.5 : 1,
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = "rgba(169,123,143,0.42)"; }}
+                onBlur={e => { e.currentTarget.style.borderColor = "rgba(67,67,43,0.11)"; }}
               />
               <button
-                onClick={() => handleSend(inputValue)} disabled={!inputValue.trim() || isTyping} aria-label="Send"
-                style={{ position: "absolute" as const, right: 6, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: 999, border: "none", background: inputValue.trim() && !isTyping ? "rgba(169,123,143,0.12)" : "transparent", cursor: !inputValue.trim() || isTyping ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: inputValue.trim() && !isTyping ? "rgba(67,67,43,0.65)" : "rgba(67,67,43,0.25)", transition: "all 180ms ease" }}
+                onClick={() => handleSend(inputValue)}
+                disabled={!inputValue.trim() || isTyping}
+                aria-label="Send"
+                style={{
+                  position: "absolute" as const,
+                  right: 7,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  border: "none",
+                  background: inputValue.trim() && !isTyping ? "rgba(169,123,143,0.12)" : "transparent",
+                  cursor: !inputValue.trim() || isTyping ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: inputValue.trim() && !isTyping ? BRAND.rose : "rgba(67,67,43,0.20)",
+                  transition: "all 160ms ease",
+                }}
               >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
       <style>{`
-        @keyframes askMukoFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes askMukoDotPulse { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.3); } }
-        @keyframes askMukoRadarPing {
-  0% { transform: scale(1); opacity: 0.6; }
-  50% { transform: scale(2.2); opacity: 0; }
-  100% { transform: scale(2.2); opacity: 0; }
-}
+        @keyframes askMukoFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes askMukoDotPulse { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.4); } }
+        @keyframes askMukoRadarPing { 0% { transform: scale(1); opacity: 0.5; } 60% { transform: scale(2.4); opacity: 0; } 100% { transform: scale(2.4); opacity: 0; } }
       `}</style>
     </div>
+  );
+}
+
+/* ─── Suggested question row ─────────────────────────────────────────────── */
+function AskMukoQuestion({ question, onSend, disabled, rose, inter }: { question: string; onSend: () => void; disabled: boolean; rose: string; inter: string }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onSend}
+      disabled={disabled}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        textAlign: "left" as const,
+        padding: "10px 14px 10px 12px",
+        border: "none",
+        borderLeft: `2px solid ${hovered && !disabled ? "rgba(169,123,143,0.50)" : "transparent"}`,
+        background: hovered && !disabled ? "rgba(169,123,143,0.03)" : "transparent",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.4 : 1,
+        fontSize: 12.5,
+        fontWeight: 450,
+        color: hovered && !disabled ? "rgba(67,67,43,0.78)" : "rgba(67,67,43,0.60)",
+        fontFamily: inter,
+        lineHeight: 1.45,
+        transition: "all 130ms ease",
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 8,
+      }}
+    >
+      <span>{question}</span>
+      {hovered && !disabled && (
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, color: rose }}>
+          <path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </button>
   );
 }
