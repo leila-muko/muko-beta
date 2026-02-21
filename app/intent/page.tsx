@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import { BRAND } from "../../lib/concept-studio/constants";
 
+/* ─── Types ─────────────────────────────────────────────────────────────────── */
 type SuccessId =
   | "brand_statement"
   | "commercial_performance"
@@ -38,62 +39,34 @@ type IntentPayload = {
   };
 };
 
-/* ─────────────────────────────────────────────────────────────── */
-/* Spec Studio pulse rail glass (exact vibe)                        */
-/* ─────────────────────────────────────────────────────────────── */
-const glassPanelBase: React.CSSProperties = {
-  borderRadius: 20,
-  border: "1px solid rgba(255, 255, 255, 0.35)",
-  background: "rgba(255, 255, 255, 0.25)",
-  backdropFilter: "blur(40px) saturate(180%)",
-  WebkitBackdropFilter: "blur(40px) saturate(180%)",
-  boxShadow:
-    "0 24px 80px rgba(0,0,0,0.05), 0 8px 32px rgba(67,67,43,0.04), inset 0 1px 0 rgba(255,255,255,0.60), inset 0 -1px 0 rgba(255,255,255,0.12)",
-  overflow: "hidden",
-  position: "relative",
-};
+/* ─── Design tokens — match Concept Studio & Report exactly ─────────────────── */
+const CHARTREUSE = "#A8B475";
+const OLIVE = BRAND.oliveInk; // #43432B
+const inter = "var(--font-inter), system-ui, sans-serif";
+const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 
-const glassSheen: React.CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  pointerEvents: "none",
-  background:
-    "radial-gradient(ellipse 280px 120px at 15% -5%, rgba(255,255,255,0.35), transparent 65%), radial-gradient(ellipse 200px 100px at 90% 10%, rgba(255,255,255,0.15), transparent 60%)",
-};
-
+/* Section label — matches "PULSE" / "MUKO INSIGHT" labels in Concept Studio */
 const microLabel: React.CSSProperties = {
-  fontSize: 11,
-  textAlign: "left",
-  fontWeight: 800,
-  letterSpacing: "0.10em",
+  fontFamily: inter,
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: "0.12em",
   textTransform: "uppercase",
-  color: "rgba(67, 67, 43, 0.42)",
-  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+  color: "rgba(67,67,43,0.38)",
+  marginBottom: 16,
 };
 
-const scoreTextStyle: React.CSSProperties = {
-  fontSize: 12,
-  textAlign: "left",
-  fontWeight: 650,
-  color: "rgba(67, 67, 43, 0.62)",
-  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-};
-
+/* ─── Main component ─────────────────────────────────────────────────────────── */
 export default function IntentCalibrationPage() {
   const router = useRouter();
   const { season, setCurrentStep, setIntentGoals, setIntentTradeoff } = useSessionStore();
 
-  const STEEL_BLUE =
-    (BRAND as any)?.steelBlue ?? (BRAND as any)?.steel ?? "#7D96AC";
+  const STEEL = (BRAND as any)?.steelBlue ?? (BRAND as any)?.steel ?? "#7D96AC";
 
-  const [headerCollectionName, setHeaderCollectionName] =
-    useState<string>("Collection");
-  const [headerSeasonLabel, setHeaderSeasonLabel] = useState<string>(
-    season || "—"
-  );
+  const [headerCollectionName, setHeaderCollectionName] = useState<string>("Collection");
+  const [headerSeasonLabel, setHeaderSeasonLabel] = useState<string>(season || "—");
 
   useEffect(() => {
-    // Entry done, Intent active
     setCurrentStep?.(1);
   }, [setCurrentStep]);
 
@@ -198,13 +171,12 @@ export default function IntentCalibrationPage() {
       window.localStorage.setItem("muko_intent", JSON.stringify(payload));
     } catch {}
 
-    // Write to Zustand store
     const goalLabels = success.map(
       (id) => successOptions.find((o) => o.id === id)?.label ?? id
     );
     setIntentGoals(goalLabels);
     setIntentTradeoff(
-      tradeoff ? (tradeoffOptions.find((o) => o.id === tradeoff)?.title ?? tradeoff) : ''
+      tradeoff ? (tradeoffOptions.find((o) => o.id === tradeoff)?.title ?? tradeoff) : ""
     );
   };
 
@@ -212,7 +184,7 @@ export default function IntentCalibrationPage() {
     setTouched({ success: true, tradeoff: true });
     if (!canContinue) return;
     saveIntent();
-    router.push("/concept"); // update if your route differs
+    router.push("/concept");
   };
 
   const primaryGoalText = useMemo(() => {
@@ -264,7 +236,7 @@ export default function IntentCalibrationPage() {
     return parts.join(" ");
   }, [success, tradeoff, tTrend]);
 
-  // Pulse on insight update (keep subtle; no pink overlay on base rail)
+  // Pulse on insight update
   const [insightPulse, setInsightPulse] = useState(false);
   const prevInsightRef = useRef<string>("");
 
@@ -282,62 +254,10 @@ export default function IntentCalibrationPage() {
     prevInsightRef.current = mukoInsight;
   }, []);
 
-  // Shared styles
-  const sectionTitle: React.CSSProperties = {
-    fontSize: 18,
-    textAlign: "left",
-    fontWeight: 650,
-    color: BRAND.oliveInk,
-    fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-    marginBottom: 6,
-  };
+  /* ─── Focus ring for text input ──────────────────────────────────────────── */
+  const [inputFocused, setInputFocused] = useState(false);
 
-  const sectionSub: React.CSSProperties = {
-    fontSize: 13,
-    textAlign: "left",
-    color: "rgba(67, 67, 43, 0.55)",
-    fontFamily: "var(--font-inter), system-ui, sans-serif",
-    lineHeight: 1.5,
-    marginBottom: 16,
-  };
-
-  const cardBase: React.CSSProperties = {
-    width: "100%",
-    textAlign: "left",
-    borderRadius: 16,
-    padding: "14px 18px",
-    background: "rgba(255,255,255,0.62)",
-    border: "1px solid rgba(67, 67, 43, 0.10)",
-    boxShadow: "0 10px 32px rgba(67, 67, 43, 0.06)",
-    cursor: "pointer",
-    transition: "all 220ms cubic-bezier(0.4, 0, 0.2, 1)",
-    outline: "none",
-    position: "relative",
-  };
-
-  const pillText: React.CSSProperties = {
-    fontSize: 15,
-    fontWeight: 600,
-    color: "rgba(67, 67, 43, 0.78)",
-    fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-    letterSpacing: "-0.005em",
-  };
-
-  const errorText: React.CSSProperties = {
-    marginTop: 10,
-    fontSize: 12,
-    fontWeight: 650,
-    color: BRAND.rose,
-    fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-  };
-
-  // Rail “status” colors to mirror your Spec screenshot behavior
-  const statusGreen = BRAND.chartreuse;
-  const statusMuted = "rgba(67,67,43,0.18)";
-
-  const goalDot = success.length ? statusGreen : statusMuted;
-  const tradeoffDot = tradeoff ? statusGreen : statusMuted;
-
+  /* ─── RENDER ─────────────────────────────────────────────────────────────── */
   return (
     <div
       style={{
@@ -347,800 +267,829 @@ export default function IntentCalibrationPage() {
         position: "relative",
       }}
     >
-      {/* Top bar — matched to Concept */}
-      <div
+      {/* ── Fixed header — matches Concept Studio exactly ──────────────────── */}
+      <header
         style={{
           position: "fixed",
           top: 0,
           left: 0,
           right: 0,
           height: 72,
-          background: "rgba(250, 249, 246, 0.86)",
-          backdropFilter: "blur(26px) saturate(180%)",
-          WebkitBackdropFilter: "blur(26px) saturate(180%)",
-          borderBottom: "1px solid rgba(67, 67, 43, 0.10)",
+          background: "rgba(250,249,246,0.92)",
+          backdropFilter: "blur(24px) saturate(160%)",
+          WebkitBackdropFilter: "blur(24px) saturate(160%)",
+          borderBottom: "1px solid rgba(67,67,43,0.09)",
           zIndex: 200,
+          display: "flex",
+          alignItems: "center",
+          padding: "0 40px",
+          justifyContent: "space-between",
+          gap: 20,
         }}
       >
-        <div
-          style={{
-            maxWidth: 1520,
-            margin: "0 auto",
-            height: "100%",
-            padding: "0 64px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 20,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <div
-              style={{
-                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                color: BRAND.oliveInk,
-                fontSize: 18,
-              }}
-            >
-              muko
-            </div>
+        {/* Left: logo + step pills */}
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <span
+            style={{
+              fontFamily: sohne,
+              fontWeight: 700,
+              fontSize: 18,
+              letterSpacing: "-0.02em",
+              color: OLIVE,
+            }}
+          >
+            muko
+          </span>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {(
-                [
-                  { label: "Intent", state: "active" },
-                  { label: "Concept", state: "idle" },
-                  { label: "Spec", state: "idle" },
-                  { label: "Report", state: "idle" },
-                ] as { label: string; state: "active" | "idle" | "done" }[]
-              ).map((s) => {
-                const isActive = s.state === "active";
-                const isDone = s.state === "done";
-
-                const stepBg = isDone
-                  ? "rgba(171, 171, 99, 0.10)"
-                  : isActive
-                  ? "rgba(169, 191, 214, 0.08)"
-                  : "rgba(67, 67, 43, 0.03)";
-
-                const stepBorder = isDone
-                  ? `1.5px solid ${BRAND.chartreuse}`
-                  : isActive
-                  ? `1.5px solid ${STEEL_BLUE}`
-                  : "1.5px solid rgba(67, 67, 43, 0.10)";
-
-                const labelColor = isDone
-                  ? "rgba(67, 67, 43, 0.72)"
-                  : isActive
-                  ? "rgba(67, 67, 43, 0.85)"
-                  : "rgba(67, 67, 43, 0.38)";
-
-                return (
-                  <div
-                    key={s.label}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {(
+              [
+                { label: "Intent", done: false, active: true },
+                { label: "Concept", done: false, active: false },
+                { label: "Spec", done: false, active: false },
+                { label: "Report", done: false, active: false },
+              ] as { label: string; done: boolean; active: boolean }[]
+            ).map((s) => (
+              <div
+                key={s.label}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  border: s.done
+                    ? `1.5px solid ${CHARTREUSE}`
+                    : s.active
+                    ? `1.5px solid ${STEEL}`
+                    : "1.5px solid rgba(67,67,43,0.10)",
+                  background: s.done
+                    ? "rgba(168,180,117,0.08)"
+                    : s.active
+                    ? "rgba(125,150,172,0.07)"
+                    : "rgba(67,67,43,0.03)",
+                  fontFamily: sohne,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.01em",
+                  color: s.done
+                    ? "rgba(67,67,43,0.70)"
+                    : s.active
+                    ? OLIVE
+                    : "rgba(67,67,43,0.35)",
+                }}
+              >
+                {s.done ? (
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                    <path
+                      d="M4.5 7.2L6.2 8.8L9.5 5.5"
+                      stroke={CHARTREUSE}
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : s.active ? (
+                  <span
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 7,
-                      padding: "7px 14px",
+                      width: 7,
+                      height: 7,
                       borderRadius: 999,
-                      border: stepBorder,
-                      background: stepBg,
-                      boxShadow: isActive
-                        ? "0 8px 24px rgba(169, 191, 214, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.80)"
-                        : isDone
-                        ? "0 6px 18px rgba(171, 171, 99, 0.08)"
-                        : "none",
-                      fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                      fontSize: 12,
-                      fontWeight: 650,
-                      letterSpacing: "0.01em",
+                      background: STEEL,
+                      boxShadow: `0 0 0 3px rgba(125,150,172,0.20)`,
                     }}
-                  >
-                    {isDone ? (
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <circle
-                          cx="7"
-                          cy="7"
-                          r="6"
-                          fill={BRAND.chartreuse}
-                          opacity="0.22"
-                        />
-                        <path
-                          d="M4.5 7.2L6.2 8.8L9.5 5.5"
-                          stroke={BRAND.chartreuse}
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    ) : isActive ? (
-                      <span
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 999,
-                          background: STEEL_BLUE,
-                          boxShadow: "0 0 0 3px rgba(169, 191, 214, 0.22)",
-                        }}
-                      />
-                    ) : (
-                      <span
-                        style={{
-                          width: 7,
-                          height: 7,
-                          borderRadius: 999,
-                          background: "rgba(67, 67, 43, 0.18)",
-                        }}
-                      />
-                    )}
-                    <span style={{ color: labelColor }}>{s.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: "rgba(67, 67, 43, 0.55)",
-                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                letterSpacing: "0.04em",
-              }}
-            >
-              {headerSeasonLabel}
-              <span style={{ padding: "0 8px", opacity: 0.35 }}>·</span>
-              {headerCollectionName}
-            </div>
-
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <button
-                onClick={() => window.history.back()}
-                style={{
-                  fontSize: 12,
-                  fontWeight: 650,
-                  color: BRAND.rose,
-                  background: "rgba(169, 123, 143, 0.06)",
-                  border: "1px solid rgba(169, 123, 143, 0.18)",
-                  borderRadius: 999,
-                  padding: "7px 14px 7px 10px",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  transition: "all 180ms ease",
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path
-                    d="M8.5 3L4.5 7L8.5 11"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
                   />
-                </svg>
-                Back
-              </button>
-
-              <button
-                onClick={() => {
-                  saveIntent();
-                }}
-                style={{
-                  fontSize: 12,
-                  fontWeight: 650,
-                  color: BRAND.rose,
-                  background: "rgba(169, 123, 143, 0.06)",
-                  border: "1px solid rgba(169, 123, 143, 0.18)",
-                  borderRadius: 999,
-                  padding: "7px 14px 7px 10px",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  transition: "all 180ms ease",
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path
-                    d="M11 8.5V11.5C11 11.776 10.776 12 10.5 12H3.5C3.224 12 3 11.776 3 11.5V2.5C3 2.224 3.224 2 3.5 2H8.5L11 4.5V8.5Z"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                ) : (
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 999,
+                      background: "rgba(67,67,43,0.18)",
+                    }}
                   />
-                  <path
-                    d="M8.5 2V4.5H11"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M5 8H9"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M5 10H7.5"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                Save &amp; Close
-              </button>
-            </div>
+                )}
+                {s.label}
+              </div>
+            ))}
           </div>
         </div>
-      </div>
 
-      <main style={{ flex: 1, paddingTop: 88 }}>
+        {/* Right: session meta + actions */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span
+            style={{
+              fontFamily: sohne,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "rgba(67,67,43,0.50)",
+              letterSpacing: "0.03em",
+            }}
+          >
+            {headerSeasonLabel}
+            <span style={{ padding: "0 7px", opacity: 0.35 }}>·</span>
+            {headerCollectionName}
+          </span>
+
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={() => window.history.back()}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "7px 13px 7px 10px",
+                borderRadius: 999,
+                border: "1px solid rgba(67,67,43,0.14)",
+                background: "transparent",
+                fontFamily: sohne,
+                fontSize: 11,
+                fontWeight: 600,
+                color: "rgba(67,67,43,0.62)",
+                cursor: "pointer",
+                letterSpacing: "0.01em",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path
+                  d="M8.5 3L4.5 7L8.5 11"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Back
+            </button>
+
+            <button
+              onClick={saveIntent}
+              style={{
+                padding: "7px 14px",
+                borderRadius: 999,
+                border: "none",
+                background: OLIVE,
+                fontFamily: sohne,
+                fontSize: 11,
+                fontWeight: 600,
+                color: "#F5F0E8",
+                cursor: "pointer",
+                letterSpacing: "0.01em",
+              }}
+            >
+              SAVE &amp; CLOSE
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Main scrollable content ────────────────────────────────────────── */}
+      <main style={{ flex: 1, paddingTop: 72 }}>
         <div
           style={{
-            padding: "46px 72px 120px",
+            padding: "36px 44px 120px",
             maxWidth: 1520,
             margin: "0 auto",
           }}
         >
-          {/* Header copy */}
-          <div style={{ marginBottom: 38 }}>
+          {/* Page title */}
+          <div style={{ paddingBottom: 28 }}>
             <h1
               style={{
-                fontSize: 32,
-                fontWeight: 600,
-                color: BRAND.oliveInk,
                 margin: 0,
-                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                fontFamily: sohne,
+                fontWeight: 500,
+                fontSize: 28,
+                color: OLIVE,
                 letterSpacing: "-0.01em",
+                lineHeight: 1.1,
               }}
             >
               Intent Calibration
             </h1>
-
             <p
               style={{
-                fontSize: 14,
-                color: "rgba(67, 67, 43, 0.55)",
-                fontFamily: "var(--font-inter), system-ui, sans-serif",
-                marginTop: 14,
-                marginBottom: 0,
-                maxWidth: 820,
+                margin: "10px 0 0",
+                fontFamily: inter,
+                fontSize: 13,
+                color: "rgba(67,67,43,0.52)",
                 lineHeight: 1.55,
+                maxWidth: 460,
               }}
             >
-              Before we define direction, help Muko understand what you're optimizing for this time.
-              There's no right answer — just tradeoffs.
+              Before we define direction, help Muko understand what you&apos;re
+              optimizing for this time. There&apos;s no right answer — just tradeoffs.
             </p>
           </div>
 
+          {/* Two-column layout */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(720px, 1fr) 372px",
+              gridTemplateColumns: "minmax(0, 1fr) 340px",
               gap: 40,
               alignItems: "start",
             }}
           >
-            {/* LEFT */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
-              {/* Section 1 */}
-              <div>
-                <div style={sectionTitle}>What does success look like for this collection?</div>
-                <div style={sectionSub}>Choose up to {maxSuccess}. This sets Muko&apos;s bias.</div>
+            {/* ── LEFT COLUMN ─────────────────────────────────────────────── */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
+              {/* Section 1 — Success goals */}
+              <div>
+                <div
+                  style={{
+                    fontFamily: sohne,
+                    fontSize: 15,
+                    fontWeight: 500,
+                    color: OLIVE,
+                    marginBottom: 6,
+                  }}
+                >
+                  What does success look like for this collection?
+                </div>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 12,
+                    fontStyle: "italic",
+                    color: "rgba(67,67,43,0.44)",
+                    marginBottom: 14,
+                  }}
+                >
+                  Choose up to {maxSuccess}. This sets Muko&apos;s bias.
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {successOptions.map((opt) => {
                     const active = success.includes(opt.id);
                     const disabled = !active && success.length >= maxSuccess;
-
                     return (
-                      <button
+                      <IntentCard
                         key={opt.id}
-                        onClick={() => toggleSuccess(opt.id)}
+                        active={active}
                         disabled={disabled}
-                        style={{
-                          ...cardBase,
-                          border: active
-                            ? `1px solid ${BRAND.chartreuse}`
-                            : "1px solid rgba(67, 67, 43, 0.10)",
-                          boxShadow: active
-                            ? "0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)"
-                            : "0 10px 32px rgba(67, 67, 43, 0.06)",
-                          opacity: disabled ? 0.55 : 1,
-                        }}
-                        onMouseEnter={(e) => {
-                          if (disabled) return;
-                          e.currentTarget.style.transform = "translateY(-1px)";
-                          e.currentTarget.style.boxShadow = active
-                            ? "0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)"
-                            : "0 14px 44px rgba(67, 67, 43, 0.10)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = active
-                            ? "0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)"
-                            : "0 10px 32px rgba(67, 67, 43, 0.06)";
-                        }}
+                        onClick={() => toggleSuccess(opt.id)}
+                        chartreuse={CHARTREUSE}
+                        steel={STEEL}
                       >
-                        <div
+                        <span
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 12,
+                            fontFamily: inter,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            color: active ? OLIVE : "rgba(67,67,43,0.78)",
                           }}
                         >
-                          <div
-                            style={{
-                              ...pillText,
-                              color: active ? BRAND.oliveInk : "rgba(67,67,43,0.78)",
-                            }}
-                          >
-                            {opt.label}
-                          </div>
-
-                          <span
-                            style={{
-                              width: 18,
-                              height: 18,
-                              borderRadius: 999,
-                              background: active
-                                ? "rgba(171,171,99,0.18)"
-                                : "rgba(67,67,43,0.08)",
-                              border: active
-                                ? "1px solid rgba(171,171,99,0.55)"
-                                : "1px solid rgba(67,67,43,0.10)",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: active ? "rgba(67,67,43,0.80)" : "transparent",
-                              fontSize: 12,
-                              fontWeight: 800,
-                            }}
-                            aria-hidden
-                          >
-                            ✓
-                          </span>
-                        </div>
-                      </button>
+                          {opt.label}
+                        </span>
+                      </IntentCard>
                     );
                   })}
                 </div>
 
                 {touched.success && success.length === 0 && (
-                  <div style={errorText}>Select at least one success goal.</div>
+                  <div
+                    style={{
+                      marginTop: 10,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: BRAND.rose,
+                      fontFamily: inter,
+                    }}
+                  >
+                    Select at least one success goal.
+                  </div>
                 )}
               </div>
 
-              {/* Section 2 */}
+              {/* Section 2 — Tradeoffs */}
               <div>
-                <div style={sectionTitle}>
+                <div
+                  style={{
+                    fontFamily: sohne,
+                    fontSize: 15,
+                    fontWeight: 500,
+                    color: OLIVE,
+                    marginBottom: 6,
+                  }}
+                >
                   When tradeoffs come up, what are you most willing to give on?
                 </div>
-                <div style={sectionSub}>Pick one. This helps Muko decide what to protect.</div>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 12,
+                    fontStyle: "italic",
+                    color: "rgba(67,67,43,0.44)",
+                    marginBottom: 14,
+                  }}
+                >
+                  Pick one. This helps Muko decide what to protect.
+                </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {tradeoffOptions.map((opt) => {
                     const active = tradeoff === opt.id;
                     return (
-                      <button
+                      <IntentCard
                         key={opt.id}
+                        active={active}
+                        disabled={false}
                         onClick={() => {
                           setTouched((t) => ({ ...t, tradeoff: true }));
                           setTradeoff(opt.id);
                         }}
-                        style={{
-                          ...cardBase,
-                          padding: "16px 18px",
-                          border: active
-                            ? `1px solid ${BRAND.chartreuse}`
-                            : "1px solid rgba(67, 67, 43, 0.10)",
-                          boxShadow: active
-                            ? "0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)"
-                            : "0 10px 32px rgba(67, 67, 43, 0.06)",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "translateY(-1px)";
-                          e.currentTarget.style.boxShadow = active
-                            ? "0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)"
-                            : "0 14px 44px rgba(67, 67, 43, 0.10)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = active
-                            ? "0 18px 56px rgba(67, 67, 43, 0.10), inset 0 0 0 1px rgba(255,255,255,0.60)"
-                            : "0 10px 32px rgba(67, 67, 43, 0.06)";
-                        }}
+                        chartreuse={CHARTREUSE}
+                        steel={STEEL}
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 14 }}>
-                          <div>
+                        <div>
+                          <div
+                            style={{
+                              fontFamily: inter,
+                              fontSize: 13,
+                              fontWeight: 500,
+                              color: active ? OLIVE : "rgba(67,67,43,0.78)",
+                            }}
+                          >
+                            {opt.title}
+                          </div>
+                          {opt.desc ? (
                             <div
                               style={{
-                                fontSize: 15,
-                                fontWeight: 650,
-                                color: BRAND.oliveInk,
-                                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                                letterSpacing: "-0.005em",
+                                marginTop: 4,
+                                fontFamily: inter,
+                                fontSize: 12,
+                                color: "rgba(67,67,43,0.52)",
+                                lineHeight: 1.5,
                               }}
                             >
-                              {opt.title}
+                              {opt.desc}
                             </div>
-                            {opt.desc ? (
-                              <div
-                                style={{
-                                  marginTop: 6,
-                                  fontSize: 13,
-                                  color: "rgba(67,67,43,0.55)",
-                                  fontFamily: "var(--font-inter), system-ui, sans-serif",
-                                  lineHeight: 1.5,
-                                }}
-                              >
-                                {opt.desc}
-                              </div>
-                            ) : null}
-                          </div>
-
-                          <span
-                            style={{
-                              width: 18,
-                              height: 18,
-                              borderRadius: 999,
-                              background: active
-                                ? "rgba(171,171,99,0.18)"
-                                : "rgba(67,67,43,0.08)",
-                              border: active
-                                ? "1px solid rgba(171,171,99,0.55)"
-                                : "1px solid rgba(67,67,43,0.10)",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: active ? "rgba(67,67,43,0.80)" : "transparent",
-                              fontSize: 12,
-                              fontWeight: 800,
-                              flex: "0 0 auto",
-                              marginTop: 2,
-                            }}
-                            aria-hidden
-                          >
-                            ✓
-                          </span>
+                          ) : null}
                         </div>
-                      </button>
+                      </IntentCard>
                     );
                   })}
                 </div>
 
                 {touched.tradeoff && !tradeoff && (
-                  <div style={errorText}>Choose one tradeoff to continue.</div>
+                  <div
+                    style={{
+                      marginTop: 10,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: BRAND.rose,
+                      fontFamily: inter,
+                    }}
+                  >
+                    Choose one tradeoff to continue.
+                  </div>
                 )}
               </div>
 
-              {/* Section 3 — slimmer, more premium sliders (keep colors) */}
+              {/* Section 3 — Tension sliders */}
               <div>
-                <div style={sectionTitle}>
+                <div
+                  style={{
+                    fontFamily: sohne,
+                    fontSize: 15,
+                    fontWeight: 500,
+                    color: OLIVE,
+                    marginBottom: 6,
+                  }}
+                >
                   What tension are you intentionally navigating with this collection?
                 </div>
-                <div style={sectionSub}>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 12,
+                    fontStyle: "italic",
+                    color: "rgba(67,67,43,0.44)",
+                    marginBottom: 14,
+                  }}
+                >
                   Slide to set the line you&apos;re walking. (You can keep it balanced.)
                 </div>
 
-                <RefinedSlider
-                  left="Trend-forward"
-                  right="Timeless"
-                  value={tTrend}
-                  onSet={setTTrend}
-                  color="#A8B475"
-                />
-                <div style={{ height: 12 }} />
-                <RefinedSlider
-                  left="Creative expression"
-                  right="Commercial safety"
-                  value={tCreative}
-                  onSet={setTCreative}
-                  color="#B8876B"
-                />
-                <div style={{ height: 12 }} />
-                <RefinedSlider
-                  left="Elevated design"
-                  right="Accessible price"
-                  value={tElevated}
-                  onSet={setTElevated}
-                  color="#7D96AC"
-                />
-                <div style={{ height: 12 }} />
-                <RefinedSlider
-                  left="Novelty"
-                  right="Continuity"
-                  value={tNovelty}
-                  onSet={setTNovelty}
-                  color="#A97B8F"
-                />
-              </div>
-
-              {/* Section 4 */}
-              <div>
-                <div style={sectionTitle}>What would make this collection feel like a miss? (Optional)</div>
-                <div style={sectionSub}>One line is enough. This helps Muko avoid “safe generic.”</div>
-
-                <div
-                  style={{
-                    borderRadius: 16,
-                    padding: "14px 18px",
-                    background: "rgba(255,255,255,0.62)",
-                    border: "1px solid rgba(67, 67, 43, 0.10)",
-                    boxShadow: "0 10px 32px rgba(67, 67, 43, 0.06)",
-                  }}
-                >
-                  <input
-                    value={miss}
-                    onChange={(e) => setMiss(e.target.value)}
-                    placeholder="Feels generic or safe…"
-                    style={{
-                      width: "100%",
-                      border: "none",
-                      outline: "none",
-                      background: "transparent",
-                      fontSize: 14,
-                      color: "rgba(67,67,43,0.80)",
-                      fontFamily: "var(--font-inter), system-ui, sans-serif",
-                    }}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <TensionSlider
+                    left="Trend-forward"
+                    right="Timeless"
+                    value={tTrend}
+                    onSet={setTTrend}
+                    steel={STEEL}
+                    color={CHARTREUSE}
+                  />
+                  <TensionSlider
+                    left="Creative expression"
+                    right="Commercial safety"
+                    value={tCreative}
+                    onSet={setTCreative}
+                    steel={STEEL}
+                    color={STEEL}
+                  />
+                  <TensionSlider
+                    left="Elevated design"
+                    right="Accessible price"
+                    value={tElevated}
+                    onSet={setTElevated}
+                    steel={STEEL}
+                    color="#B8876B"
+                  />
+                  <TensionSlider
+                    left="Novelty"
+                    right="Continuity"
+                    value={tNovelty}
+                    onSet={setTNovelty}
+                    steel={STEEL}
+                    color="#A97B8F"
                   />
                 </div>
+              </div>
+
+              {/* Section 4 — Optional miss input */}
+              <div>
+                <div
+                  style={{
+                    fontFamily: sohne,
+                    fontSize: 15,
+                    fontWeight: 500,
+                    color: OLIVE,
+                    marginBottom: 6,
+                  }}
+                >
+                  What would make this collection feel like a miss? (Optional)
+                </div>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 12,
+                    fontStyle: "italic",
+                    color: "rgba(67,67,43,0.44)",
+                    marginBottom: 14,
+                  }}
+                >
+                  One line is enough. This helps Muko avoid &ldquo;safe generic.&rdquo;
+                </div>
+
+                <input
+                  value={miss}
+                  onChange={(e) => setMiss(e.target.value)}
+                  onFocus={() => setInputFocused(true)}
+                  onBlur={() => setInputFocused(false)}
+                  placeholder="Feels generic or safe…"
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "12px 14px",
+                    fontSize: 13,
+                    borderRadius: 10,
+                    border: inputFocused
+                      ? `1px solid ${STEEL}`
+                      : "1px solid rgba(67,67,43,0.12)",
+                    background: "rgba(255,255,255,0.80)",
+                    color: OLIVE,
+                    fontFamily: inter,
+                    outline: "none",
+                    transition: "border-color 150ms ease",
+                  }}
+                />
               </div>
             </div>
 
-            {/* RIGHT RAIL — now matches Spec Studio pulse screenshot glass + coloring */}
-            <div style={{ position: "sticky", top: 96 }}>
-              {/* Intent Summary (pulse-style panel) */}
-              <div style={{ ...glassPanelBase, padding: 18 }}>
-                <div style={glassSheen} />
-                <div style={{ position: "relative" }}>
-                  <div style={{ ...microLabel, marginBottom: 12 }}>Intent</div>
+            {/* ── RIGHT RAIL column wrapper ────────────────────────────── */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {/* Panel */}
+            <div
+              style={{
+                position: "sticky",
+                top: 88,
+                background: "rgba(250,249,246,0.98)",
+                borderRadius: 10,
+                border: "1px solid rgba(67,67,43,0.08)",
+                padding: "20px 22px",
+              }}
+            >
+              {/* INTENT section — mirrors PULSE section */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ ...microLabel }}>INTENT</div>
 
-                  <PulseLikeRow
-                    dot={goalDot}
-                    label="Primary goal"
-                    value={primaryGoalText}
-                  />
-                  <PulseLikeRow
-                    dot={tradeoffDot}
-                    label="Tradeoff"
-                    value={tradeoffText}
-                  />
-                </div>
+                <IntentPulseRow
+                  label="PRIMARY GOAL"
+                  value={primaryGoalText}
+                  filled={success.length > 0}
+                  chartreuse={CHARTREUSE}
+                />
+                <IntentPulseRow
+                  label="TRADEOFF"
+                  value={tradeoffText}
+                  filled={!!tradeoff}
+                  chartreuse={CHARTREUSE}
+                  isLast
+                />
               </div>
 
-              {/* Muko Insight */}
-              <div
-                style={{
-                  ...glassPanelBase,
-                  marginTop: 12,
-                  padding: 18,
-                }}
-              >
-                <div style={glassSheen} />
-                <div style={{ position: "relative" }}>
-                  <div
-                    style={{
-                      boxShadow: insightPulse
-                        ? "0 22px 70px rgba(169,123,143,0.10)"
-                        : "none",
-                      transition: "box-shadow 420ms ease",
-                    }}
-                  >
-                    <div style={{ ...microLabel, marginBottom: 10 }}>
-                      Muko Insight
-                    </div>
-
-                    <div
-                      style={{
-                        fontSize: 13,
-                        lineHeight: 1.58,
-                        color: "rgba(67, 67, 43, 0.66)",
-                        fontFamily: "var(--font-inter), system-ui, sans-serif",
-                      }}
-                    >
-                      {mukoInsight}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Continue button */}
-              <button
-                onClick={onContinue}
-                disabled={!canContinue}
-                style={{
-                  marginTop: 14,
-                  width: "100%",
-                  padding: "14px 16px",
-                  borderRadius: 14,
-                  fontSize: 13,
-                  fontWeight: 750,
-                  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                  color: canContinue ? STEEL_BLUE : "rgba(67, 67, 43, 0.32)",
-                  background: canContinue
-                    ? "rgba(125, 150, 172, 0.08)"
-                    : "rgba(255,255,255,0.46)",
-                  border: canContinue
-                    ? `1.5px solid ${STEEL_BLUE}`
-                    : "1.5px solid rgba(67, 67, 43, 0.10)",
-                  cursor: canContinue ? "pointer" : "not-allowed",
-                  boxShadow: canContinue
-                    ? "0 14px 44px rgba(125, 150, 172, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.60)"
-                    : "none",
-                  transition: "all 280ms cubic-bezier(0.4, 0, 0.2, 1)",
-                  opacity: canContinue ? 1 : 0.75,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 10,
-                }}
-                onMouseEnter={(e) => {
-                  if (!canContinue) return;
-                  e.currentTarget.style.background = "rgba(125, 150, 172, 0.14)";
-                  e.currentTarget.style.transform = "translateY(-1px)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!canContinue) return;
-                  e.currentTarget.style.background = "rgba(125, 150, 172, 0.08)";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-              >
-                <span>Continue to Concept</span>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  style={{
-                    transition: "transform 280ms ease",
-                    opacity: canContinue ? 1 : 0.4,
-                  }}
-                >
-                  <path
-                    d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-
-              {miss.trim() ? (
+              {/* MUKO INSIGHT section */}
+              <div>
+                <div style={{ ...microLabel }}>MUKO INSIGHT</div>
                 <div
                   style={{
-                    marginTop: 12,
-                    ...glassPanelBase,
-                    padding: 18,
+                    fontFamily: inter,
+                    fontSize: 12.5,
+                    lineHeight: 1.7,
+                    color: "rgba(67,67,43,0.64)",
+                    transition: "opacity 300ms ease",
+                    opacity: insightPulse ? 0.7 : 1,
                   }}
                 >
-                  <div style={glassSheen} />
-                  <div style={{ position: "relative" }}>
-                    <div style={{ ...microLabel, marginBottom: 10 }}>
-                      “A miss” looks like
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        lineHeight: 1.58,
-                        color: "rgba(67, 67, 43, 0.66)",
-                        fontFamily: "var(--font-inter), system-ui, sans-serif",
-                      }}
-                    >
-                      {miss.trim()}
-                    </div>
+                  {mukoInsight}
+                </div>
+              </div>
+
+              {/* "A miss" block — conditional */}
+              {miss.trim() ? (
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ ...microLabel }}>&ldquo;A MISS&rdquo; LOOKS LIKE</div>
+                  <div
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 12.5,
+                      lineHeight: 1.7,
+                      color: "rgba(67,67,43,0.64)",
+                    }}
+                  >
+                    {miss.trim()}
                   </div>
                 </div>
               ) : null}
             </div>
-          </div>
 
-          <style>{`
-            @media (max-width: 1100px) {
-              main > div > div[style*="grid-template-columns: minmax(720px, 1fr) 372px"] {
-                grid-template-columns: 1fr !important;
-              }
-            }
-          `}</style>
+            {/* Continue button — standalone below the rail panel */}
+            <button
+              onClick={onContinue}
+              disabled={!canContinue}
+              style={{
+                width: "100%",
+                marginTop: 12,
+                padding: "14px 16px",
+                borderRadius: 10,
+                fontSize: 12,
+                fontWeight: 700,
+                fontFamily: sohne,
+                letterSpacing: "0.02em",
+                color: canContinue ? STEEL : "rgba(67,67,43,0.30)",
+                background: canContinue
+                  ? "rgba(125,150,172,0.07)"
+                  : "rgba(255,255,255,0.46)",
+                border: canContinue
+                  ? `1.5px solid ${STEEL}`
+                  : "1.5px solid rgba(67,67,43,0.10)",
+                cursor: canContinue ? "pointer" : "not-allowed",
+                transition: "all 280ms ease",
+                opacity: canContinue ? 1 : 0.65,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+              }}
+              onMouseEnter={(e) => {
+                if (!canContinue) return;
+                e.currentTarget.style.background = "rgba(125,150,172,0.14)";
+                e.currentTarget.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                if (!canContinue) return;
+                e.currentTarget.style.background = "rgba(125,150,172,0.07)";
+                e.currentTarget.style.transform = "translateY(0)";
+              }}
+            >
+              <span>Continue to Concept</span>
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 16 16"
+                fill="none"
+                style={{ opacity: canContinue ? 1 : 0.4 }}
+              >
+                <path
+                  d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            </div>{/* end right rail column wrapper */}
+          </div>
         </div>
       </main>
+
+      <style>{`
+        @media (max-width: 1100px) {
+          .intent-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
 
-/* ─────────────────────────────────────────────────────────────── */
-/* Pulse-style row (matches Spec rail row treatment)                */
-/* ─────────────────────────────────────────────────────────────── */
-function PulseLikeRow({
-  dot,
+/* ─── IntentCard — matches DirectionCard style from Concept Studio ─────────── */
+function IntentCard({
+  active,
+  disabled,
+  onClick,
+  children,
+  chartreuse,
+  steel,
+}: {
+  active: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  chartreuse: string;
+  steel: string;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => !disabled && setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: "100%",
+        textAlign: "left",
+        borderRadius: 8,
+        padding: "14px 16px",
+        background: active ? "rgba(168,180,117,0.08)" : "rgba(255,255,255,0.75)",
+        border: "1px solid rgba(67,67,43,0.09)",
+        borderLeft: active
+          ? `3px solid ${chartreuse}`
+          : hovered && !disabled
+          ? `3px solid ${steel}`
+          : "3px solid transparent",
+        cursor: disabled ? "not-allowed" : "pointer",
+        outline: "none",
+        transition: "all 180ms ease",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        opacity: disabled ? 0.45 : 1,
+      }}
+    >
+      {/* Selection indicator — left side */}
+      <span
+        style={{
+          width: 13,
+          height: 13,
+          borderRadius: 999,
+          border: active ? `1.5px solid ${chartreuse}` : "1.5px solid rgba(67,67,43,0.22)",
+          background: active ? chartreuse : "transparent",
+          flexShrink: 0,
+          transition: "all 150ms ease",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+        aria-hidden
+      >
+        {active && (
+          <svg width="7" height="6" viewBox="0 0 7 6" fill="none">
+            <path
+              d="M1 3L2.8 4.8L6 1.5"
+              stroke="white"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </span>
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
+    </button>
+  );
+}
+
+/* ─── IntentPulseRow — mirrors Concept Studio pulse rows ────────────────────── */
+function IntentPulseRow({
   label,
   value,
+  filled,
+  chartreuse,
+  isLast,
 }: {
-  dot: string;
   label: string;
   value: string;
+  filled: boolean;
+  chartreuse: string;
+  isLast?: boolean;
 }) {
+  const inter = "var(--font-inter), system-ui, sans-serif";
   return (
     <div
       style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 10,
-        padding: "14px 14px",
-        borderRadius: 14,
-        border: "1px solid rgba(255,255,255,0.30)",
-        background: "rgba(255,255,255,0.18)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        marginBottom: 10,
+        paddingBottom: 14,
+        marginBottom: isLast ? 0 : 14,
+        borderBottom: isLast ? "none" : "1px solid rgba(67,67,43,0.07)",
       }}
     >
-      <span
+      {/* Label row with dot */}
+      <div
         style={{
-          width: 10,
-          height: 10,
-          borderRadius: 999,
-          background: dot,
-          flex: "0 0 auto",
-          marginTop: 3,
-          boxShadow:
-            dot === "rgba(67,67,43,0.18)"
-              ? "none"
-              : `0 0 0 4px ${dot}22`,
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          marginBottom: 5,
         }}
-      />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
+      >
+        <span
           style={{
-            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-            fontWeight: 750,
-            fontSize: 12,
-            letterSpacing: "0.06em",
+            width: 7,
+            height: 7,
+            borderRadius: 999,
+            background: filled ? chartreuse : "rgba(67,67,43,0.18)",
+            flexShrink: 0,
+            transition: "background 250ms ease",
+            boxShadow: filled ? `0 0 0 3px rgba(168,180,117,0.18)` : "none",
+          }}
+        />
+        <span
+          style={{
+            fontFamily: inter,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.10em",
             textTransform: "uppercase",
-            color: "rgba(67,67,43,0.74)",
-            marginBottom: 4,
+            color: "rgba(67,67,43,0.68)",
           }}
         >
           {label}
-        </div>
-        <div style={{ ...scoreTextStyle }}>
-          {value}
-        </div>
+        </span>
+      </div>
+
+      {/* Value */}
+      <div
+        style={{
+          fontFamily: inter,
+          fontSize: 12,
+          color: "rgba(67,67,43,0.52)",
+          paddingLeft: 14,
+          marginBottom: 8,
+          lineHeight: 1.4,
+        }}
+      >
+        {value}
+      </div>
+
+      {/* 2px progress bar — matches Concept Studio pulse bars */}
+      <div
+        style={{
+          height: 2,
+          background: "rgba(67,67,43,0.08)",
+          borderRadius: 1,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: filled ? "100%" : "0%",
+            background: chartreuse,
+            borderRadius: 1,
+            transition: "width 500ms ease",
+          }}
+        />
       </div>
     </div>
   );
 }
 
-/* ─────────────────────────────────────────────────────────────── */
-/* Sliders — slimmer + premium                                     */
-/* ─────────────────────────────────────────────────────────────── */
-function RefinedSlider({
+/* ─── TensionSlider — slim 2px track, chartreuse fill, clean handle ────────── */
+function TensionSlider({
   left,
   right,
   value,
   onSet,
+  steel,
   color,
 }: {
   left: string;
   right: string;
   value: TensionValue;
   onSet: (v: TensionValue) => void;
+  steel: string;
   color: string;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   const position = value === "left" ? 0 : value === "center" ? 50 : 100;
 
@@ -1160,154 +1109,139 @@ function RefinedSlider({
     handleInteraction(e.clientX);
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (isDragging) handleInteraction(e.clientX);
-  };
-
-  const handleMouseUp = () => setIsDragging(false);
-
   useEffect(() => {
-    if (!isDragging) return;
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) handleInteraction(e.clientX);
+    };
+    const handleMouseUp = () => setIsDragging(false);
+
+    if (isDragging) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+    }
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isDragging]);
 
-  const stateLabel =
-    value === "center" ? "Balanced" : value === "left" ? "Leaning left" : "Leaning right";
+  const centerLabel = value === "center" ? "BALANCED" : value === "left" ? "←" : "→";
 
   return (
     <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => !isDragging && setHovered(false)}
       style={{
-        borderRadius: 16,
-        padding: "12px 14px 12px",
-        background: "rgba(255,255,255,0.62)",
-        border: "1px solid rgba(67, 67, 43, 0.08)",
-        boxShadow: "0 10px 26px rgba(67, 67, 43, 0.05)",
+        borderRadius: 8,
+        padding: "14px 16px",
+        background: "rgba(255,255,255,0.75)",
+        border: "1px solid rgba(67,67,43,0.09)",
+        borderLeft: hovered ? `3px solid ${steel}` : "3px solid transparent",
+        transition: "border-left 180ms ease",
       }}
     >
-      {/* Labels row */}
+      {/* Pole labels + center state */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "1fr auto 1fr",
           alignItems: "center",
-          gap: 14,
+          gap: 8,
           marginBottom: 12,
         }}
       >
-        <div
+        <span
           style={{
-            fontSize: 13,
-            fontWeight: 650,
-            color: "rgba(67,67,43,0.70)",
-            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+            fontFamily: "var(--font-inter), system-ui, sans-serif",
+            fontSize: 12,
+            fontWeight: 500,
+            color: "rgba(67,67,43,0.72)",
           }}
         >
           {left}
-        </div>
+        </span>
 
-        <div
+        <span
           style={{
-            fontSize: 11,
-            color: "rgba(67, 67, 43, 0.42)",
             fontFamily: "var(--font-inter), system-ui, sans-serif",
+            fontSize: 10,
             fontWeight: 600,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "rgba(67,67,43,0.38)",
             textAlign: "center",
-            minWidth: 78,
+            minWidth: 64,
           }}
         >
-          {stateLabel}
-        </div>
+          {centerLabel}
+        </span>
 
-        <div
+        <span
           style={{
-            fontSize: 13,
-            fontWeight: 650,
-            color: "rgba(67,67,43,0.70)",
-            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+            fontFamily: "var(--font-inter), system-ui, sans-serif",
+            fontSize: 12,
+            fontWeight: 500,
+            color: "rgba(67,67,43,0.72)",
             textAlign: "right",
           }}
         >
           {right}
-        </div>
+        </span>
       </div>
 
-      {/* Track */}
+      {/* Clickable track wrapper (20px tall for usability, 2px visual) */}
       <div
         ref={trackRef}
         onMouseDown={handleMouseDown}
         style={{
           position: "relative",
-          height: 22,
-          borderRadius: 999,
-          background:
-            "linear-gradient(180deg, rgba(255,255,255,0.80), rgba(255,255,255,0.52))",
-          cursor: "pointer",
-          border: "1px solid rgba(255,255,255,0.42)",
+          height: 20,
+          cursor: isDragging ? "grabbing" : "pointer",
           display: "flex",
           alignItems: "center",
-          padding: "0 8px",
-          boxShadow:
-            "0 10px 26px rgba(67,67,43,0.05), inset 0 1px 0 rgba(255,255,255,0.75), inset 0 -1px 0 rgba(255,255,255,0.14)",
         }}
       >
-        {/* Active fill */}
+        {/* Track background */}
         <div
           style={{
             position: "absolute",
             left: 0,
-            top: 0,
-            bottom: 0,
-            width: `${position}%`,
-            background: `linear-gradient(90deg, ${color}24, ${color}10)`,
-            borderRadius: "999px 0 0 999px",
-            transition: isDragging ? "none" : "width 260ms cubic-bezier(0.4, 0, 0.2, 1)",
-            pointerEvents: "none",
+            right: 0,
+            height: 2,
+            borderRadius: 2,
+            background: "rgba(224,221,214,1)",
           }}
-        />
-
-        {/* Subtle ticks */}
-        {[
-          { left: "33.33%", h: 10, o: 0.11 },
-          { left: "50%", h: 12, o: 0.16 },
-          { left: "66.67%", h: 10, o: 0.11 },
-        ].map((t) => (
+        >
+          {/* Colored fill from left */}
           <div
-            key={t.left}
             style={{
               position: "absolute",
-              left: t.left,
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: 1,
-              height: t.h,
-              borderRadius: 999,
-              background: `rgba(67,67,43,${t.o})`,
-              pointerEvents: "none",
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: `${position}%`,
+              background: color,
+              borderRadius: "2px 0 0 2px",
+              transition: isDragging ? "none" : "width 260ms cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           />
-        ))}
+        </div>
 
-        {/* Knob (smaller + cleaner) */}
+        {/* Handle */}
         <div
           style={{
             position: "absolute",
             left: `${position}%`,
-            top: "50%",
-            transform: "translate(-50%, -50%)",
+            transform: "translate(-50%, 0)",
             width: 14,
             height: 14,
             borderRadius: "50%",
-            background: "rgba(255,255,255,0.96)",
-            boxShadow: `0 8px 20px rgba(67,67,43,0.10), 0 2px 8px ${color}18, inset 0 1px 0 rgba(255,255,255,0.75)`,
+            background: "#fff",
             border: `1.5px solid ${color}`,
-            transition: isDragging ? "none" : "left 260ms cubic-bezier(0.4, 0, 0.2, 1)",
+            boxShadow: `0 1px 5px rgba(0,0,0,0.14), 0 0 0 2px ${color}28`,
             cursor: isDragging ? "grabbing" : "grab",
-            pointerEvents: "auto",
+            transition: isDragging ? "none" : "left 260ms cubic-bezier(0.4, 0, 0.2, 1)",
+            pointerEvents: "none",
           }}
           onMouseDown={(e) => {
             e.stopPropagation();

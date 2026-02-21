@@ -31,12 +31,12 @@ import { SuggestionCard } from "@/components/ui/SuggestionCard";
 import type { InsightData, SpecInsightMode } from "@/lib/types/insight";
 
 /* ─── Icons: matched to Concept Studio (star, users, cog) ─── */
-function IconIdentity({ size = 16 }: { size?: number }) {
+function IconIdentity({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
         d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
-        stroke="currentColor"
+        stroke={color}
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -45,12 +45,12 @@ function IconIdentity({ size = 16 }: { size?: number }) {
   );
 }
 
-function IconResonance({ size = 16 }: { size?: number }) {
+function IconResonance({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
         d="M17 21V19C17 16.79 15.21 15 13 15H5C2.79 15 1 16.79 1 19V21"
-        stroke="currentColor"
+        stroke={color}
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -59,21 +59,21 @@ function IconResonance({ size = 16 }: { size?: number }) {
         cx="9"
         cy="7"
         r="4"
-        stroke="currentColor"
+        stroke={color}
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
         d="M23 21V19C22.99 17.18 21.8 15.58 20 15.13"
-        stroke="currentColor"
+        stroke={color}
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
         d="M16 3.13C17.8 3.58 18.99 5.18 18.99 7C18.99 8.82 17.8 10.42 16 10.87"
-        stroke="currentColor"
+        stroke={color}
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -93,20 +93,32 @@ const BRAND = {
   parchment: "#FAF9F6",
 };
 
+/* ─── Design tokens matching Concept Studio ─── */
+const CHARTREUSE = "#A8B475";
+const STEEL = "#7D96AC";
+const OLIVE = "#43432B";
+const ROSE = "#A97B8F";
+const CAMEL_COL = "#B8876B";
+const PULSE_GREEN = "#4D7A56";
+const PULSE_YELLOW = "#9B7A3A";
+const PULSE_RED = "#8A3A3A";
+const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
+const inter = "var(--font-inter), system-ui, sans-serif";
+
 /* ─── Icons ─── */
-function IconExecution({ size = 16 }: { size?: number }) {
+function IconExecution({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
         d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
-        stroke="currentColor"
+        stroke={color}
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
         d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
-        stroke="currentColor"
+        stroke={color}
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -141,25 +153,6 @@ const scoreTextStyle: React.CSSProperties = {
   fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
 };
 
-const glassPanelBase: React.CSSProperties = {
-  borderRadius: 20,
-  border: "1px solid rgba(255, 255, 255, 0.35)",
-  background: "rgba(255, 255, 255, 0.25)",
-  backdropFilter: "blur(40px) saturate(180%)",
-  WebkitBackdropFilter: "blur(40px) saturate(180%)",
-  boxShadow:
-    "0 24px 80px rgba(0,0,0,0.05), 0 8px 32px rgba(67,67,43,0.04), inset 0 1px 0 rgba(255,255,255,0.60), inset 0 -1px 0 rgba(255,255,255,0.12)",
-  overflow: "hidden",
-  position: "relative" as const,
-};
-
-const glassSheen: React.CSSProperties = {
-  position: "absolute" as const,
-  inset: 0,
-  pointerEvents: "none" as const,
-  background:
-    "radial-gradient(ellipse 280px 120px at 15% -5%, rgba(255,255,255,0.35), transparent 65%), radial-gradient(ellipse 200px 100px at 90% 10%, rgba(255,255,255,0.15), transparent 60%)",
-};
 
 const sectionHeading: React.CSSProperties = {
   fontSize: 18,
@@ -459,7 +452,7 @@ function aggregateDeltaDot({ deltas }: { deltas: Deltas }) {
   if (total === 0) return null;
 
   const status = total > 0 ? "good" : "bad";
-  const color = status === "good" ? BRAND.chartreuse : BRAND.rose;
+  const color = status === "good" ? CHARTREUSE : BRAND.rose;
 
   return (
     <div
@@ -477,48 +470,31 @@ function aggregateDeltaDot({ deltas }: { deltas: Deltas }) {
 
 function compactDeltaCluster({
   deltas,
-  isHoverOrActive,
-  isRecommended,
 }: {
   deltas: Deltas;
   isHoverOrActive: boolean;
   isRecommended: boolean;
 }) {
-  const c = deltaColor({ isHoverOrActive, isRecommended });
-  const itemStyle: React.CSSProperties = {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-  };
-  const iconStyle: React.CSSProperties = {
-    color: c,
-    opacity: isHoverOrActive || isRecommended ? 1 : 0.85,
-  };
-  const textStyle: React.CSSProperties = {
-    fontSize: 12,
-    fontWeight: 700,
-    color: c,
-    fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-    fontVariantNumeric: "tabular-nums" as const,
-    letterSpacing: "0.01em",
-  };
+  const dc = (v: number) => v > 0 ? PULSE_GREEN : v < 0 ? PULSE_RED : "rgba(67,67,43,0.35)";
 
   const deltaItems = [
-    { icon: <IconIdentity size={16} />, value: deltas.identity, key: "identity" },
-    { icon: <IconResonance size={16} />, value: deltas.resonance, key: "resonance" },
-    { icon: <IconExecution size={16} />, value: deltas.execution, key: "execution" },
+    { icon: (c: string) => <IconIdentity size={10} color={c} />, value: deltas.identity, key: "identity" },
+    { icon: (c: string) => <IconResonance size={10} color={c} />, value: deltas.resonance, key: "resonance" },
+    { icon: (c: string) => <IconExecution size={10} color={c} />, value: deltas.execution, key: "execution" },
   ].filter((item) => item.value !== 0);
 
   if (deltaItems.length === 0) return null;
 
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 14 }}>
-      {deltaItems.map((item) => (
-        <div key={item.key} style={itemStyle}>
-          <span style={iconStyle}>{item.icon}</span>
-          <span style={textStyle}>{fmtDelta(item.value)}</span>
-        </div>
-      ))}
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      {deltaItems.map((item) => {
+        const c = dc(item.value);
+        return (
+          <span key={item.key} style={{ display: "inline-flex", alignItems: "center", gap: 2, fontFamily: "var(--font-inter), system-ui, sans-serif", fontSize: 10, fontWeight: 650, color: c, fontVariantNumeric: "tabular-nums" as const }}>
+            {item.icon(c)}{fmtDelta(item.value)}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -576,7 +552,7 @@ function getSpecInsightData(
 
 export default function SpecStudioPage() {
   const router = useRouter();
-  const { setCategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep } = useSessionStore();
+  const { setCategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection } = useSessionStore();
   const categories: Category[] = categoriesData.categories as unknown as Category[];
   const materials: Material[] = materialsData as unknown as Material[];
 
@@ -584,15 +560,18 @@ export default function SpecStudioPage() {
   const [targetMSRP, setTargetMSRP] = useState(450);
   const [materialId, setMaterialId] = useState("");
   const [silhouetteId, setSilhouetteId] = useState("");
-  const [constructionTier, setConstructionTier] = useState<ConstructionTier>("high");
+  const [constructionTier, setConstructionTier] = useState<ConstructionTier | null>(null);
   const [overrideWarning, setOverrideWarning] = useState<string | null>(null);
   const [pulseUpdated, setPulseUpdated] = useState(false);
-  const [selectedPaletteIdx, setSelectedPaletteIdx] = useState(0);
+  const [selectedPaletteIdx, setSelectedPaletteIdx] = useState(-1);
+
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   const [hoveredMaterialId, setHoveredMaterialId] = useState<string | null>(null);
   const [hoveredSilhouetteId, setHoveredSilhouetteId] = useState<string | null>(null);
   const [hoveredPaletteIdx, setHoveredPaletteIdx] = useState<number | null>(null);
   const [hoveredComplexity, setHoveredComplexity] = useState<ConstructionTier | null>(null);
+  const [pulseExpandedRow, setPulseExpandedRow] = useState<string | null>(null);
 
   const storeAesthetic = useSessionStore((s) => s.aestheticMatchedId);
   const storeModifiers = useSessionStore((s) => s.refinementModifiers);
@@ -654,6 +633,8 @@ export default function SpecStudioPage() {
     () => (selectedCategory.silhouettes || []).find((s) => s.id === silhouetteId) || null,
     [silhouetteId, selectedCategory]
   );
+
+  const hasUserSelection = materialId !== "" || silhouetteId !== "" || constructionTier !== null || selectedPaletteIdx >= 0;
 
   const paletteOptions =
     AESTHETIC_PALETTE_OPTIONS[conceptContext.aestheticMatchedId] ||
@@ -795,11 +776,11 @@ export default function SpecStudioPage() {
 
   const chipsForHighComplexity = useMemo((): ActivatedChip[] => {
     if (!chipSelection) return [];
-    return chipSelection.activatedChips.filter((c) => c.complexity_mod > 0 && !c.isCustom);
+    return chipSelection.activatedChips.filter((c) => c.complexity_mod > 0);
   }, [chipSelection]);
 
   const insight = useMemo(() => {
-    if (!selectedMaterial || !selectedSilhouette) return null;
+    if (!selectedMaterial || !selectedSilhouette || !constructionTier) return null;
     const breakdown = calculateCOGS(
       selectedMaterial,
       selectedSilhouette.yardage,
@@ -844,7 +825,7 @@ export default function SpecStudioPage() {
 
   const executionColor =
     executionStatus === "green"
-      ? BRAND.chartreuse
+      ? CHARTREUSE
       : executionStatus === "yellow"
         ? BRAND.rose
         : executionStatus === "red"
@@ -870,6 +851,62 @@ export default function SpecStudioPage() {
     );
   };
 
+  const applyMukosPick = () => {
+    if (recommendedMaterialId) setMaterialId(recommendedMaterialId);
+    if (recommendedSilhouetteId) setSilhouetteId(recommendedSilhouetteId);
+    setSelectedPaletteIdx(recommendedPaletteIdx);
+    handleComplexityChange(baselineComplexity);
+  };
+
+  const [addedSharpenItems, setAddedSharpenItems] = useState<Set<string>>(new Set());
+
+  // Extract the core noun phrase from a suggestion like "Add tonal topstitching for craft credibility"
+  function sharpenChipLabel(text: string): string {
+    let s = text.trim();
+    // Strip leading verb: "Add ", "Consider ", "Upgrade to ", "Switch to ", "Verify ", "Lock ", "Reduce "
+    s = s.replace(/^(Add|Consider|Upgrade to|Switch to|Verify|Lock|Reduce)\s+/i, "");
+    // Trim trailing qualifier: " for ...", " — ...", " to ..."
+    s = s.replace(/\s+(for|—|to)\s+.*/i, "");
+    // Lowercase first char for chip display
+    return s.charAt(0).toLowerCase() + s.slice(1);
+  }
+
+  const addSharpenChip = (fullText: string) => {
+    setAddedSharpenItems((prev) => new Set([...prev, fullText]));
+    const chipLabel = sharpenChipLabel(fullText);
+    const existing = chipSelection?.activatedChips ?? [];
+    if (existing.some((c) => c.label === chipLabel)) return;
+    const newChip: ActivatedChip = {
+      label: chipLabel,
+      type: "spec",
+      material: null,
+      silhouette: null,
+      complexity_mod: 1,
+      palette: null,
+      isCustom: true,
+    };
+    setChipSelection({
+      directionId: chipSelection?.directionId ?? (conceptContext.aestheticMatchedId || "custom"),
+      activatedChips: [...existing, newChip],
+    });
+  };
+
+  const removeSpecChip = (chipLabel: string) => {
+    if (!chipSelection) return;
+    setChipSelection({
+      ...chipSelection,
+      activatedChips: chipSelection.activatedChips.filter((c) => c.label !== chipLabel),
+    });
+    // Revert the matching addedSharpenItems entry
+    setAddedSharpenItems((prev) => {
+      const next = new Set(prev);
+      for (const fullText of prev) {
+        if (sharpenChipLabel(fullText) === chipLabel) next.delete(fullText);
+      }
+      return next;
+    });
+  };
+
   const isComplete = materialId && silhouetteId && constructionTier;
   const marginCeiling = Math.round(targetMSRP * (1 - brandTargetMargin));
 
@@ -891,6 +928,15 @@ export default function SpecStudioPage() {
     const id = recommendedSilhouetteId || silhouetteId || "";
     return (selectedCategory.silhouettes || []).find((s) => s.id === id) || null;
   }, [selectedCategory.silhouettes, recommendedSilhouetteId, silhouetteId]);
+
+  // Set step indicator and pre-select Muko's recommended values on first mount
+  useEffect(() => { setCurrentStep(3); }, [setCurrentStep]);
+
+  useEffect(() => {
+    if (!hasInitialized && recommendedMaterialId) {
+      setHasInitialized(true);
+    }
+  }, [hasInitialized, recommendedMaterialId]);
 
   function getBaselineMaterialCost() {
     if (!baselineMaterial) {
@@ -989,7 +1035,7 @@ export default function SpecStudioPage() {
     const materialDelta = selectedMaterial ? scoreMaterialDeltas(selectedMaterial).identity : 0;
     const silhouetteDelta = silhouetteId ? scoreSilhouetteDeltas(silhouetteId).identity : 0;
     const paletteDelta = scorePaletteDeltas(selectedPaletteIdx).identity;
-    const complexityDelta = scoreComplexityDeltas(constructionTier).identity;
+    const complexityDelta = constructionTier ? scoreComplexityDeltas(constructionTier).identity : 0;
 
     return clamp(
       baseScore + materialDelta + silhouetteDelta + paletteDelta + complexityDelta,
@@ -1021,7 +1067,7 @@ export default function SpecStudioPage() {
     const materialDelta = selectedMaterial ? scoreMaterialDeltas(selectedMaterial).resonance : 0;
     const silhouetteDelta = silhouetteId ? scoreSilhouetteDeltas(silhouetteId).resonance : 0;
     const paletteDelta = scorePaletteDeltas(selectedPaletteIdx).resonance;
-    const complexityDelta = scoreComplexityDeltas(constructionTier).resonance;
+    const complexityDelta = constructionTier ? scoreComplexityDeltas(constructionTier).resonance : 0;
 
     return clamp(
       baseScore + materialDelta + silhouetteDelta + paletteDelta + complexityDelta,
@@ -1048,14 +1094,14 @@ export default function SpecStudioPage() {
 
   const identityColor =
     dynamicIdentityScore >= 80
-      ? BRAND.chartreuse
+      ? CHARTREUSE
       : dynamicIdentityScore >= 60
         ? BRAND.rose
         : BRAND.camel;
 
   const resonanceColor =
     dynamicResonanceScore >= 80
-      ? BRAND.chartreuse
+      ? CHARTREUSE
       : dynamicResonanceScore >= 60
         ? BRAND.rose
         : BRAND.camel;
@@ -1115,7 +1161,7 @@ export default function SpecStudioPage() {
     const m = scoreMaterialDeltas(selectedMaterial);
     const s = scoreSilhouetteDeltas(silhouetteId);
     const p = scorePaletteDeltas(selectedPaletteIdx);
-    const c = scoreComplexityDeltas(constructionTier);
+    const c = constructionTier ? scoreComplexityDeltas(constructionTier) : { identity: 0, resonance: 0, execution: 0 };
     return addDeltas(addDeltas(m, s), addDeltas(p, c));
   }, [selectedMaterial, silhouetteId, selectedPaletteIdx, constructionTier]);
 
@@ -1293,359 +1339,292 @@ export default function SpecStudioPage() {
     aestheticKws,
   ]);
 
-  const roseGlowStyle: React.CSSProperties = {
-    position: "absolute" as const,
-    inset: -3,
-    borderRadius: 23,
-    pointerEvents: "none" as const,
-    opacity: pulseUpdated ? 1 : 0,
-    transition: "opacity 600ms cubic-bezier(0.4, 0, 0.2, 1)",
-    background: pulseUpdated
-      ? "radial-gradient(ellipse 120% 80% at 50% 30%, rgba(186, 156, 168, 0.14), transparent 70%)"
-      : "transparent",
-    boxShadow: pulseUpdated
-      ? "0 0 50px rgba(186, 156, 168, 0.35), 0 0 100px rgba(186, 156, 168, 0.18)"
-      : "none",
-    border: pulseUpdated ? "1.5px solid rgba(186, 156, 168, 0.30)" : "1.5px solid transparent",
-  };
 
+  /* ─── Spec insight content ─────────────────────────────────────────────── */
+  const specInsightContent = useMemo(() => {
+    const mat = selectedMaterial ?? baselineMaterial;
+    const dir = conceptContext.aestheticName;
+    const ceiling = marginCeiling;
+
+    if (!mat) {
+      return {
+        headline: `Choose a material to start your ${dir} spec.`,
+        p1: `The rose glow on the material grid marks Muko's recommendation for this direction — the starting point with the best fit across brand alignment, margin, and lead time.`,
+        p2: `Your margin ceiling is $${ceiling} — that's the maximum COGS at your target margin. Material cost × yardage + construction multiplier must stay within this.`,
+        p3: `Select a material and silhouette to see your full execution readout. Identity and Resonance carry forward from Concept Studio — Execution is the score to optimize here.`,
+        opportunity: [] as string[],
+        editItems: [] as string[],
+        sharpenItems: [] as string[],
+      };
+    }
+
+    const cost = mat.cost_per_yard || 0;
+    const leadTime = mat.lead_time_weeks || 0;
+    const isOver = insight ? insight.cogs > insight.ceiling : false;
+    const overBy = isOver && insight ? insight.cogs - insight.ceiling : 0;
+
+    const matP1Map: Record<string, string> = {
+      "organic-cotton": `Organic cotton reads cleanly within ${dir}'s visual language — honest material, GOTS-certified, with a provenance story your customer can verify. The fabrication lets the design carry the concept without competing for attention.`,
+      "tencel": `Tencel's fluid drape reads elevated on-body for ${dir} — the Lenzing trademark adds a sustainability credential at a price point that doesn't strain margin. Premium-feeling material that doesn't demand premium cost.`,
+      "linen": `Linen's natural slub texture is one of the most authentic fabrication signals for ${dir} — it improves with wear and reads honest in a way synthetic blends can't replicate. The 13-week lead is your primary planning constraint.`,
+      "silk": `Silk is the highest-identity material signal available for ${dir} — luminous, fluid, and immediately readable as a hero fabrication. Watch the 15-week lead and factor genuine complexity into your production calendar.`,
+      "wool-merino": `Merino wool is itch-free, temperature-regulating, and premium-feeling without announcing itself — for ${dir}, it's the easiest fabrication upgrade with the clearest commercial proposition.`,
+      "cashmere-blend": `Cashmere signals luxury before the garment is worn — for ${dir}, it elevates the entire concept. An 18-week lead and $40/yd cost means this should be a hero SKU, not a basic.`,
+      "recycled-polyester": `Recycled polyester gives ${dir} a credible sustainability angle without premium cost — best positioned in layering or outerwear where surface texture is secondary to function.`,
+      "deadstock-fabric": `Deadstock fits ${dir}'s restraint ethos — the material story becomes part of the design story, and your customer responds to that kind of intentionality. Lot-based availability is the trade-off: size the run carefully.`,
+      "hemp": `Hemp has the highest sustainability score in the lineup for ${dir} — structured drape, improving softness, and a strong provenance story that carries real commercial credibility now.`,
+      "leather": `Leather is a high-identity, long-lead choice for ${dir} — a genuinely premium read that requires the production depth and complexity budget to execute correctly. Half-measures won't register.`,
+      "vegan-leather": `Vegan leather gives ${dir} leather's structure at lower cost with easier compliance — the sustainability score is lower than organic materials, so be transparent rather than leaning on the eco story.`,
+      "rayon-viscose": `Rayon viscose gives ${dir} Tencel's fluid drape at a lower price point — affordable and commercial, though the environmental story is weaker. Best where drape and cost take priority over provenance.`,
+    };
+
+    const p1 = matP1Map[mat.id] ?? `${mat.name} aligns with ${dir}'s fabrication language — the material weight and surface carry the direction's signals clearly without requiring additional explanation.`;
+
+    const p2 = insight
+      ? isOver
+        ? `At $${cost}/yd, your COGS comes in at $${insight.cogs} — $${overBy} over your $${ceiling} ceiling. The fastest recovery is construction tier or silhouette yardage, not a material swap.`
+        : `At $${cost}/yd with a $${ceiling} ceiling, you're at $${insight.cogs} COGS — $${ceiling - insight.cogs} within margin. That's real room to invest in construction quality without pressure.`
+      : `At $${cost}/yd with a $${ceiling} ceiling, select a silhouette to see your full COGS breakdown. Material cost is your biggest lever — the rest is construction and yardage.`;
+
+    const p3 = leadTime <= 4
+      ? `${leadTime}-week lead time is your sharpest production advantage — short enough to course-correct on anything in the spec without calendar risk.`
+      : leadTime <= 8
+        ? `${leadTime}-week lead gives you a workable window — plan sampling now and confirm construction approval early to stay ahead of deadline risk.`
+        : leadTime <= 12
+          ? `${leadTime}-week lead is tight against a typical season calendar. Confirm factory alignment and don't let sampling stretch — any slip compounds quickly.`
+          : `${leadTime}-week lead is your biggest risk flag. Confirm material receipt and factory capacity before committing to the range plan.`;
+
+    const opportunity: string[] = !isOver
+      ? [
+          `${mat.name} is the most legible fabrication signal for this direction — let it carry the concept`,
+          insight && (ceiling - insight.cogs) > 30
+            ? `You have $${ceiling - insight.cogs} in margin headroom — room to invest in finishing detail or construction quality`
+            : `Keep construction at Moderate to preserve margin flexibility`,
+          leadTime <= 6
+            ? `Short lead means fast iteration — confirm silhouette and move`
+            : `Confirm yardage and spec early to protect against lead time risk`,
+        ]
+      : [
+          `Reduce complexity to Moderate — fastest route to recover $${Math.round(overBy * 0.6)} without touching the material`,
+          alternativeMaterial
+            ? `Consider ${alternativeMaterial.name} at $${alternativeMaterial.cost_per_yard}/yd — comparable properties, lower cost`
+            : `Review silhouette yardage — lower volume cut reduces COGS without changing the design language`,
+          `Lock silhouette and confirm lead time before committing to production quantities`,
+        ];
+
+    const editItems: string[] = isOver
+      ? [
+          `A lower-cost fabrication would bring COGS back within your $${ceiling} ceiling`,
+          `Reducing construction complexity is the fastest route to recover margin headroom`,
+        ]
+      : leadTime > 10
+        ? [
+            `Confirm material lead time against your season deadline before locking the spec`,
+            `A shorter-lead alternative would reduce calendar risk without changing the design language`,
+          ]
+        : [];
+
+    const sharpenItems = [
+      ...(mukoSynthesis?.suggestions?.slice(0, 2).map((s) => s.label) ?? []),
+      !isOver ? `Add ${baselineComplexity === "low" ? "moderate seaming detail" : "tonal topstitching"} for craft credibility` : "",
+    ].filter(Boolean).slice(0, 3) as string[];
+
+    return {
+      headline: `${mat.name} is your starting point for ${dir}.`,
+      p1, p2, p3, opportunity, editItems, sharpenItems,
+    };
+  }, [selectedMaterial, baselineMaterial, conceptContext.aestheticName, marginCeiling, insight, alternativeMaterial, mukoSynthesis, baselineComplexity]);
+
+  const suggestedQuestions = useMemo(() => {
+    const qs = [
+      "What's the biggest execution risk here?",
+      "Is there a better material for this direction?",
+    ];
+    if (insight && insight.cogs <= insight.ceiling) qs.push("How much complexity can I add before I'm at risk?");
+    else if (insight && insight.cogs > insight.ceiling) qs.push("What's the fastest way to get back within margin?");
+    if (selectedMaterial && (selectedMaterial.lead_time_weeks ?? 0) > 14) qs.push("Is there a material with a shorter lead time?");
+    if (constructionTier === "high") qs.push("Is High complexity worth the margin cost for this direction?");
+    return qs.slice(0, 3);
+  }, [insight, selectedMaterial, constructionTier]);
+
+  /* ─── RENDER ───────────────────────────────────────────────────────────── */
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: BRAND.parchment,
-        display: "flex",
-        position: "relative",
-      }}
-    >
-      {/* ═══ TOP NAV ═══ */}
-      <div
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#FAF9F6", overflow: "hidden" }}>
+      {/* ── Fixed Header ──────────────────────────────────────────────────── */}
+      <header
         style={{
           position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
+          top: 0, left: 0, right: 0,
           height: 72,
-          background: "rgba(250, 249, 246, 0.86)",
-          backdropFilter: "blur(26px) saturate(180%)",
-          WebkitBackdropFilter: "blur(26px) saturate(180%)",
-          borderBottom: "1px solid rgba(67, 67, 43, 0.10)",
+          background: "rgba(250,249,246,0.92)",
+          backdropFilter: "blur(24px) saturate(160%)",
+          WebkitBackdropFilter: "blur(24px) saturate(160%)",
+          borderBottom: "1px solid rgba(67,67,43,0.09)",
           zIndex: 200,
+          display: "flex",
+          alignItems: "center",
+          padding: "0 40px",
+          justifyContent: "space-between",
+          gap: 20,
         }}
       >
-        <div
-          style={{
-            maxWidth: 1520,
-            margin: "0 auto",
-            height: "100%",
-            padding: "0 64px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 20,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <div
-              style={{
-                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                color: BRAND.oliveInk,
-                fontSize: 18,
-              }}
-            >
-              muko
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {[
-                { label: "Intent", state: "done" },
-                { label: "Concept", state: "done" },
-                { label: "Spec", state: "active" },
-                { label: "Report", state: "idle" },
-              ].map((s) => {
-                const isDone = s.state === "done";
-                const isActive = s.state === "active";
-                return (
-                  <div
-                    key={s.label}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 7,
-                      padding: "7px 14px",
-                      borderRadius: 999,
-                      border: isDone
-                        ? `1.5px solid ${BRAND.chartreuse}`
-                        : isActive
-                          ? `1.5px solid ${BRAND.steelBlue}`
-                          : "1.5px solid rgba(67, 67, 43, 0.10)",
-                      background: isDone
-                        ? "rgba(171, 171, 99, 0.10)"
-                        : isActive
-                          ? "rgba(169, 191, 214, 0.08)"
-                          : "rgba(67, 67, 43, 0.03)",
-                      boxShadow: isActive
-                        ? "0 8px 24px rgba(169, 191, 214, 0.14), inset 0 1px 0 rgba(255,255,255,0.80)"
-                        : isDone
-                          ? "0 6px 18px rgba(171, 171, 99, 0.08)"
-                          : "none",
-                      fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                      fontSize: 12,
-                      fontWeight: 650,
-                      letterSpacing: "0.01em",
-                    }}
-                  >
-                    {isDone ? (
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <circle cx="7" cy="7" r="6" fill={BRAND.chartreuse} opacity="0.22" />
-                        <path
-                          d="M4.5 7.2L6.2 8.8L9.5 5.5"
-                          stroke={BRAND.chartreuse}
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    ) : isActive ? (
-                      <span
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 999,
-                          background: BRAND.steelBlue,
-                          boxShadow: "0 0 0 3px rgba(169, 191, 214, 0.22)",
-                        }}
-                      />
-                    ) : (
-                      <span
-                        style={{
-                          width: 7,
-                          height: 7,
-                          borderRadius: 999,
-                          background: "rgba(67, 67, 43, 0.18)",
-                        }}
-                      />
-                    )}
-                    <span
-                      style={{
-                        color: isDone
-                          ? "rgba(67, 67, 43, 0.72)"
-                          : isActive
-                            ? "rgba(67, 67, 43, 0.85)"
-                            : "rgba(67, 67, 43, 0.38)",
-                      }}
-                    >
-                      {s.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: "rgba(67, 67, 43, 0.55)",
-                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                letterSpacing: "0.04em",
-              }}
-            >
-              {headerSeasonLabel}
-              <span style={{ padding: "0 8px", opacity: 0.35 }}>·</span>
-              {headerCollectionName}
-            </div>
-
-            <div style={{ display: "flex", gap: 6 }}>
-              {[
-                {
-                  label: "Back",
-                  icon: (
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path
-                        d="M8.5 3L4.5 7L8.5 11"
-                        stroke="currentColor"
-                        strokeWidth="1.4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  ),
-                  onClick: () => window.history.back(),
-                },
-                {
-                  label: "Save & Close",
-                  icon: (
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path
-                        d="M11 8.5V11.5C11 11.776 10.776 12 10.5 12H3.5C3.224 12 3 11.776 3 11.5V2.5C3 2.224 3.224 2 3.5 2H8.5L11 4.5V8.5Z"
-                        stroke="currentColor"
-                        strokeWidth="1.3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M8.5 2V4.5H11"
-                        stroke="currentColor"
-                        strokeWidth="1.3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path d="M5 8H9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                      <path d="M5 10H7.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                    </svg>
-                  ),
-                  onClick: () => console.log("Save & Close"),
-                },
-              ].map((btn) => (
-                <button
-                  key={btn.label}
-                  onClick={btn.onClick}
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 650,
-                    color: BRAND.rose,
-                    background: "rgba(169, 123, 143, 0.06)",
-                    border: "1px solid rgba(169, 123, 143, 0.18)",
-                    borderRadius: 999,
-                    padding: "7px 14px 7px 10px",
-                    cursor: "pointer",
-                    fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    transition: "all 180ms ease",
-                  }}
-                >
-                  {btn.icon}
-                  {btn.label}
-                </button>
-              ))}
-            </div>
+        {/* Left: logo + stepper */}
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <span style={{ fontFamily: sohne, fontWeight: 700, fontSize: 18, letterSpacing: "-0.02em", color: OLIVE }}>muko</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {[
+              { label: "Intent", done: true, active: false },
+              { label: "Concept", done: true, active: false },
+              { label: "Spec", done: false, active: true },
+              { label: "Report", done: false, active: false },
+            ].map((s) => (
+              <div
+                key={s.label}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  border: s.done ? `1.5px solid ${CHARTREUSE}` : s.active ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)",
+                  background: s.done ? "rgba(168,180,117,0.08)" : s.active ? "rgba(125,150,172,0.07)" : "rgba(67,67,43,0.03)",
+                  fontFamily: sohne, fontSize: 11, fontWeight: 600, letterSpacing: "0.01em",
+                  color: s.done ? "rgba(67,67,43,0.70)" : s.active ? OLIVE : "rgba(67,67,43,0.35)",
+                }}
+              >
+                {s.done ? (
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                    <path d="M4.5 7.2L6.2 8.8L9.5 5.5" stroke={CHARTREUSE} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : s.active ? (
+                  <span style={{ width: 7, height: 7, borderRadius: 999, background: STEEL, boxShadow: `0 0 0 3px rgba(125,150,172,0.20)` }} />
+                ) : (
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(67,67,43,0.18)" }} />
+                )}
+                {s.label}
+              </div>
+            ))}
           </div>
         </div>
-      </div>
 
-      {/* ═══ MAIN (FIXED WRAPPER) ═══ */}
-      <main style={{ flex: 1, paddingTop: 88 }}>
-        <div style={{ padding: "46px 72px 120px", maxWidth: 1520, margin: "0 auto" }}>
-          {/* Page header */}
-          <div style={{ marginBottom: 24 }}>
-            <h1
-              style={{
-                fontSize: 32,
-                fontWeight: 600,
-                color: BRAND.oliveInk,
-                margin: 0,
-                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                letterSpacing: "-0.01em",
-              }}
+        {/* Right: season/collection + actions */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ fontFamily: sohne, fontSize: 12, fontWeight: 600, color: "rgba(67,67,43,0.50)", letterSpacing: "0.03em" }}>
+            {headerSeasonLabel}<span style={{ padding: "0 7px", opacity: 0.35 }}>·</span>{headerCollectionName}
+          </span>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={() => window.history.back()}
+              style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px 7px 10px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "rgba(67,67,43,0.62)", cursor: "pointer", letterSpacing: "0.01em" }}
             >
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7L8.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              Back
+            </button>
+            <button
+              onClick={() => {}}
+              style={{ padding: "7px 14px", borderRadius: 999, border: "none", background: OLIVE, fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "#F5F0E8", cursor: "pointer", letterSpacing: "0.01em" }}
+            >
+              SAVE & CLOSE
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Two-column body ────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", flex: 1, paddingTop: 72, overflow: "hidden", height: "calc(100vh - 72px)" }}>
+
+        {/* ── LEFT COLUMN ── scrollable ─────────────────────────────────────── */}
+        <div style={{ width: "50%", height: "100%", overflowY: "auto", overflowX: "hidden" }}>
+
+          {/* Title */}
+          <div style={{ padding: "36px 44px 24px" }}>
+            <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 28, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1 }}>
               Spec Studio
             </h1>
-            <p
-              style={{
-                fontSize: 14,
-                color: "rgba(67, 67, 43, 0.55)",
-                fontFamily: "var(--font-inter), system-ui, sans-serif",
-                marginTop: 14,
-                marginBottom: 0,
-              }}
-            >
-              Define the physical product — Muko will check your margins and feasibility in real time.
+            <p style={{ margin: "10px 0 0", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.52)", lineHeight: 1.55, maxWidth: 460 }}>
+              Define the physical product — Muko checks your margins and feasibility in real time.
             </p>
           </div>
+
+          <div style={{ padding: "0 44px 48px" }}>
 
           {/* ─── Locked Concept Bar ─── */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
               padding: "12px 18px",
               borderRadius: 14,
-              background: "rgba(255,255,255,0.62)",
-              border: `1px solid ${BRAND.chartreuse}`,
-              boxShadow:
-                "0 10px 32px rgba(67, 67, 43, 0.06), inset 0 0 0 1px rgba(255,255,255,0.50)",
+              background: "rgba(255,255,255,0.80)",
+              border: "1px solid rgba(67,67,43,0.10)",
+              boxShadow: "0 2px 12px rgba(67,67,43,0.05)",
               marginBottom: 16,
+              gap: 10,
+              flexWrap: "wrap" as const,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" as const }}>
-              <span
-                style={{
-                  fontSize: 16,
-                  fontWeight: 650,
-                  color: BRAND.oliveInk,
-                  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                }}
-              >
-                {refinement.base}
+            {/* Direction name */}
+            <span style={{ fontFamily: sohne, fontSize: 13.5, fontWeight: 500, color: OLIVE, letterSpacing: "-0.01em", flexShrink: 0 }}>
+              {refinement.base}
+            </span>
+
+            {/* Scores inline — identity + resonance only */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 2, fontFamily: inter, fontSize: 10, fontWeight: 650, color: identityColor }}>
+                <IconIdentity size={10} color={identityColor} />{dynamicIdentityScore}
               </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 2, fontFamily: inter, fontSize: 10, fontWeight: 650, color: resonanceColor }}>
+                <IconResonance size={10} color={resonanceColor} />{dynamicResonanceScore}
+              </span>
+            </div>
 
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span style={{ color: identityColor, opacity: 0.95 }}>
-                  <IconIdentity size={16} />
-                </span>
-                <span style={scoreTextStyle}>{dynamicIdentityScore}</span>
-              </div>
-
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span style={{ color: resonanceColor, opacity: 0.95 }}>
-                  <IconResonance size={16} />
-                </span>
-                <span style={scoreTextStyle}>{dynamicResonanceScore}</span>
-              </div>
-
-              {refinement.modifiers.length > 0 && (
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  {refinement.modifiers.map((m) => (
+            {/* Chips — concept chips (dark blue, locked), spec chips (light blue + removable x) */}
+            {chipSelection && chipSelection.activatedChips.length > 0 && (
+              <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" as const }}>
+                {chipSelection.activatedChips.map((chip) => {
+                  const isSpecChip = chip.type === "spec";
+                  return isSpecChip ? (
                     <span
-                      key={m}
+                      key={chip.label}
                       style={{
-                        padding: "4px 10px",
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        padding: "4px 8px 4px 10px",
                         borderRadius: 999,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "rgba(67, 67, 43, 0.60)",
-                        background: "rgba(171, 171, 99, 0.10)",
-                        border: "1px solid rgba(171, 171, 99, 0.18)",
-                        fontFamily: "var(--font-inter), system-ui, sans-serif",
+                        fontSize: 11,
+                        fontWeight: 500,
+                        color: STEEL,
+                        background: "rgba(125,150,172,0.07)",
+                        border: `1px solid rgba(125,150,172,0.28)`,
+                        fontFamily: inter,
                       }}
                     >
-                      {m}
+                      {chip.label}
+                      <button
+                        onClick={() => removeSpecChip(chip.label)}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 13, height: 13, borderRadius: "50%", background: "rgba(125,150,172,0.18)", border: "none", cursor: "pointer", padding: 0, color: STEEL, fontSize: 9, fontWeight: 700, lineHeight: 1, flexShrink: 0 }}
+                        aria-label={`Remove ${chip.label}`}
+                      >
+                        ×
+                      </button>
                     </span>
-                  ))}
-                </div>
-              )}
-
-              {chipSelection && chipSelection.activatedChips.length > 0 && (
-                <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" as const }}>
-                  {chipSelection.activatedChips.map((chip) => (
+                  ) : (
                     <span
                       key={chip.label}
                       style={{
                         padding: "4px 10px",
                         borderRadius: 999,
                         fontSize: 11,
-                        fontWeight: 550,
-                        color: "#6B7040",
-                        background: "rgba(171, 171, 99, 0.14)",
-                        border: chip.isCustom
-                          ? "1.5px dashed rgba(171, 171, 99, 0.40)"
-                          : "1.5px solid rgba(171, 171, 99, 0.40)",
-                        fontFamily: "var(--font-inter), system-ui, sans-serif",
+                        fontWeight: 500,
+                        color: "#4D7390",
+                        background: "rgba(125,150,172,0.14)",
+                        border: `1px solid rgba(125,150,172,0.38)`,
+                        fontFamily: inter,
                       }}
                     >
                       {chip.label}
                     </span>
-                  ))}
-                </div>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* ─── Top Rail ─── */}
@@ -1653,10 +1632,11 @@ export default function SpecStudioPage() {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 32,
+              gap: 20,
               padding: "14px 0",
               marginBottom: 32,
               borderBottom: "1px solid rgba(67, 67, 43, 0.08)",
+              overflow: "visible",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1665,9 +1645,9 @@ export default function SpecStudioPage() {
                 value={categoryId}
                 onChange={(e) => handleCategoryChange(e.target.value)}
                 style={{
-                  padding: "10px 36px 10px 16px",
+                  padding: "8px 28px 8px 12px",
                   borderRadius: 12,
-                  width: 180,
+                  width: 130,
                   border: "1px solid rgba(67, 67, 43, 0.12)",
                   background: "rgba(255,255,255,0.78)",
                   fontFamily: "var(--font-inter), system-ui, sans-serif",
@@ -1693,7 +1673,7 @@ export default function SpecStudioPage() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={microLabel}>Target MSRP</span>
+              <span style={microLabel}>MSRP</span>
               <div style={{ position: "relative" }}>
                 <span
                   style={{
@@ -1712,9 +1692,9 @@ export default function SpecStudioPage() {
                   value={targetMSRP}
                   onChange={(e) => setTargetMSRP(Number(e.target.value))}
                   style={{
-                    padding: "10px 16px 10px 28px",
+                    padding: "8px 12px 8px 26px",
                     borderRadius: 12,
-                    width: 180,
+                    width: 105,
                     border: "1px solid rgba(67, 67, 43, 0.12)",
                     background: "rgba(255,255,255,0.78)",
                     fontFamily: "var(--font-inter), system-ui, sans-serif",
@@ -1738,7 +1718,7 @@ export default function SpecStudioPage() {
             </div>
 
             {insight && (
-              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={microLabel}>Est. COGS</span>
                 <span
                   style={{
@@ -1749,8 +1729,8 @@ export default function SpecStudioPage() {
                       insight.type === "warning"
                         ? BRAND.camel
                         : insight.type === "strong"
-                          ? BRAND.chartreuse
-                          : BRAND.steelBlue,
+                          ? CHARTREUSE
+                          : STEEL,
                     fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
                     transition: "color 300ms ease",
                   }}
@@ -1761,17 +1741,90 @@ export default function SpecStudioPage() {
             )}
           </div>
 
-          {/* ═══ 2-COLUMN LAYOUT ═══ */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 372px",
-              gap: 40,
-              alignItems: "start",
-            }}
-          >
-            {/* LEFT */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
+          {/* ─── Hero Card: Muko's Pick / Selected ─── */}
+          {(() => {
+            const cellStyle = { borderRadius: 10, background: "rgba(67,67,43,0.03)", border: "1px solid rgba(67,67,43,0.08)", padding: "10px 12px" };
+            const cellLabelColor = hasUserSelection ? "rgba(67,67,43,0.50)" : ROSE;
+            const cellLabelStyle = { fontSize: 9, fontWeight: 800 as const, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: cellLabelColor, fontFamily: sohne, marginBottom: 5 };
+            const cellValueStyle = { fontFamily: sohne, fontSize: 13, fontWeight: 650 as const, color: OLIVE, marginBottom: 3 };
+            const cellDetailStyle = { fontFamily: inter, fontSize: 10, color: "rgba(67,67,43,0.45)" };
+
+            // Muko's Pick: show all 4 baseline cells
+            // Selected: only show cells user has actually chosen, order: Material, Silhouette, Palette, Complexity
+            const mukoCells = [
+              { key: "material", label: "Material", name: baselineMaterial?.name ?? "—", detail: baselineMaterial ? `$${baselineMaterial.cost_per_yard}/yd · ${baselineMaterial.lead_time_weeks}wk` : "—" },
+              { key: "silhouette", label: "Silhouette", name: baselineSilhouette?.name ?? "—", detail: baselineSilhouette ? `~${baselineSilhouette.yardage} yards` : "—" },
+              { key: "palette", label: "Palette", name: paletteOptions[recommendedPaletteIdx]?.name ?? "—", detail: null, swatches: paletteOptions[recommendedPaletteIdx]?.palette },
+              { key: "complexity", label: "Complexity", name: COMPLEXITY_CONTEXT[baselineComplexity].label, detail: COMPLEXITY_CONTEXT[baselineComplexity].description },
+            ];
+
+            const selectedCells = [
+              ...(materialId ? [{ key: "material", label: "Material", name: selectedMaterial?.name ?? "—", detail: selectedMaterial ? `$${selectedMaterial.cost_per_yard}/yd · ${selectedMaterial.lead_time_weeks}wk` : "—" }] : []),
+              ...(silhouetteId ? [{ key: "silhouette", label: "Silhouette", name: selectedSilhouette?.name ?? "—", detail: selectedSilhouette ? `~${selectedSilhouette.yardage} yards` : "—" }] : []),
+              ...(selectedPaletteIdx >= 0 ? [{ key: "palette", label: "Palette", name: paletteOptions[selectedPaletteIdx]?.name ?? "—", detail: null, swatches: paletteOptions[selectedPaletteIdx]?.palette }] : []),
+              ...(constructionTier ? [{ key: "complexity", label: "Complexity", name: COMPLEXITY_CONTEXT[constructionTier].label, detail: COMPLEXITY_CONTEXT[constructionTier].description }] : []),
+            ];
+
+            const cells = hasUserSelection ? selectedCells : mukoCells;
+            const gridCols = cells.length <= 1 ? "1fr" : cells.length === 2 ? "repeat(2, 1fr)" : cells.length === 3 ? "repeat(3, 1fr)" : "repeat(4, 1fr)";
+
+            return (
+              <div style={{ marginBottom: 28 }}>
+                {/* Section label */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: hasUserSelection ? CHARTREUSE : ROSE, fontFamily: sohne }}>
+                    {hasUserSelection ? "Your Spec" : "Muko\u2019s Pick"}
+                  </span>
+                  <div style={{ flex: 1, height: 1, background: hasUserSelection ? "rgba(168,180,117,0.25)" : "rgba(169,123,143,0.20)" }} />
+                </div>
+
+                {/* Card */}
+                <div style={{
+                  borderRadius: 16,
+                  border: hasUserSelection ? `1.5px solid ${CHARTREUSE}` : "1.5px solid rgba(169,123,143,0.30)",
+                  background: "rgba(255,255,255,0.72)",
+                  boxShadow: hasUserSelection
+                    ? "0 4px 16px rgba(168,180,117,0.18), 0 1px 4px rgba(0,0,0,0.06)"
+                    : "0 18px 50px rgba(169,123,143,0.12), 0 2px 8px rgba(67,67,43,0.04), inset 0 1px 0 rgba(255,255,255,0.70)",
+                  padding: "18px 20px 16px",
+                }}>
+                  {/* Mini-cells */}
+                  <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 8, marginBottom: 14 }}>
+                    {cells.map((cell) => (
+                      <div key={cell.key} style={{ ...cellStyle, position: "relative" as const }}>
+                        {hasUserSelection && (
+                          <div style={{ position: "absolute", top: 6, right: 6, width: 18, height: 18, borderRadius: "50%", background: CHARTREUSE, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          </div>
+                        )}
+                        <div style={cellLabelStyle}>{cell.label}</div>
+                        <div style={cellValueStyle}>{cell.name}</div>
+                        {cell.detail && <div style={cellDetailStyle}>{cell.detail}</div>}
+                        {(cell as any).swatches && (
+                          <div style={{ display: "flex", gap: 3, marginTop: 2 }}>
+                            {((cell as any).swatches as Array<{ hex: string }>).slice(0, 5).map((c, ci) => (
+                              <div key={ci} style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: c.hex, border: "1px solid rgba(0,0,0,0.06)" }} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Footer */}
+                  <div style={{ borderTop: "1px solid rgba(67,67,43,0.07)", paddingTop: 10 }}>
+                    <p style={{ margin: 0, fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.40)", lineHeight: 1.5 }}>
+                      {hasUserSelection
+                        ? "Muko recalculates as you refine — change any input below."
+                        : "Select any material, silhouette, or construction below to override — Muko will recalculate in real time."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
               {/* Material */}
               <div>
                 <div
@@ -1820,9 +1873,9 @@ export default function SpecStudioPage() {
                           textAlign: "left",
                           borderRadius: 14,
                           padding: "14px 14px 12px",
-                          background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
+                          background: isSel ? "rgba(255,255,255,0.88)" : isRec ? "rgba(169,123,143,0.04)" : "rgba(255,255,255,0.55)",
                           border: isSel
-                            ? `1.5px solid ${BRAND.chartreuse}`
+                            ? `1.5px solid ${CHARTREUSE}`
                             : "1px solid rgba(67, 67, 43, 0.10)",
                           boxShadow: isSel
                             ? "0 14px 40px rgba(67,67,43,0.10)"
@@ -1832,9 +1885,16 @@ export default function SpecStudioPage() {
                           transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
                           transform: isSel ? "translateY(-1px)" : "translateY(0)",
                           position: "relative",
-                          ...(isRec ? roseGlow : {}),
+                          ...(isRec && !isSel ? roseGlow : {}),
                         }}
                       >
+                        {isRec && !isSel && (
+                          <div style={{ position: "absolute", top: 8, right: 8 }}>
+                            <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(169,123,143,0.10)", border: "1px solid rgba(169,123,143,0.30)", color: ROSE, fontFamily: inter, whiteSpace: "nowrap" }}>
+                              Muko&apos;s Pick
+                            </span>
+                          </div>
+                        )}
                         <div
                           style={{
                             display: "flex",
@@ -1844,15 +1904,15 @@ export default function SpecStudioPage() {
                           }}
                         >
                           <div>
-                            <div style={{ fontSize: 16, marginBottom: 4 }}>
+                            <div style={{ fontSize: 13, marginBottom: 4, color: "rgba(67,67,43,0.35)" }}>
                               {MATERIAL_ICONS[mat.id] || "○"}
                             </div>
                             <div
                               style={{
-                                fontSize: 13,
+                                fontSize: 14,
                                 fontWeight: 650,
-                                color: BRAND.oliveInk,
-                                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                                color: OLIVE,
+                                fontFamily: sohne,
                                 marginBottom: 2,
                               }}
                             >
@@ -1860,15 +1920,15 @@ export default function SpecStudioPage() {
                             </div>
                           </div>
 
-                          {isHover || isSel ? (
+                          {isHover && !isSel ? (
                             compactDeltaCluster({
                               deltas,
                               isHoverOrActive: true,
                               isRecommended: isRec,
                             })
-                          ) : (
+                          ) : !isSel ? (
                             aggregateDeltaDot({ deltas })
-                          )}
+                          ) : null}
                         </div>
 
                         <div
@@ -1892,10 +1952,10 @@ export default function SpecStudioPage() {
                                   borderRadius: 999,
                                   fontSize: 10,
                                   fontWeight: 550,
-                                  color: "#6B7040",
-                                  background: "rgba(171, 171, 99, 0.14)",
-                                  border: "1.5px solid rgba(171, 171, 99, 0.40)",
-                                  fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                  color: STEEL,
+                                  background: "rgba(125,150,172,0.10)",
+                                  border: "1px solid rgba(125,150,172,0.28)",
+                                  fontFamily: inter,
                                 }}
                               >
                                 {chip.label}
@@ -1916,35 +1976,6 @@ export default function SpecStudioPage() {
                             >
                               {MATERIAL_DESCRIPTIONS[mat.id] || "Shifts weight, drape, and finish — this choice will quietly define the piece's tone."}
                             </div>
-
-                            {isRec && (
-                              <div style={{ marginTop: 10 }}>
-                                <div
-                                  style={{
-                                    fontSize: 10,
-                                    fontWeight: 800,
-                                    letterSpacing: "0.08em",
-                                    textTransform: "uppercase" as const,
-                                    color: "rgba(67,67,43,0.50)",
-                                    fontFamily:
-                                      "var(--font-sohne-breit), system-ui, sans-serif",
-                                    marginBottom: 4,
-                                  }}
-                                >
-                                  Why This Works
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    color: "rgba(67,67,43,0.62)",
-                                    fontFamily: "var(--font-inter), system-ui, sans-serif",
-                                  }}
-                                >
-                                  Scores highest against your direction — fabric choice is the fastest way to signal intent before the garment is even worn.
-                                </div>
-                              </div>
-                            )}
                           </div>
                         )}
                       </button>
@@ -1998,7 +2029,7 @@ export default function SpecStudioPage() {
                           padding: "16px 14px 14px",
                           background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
                           border: isSel
-                            ? `1.5px solid ${BRAND.chartreuse}`
+                            ? `1.5px solid ${CHARTREUSE}`
                             : "1px solid rgba(67,67,43,0.10)",
                           boxShadow: isSel
                             ? "0 14px 40px rgba(67,67,43,0.10)"
@@ -2023,17 +2054,22 @@ export default function SpecStudioPage() {
                               style={{
                                 fontSize: 14,
                                 fontWeight: 650,
-                                color: BRAND.oliveInk,
-                                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                                color: OLIVE,
+                                fontFamily: sohne,
                               }}
                             >
                               {sil.name}
                             </div>
+                            {isRec && !isSel && (
+                              <span style={{ display: "inline-block", marginTop: 3, padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(169,123,143,0.10)", border: "1px solid rgba(169,123,143,0.30)", color: ROSE, fontFamily: inter }}>
+                                Muko&apos;s Pick
+                              </span>
+                            )}
                             <div
                               style={{
                                 fontSize: 11,
                                 color: "rgba(67,67,43,0.38)",
-                                fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                fontFamily: inter,
                                 marginTop: 4,
                               }}
                             >
@@ -2050,10 +2086,10 @@ export default function SpecStudioPage() {
                                       borderRadius: 999,
                                       fontSize: 10,
                                       fontWeight: 550,
-                                      color: BRAND.oliveInk,
-                                      background: "rgba(171, 171, 99, 0.14)",
-                                      border: "1.5px solid rgba(171, 171, 99, 0.40)",
-                                      fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                      color: STEEL,
+                                      background: "rgba(125,150,172,0.10)",
+                                      border: "1px solid rgba(125,150,172,0.28)",
+                                      fontFamily: inter,
                                     }}
                                   >
                                     {chip.label}
@@ -2063,15 +2099,15 @@ export default function SpecStudioPage() {
                             )}
                           </div>
 
-                          {isHover || isSel ? (
+                          {isHover && !isSel ? (
                             compactDeltaCluster({
                               deltas,
                               isHoverOrActive: true,
                               isRecommended: isRec,
                             })
-                          ) : (
+                          ) : !isSel ? (
                             aggregateDeltaDot({ deltas })
-                          )}
+                          ) : null}
                         </div>
 
                         {(isHover || isSel) && (
@@ -2086,35 +2122,6 @@ export default function SpecStudioPage() {
                             >
                               {SILHOUETTE_DESCRIPTIONS[sil.id] || "Sets proportion and posture — this will drive both fabric behavior and cost."}
                             </div>
-
-                            {isRec && (
-                              <div style={{ marginTop: 10 }}>
-                                <div
-                                  style={{
-                                    fontSize: 10,
-                                    fontWeight: 800,
-                                    letterSpacing: "0.08em",
-                                    textTransform: "uppercase" as const,
-                                    color: "rgba(67,67,43,0.50)",
-                                    fontFamily:
-                                      "var(--font-sohne-breit), system-ui, sans-serif",
-                                    marginBottom: 4,
-                                  }}
-                                >
-                                  Why This Works
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    color: "rgba(67,67,43,0.62)",
-                                    fontFamily: "var(--font-inter), system-ui, sans-serif",
-                                  }}
-                                >
-                                  Aligns with your direction&apos;s visual language — feels cohesive with the concept and keeps proportion reads consistent across the collection.
-                                </div>
-                              </div>
-                            )}
                           </div>
                         )}
                       </button>
@@ -2201,7 +2208,7 @@ export default function SpecStudioPage() {
                           padding: "14px 14px 12px",
                           background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
                           border: isSel
-                            ? `1.5px solid ${BRAND.chartreuse}`
+                            ? `1.5px solid ${CHARTREUSE}`
                             : "1px solid rgba(67,67,43,0.10)",
                           boxShadow: isSel
                             ? "0 14px 40px rgba(67,67,43,0.10)"
@@ -2245,7 +2252,7 @@ export default function SpecStudioPage() {
                             </div>
                             <div
                               style={{
-                                fontSize: 12,
+                                fontSize: 14,
                                 fontWeight: 650,
                                 color: BRAND.oliveInk,
                                 fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
@@ -2254,6 +2261,12 @@ export default function SpecStudioPage() {
                             >
                               {opt.name}
                             </div>
+
+                            {isRec && !isSel && (
+                              <span style={{ display: "inline-block", marginTop: 4, padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(169,123,143,0.10)", border: "1px solid rgba(169,123,143,0.30)", color: ROSE, fontFamily: inter }}>
+                                Muko&apos;s Pick
+                              </span>
+                            )}
 
                             {matchingChips.length > 0 && (
                               <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -2265,10 +2278,10 @@ export default function SpecStudioPage() {
                                       borderRadius: 999,
                                       fontSize: 10,
                                       fontWeight: 550,
-                                      color: BRAND.oliveInk,
-                                      background: "rgba(171, 171, 99, 0.14)",
-                                      border: "1.5px solid rgba(171, 171, 99, 0.40)",
-                                      fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                      color: STEEL,
+                                      background: "rgba(125,150,172,0.10)",
+                                      border: "1px solid rgba(125,150,172,0.28)",
+                                      fontFamily: inter,
                                     }}
                                   >
                                     {chip.label}
@@ -2278,15 +2291,15 @@ export default function SpecStudioPage() {
                             )}
                           </div>
 
-                          {isHover || isSel ? (
+                          {isHover && !isSel ? (
                             compactDeltaCluster({
                               deltas,
                               isHoverOrActive: true,
                               isRecommended: isRec,
                             })
-                          ) : (
+                          ) : !isSel ? (
                             aggregateDeltaDot({ deltas })
-                          )}
+                          ) : null}
                         </div>
 
                         {(isHover || isSel) && (
@@ -2301,35 +2314,6 @@ export default function SpecStudioPage() {
                             >
                               {PALETTE_DESCRIPTIONS[opt.name] || "Shifts mood and perceived value — palette is one of your strongest 'intent' levers."}
                             </div>
-
-                            {isRec && (
-                              <div style={{ marginTop: 10 }}>
-                                <div
-                                  style={{
-                                    fontSize: 10,
-                                    fontWeight: 800,
-                                    letterSpacing: "0.08em",
-                                    textTransform: "uppercase" as const,
-                                    color: "rgba(67,67,43,0.50)",
-                                    fontFamily:
-                                      "var(--font-sohne-breit), system-ui, sans-serif",
-                                    marginBottom: 4,
-                                  }}
-                                >
-                                  Why This Works
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    color: "rgba(67,67,43,0.62)",
-                                    fontFamily: "var(--font-inter), system-ui, sans-serif",
-                                  }}
-                                >
-                                  Best color coherence with your locked direction — consistent palette reduces sampling rounds and tightens seasonal storytelling.
-                                </div>
-                              </div>
-                            )}
                           </div>
                         )}
                       </button>
@@ -2338,6 +2322,7 @@ export default function SpecStudioPage() {
                 </div>
 
                 {/* Palette preview */}
+                {selectedPaletteIdx >= 0 && (
                 <div
                   style={{
                     marginTop: 12,
@@ -2394,6 +2379,7 @@ export default function SpecStudioPage() {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
 
               {/* Complexity */}
@@ -2404,7 +2390,7 @@ export default function SpecStudioPage() {
                     style={{
                       fontSize: 11,
                       fontWeight: 650,
-                      color: BRAND.chartreuse,
+                      color: CHARTREUSE,
                       background: "rgba(171,171,99,0.10)",
                       border: "1px solid rgba(171,171,99,0.18)",
                       borderRadius: 999,
@@ -2446,7 +2432,7 @@ export default function SpecStudioPage() {
                           padding: "16px 14px 14px",
                           background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
                           border: isSel
-                            ? `1.5px solid ${BRAND.chartreuse}`
+                            ? `1.5px solid ${CHARTREUSE}`
                             : "1px solid rgba(67,67,43,0.10)",
                           boxShadow: isSel
                             ? "0 14px 40px rgba(67,67,43,0.10)"
@@ -2471,17 +2457,22 @@ export default function SpecStudioPage() {
                               style={{
                                 fontSize: 14,
                                 fontWeight: 650,
-                                color: BRAND.oliveInk,
-                                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
+                                color: OLIVE,
+                                fontFamily: sohne,
                               }}
                             >
                               {info.label}
                             </div>
+                            {isRec && !isSel && (
+                              <span style={{ display: "inline-block", marginTop: 3, padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(169,123,143,0.10)", border: "1px solid rgba(169,123,143,0.30)", color: ROSE, fontFamily: inter }}>
+                                Muko&apos;s Pick
+                              </span>
+                            )}
                             <div
                               style={{
                                 fontSize: 11,
                                 color: "rgba(67,67,43,0.38)",
-                                fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                fontFamily: inter,
                                 marginTop: 4,
                                 lineHeight: 1.4,
                               }}
@@ -2490,15 +2481,15 @@ export default function SpecStudioPage() {
                             </div>
                           </div>
 
-                          {isHover || isSel ? (
+                          {isHover && !isSel ? (
                             compactDeltaCluster({
                               deltas,
                               isHoverOrActive: true,
                               isRecommended: isRec,
                             })
-                          ) : (
+                          ) : !isSel ? (
                             aggregateDeltaDot({ deltas })
-                          )}
+                          ) : null}
                         </div>
 
                         <div
@@ -2527,10 +2518,10 @@ export default function SpecStudioPage() {
                                   borderRadius: 999,
                                   fontSize: 10,
                                   fontWeight: 550,
-                                  color: "#6B7040",
-                                  background: "rgba(171, 171, 99, 0.14)",
-                                  border: "1.5px solid rgba(171, 171, 99, 0.40)",
-                                  fontFamily: "var(--font-inter), system-ui, sans-serif",
+                                  color: STEEL,
+                                  background: "rgba(125,150,172,0.10)",
+                                  border: "1px solid rgba(125,150,172,0.28)",
+                                  fontFamily: inter,
                                 }}
                               >
                                 {chip.label}
@@ -2551,35 +2542,6 @@ export default function SpecStudioPage() {
                             >
                               {COMPLEXITY_DESCRIPTIONS[tier].hover}
                             </div>
-
-                            {isRec && (
-                              <div style={{ marginTop: 10 }}>
-                                <div
-                                  style={{
-                                    fontSize: 10,
-                                    fontWeight: 800,
-                                    letterSpacing: "0.08em",
-                                    textTransform: "uppercase" as const,
-                                    color: "rgba(67,67,43,0.50)",
-                                    fontFamily:
-                                      "var(--font-sohne-breit), system-ui, sans-serif",
-                                    marginBottom: 4,
-                                  }}
-                                >
-                                  Why This Works
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    color: "rgba(67,67,43,0.62)",
-                                    fontFamily: "var(--font-inter), system-ui, sans-serif",
-                                  }}
-                                >
-                                  {COMPLEXITY_DESCRIPTIONS[tier].why}
-                                </div>
-                              </div>
-                            )}
                           </div>
                         )}
                       </button>
@@ -2615,438 +2577,266 @@ export default function SpecStudioPage() {
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* RIGHT */}
-            <div style={{ position: "relative" }}>
-              <div
-                style={{
-                  position: "absolute",
-                  inset: "-40px -30px",
-                  zIndex: 0,
-                  pointerEvents: "none",
-                  overflow: "hidden",
-                  borderRadius: 32,
-                }}
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    width: 380,
-                    height: 380,
-                    top: "-15%",
-                    right: "-15%",
-                    borderRadius: "50%",
-                    background:
-                      "radial-gradient(circle, rgba(186,156,168,0.32) 0%, rgba(186,156,168,0.08) 40%, transparent 65%)",
-                    filter: "blur(60px)",
-                    animation: "blobDrift1 12s ease-in-out infinite alternate",
-                    opacity: pulseUpdated ? 0.95 : 0.75,
-                    transition: "opacity 800ms ease",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    width: 340,
-                    height: 340,
-                    top: "25%",
-                    left: "-18%",
-                    borderRadius: "50%",
-                    background:
-                      "radial-gradient(circle, rgba(178,180,140,0.28) 0%, rgba(178,180,140,0.06) 40%, transparent 65%)",
-                    filter: "blur(65px)",
-                    animation: "blobDrift2 14s ease-in-out infinite alternate",
-                    opacity: pulseUpdated ? 0.9 : 0.65,
-                    transition: "opacity 800ms ease",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    width: 300,
-                    height: 300,
-                    bottom: "0%",
-                    right: "5%",
-                    borderRadius: "50%",
-                    background:
-                      "radial-gradient(circle, rgba(180,192,204,0.26) 0%, rgba(180,192,204,0.06) 40%, transparent 65%)",
-                    filter: "blur(60px)",
-                    animation: "blobDrift3 10s ease-in-out infinite alternate",
-                    opacity: pulseUpdated ? 0.85 : 0.6,
-                    transition: "opacity 800ms ease",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    width: 260,
-                    height: 260,
-                    top: "45%",
-                    left: "15%",
-                    borderRadius: "50%",
-                    background: "radial-gradient(circle, rgba(200,182,160,0.20) 0%, transparent 60%)",
-                    filter: "blur(55px)",
-                    animation: "blobDrift4 16s ease-in-out infinite alternate",
-                    opacity: 0.55,
-                  }}
-                />
-              </div>
-
-              <div style={{ position: "sticky", top: 96, zIndex: 1 }}>
-                {/* Pulse Rail */}
-                <div
-                  style={{
-                    ...glassPanelBase,
-                    padding: 18,
-                    transition: "box-shadow 500ms ease, transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1)",
-                    transform: pulseUpdated ? "translateY(-3px) scale(1.008)" : "translateY(0) scale(1)",
-                    animation: pulseUpdated ? "panelGlowPulse 1.2s ease-out 1" : "none",
-                  }}
-                >
-                  <div style={glassSheen} />
-                  <div style={roseGlowStyle} />
-                  <div style={{ position: "relative" }}>
-                    <div style={{ ...microLabel, marginBottom: 12 }}>Pulse</div>
-                    {[
-                      {
-                        label: "Identity",
-                        dot: identityColor,
-                        icon: <IconIdentity size={16} />,
-                        score: `${dynamicIdentityScore}`,
-                        accent: identityColor,
-                        chip: identityChipData,
-                      },
-                      {
-                        label: "Resonance",
-                        dot: resonanceColor,
-                        icon: <IconResonance size={16} />,
-                        score: `${dynamicResonanceScore}`,
-                        accent: resonanceColor,
-                        chip: resonanceChipData,
-                      },
-                      {
-                        label: "Execution",
-                        dot: executionColor,
-                        icon: <IconExecution size={16} />,
-                        score: !insight ? "Pending" : `$${insight.cogs}`,
-                        accent: executionColor,
-                        chip: executionChipData,
-                      },
-                    ].map((row) => (
-                      <div
-                        key={row.label}
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          padding: "14px 14px",
-                          borderRadius: 14,
-                          border: "1px solid rgba(255,255,255,0.30)",
-                          background: "rgba(255,255,255,0.18)",
-                          backdropFilter: "blur(12px)",
-                          WebkitBackdropFilter: "blur(12px)",
-                          marginBottom: 10,
-                          gap: row.chip ? 8 : 0,
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span
-                              style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: 999,
-                                background: row.dot,
-                                boxShadow: executionStatus ? `0 0 0 4px ${executionColor}22` : "none",
-                              }}
-                            />
-                            <div
-                              style={{
-                                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                                fontWeight: 750,
-                                fontSize: 12,
-                                letterSpacing: "0.06em",
-                                textTransform: "uppercase" as const,
-                                color: "rgba(67,67,43,0.74)",
-                              }}
-                            >
-                              {row.label}
-                            </div>
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span style={{ color: row.accent, opacity: 0.95 }}>{row.icon}</span>
-                            <span style={scoreTextStyle}>{row.score}</span>
-                          </div>
-                        </div>
-                        {row.chip && (
-                          <div style={{ paddingLeft: 20 }}>
-                            <PulseChip {...row.chip} />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Muko Insight */}
-                <div
-                  style={{
-                    ...glassPanelBase,
-                    marginTop: 16,
-                    padding: 18,
-                    transition:
-                      "box-shadow 500ms ease, transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1) 100ms",
-                    transform: pulseUpdated ? "translateY(-2px) scale(1.005)" : "translateY(0) scale(1)",
-                    animation: pulseUpdated ? "panelGlowPulse 1.2s ease-out 1 150ms" : "none",
-                  }}
-                >
-                  <div style={glassSheen} />
-                  <div style={roseGlowStyle} />
-                  <div style={{ position: "relative" }}>
-                    <div style={{ ...microLabel, marginBottom: 10 }}>Muko Insight</div>
-
-                    {!mukoSynthesis || !insight ? (
-                      <div>
-                        <div
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 650,
-                            lineHeight: 1.45,
-                            color: "rgba(67,67,43,0.82)",
-                            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                            marginBottom: 10,
-                          }}
-                        >
-                          {mukoSynthesis?.headline || `Start by selecting a material`}
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: 13,
-                            lineHeight: 1.58,
-                            color: "rgba(67,67,43,0.66)",
-                            fontFamily: "var(--font-inter), system-ui, sans-serif",
-                            marginBottom: 10,
-                          }}
-                        >
-                          {mukoSynthesis?.overall ||
-                            "Look for the subtle rose glow — those are Muko's recommendations for your locked direction."}
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: 13,
-                            lineHeight: 1.58,
-                            color: "rgba(67,67,43,0.60)",
-                            fontFamily: "var(--font-inter), system-ui, sans-serif",
-                          }}
-                        >
-                          {mukoSynthesis?.detail ||
-                            "Choose a silhouette to see your full execution + margin readout (COGS vs ceiling)."}
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div style={{ marginBottom: 14 }}>
-                          <div
-                            style={{
-                              height: 4,
-                              borderRadius: 2,
-                              background: "rgba(67,67,43,0.08)",
-                              position: "relative",
-                            }}
-                          >
-                            <div
-                              style={{
-                                height: 4,
-                                borderRadius: 2,
-                                background:
-                                  insight.type === "warning"
-                                    ? BRAND.camel
-                                    : insight.type === "strong"
-                                      ? BRAND.chartreuse
-                                      : BRAND.steelBlue,
-                                width: `${Math.min((insight.cogs / insight.ceiling) * 100, 100)}%`,
-                                transition: "width 600ms ease-out, background 300ms ease",
-                              }}
-                            />
-                            <div
-                              style={{
-                                position: "absolute",
-                                right: 0,
-                                top: -3,
-                                width: 1,
-                                height: 10,
-                                background: "rgba(67,67,43,0.22)",
-                              }}
-                            />
-                          </div>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                            <span
-                              style={{
-                                fontSize: 10,
-                                color: "rgba(67,67,43,0.35)",
-                                fontFamily: "var(--font-inter), system-ui, sans-serif",
-                              }}
-                            >
-                              $0
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 10,
-                                color: "rgba(67,67,43,0.35)",
-                                fontFamily: "var(--font-inter), system-ui, sans-serif",
-                              }}
-                            >
-                              ${insight.ceiling}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 650,
-                            lineHeight: 1.45,
-                            color: "rgba(67,67,43,0.88)",
-                            fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                            marginBottom: 14,
-                          }}
-                        >
-                          {mukoSynthesis.headline}
-                        </div>
-
-                        <InsightPanel data={specInsightData} />
-
-                        {mukoSynthesis.suggestions.length > 0 && (
-                          <div style={{ marginTop: 14 }}>
-                            <div style={{ ...microLabel, marginBottom: 8 }}>Suggestions</div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                              {mukoSynthesis.suggestions.slice(0, 3).map((sug, i) => (
-                                <SuggestionCard
-                                  key={`${sug.kind}-${i}`}
-                                  title={sug.label}
-                                  description={sug.sub ?? ""}
-                                  onApply={sug.action}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-
-                  </div>
-                </div>
-
-                {/* After the Muko Insight glassmorphic panel */}
-{/* Before the Continue button */}
-
-<AskMuko
-  step="spec"
-  suggestedQuestions={[
-    "Why is COGS $2 over ceiling?",
-    "What happens if I keep Cocoon?",
-    "Is Modal the right choice here?",
-  ]}
-  context={{
-    aesthetic: conceptContext.aestheticMatchedId,
-    refinement,
-    identityScore: conceptContext.identityScore,
-    resonanceScore: conceptContext.resonanceScore,
-    material: selectedMaterial?.name,
-    silhouette: selectedSilhouette?.name,
-    category: categoryId,
-  }}
-/>
-
-                {/* Run Analysis Button (below Muko Insight — matches Concept Studio placement) */}
-                <button
-                  disabled={!isComplete}
-                  onClick={() => {
-                    if (!isComplete) return;
-                    const cat = categories.find(c => c.id === categoryId);
-                    setCategory(cat?.name ?? categoryId);
-                    setTargetMsrp(targetMSRP);
-                    setMaterial(materialId);
-                    const sil = cat?.silhouettes.find(s => s.id === silhouetteId);
-                    setSilhouette(sil?.name ?? silhouetteId);
-                    setStoreTier(constructionTier);
-                    const palette = paletteOptions[selectedPaletteIdx];
-                    if (palette) {
-                      setColorPalette(palette.palette.map((c: PaletteColor) => c.hex), palette.name);
-                    }
-                    setCurrentStep(4);
-                    router.push("/report");
-                  }}
-                  style={{
-                    marginTop: 14,
-                    width: "100%",
-                    padding: "14px 16px",
-                    borderRadius: 14,
-                    fontSize: 13,
-                    fontWeight: 750,
-                    fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                    color: isComplete ? BRAND.steelBlue : "rgba(67,67,43,0.32)",
-                    background: isComplete ? "rgba(169,191,214,0.08)" : "rgba(255,255,255,0.46)",
-                    border: isComplete ? `1.5px solid ${BRAND.steelBlue}` : "1.5px solid rgba(67,67,43,0.10)",
-                    cursor: isComplete ? "pointer" : "not-allowed",
-                    boxShadow: isComplete
-                      ? "0 14px 44px rgba(169,191,214,0.16), inset 0 1px 0 rgba(255,255,255,0.60)"
-                      : "none",
-                    transition: "all 280ms cubic-bezier(0.4, 0, 0.2, 1)",
-                    opacity: isComplete ? 1 : 0.75,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 10,
-                    animation: isComplete ? "continueReady 600ms ease-out 1" : "none",
-                  }}
-                >
-                  <span>Run Muko Analysis</span>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    style={{
-                      transition: "transform 280ms ease",
-                      transform: isComplete ? "translateX(0)" : "translateX(-2px)",
-                      opacity: isComplete ? 1 : 0.4,
-                      animation: isComplete ? "arrowNudge 2s ease-in-out infinite 1s" : "none",
-                    }}
-                  >
-                    <path
-                      d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
+          </div>{/* end sections */}
 
           <style>{`
             @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-            @keyframes blobDrift1 { 0% { transform: translate(0,0) scale(1); } 33% { transform: translate(-15px,20px) scale(1.08); } 66% { transform: translate(10px,-10px) scale(0.95); } 100% { transform: translate(-8px,15px) scale(1.04); } }
-            @keyframes blobDrift2 { 0% { transform: translate(0,0) scale(1); } 50% { transform: translate(20px,-15px) scale(1.1); } 100% { transform: translate(-10px,10px) scale(0.96); } }
-            @keyframes blobDrift3 { 0% { transform: translate(0,0) scale(1); } 40% { transform: translate(-12px,-18px) scale(1.06); } 100% { transform: translate(15px,8px) scale(0.98); } }
-            @keyframes blobDrift4 { 0% { transform: translate(0,0) scale(1); } 50% { transform: translate(10px,12px) scale(1.05); } 100% { transform: translate(-8px,-6px) scale(0.97); } }
-            @keyframes panelGlowPulse {
-              0% { box-shadow: 0 24px 80px rgba(0,0,0,0.05), 0 8px 32px rgba(67,67,43,0.04), inset 0 1px 0 rgba(255,255,255,0.60), inset 0 -1px 0 rgba(255,255,255,0.12); }
-              35% { box-shadow: 0 30px 100px rgba(186,156,168,0.22), 0 12px 48px rgba(186,156,168,0.12), 0 0 60px rgba(186,156,168,0.15), inset 0 1px 0 rgba(255,255,255,0.70), inset 0 -1px 0 rgba(255,255,255,0.15); }
-              100% { box-shadow: 0 24px 80px rgba(0,0,0,0.05), 0 8px 32px rgba(67,67,43,0.04), inset 0 1px 0 rgba(255,255,255,0.60), inset 0 -1px 0 rgba(255,255,255,0.12); }
-            }
             @keyframes continueReady { 0% { transform: translateY(4px); opacity: 0.6; } 100% { transform: translateY(0); opacity: 1; } }
-            @keyframes arrowNudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
-            @media (max-width: 1100px) { main > div > div[style*="grid-template-columns: 1fr 372px"] { grid-template-columns: 1fr !important; } }
           `}</style>
+
+        </div>{/* end left content padding */}
+      </div>{/* end left column */}
+
+      {/* ── RIGHT COLUMN ── scrollable ─────────────────────────────────── */}
+      <div style={{ width: "50%", height: "100%", overflowY: "auto", overflowX: "hidden", borderLeft: "1px solid rgba(67,67,43,0.07)" }}>
+        <div style={{ padding: "36px 36px 48px" }}>
+          {/* Pulse Rail */}
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 16 }}>Pulse</div>
+            {([
+              {
+                label: "Identity",
+                key: "identity",
+                icon: <IconIdentity size={14} />,
+                score: `${dynamicIdentityScore}`,
+                scoreNum: dynamicIdentityScore,
+                color: identityColor,
+                chip: identityChipData,
+                subLabel: "Locked from Concept" as string | null,
+                what: "Identity measures how well your material, silhouette, palette, and construction choices reinforce the locked direction's brand signals.",
+                how: "Delta scoring against your locked aesthetic — each spec choice adds or subtracts from the base concept identity score.",
+              },
+              {
+                label: "Resonance",
+                key: "resonance",
+                icon: <IconResonance size={14} />,
+                score: `${dynamicResonanceScore}`,
+                scoreNum: dynamicResonanceScore,
+                color: resonanceColor,
+                chip: resonanceChipData,
+                subLabel: "Locked from Concept" as string | null,
+                what: "Resonance measures whether your choices are commercially timed — does the market appetite exist for this spec combination right now?",
+                how: "Material trend alignment + silhouette saturation score, weighted against your direction's velocity data.",
+              },
+              {
+                label: "Execution",
+                key: "execution",
+                icon: <IconExecution size={14} />,
+                score: !insight ? "—" : `$${insight.cogs}`,
+                scoreNum: !insight ? 0 : Math.min((insight.cogs / insight.ceiling) * 100, 100),
+                color: executionColor,
+                chip: executionChipData,
+                subLabel: null as string | null,
+                what: "Execution measures cost feasibility — whether your build is viable at the target margin. COGS is calculated from material cost × yardage + complexity multiplier.",
+                how: "COGS vs margin ceiling: green if under, amber within 5%, red if over. Lead time scored separately against season deadline.",
+              },
+            ]).map((row) => {
+              const isExpanded = pulseExpandedRow === row.key;
+              const pillVariant = row.chip?.variant ?? "amber";
+              const PILL = {
+                green: { bg: "rgba(77,122,86,0.10)", color: "#4D7A56", border: "rgba(77,122,86,0.20)" },
+                amber: { bg: "rgba(155,122,58,0.10)", color: "#9B7A3A", border: "rgba(155,122,58,0.20)" },
+                red: { bg: "rgba(138,58,58,0.10)", color: "#8A3A3A", border: "rgba(138,58,58,0.20)" },
+              };
+              const pill = PILL[pillVariant as keyof typeof PILL] || PILL.amber;
+              return (
+                <div key={row.key} style={{ borderBottom: "1px solid rgba(67,67,43,0.07)", paddingBottom: 14, marginBottom: 14 }}>
+                  <button
+                    onClick={() => setPulseExpandedRow(isExpanded ? null : row.key)}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", marginBottom: 8 }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ color: row.color, opacity: 0.9 }}>{row.icon}</span>
+                      <span style={{ fontFamily: sohne, fontWeight: 700, fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.68)" }}>
+                        {row.label}
+                      </span>
+                      {row.chip && (
+                        <span style={{ fontSize: 10, fontWeight: 600, fontFamily: inter, color: pill.color, background: pill.bg, border: `1px solid ${pill.border}`, borderRadius: 999, padding: "2px 8px" }}>
+                          {row.chip.status}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ ...scoreTextStyle, fontSize: 13 }}>{row.score}</span>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.35, transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 200ms ease" }}>
+                        <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  </button>
+                  <div style={{ height: 2, borderRadius: 1, background: "rgba(67,67,43,0.08)", marginBottom: (row.subLabel || row.chip?.consequence) ? 6 : 0 }}>
+                    <div style={{ height: 2, borderRadius: 1, background: row.color, width: `${row.scoreNum}%`, transition: "width 500ms ease, background 300ms ease" }} />
+                  </div>
+                  {(row.subLabel || row.chip?.consequence) && (
+                    <div style={{ fontSize: 10, color: "rgba(67,67,43,0.45)", fontFamily: inter, marginTop: 4 }}>
+                      {row.subLabel ?? row.chip?.consequence}
+                    </div>
+                  )}
+                  {isExpanded && (
+                    <div style={{ marginTop: 10, padding: "12px 14px", borderRadius: 8, background: "rgba(67,67,43,0.03)", border: "1px solid rgba(67,67,43,0.07)", animation: "fadeIn 200ms ease-out" }}>
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 4 }}>What this means</div>
+                        <div style={{ fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.65)", fontFamily: inter }}>{row.what}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 4 }}>How it&apos;s calculated</div>
+                        <div style={{ fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.65)", fontFamily: inter }}>{row.how}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Muko Insight */}
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 12 }}>
+              Muko Insight
+            </div>
+            <h3 style={{ margin: "0 0 14px", fontFamily: sohne, fontWeight: 500, fontSize: 17, color: OLIVE, lineHeight: 1.3, letterSpacing: "-0.01em" }}>
+              {specInsightContent.headline}
+            </h3>
+            <p style={{ margin: "0 0 10px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.82)", lineHeight: 1.62 }}>
+              {specInsightContent.p1}
+            </p>
+            <p style={{ margin: "0 0 10px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.66)", lineHeight: 1.62 }}>
+              {specInsightContent.p2}
+            </p>
+            <p style={{ margin: "0 0 20px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.52)", lineHeight: 1.62 }}>
+              {specInsightContent.p3}
+            </p>
+            {specInsightContent.opportunity.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: BRAND.chartreuse, fontFamily: sohne, marginBottom: 4 }}>
+                  The Opportunity
+                </div>
+                <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 8 }}>
+                  What&apos;s working in your favor right now
+                </div>
+                <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {specInsightContent.opportunity.map((item, i) => (
+                    <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                      <span style={{ color: BRAND.chartreuse, fontSize: 11, lineHeight: "1.55", flexShrink: 0, marginTop: 1 }}>—</span>
+                      <span style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.72)", lineHeight: 1.55 }}>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {specInsightContent.editItems.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: CAMEL_COL, fontFamily: sohne, marginBottom: 4 }}>
+                  The Edit
+                </div>
+                <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 10 }}>
+                  Inputs worth revisiting before you commit
+                </div>
+                <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {specInsightContent.editItems.map((item, i) => (
+                    <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                      <span style={{ color: CAMEL_COL, fontSize: 11, lineHeight: "1.55", flexShrink: 0, marginTop: 1 }}>—</span>
+                      <span style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.72)", lineHeight: 1.55 }}>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {specInsightContent.sharpenItems.length > 0 && (
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: BRAND.steelBlue, fontFamily: sohne, marginBottom: 4 }}>
+                  Sharpen Your Spec
+                </div>
+                <p style={{ margin: "0 0 10px", fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", lineHeight: 1.5 }}>
+                  Small additions that improve execution clarity
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {specInsightContent.sharpenItems.map((item, i) => {
+                    const isAdded = addedSharpenItems.has(item);
+                    return (
+                      <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 10px", borderRadius: 8, background: isAdded ? "rgba(125,150,172,0.05)" : "rgba(67,67,43,0.02)", border: isAdded ? "1px solid rgba(125,150,172,0.22)" : "1px solid rgba(67,67,43,0.07)", transition: "all 200ms ease" }}>
+                        <span style={{ fontFamily: inter, fontSize: 12, color: isAdded ? STEEL : "rgba(67,67,43,0.72)", lineHeight: 1.5, flex: 1 }}>{item}</span>
+                        {isAdded ? (
+                          <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, fontFamily: sohne, color: STEEL, letterSpacing: "0.02em" }}>✓ Added</span>
+                        ) : (
+                          <button
+                            onClick={() => addSharpenChip(item)}
+                            style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, fontFamily: sohne, color: STEEL, background: "rgba(125,150,172,0.07)", border: `1px solid rgba(125,150,172,0.22)`, borderRadius: 6, padding: "4px 8px", cursor: "pointer", letterSpacing: "0.02em" }}
+                          >
+                            ADD
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Ask Muko */}
+          <AskMuko
+            step="spec"
+            suggestedQuestions={suggestedQuestions}
+            context={{
+              aesthetic: conceptContext.aestheticMatchedId,
+              refinement,
+              identityScore: conceptContext.identityScore,
+              resonanceScore: conceptContext.resonanceScore,
+              material: selectedMaterial?.name,
+              silhouette: selectedSilhouette?.name,
+              category: categoryId,
+            }}
+          />
+
+          {/* Run Muko Analysis */}
+          <button
+            disabled={!isComplete}
+            onClick={() => {
+              if (!isComplete) return;
+              const cat = categories.find(c => c.id === categoryId);
+              setCategory(cat?.name ?? categoryId);
+              setTargetMsrp(targetMSRP);
+              setMaterial(materialId);
+              const sil = cat?.silhouettes.find(s => s.id === silhouetteId);
+              setSilhouette(sil?.name ?? silhouetteId);
+              setStoreTier(constructionTier!);
+              const palette = paletteOptions[selectedPaletteIdx];
+              if (palette) {
+                setColorPalette(palette.palette.map((c: PaletteColor) => c.hex), palette.name);
+              }
+              setCurrentStep(4);
+              router.push("/report");
+            }}
+            style={{
+              marginTop: 16,
+              width: "100%",
+              padding: "14px 16px",
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 700,
+              fontFamily: sohne,
+              letterSpacing: "0.02em",
+              color: isComplete ? STEEL : "rgba(67,67,43,0.30)",
+              background: isComplete ? "rgba(125,150,172,0.07)" : "rgba(255,255,255,0.46)",
+              border: isComplete ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)",
+              cursor: isComplete ? "pointer" : "not-allowed",
+              transition: "all 280ms ease",
+              opacity: isComplete ? 1 : 0.65,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              animation: isComplete ? "continueReady 600ms ease-out 1" : "none",
+            }}
+          >
+            <span>Run Muko Analysis</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ transition: "transform 280ms ease", transform: isComplete ? "translateX(0)" : "translateX(-2px)", opacity: isComplete ? 1 : 0.4 }}>
+              <path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
         </div>
-      </main>
+      </div>
     </div>
+  </div>
   );
 }

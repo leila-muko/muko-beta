@@ -3,16 +3,14 @@
     "id": "terrain-luxe",
     "name": "Terrain Luxe",
     "description": "Elevated outdoor utility meets refined tailoring — guardian details, resilient hardware, and grounded earthy tones that signal protection without sacrificing contemporary polish.",
-    "keywords": ["Technical", "Rustic", "Sustainable", "Premium", "Masculine", "Sophisticated", "Timeless", "Utilitarian", "Functional", "Protective"],
+    "keywords": ["Technical", "Rustic", "Sustainable", "Premium", "Masculine", "Sophisticated", "Timeless", "Utilitarian", "Functional", "Protective", "Utility"],
     "custom_keywords": ["Utilitarian", "Functional", "Protective"],
     "tension_keywords": ["Feminine", "Playful", "Dramatic", "Vibrant"],
     "saturation_score": 42,
     "saturation_basis": "Post-gorpcore evolution with growing but not yet mainstream adoption. Aritzia and Everlane both launched dedicated utility collections for SS26. Ascending presence in runway-to-retail coverage; utility references broadening beyond outdoor niche into office-ready tailoring.",
-    "trend_velocity": "emerging",
-    "seasonal_relevance": {
-      "ss26": 4,
-      "fw26": 5
-    },
+    "trend_velocity": "ascending",
+    "score_source": "hardcoded_v1",
+    "seasonal_relevance": { "ss26": 4, "fw26": 5 },
     "collections_analyzed": 187,
     "seen_in": ["Aritzia", "Everlane", "COS", "Napapijri x Martine Rose", "Barbour"],
     "consumer_insight": "Driven by the search for self-preservation in an unpredictable world. Consumers want cost-per-wear value where durability justifies the bridge price point, and clothing functions as both a physical and psychological shield against instability.",
@@ -21,15 +19,13 @@
     "evidence": [
       {
         "claim": "Aritzia Pre-Spring 2026 Soundwave Waxed Trench Coat and Strobe Cargo Pants as key executions",
-        "source": "Marie Claire",
-        "type": "editorial",
+        "source": "Marie Claire", "type": "editorial",
         "url": "https://www.marieclaire.com/fashion/winter-fashion/aritzia-pre-spring-2026-collection/",
         "verified": true
       },
       {
         "claim": "Everlane Modern Utility collection with organic cotton herringbone jackets",
-        "source": "Everlane",
-        "type": "retail",
+        "source": "Everlane", "type": "retail",
         "url": "https://blog.everlane.com/everworld/modern-utility-fashion",
         "verified": true
       }
@@ -44,52 +40,86 @@
       {
         "label": "waxed cotton",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": "cotton-twill",
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named specifically in report: Aritzia Soundwave Waxed Trench Coat. Core material signal for aesthetic.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["protective", "functional", "utilitarian", "durable"]
       },
       {
         "label": "shearling trim",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": "wool",
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Secondary signal — mentioned as texture reference for FW26 elevated utility, not named as hero detail.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["premium", "textural", "warm", "rustic"]
       },
       {
         "label": "cargo detailing",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": null,
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named in report: Aritzia Strobe Cargo Pants as key execution. Core silhouette signal for Terrain Luxe.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["utilitarian", "functional", "urban", "technical"]
       },
       {
         "label": "earthy neutrals",
         "type": "mood",
+        "primary_dimension": "identity",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": "earth tones"
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Palette named specifically in report: Amber Terrain, Sage Green, Classic Navy. Strong palette signal but secondary to structural details.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": "earth tones",
+        "keywords": ["grounded", "rustic", "timeless", "natural"]
       },
       {
         "label": "utility hardware",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": null,
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named in report: heavy-duty zippers and magnetic closures as core guardian detail. Strong execution signal.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["functional", "technical", "utilitarian", "protective"]
       },
       {
         "label": "weather-ready knits",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": "merino-wool",
-        "silhouette": {
-          "knitwear": "oversized"
-        },
+        "silhouette": { "knitwear": "oversized" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.02,
+        "resonance_mod_source": "Implied by transseasonal fabric focus but not named explicitly. Lower mod reflects lack of direct report citation.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["functional", "premium", "technical", "timeless"]
       }
     ]
   },
@@ -103,10 +133,8 @@
     "saturation_score": 72,
     "saturation_basis": "Dominant direction across Toteme, Khaite, COS, The Row with high runway-to-retail conversion. Column silhouettes and architectural tailoring visible in both Michael Kors and Ralph Lauren SS26. Multi-season presence creates real consumer fatigue risk.",
     "trend_velocity": "peak",
-    "seasonal_relevance": {
-      "ss26": 5,
-      "fw26": 5
-    },
+    "score_source": "hardcoded_v1",
+    "seasonal_relevance": { "ss26": 5, "fw26": 5 },
     "collections_analyzed": 243,
     "seen_in": ["Toteme", "Khaite", "COS", "Rohe", "The Row"],
     "consumer_insight": "Driven by the desire for visual silence and internal authority in a world of algorithm fatigue. These clothes provide calm and control, allowing the wearer to feel composed and intentional without dressing for external approval.",
@@ -115,15 +143,13 @@
     "evidence": [
       {
         "claim": "Toteme architectural capes and Khaite simplistic white dresses as category-defining executions",
-        "source": "Who What Wear",
-        "type": "editorial",
+        "source": "Who What Wear", "type": "editorial",
         "url": "https://www.whowhatwear.com/fashion/shopping/luxury-fashion-trends-2026",
         "verified": true
       },
       {
         "claim": "80s tailoring influence with sharp shoulders and funnel necks across SS26 runways",
-        "source": "Who What Wear",
-        "type": "editorial",
+        "source": "Who What Wear", "type": "editorial",
         "url": "https://www.whowhatwear.com/fashion/trends/minimalist-fashion-trends-2026",
         "verified": true
       }
@@ -138,59 +164,86 @@
       {
         "label": "column silhouettes",
         "type": "spec",
+        "primary_dimension": "identity",
         "material": null,
-        "silhouette": {
-          "outerwear": "straight",
-          "bottoms": "straight",
-          "dresses": "column"
-        },
+        "silhouette": { "outerwear": "straight", "bottoms": "straight", "dresses": "column" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": -0.01,
+        "resonance_mod_source": "Negative mod: saturation score 72 (peak). Report warns of consumer fatigue risk. Column silhouettes are widely copied — adding more of this signal does not improve market opportunity.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["architectural", "minimalist", "restrained", "structured"]
       },
       {
         "label": "soft suiting",
         "type": "spec",
+        "primary_dimension": "identity",
         "material": "modal",
-        "silhouette": {
-          "outerwear": "belted",
-          "tops": "fitted",
-          "bottoms": "straight",
-          "knitwear": "fitted"
-        },
+        "silhouette": { "outerwear": "belted", "tops": "fitted", "bottoms": "straight", "knitwear": "fitted" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.02,
+        "resonance_mod_source": "Named via Khaite reference — simplistic fitted silhouettes as differentiator at peak saturation. Slightly above base because suiting is the differentiating execution, not the generic signal.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["sophisticated", "minimalist", "luxe", "intentional"]
       },
       {
         "label": "matte fabrics",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": "tencel",
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.02,
+        "resonance_mod_source": "Named in report: crepe, Mikado, heavy satins specifically called out as material differentiators for Quiet Structure. Moderate mod — execution differentiator within a saturated aesthetic.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["restrained", "serene", "premium", "minimalist"]
       },
       {
         "label": "tonal layering",
         "type": "mood",
+        "primary_dimension": "identity",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.01,
+        "resonance_mod_source": "Directional mood signal. Present in report but not named as a specific execution detail. Low mod reflects mood-only status at peak saturation.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["sophisticated", "intentional", "serene", "architectural"]
       },
       {
         "label": "architectural draping",
         "type": "mood",
+        "primary_dimension": "execution",
         "material": null,
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Highest mod in this aesthetic — report names Toteme architectural capes and 80s sharp shoulders as differentiation play within peak saturation. This chip is the white space signal.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["architectural", "premium", "sophisticated", "structural"]
       },
       {
         "label": "bone & ivory",
         "type": "mood",
+        "primary_dimension": "identity",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": "bone, ivory, cream"
+        "resonance_mod": 0.00,
+        "resonance_mod_source": "Zero mod: this palette is the most saturated signal in an already saturated aesthetic. Report specifically warns about consumer fatigue in minimalist neutrals. No resonance benefit.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": "bone, ivory, cream",
+        "keywords": ["serene", "minimalist", "restrained", "timeless"]
       }
     ]
   },
@@ -203,21 +256,18 @@
     "tension_keywords": ["Technical", "Innovative", "Minimalist", "Urban", "Vibrant"],
     "saturation_score": 35,
     "saturation_basis": "Growing momentum from academia-core and analog-nostalgia movements. Strong at Sezane and Bode but limited mainstream penetration. 136% increase in analog hobby searches signals ascending consumer interest.",
-    "trend_velocity": "emerging",
-    "seasonal_relevance": {
-      "ss26": 3,
-      "fw26": 5
-    },
+    "trend_velocity": "ascending",
+    "score_source": "hardcoded_v1",
+    "seasonal_relevance": { "ss26": 3, "fw26": 5 },
     "collections_analyzed": 156,
     "seen_in": ["Sezane", "Bode", "Sandy Liang", "Barbour x Kaptain Sunshine", "Doen"],
-    "consumer_insight": "Driven by affective familiarity — using clothing as a form of emotional continuity in an unstable world. Consumers are longing for things they can touch and feel, reflected in a 136% increase in searches for analog hobbies. The appeal is in garments that feel collected over time rather than purchased.",
+    "consumer_insight": "Driven by affective familiarity — using clothing as a form of emotional continuity in an unstable world. Consumers are longing for things they can touch and feel, reflected in a 136% increase in searches for analog hobbies.",
     "adjacent_directions": ["heritage-hand", "undone-glam"],
     "confidence": 0.8,
     "evidence": [
       {
         "claim": "136% increase in searches for analog hobbies",
-        "source": "Highsnobiety",
-        "type": "editorial",
+        "source": "Highsnobiety", "type": "editorial",
         "url": "https://www.highsnobiety.com/p/fashion-in-its-try-hard-era-bottega-prada/",
         "verified": true
       }
@@ -232,59 +282,86 @@
       {
         "label": "vintage knitwear",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": "merino-wool",
-        "silhouette": {
-          "knitwear": "relaxed"
-        },
+        "silhouette": { "knitwear": "relaxed" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.05,
+        "resonance_mod_source": "Highest mod: report names oversized heritage knits as key FW26 item (FW26=5). Future-vintage knitwear named as defining silhouette. Strong ascending signal with direct commercial proof at Sezane.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["romantic", "artisanal", "vintage", "tactile"]
       },
       {
         "label": "lace detailing",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": "silk-blend",
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named in report for SS26: lace slips called out as key SS26 item. Strong signal for the ascending season despite lower SS26 relevance score (3) for the aesthetic overall.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["feminine", "romantic", "artisanal", "soft"]
       },
       {
         "label": "oversized blazers",
         "type": "spec",
+        "primary_dimension": "identity",
         "material": null,
-        "silhouette": {
-          "outerwear": "cocoon",
-          "tops": "oversized",
-          "knitwear": "oversized"
-        },
+        "silhouette": { "outerwear": "cocoon", "tops": "oversized", "knitwear": "oversized" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named in report: future-vintage blazers and cinematic thought-daughter aesthetics. Sezane 70s trouser reference. Strong ascending signal with commercial proof.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["vintage", "bohemian", "moody", "cinematic"]
       },
       {
         "label": "sheer layers",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": "silk",
-        "silhouette": {
-          "tops": "relaxed",
-          "dresses": "column"
-        },
+        "silhouette": { "tops": "relaxed", "dresses": "column" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Named in report as SS26 signal (lace slips, sheer retro cardigans). Secondary mod — sheer is cross-aesthetic and less distinctive to Romantic Analog specifically.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["romantic", "feminine", "soft", "tactile"]
       },
       {
         "label": "warm yellow",
         "type": "mood",
+        "primary_dimension": "identity",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": "butter yellow, soft gold"
+        "resonance_mod": 0.02,
+        "resonance_mod_source": "Mood signal only — butter yellow referenced via Sandy Liang but not named as a primary palette for this aesthetic in the report. Lower mod reflects indirect citation.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": "butter yellow, soft gold",
+        "keywords": ["soft", "warm", "romantic", "nostalgic"]
       },
       {
         "label": "prairie references",
         "type": "mood",
+        "primary_dimension": "resonance",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Named via Ametora movement and Barbour x Kaptain Sunshine collaboration. Report specifically names this cultural underpinning as driving ascending consumer interest.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["rustic", "bohemian", "romantic", "vintage"]
       }
     ]
   },
@@ -297,28 +374,24 @@
     "tension_keywords": ["Technical", "Urban", "Trendy", "Edgy", "Bold"],
     "saturation_score": 52,
     "saturation_basis": "Established through sustainability-forward brands (Reformation, Gabriela Hearst, Bode). +200% growth in raw denim runway visibility. Artisanal positioning now expected rather than differentiating in contemporary segment.",
-    "trend_velocity": "emerging",
-    "seasonal_relevance": {
-      "ss26": 5,
-      "fw26": 4
-    },
+    "trend_velocity": "ascending",
+    "score_source": "hardcoded_v1",
+    "seasonal_relevance": { "ss26": 5, "fw26": 4 },
     "collections_analyzed": 198,
     "seen_in": ["Reformation", "Sezane", "Gabriela Hearst", "Bode", "Doen", "St. Agni"],
-    "consumer_insight": "Consumers increasingly demand proof of durability and verified impact — sustainability is no longer optional but a critical factor in brand strategy by 2026. The psychological driver is the search for authenticity as a counterweight to AI-generated and mass-produced design.",
+    "consumer_insight": "Consumers increasingly demand proof of durability and verified impact — sustainability is no longer optional but a critical factor in brand strategy by 2026.",
     "adjacent_directions": ["romantic-analog", "sweet-subversion"],
     "confidence": 0.85,
     "evidence": [
       {
         "claim": "+200% growth in raw denim runway visibility",
-        "source": "Heuritech",
-        "type": "analytics",
+        "source": "Heuritech", "type": "analytics",
         "url": "https://heuritech.com/fashion-trends-2026/",
         "verified": true
       },
       {
         "claim": "Sezane basket bags ($245-$310) demonstrate commercial scalability of hand-woven trend",
-        "source": "Sezane",
-        "type": "retail",
+        "source": "Sezane", "type": "retail",
         "url": "https://www.sezane.com/us-en/lookbook-spring-2026-pre-collection",
         "verified": true
       }
@@ -333,53 +406,86 @@
       {
         "label": "hand-woven texture",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": "linen",
-        "silhouette": {
-          "tops": "relaxed",
-          "knitwear": "relaxed"
-        },
+        "silhouette": { "tops": "relaxed", "knitwear": "relaxed" },
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.05,
+        "resonance_mod_source": "Highest mod: Sezane Maia and Justine Basket Bags ($245-310) named with specific commercial proof. Report calls hand-woven the scalable contemporary signal. SS26=5 relevance.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["artisanal", "handcrafted", "natural", "tactile"]
       },
       {
         "label": "natural dyes",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": "organic-cotton",
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": "earth tones"
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Named as bio-based fibers and organic processes in report. Ascending signal with sustainability proof but less commercially cited than hand-woven.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": "earth tones",
+        "keywords": ["sustainable", "ethical", "natural", "artisanal"]
       },
       {
         "label": "shibori",
         "type": "mood",
+        "primary_dimension": "resonance",
         "material": null,
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": "indigo, blue"
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named via regional craft tradition emphasis in report — local and cultural flavor called out as a defining characteristic. Shibori is the most commercially recognized artisan dye process at this tier.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": "indigo, blue",
+        "keywords": ["artisanal", "handcrafted", "cultural", "tactile"]
       },
       {
         "label": "fringe detailing",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": null,
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Appears as a cross-aesthetic signal (also in Undone Glam). For Heritage Hand, fringe is an artisan finishing detail. Moderate mod — visible in report context but not the primary named signal.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["bohemian", "artisanal", "rustic", "handcrafted"]
       },
       {
         "label": "artisan patchwork",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": null,
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named via Bode reference — hand-stitched detailing and vintage fabrics for Modern Heirloom style. Report cites Bode as the high-water mark. Strong ascending signal.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["handcrafted", "artisanal", "sustainable", "raw"]
       },
       {
         "label": "raw edge finishing",
         "type": "mood",
+        "primary_dimension": "identity",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Named in report: Brut Denim (unwashed, stiff) and raw authenticity — +200% runway visibility cited. Ascending but mood-level signal for this aesthetic.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["raw", "natural", "artisanal", "intentional"]
       }
     ]
   },
@@ -393,27 +499,23 @@
     "saturation_score": 28,
     "saturation_basis": "Early-stage counter-reaction to clean-girl dominance. Led by Prada SS26 and Collina Strada but minimal contemporary-segment adoption yet. +270% search increase in asymmetric beauty signals emerging consumer appetite.",
     "trend_velocity": "emerging",
-    "seasonal_relevance": {
-      "ss26": 4,
-      "fw26": 5
-    },
+    "score_source": "hardcoded_v1",
+    "seasonal_relevance": { "ss26": 4, "fw26": 5 },
     "collections_analyzed": 134,
     "seen_in": ["Prada", "Collina Strada", "Area", "Victoria Beckham", "Dries Van Noten"],
-    "consumer_insight": "The search for recognition and agency in an absurd world — error and noise become language rather than mistakes. Consumers want to look like they chose their own life rather than followed an algorithm, using disorder as self-expression and emotional regulation.",
+    "consumer_insight": "The search for recognition and agency in an absurd world — error and noise become language rather than mistakes.",
     "adjacent_directions": ["haptic-play", "romantic-analog"],
     "confidence": 0.7,
     "evidence": [
       {
         "claim": "+270% search increase in asymmetric beauty (asymmetrical lobs, mismatched nails)",
-        "source": "Who What Wear",
-        "type": "editorial",
+        "source": "Who What Wear", "type": "editorial",
         "url": "https://www.whowhatwear.com/beauty/pinterest-predicts-glitchy-glam-trend",
         "verified": true
       },
       {
         "claim": "Prada SS26 as definitive reference for undone styling",
-        "source": "The Guardian",
-        "type": "editorial",
+        "source": "The Guardian", "type": "editorial",
         "url": "https://www.rokytnice.com/en/efdbbamshop/uk/fashion/a69818811/spring-summer-2025-undone-fashion-trend/",
         "verified": true
       }
@@ -428,64 +530,86 @@
       {
         "label": "distressed leather",
         "type": "spec",
+        "primary_dimension": "identity",
         "material": "leather",
-        "silhouette": {
-          "outerwear": "straight",
-          "bottoms": "slim"
-        },
+        "silhouette": { "outerwear": "straight", "bottoms": "slim" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.05,
+        "resonance_mod_source": "Named via Prada SS26 reference — distressed and anti-polish materials as core signal. Lowest saturation aesthetic (28) = highest opportunity. Prada citation gives commercial credibility.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["edgy", "rebellious", "grunge", "deconstructed"]
       },
       {
         "label": "metallic fabrics",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": "silk-blend",
-        "silhouette": {
-          "tops": "fitted",
-          "dresses": "column"
-        },
+        "silhouette": { "tops": "fitted", "dresses": "column" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named via Collina Strada and Area Glitchy Glam reference — intensified color-blocking and metallic as Undone Glam's maximalist edge. Cross-aesthetic signal but strong within this direction.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["bold", "dramatic", "urban", "expressive"]
       },
       {
         "label": "raw print",
         "type": "spec",
+        "primary_dimension": "identity",
         "material": "organic-cotton",
-        "silhouette": {
-          "tops": "boxy"
-        },
+        "silhouette": { "tops": "boxy" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.05,
+        "resonance_mod_source": "Named in report as anti-polish energy — raw, unrefined graphics as the counter to clean-girl aesthetic. +270% asymmetric search increase supports visual disruption signals.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["rebellious", "deconstructed", "nonchalant", "edgy"]
       },
       {
         "label": "anti-fit tailoring",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": null,
-        "silhouette": {
-          "outerwear": "cocoon",
-          "tops": "oversized",
-          "bottoms": "wide-leg",
-          "dresses": "shift",
-          "knitwear": "oversized"
-        },
+        "silhouette": { "outerwear": "cocoon", "tops": "oversized", "bottoms": "wide-leg", "dresses": "shift", "knitwear": "oversized" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.06,
+        "resonance_mod_source": "Highest mod in file: Prada SS26 named as definitive reference, specifically anti-fit as core design language. Lowest saturation (28) + emerging velocity + direct Prada citation = maximum resonance opportunity signal.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["deconstructed", "asymmetrical", "rebellious", "nonchalant"]
       },
       {
         "label": "layered chains",
         "type": "mood",
+        "primary_dimension": "identity",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Mood signal — referenced via Collina Strada accessories and the clothespin aesthetic. Secondary signal. Lower mod reflects mood-only classification and lack of direct named citation.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["edgy", "bold", "dramatic", "urban"]
       },
       {
         "label": "fringe",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": null,
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Cross-aesthetic finishing detail. For Undone Glam, fringe reads as deconstructed edge rather than artisanal. Named across multiple trend references. Solid mid-range mod.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["rebellious", "deconstructed", "bohemian", "moody"]
       }
     ]
   },
@@ -498,28 +622,24 @@
     "tension_keywords": ["Timeless", "Rustic", "Minimalist", "Sophisticated", "Masculine"],
     "saturation_score": 32,
     "saturation_basis": "Designer-led innovation (Loewe, Coperni, JW Anderson) with growing commercial translation through UGG and Melissa. Strong in accessories but limited ready-to-wear adoption at contemporary price points.",
-    "trend_velocity": "emerging",
-    "seasonal_relevance": {
-      "ss26": 5,
-      "fw26": 3
-    },
+    "trend_velocity": "ascending",
+    "score_source": "hardcoded_v1",
+    "seasonal_relevance": { "ss26": 5, "fw26": 3 },
     "collections_analyzed": 142,
     "seen_in": ["Loewe", "UGG", "Coperni", "JW Anderson", "Melissa"],
-    "consumer_insight": "Physical experience is becoming the new measure of product value as consumers seek counterbalances to constant digital stimulation. Tactile richness and dimensional form signal material innovation, with soft-touch and inflated textures driving premiumization across categories.",
+    "consumer_insight": "Physical experience is becoming the new measure of product value as consumers seek counterbalances to constant digital stimulation.",
     "adjacent_directions": ["sweet-subversion", "undone-glam"],
     "confidence": 0.75,
     "evidence": [
       {
         "claim": "Loewe Pre-Spring 2026 sculptural accessories as pioneer of art-literate tactile design",
-        "source": "The Impression",
-        "type": "editorial",
+        "source": "The Impression", "type": "editorial",
         "url": "https://theimpression.com/loewe-pre-spring-2026-accessories-ad-campaign-review/",
         "verified": true
       },
       {
         "claim": "Covacryl and Sensibead technologies creating mochi-like bouncy textures in beauty/textile",
-        "source": "Sensient Beauty",
-        "type": "industry",
+        "source": "Sensient Beauty", "type": "industry",
         "url": "https://sensient-beauty.com/insights/beauty-trends-2026-good-formulations-sensorial-innovations/",
         "verified": true
       }
@@ -534,58 +654,86 @@
       {
         "label": "rubberized finishes",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": "technical-nylon",
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.05,
+        "resonance_mod_source": "Named specifically in report: Loewe and UGG as pioneers. Rubberized and hyper-tactile materials are the primary resonance signal for Haptic Play. SS26=5. Strong ascending with designer proof.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["innovative", "tactile", "technical", "sensory"]
       },
       {
         "label": "translucent layers",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": "technical-nylon",
-        "silhouette": {
-          "tops": "relaxed",
-          "dresses": "shift"
-        },
+        "silhouette": { "tops": "relaxed", "dresses": "shift" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named via Coperni and JW Anderson — flexible silicone panels and translucent materials called out as defining executions. Strong designer citation, secondary to rubberized as hero signal.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["innovative", "sensory", "bold", "tactile"]
       },
       {
         "label": "inflated forms",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": null,
-        "silhouette": {
-          "outerwear": "cocoon",
-          "tops": "oversized",
-          "bottoms": "wide-leg",
-          "knitwear": "oversized"
-        },
+        "silhouette": { "outerwear": "cocoon", "tops": "oversized", "bottoms": "wide-leg", "knitwear": "oversized" },
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.05,
+        "resonance_mod_source": "Named in report: inflated accessories and garments as core Haptic Play signal. Puffy, soft, squishy textures called out as 'almost a delicacy now'. Co-hero signal with rubberized finishes.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["inflated", "innovative", "playful", "sensory"]
       },
       {
         "label": "gel forms",
         "type": "mood",
+        "primary_dimension": "resonance",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named in report: jelly-like, gummy, and glossy finishes as ASMR-adjacent signal. Covacryl/Sensibead technologies cited. Strong resonance signal even as mood chip due to direct technology citation.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["innovative", "tactile", "youthful", "sensory"]
       },
       {
         "label": "saturated pastel",
         "type": "mood",
+        "primary_dimension": "identity",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": "sweetened pastels, digital brights"
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Named in report: sweetened pastels and digital brights as Haptic Play palette. Jelly mint and sugary hues specifically cited. Moderate mod — palette signal is secondary to material/form signals.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": "sweetened pastels, digital brights",
+        "keywords": ["vibrant", "playful", "youthful", "bold"]
       },
       {
         "label": "molded details",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": null,
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named via Coperni flexible silicone panels and Loewe sculptural accessories. Molded/structural details are the execution differentiator that justifies bridge pricing for Haptic Play.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["innovative", "technical", "sensory", "inflated"]
       }
     ]
   },
@@ -598,35 +746,30 @@
     "tension_keywords": ["Minimalist", "Serene", "Soft", "Rustic", "Accessible"],
     "saturation_score": 48,
     "saturation_basis": "Ascending from occasion-only to everyday positioning. Michael Kors and Ralph Lauren integrating metallics into SS26 daywear. Area making crystal details commercially accessible. Silver treated as new neutral signals broadening adoption.",
-    "trend_velocity": "emerging",
-    "seasonal_relevance": {
-      "ss26": 5,
-      "fw26": 5
-    },
+    "trend_velocity": "ascending",
+    "score_source": "hardcoded_v1",
+    "seasonal_relevance": { "ss26": 5, "fw26": 5 },
     "collections_analyzed": 176,
     "seen_in": ["The Attico", "Area", "Michael Kors", "Rabanne", "Ralph Lauren"],
-    "consumer_insight": "The search for recognition and aesthetic affirmation after years of minimalist hiding. Consumers want to displace the body from normative frameworks — aesthetics as a request for visibility becomes a powerful emotional driver, making shine part of daily self-expression rather than reserved for special occasions.",
+    "consumer_insight": "The search for recognition and aesthetic affirmation after years of minimalist hiding. Consumers want to displace the body from normative frameworks — aesthetics as a request for visibility.",
     "adjacent_directions": ["quiet-structure", "haptic-play"],
     "confidence": 0.8,
     "evidence": [
       {
         "claim": "Metallic coated denim and daytime silver positioning in Michael Kors and Ralph Lauren SS26",
-        "source": "Who What Wear",
-        "type": "editorial",
+        "source": "Who What Wear", "type": "editorial",
         "url": "https://www.whowhatwear.com/fashion/trends/minimalist-fashion-trends-2026",
         "verified": true
       },
       {
         "claim": "Micro-sequins now stretchable and breathable, enabling everyday metallic wear",
-        "source": "Rue Sophie",
-        "type": "retail",
+        "source": "Rue Sophie", "type": "retail",
         "url": "https://ruesophie.com/blogs/the-style-edit/metallic-trend-2026",
         "verified": true
       },
       {
         "claim": "Power Chokers and Impact Cuffs as anchor accessories for SS26",
-        "source": "Harper's Bazaar",
-        "type": "editorial",
+        "source": "Harper's Bazaar", "type": "editorial",
         "url": "https://harpersbazaar.com.au/spring-summer-jewellery-trends-2026/",
         "verified": true
       }
@@ -641,60 +784,86 @@
       {
         "label": "metallic knits",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": "silk-blend",
-        "silhouette": {
-          "knitwear": "fitted"
-        },
+        "silhouette": { "knitwear": "fitted" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named in report: liquid-metal finishes and metallic knits as FW26 key item (FW26=5). Report calls silver and gold the new neutrals. Strong ascending signal with both SS26 and FW26 relevance.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["bold", "luxe", "dramatic", "premium"]
       },
       {
         "label": "sequin saturation",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": "silk",
-        "silhouette": {
-          "tops": "fitted",
-          "dresses": "column"
-        },
+        "silhouette": { "tops": "fitted", "dresses": "column" },
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named in report: stretchable breathable micro-sequins enabling everyday wear — this is the key commercial innovation. Report cites this as moving High Voltage from occasion to everyday. Core ascending signal.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["maximalist", "dramatic", "expressive", "bold"]
       },
       {
         "label": "bold shoulders",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": null,
-        "silhouette": {
-          "outerwear": "belted",
-          "tops": "boxy"
-        },
+        "silhouette": { "outerwear": "belted", "tops": "boxy" },
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Named in report: The Attico and Tom Ford bold shoulders as defining execution. Power dressing referenced with SS26 and FW26 both at 5. Moderate mod — strong but secondary to metallic as the hero signal.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["confident", "dramatic", "bold", "expressive"]
       },
       {
         "label": "high-shine fabrication",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": "vegan-leather",
-        "silhouette": {
-          "bottoms": "slim"
-        },
+        "silhouette": { "bottoms": "slim" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Named via metallic coated denim (Michael Kors, Ralph Lauren SS26). High-shine as execution differentiator for everyday positioning. Moderate mod — strong brand proof but secondary to sequin hero.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["luxe", "premium", "bold", "vibrant"]
       },
       {
         "label": "statement jewelry",
         "type": "mood",
+        "primary_dimension": "identity",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Named in report: Power Chokers and Impact Cuffs as SS26 anchor accessories (Harper's Bazaar citation). Sculptural gold as modern armor. Mood-level but has direct editorial citation — justifies 0.03 vs lower.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["expressive", "confident", "dramatic", "feminine"]
       },
       {
         "label": "statement red",
         "type": "mood",
+        "primary_dimension": "identity",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": "lava red, crimson, amber"
+        "resonance_mod": 0.03,
+        "resonance_mod_source": "Named in report: Lava Red and Amber Haze as High Voltage palette. Michael Kors and Ralph Lauren pops of red for SS26 daywear cited. Palette mood signal with direct brand execution proof.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": "lava red, crimson, amber",
+        "keywords": ["bold", "vibrant", "confident", "dramatic"]
       }
     ]
   },
@@ -707,28 +876,24 @@
     "tension_keywords": ["Minimalist", "Sophisticated", "Masculine", "Technical", "Timeless"],
     "saturation_score": 31,
     "saturation_basis": "Niche but growing, anchored by Sandy Liang SS26 and Ganni's brand codes. Crossover from toy-industry cozy-culture trend into fashion. Limited mainstream adoption keeps saturation low despite strong press coverage.",
-    "trend_velocity": "emerging",
-    "seasonal_relevance": {
-      "ss26": 5,
-      "fw26": 4
-    },
+    "trend_velocity": "ascending",
+    "score_source": "hardcoded_v1",
+    "seasonal_relevance": { "ss26": 5, "fw26": 4 },
     "collections_analyzed": 128,
     "seen_in": ["Sandy Liang", "Ganni", "Cecilie Bahnsen", "Staud", "Simone Rocha"],
-    "consumer_insight": "Driven by escapism and self-preservation through childhood memories — people still want to feel playful and yearn for childlike nostalgia as a source of comfort. The throwback-kid aesthetic works because pieces feel loaded with history and immediate recognition, providing emotional regulation through familiar warmth.",
+    "consumer_insight": "Driven by escapism and self-preservation through childhood memories — people still want to feel playful and yearn for childlike nostalgia as a source of comfort.",
     "adjacent_directions": ["heritage-hand", "haptic-play"],
     "confidence": 0.75,
     "evidence": [
       {
         "claim": "Sandy Liang Spring 2026 collection as definitive execution — PVC skirts, sticker-covered slippers, doll-clothes dresses",
-        "source": "Fashionista",
-        "type": "editorial",
+        "source": "Fashionista", "type": "editorial",
         "url": "https://fashionista.com/2025/09/sandy-liang-spring-2026-review",
         "verified": true
       },
       {
         "claim": "Cozy Culture toy industry trend supporting crossover into fashion lifestyle products",
-        "source": "Global Toy News",
-        "type": "industry",
+        "source": "Global Toy News", "type": "industry",
         "url": "https://globaltoynews.com/2026/01/03/designing-play-toy-industry-trends-for-2026/",
         "verified": true
       }
@@ -743,53 +908,86 @@
       {
         "label": "charm-loaded accessories",
         "type": "mood",
+        "primary_dimension": "identity",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named in report: clothespin accessories and walnut shell cradles — Sandy Liang sticker-covered slippers and charm details are definitive executions. Mood chip but direct brand citation justifies 0.04.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["playful", "whimsical", "nostalgic", "feminine"]
       },
       {
         "label": "bold color blocking",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": "recycled-poly",
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": "bold multi-color"
+        "resonance_mod": 0.05,
+        "resonance_mod_source": "Named in report: bold palettes and intensified color-blocking via Staud and Simone Rocha. Ganni brand codes named. SS26=5 and ascending. Strong resonance signal for the commercial tier.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": "bold multi-color",
+        "keywords": ["bold", "playful", "vibrant", "imaginative"]
       },
       {
         "label": "micro scale",
         "type": "mood",
+        "primary_dimension": "resonance",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.05,
+        "resonance_mod_source": "Named in report as KEY differentiator: scale manipulation called out as the defining design logic — miniature and oversized scale play both cited. Mood chip but scale is the conceptual core of Sweet Subversion.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["playful", "whimsical", "nostalgic", "soft"]
       },
       {
         "label": "novelty prints",
         "type": "spec",
+        "primary_dimension": "resonance",
         "material": "organic-cotton",
-        "silhouette": {
-          "tops": "boxy",
-          "dresses": "a-line"
-        },
+        "silhouette": { "tops": "boxy", "dresses": "a-line" },
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.05,
+        "resonance_mod_source": "Named in report with specificity: bunnies, gingham, pastel tulips, Oz-coded blue gingham. Sandy Liang doll-clothes dresses. Highest commercial proof for this aesthetic — direct brand and pattern citations.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["playful", "imaginative", "vibrant", "nostalgic"]
       },
       {
         "label": "exaggerated scale",
         "type": "mood",
+        "primary_dimension": "identity",
         "material": null,
         "silhouette": null,
         "complexity_mod": 0,
-        "palette": null
+        "resonance_mod": 0.05,
+        "resonance_mod_source": "Named in report: oversized objects (10-foot cake sets) and miniature items both called out as the KEY design tension for Sweet Subversion. Scale manipulation is the aesthetic's defining differentiator.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["whimsical", "bold", "playful", "imaginative"]
       },
       {
         "label": "jewel encrusting",
         "type": "spec",
+        "primary_dimension": "execution",
         "material": null,
         "silhouette": null,
         "complexity_mod": 1,
-        "palette": null
+        "resonance_mod": 0.04,
+        "resonance_mod_source": "Named via Sandy Liang clear slippers with stickers and Cecilie Bahnsen crystal/bow details. Ganni brand codes include embellishment. Strong execution signal for the aesthetic's premium justification.",
+        "identity_mod": 0.0,
+        "identity_mod_source": "placeholder — will be calculated from brand keyword overlap by Critic agent",
+        "palette": null,
+        "keywords": ["feminine", "romantic", "playful", "luxe"]
       }
     ]
   }

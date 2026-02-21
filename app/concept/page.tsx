@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import {
   BRAND,
@@ -46,11 +47,11 @@ function IconExecution({ size = 14, color = "currentColor" }: { size?: number; c
 
 /* ─── Design tokens ───────────────────────────────────────────────────────── */
 const CHARTREUSE = "#A8B475";
-const STEEL = BRAND.steelBlue; // #7D96AC
+const STEEL = BRAND.steelBlue;
 const PULSE_GREEN = "#4D7A56";
 const PULSE_YELLOW = "#9B7A3A";
 const PULSE_RED = "#8A3A3A";
-const OLIVE = BRAND.oliveInk; // #43432B
+const OLIVE = BRAND.oliveInk;
 
 /* ─── Type aliases ────────────────────────────────────────────────────────── */
 type Confidence = "high" | "med" | "low";
@@ -77,11 +78,7 @@ function getAestheticChips(aestheticName: string): AestheticChip[] {
   if (!aestheticName) return [];
   const slug = aestheticName.toLowerCase().replace(/\s+/g, "-");
   const entry = (
-    aestheticsData as unknown as Array<{
-      id: string;
-      name: string;
-      chips: AestheticChip[];
-    }>
+    aestheticsData as unknown as Array<{ id: string; name: string; chips: AestheticChip[] }>
   ).find((a) => a.id === slug || a.name === aestheticName);
   return entry?.chips ?? [];
 }
@@ -90,12 +87,10 @@ function getAestheticChips(aestheticName: string): AestheticChip[] {
 function matchFreeFormToAesthetic(input: string): string | null {
   if (!input.trim() || input.trim().length < 2) return null;
   const normalized = input.toLowerCase().trim();
-
   for (const aesthetic of AESTHETICS) {
     const aLower = aesthetic.toLowerCase();
     if (aLower === normalized || normalized.includes(aLower)) return aesthetic;
   }
-
   const keywordMap: Array<{ keywords: string[]; aesthetic: string }> = [
     { keywords: ["quiet luxury","minimal","minimalist","clean","sleek","structural","monochrome","old money","column silhouette","tonal","matte","architectural","refined","precision","crisp","pared","understated"], aesthetic: "Quiet Structure" },
     { keywords: ["rugged","outdoor","gorpcore","utility","durable","earthy","adventure","workwear","tactical","mountain","trail","protection","terrain","technical"], aesthetic: "Terrain Luxe" },
@@ -106,7 +101,6 @@ function matchFreeFormToAesthetic(input: string): string | null {
     { keywords: ["glam","glamour","sequin","power dressing","bold shoulders","metallic","80s","gold","maximalist","bold","diva","extra","opulent","eighties","high shine","showstopper","voltage"], aesthetic: "High Voltage" },
     { keywords: ["cute","kawaii","adorable","sweet","pastel","whimsy","cartoon","childlike","precious","toy","bubbly","saccharine","subversion","chunky","color blocking"], aesthetic: "Sweet Subversion" },
   ];
-
   let bestMatch: string | null = null;
   let bestScore = 0;
   for (const { keywords, aesthetic } of keywordMap) {
@@ -116,7 +110,6 @@ function matchFreeFormToAesthetic(input: string): string | null {
     }
     if (score > bestScore) { bestScore = score; bestMatch = aesthetic; }
   }
-
   if (bestScore < 2) {
     const words = normalized.split(/\s+/).filter((w) => w.length > 3);
     for (const aesthetic of AESTHETICS) {
@@ -131,7 +124,6 @@ function matchFreeFormToAesthetic(input: string): string | null {
       if (score > bestScore) { bestScore = score; bestMatch = aesthetic; }
     }
   }
-
   return bestScore >= 2 ? bestMatch : null;
 }
 
@@ -142,7 +134,6 @@ function getIdentityStatus(score: number | undefined): { label: string; color: s
   if (score >= 70) return { label: "Moderate", color: PULSE_YELLOW, sublabel: "Some tension with core values" };
   return { label: "Tension", color: PULSE_RED, sublabel: "Significant brand tension" };
 }
-
 function getResonanceStatus(score: number | undefined, velocity?: string): { label: string; color: string; sublabel: string } {
   if (score === undefined) return { label: "—", color: "rgba(67,67,43,0.35)", sublabel: "Select a direction to score" };
   if (velocity === "emerging") return { label: "Ascending", color: PULSE_GREEN, sublabel: "Early momentum building" };
@@ -152,79 +143,91 @@ function getResonanceStatus(score: number | undefined, velocity?: string): { lab
   return { label: "Saturated", color: PULSE_RED, sublabel: "Market is crowded" };
 }
 
-/* ─── Direction insight content per aesthetic ─────────────────────────────── */
+/* ─── Direction insight ───────────────────────────────────────────────────── */
 function getDirectionInsight(
   aesthetic: string,
   identityScore: number,
   resonanceScore: number,
   topChips: string[],
   velocity: string
-): { headline: string; p1: string; p2: string; p3: string; opportunity: string[]; sharpenChips: string[] } {
+): { headline: string; p1: string; p2: string; p3: string; opportunity: string[]; editItems: string[]; sharpenChips: string[] } {
   const chipList = topChips.slice(0, 3).join(", ");
   const chipA = topChips[0] ?? "key material signals";
   const chipB = topChips[1] ?? "construction details";
   const highId = identityScore >= 80;
   const highRes = resonanceScore >= 80;
   const ascending = velocity === "emerging";
-
   if (highId && highRes) {
     return {
       headline: `${aesthetic} — strong alignment, move with confidence.`,
       p1: `Brand fit is high and market timing is favorable. ${aesthetic} maps naturally to your design language — the identity signals are consistent without forcing.`,
       p2: `${chipA} and ${chipB} are the strongest entry points here. They carry the aesthetic without overcommitting to the trend — exactly the right leverage.`,
       p3: ascending ? `The market window is open and still early. Move now with a full direction commitment — waiting dilutes the advantage.` : `Consumer appetite is strong. This is the moment to invest fully rather than test cautiously.`,
-      opportunity: [
-        `Lead with ${chipA} as the brand's signature entry into this direction`,
-        `Invest in the hero fabrication — half-measures won't register`,
-        `Own the aesthetic fully across touchpoints for maximum impact`,
-      ],
+      opportunity: [`Lead with ${chipA} as the brand's signature entry into this direction`, `Invest in the hero fabrication — half-measures won't register`, `Own the aesthetic fully across touchpoints for maximum impact`],
+      editItems: [`Tighten your refinement to specify the exact fabrication language you want to own`, `Narrowing to your three strongest chips would sharpen the direction signal`],
       sharpenChips: topChips.slice(3, 6),
     };
   }
-
   if (highId && !highRes) {
     return {
       headline: `${aesthetic} fits your brand — the market timing needs navigation.`,
       p1: `Brand alignment is solid at ${identityScore} — this direction maps well to your DNA. The challenge is market timing: consumer demand is present but softer than optimal.`,
       p2: `${chipA} and ${chipB} are the signals with clearest commercial read. Anchor in these rather than the broader aesthetic signals to sharpen the consumer proposition.`,
       p3: ascending ? `The market is still building. You have time to establish presence before saturation, but move deliberately.` : `Specificity is your differentiation play here — a tighter edit creates its own demand.`,
-      opportunity: [
-        `Use brand authenticity as the differentiator — this is genuinely your territory`,
-        `${chipA} is the most commercially transferable signal in this direction`,
-        `A tighter silhouette edit will sharpen the resonance without compromising identity`,
-      ],
+      opportunity: [`Use brand authenticity as the differentiator — this is genuinely your territory`, `${chipA} is the most commercially transferable signal in this direction`, `A tighter silhouette edit will sharpen the resonance without compromising identity`],
+      editItems: [`A more targeted refinement would help navigate the timing gap — speak to what makes this direction yours`, `Lead with the chips that have strongest commercial traction`],
       sharpenChips: topChips.slice(2, 5),
     };
   }
-
   if (!highId && highRes) {
     return {
       headline: `${aesthetic} has real momentum — but requires intentional ownership.`,
       p1: `Market traction is building with clear upward velocity, but brand alignment is moderate — there's tension between ${aesthetic}'s signals and your core positioning. You can enter this space, but you need to do it on your terms.`,
       p2: `${chipA} and ${chipB} are the signals with the most traction, but they can read as costume if not handled with your specific brand lens. Lead with your brand's point of view, not the trend.`,
       p3: ascending ? `A limited capsule to test reception before committing to a full direction is the right call here.` : `Consumer appetite is strong, but differentiation is now required. Enter with a clear editorial position.`,
-      opportunity: [
-        `Lead with your existing credentials — approach the aesthetic through your brand's lens`,
-        `${chipA} is the highest-traction signal — use it as an anchor, not decoration`,
-        `Consider a capsule test before committing the full collection`,
-      ],
+      opportunity: [`Lead with your existing credentials — approach the aesthetic through your brand's lens`, `${chipA} is the highest-traction signal — use it as an anchor, not decoration`, `Consider a capsule test before committing the full collection`],
+      editItems: [`Refine your direction statement to bridge the identity gap — frame this through your brand's lens`, `A tighter chip selection focused on your brand's strengths would reduce the tension`],
       sharpenChips: topChips.slice(2, 5),
     };
   }
-
-  // Both moderate or low
   return {
     headline: `${aesthetic} — proceed with clear creative conviction.`,
     p1: `Both brand alignment and market timing present real challenges here. ${aesthetic} requires significant creative investment to execute convincingly across brand and consumer touchpoints.`,
     p2: `${chipList ? `The strongest entry signals are ${chipList}.` : "Focus on the most brand-adjacent signals in this direction."} Refinement is essential — the generic read of this aesthetic won't work for your positioning.`,
     p3: `If you have a strong creative reason to pursue this, proceed with conviction. A tentative approach in difficult territory produces the worst outcomes.`,
-    opportunity: [
-      `Push the aesthetic further than the category expects — half-measures won't work`,
-      `Find the unexpected material within the direction to create differentiation`,
-      `Anchor in your strongest brand signals to make the direction feel earned`,
-    ],
+    opportunity: [`Push the aesthetic further than the category expects — half-measures won't work`, `Find the unexpected material within the direction to create differentiation`, `Anchor in your strongest brand signals to make the direction feel earned`],
+    editItems: [`A sharper refinement statement would clarify your creative conviction for this direction`, `Revisit your aesthetic choice — consider a direction with stronger brand alignment`],
     sharpenChips: topChips.slice(0, 4),
   };
+}
+
+/* ─── Compute recommended aesthetic (static, deterministic) ─────────────── */
+function computeRecommendedAesthetic(): string {
+  const getDiffBonus = (velocity: string, saturation: number) => {
+    if (velocity === "emerging") return saturation < 45 ? 100 : saturation < 60 ? 75 : 50;
+    if (velocity === "peak") return saturation < 50 ? 40 : 20;
+    return 0;
+  };
+  const scored = AESTHETICS.map((aesthetic) => {
+    const content = AESTHETIC_CONTENT[aesthetic];
+    const entry = (aestheticsData as Array<{ id: string; name: string; trend_velocity: string; saturation_score: number }>)
+      .find((a) => a.name === aesthetic || a.id === aesthetic.toLowerCase().replace(/\s+/g, "-"));
+    const velocity = entry?.trend_velocity ?? "peak";
+    const saturation = entry?.saturation_score ?? 50;
+    const bonus = getDiffBonus(velocity, saturation);
+    const heroScore = (content?.identityScore ?? 0) * 0.4 + (content?.resonanceScore ?? 0) * 0.4 + bonus * 0.2;
+    return { aesthetic, heroScore };
+  });
+  scored.sort((a, b) => b.heroScore - a.heroScore);
+  return scored[0]?.aesthetic ?? TOP_SUGGESTED[0];
+}
+
+/* ─── Load moodboard images for a given aesthetic ────────────────────────── */
+function loadMoodboardImages(aesthetic: string): string[] {
+  const folder = matchAestheticToFolder(aesthetic);
+  if (!folder) return [];
+  const all = Array.from({ length: 10 }, (_, i) => `/images/aesthetics/${folder}/${i + 1}.jpg`);
+  return seededShuffle(all, `${aesthetic}::`).slice(0, 9);
 }
 
 /* ─── Main component ──────────────────────────────────────────────────────── */
@@ -245,7 +248,6 @@ export default function ConceptStudioPage() {
   const [headerSeasonLabel, setHeaderSeasonLabel] = useState<string>(season || "—");
 
   useEffect(() => { setCurrentStep(2); }, [setCurrentStep]);
-
   useEffect(() => {
     try {
       const n = window.localStorage.getItem("muko_collectionName");
@@ -253,156 +255,67 @@ export default function ConceptStudioPage() {
       if (n) setHeaderCollectionName(n);
       if (s) setHeaderSeasonLabel(s);
       else setHeaderSeasonLabel(season || "—");
-    } catch {
-      setHeaderSeasonLabel(season || "—");
-    }
+    } catch { setHeaderSeasonLabel(season || "—"); }
   }, [season]);
 
-  const [hoveredAesthetic, setHoveredAesthetic] = useState<string | null>(null);
-  const [browsingList, setBrowsingList] = useState(false);
-  const [pulseExpandedRow, setPulseExpandedRow] = useState<string | null>(null);
-  const hoverCloseTimer = useRef<number | null>(null);
-
-  const openHover = (aesthetic: string) => {
-    if (hoverCloseTimer.current) window.clearTimeout(hoverCloseTimer.current);
-    setHoveredAesthetic(aesthetic);
-  };
-
-  const closeHoverSoft = () => {
-    if (hoverCloseTimer.current) window.clearTimeout(hoverCloseTimer.current);
-    hoverCloseTimer.current = window.setTimeout(() => setHoveredAesthetic(null), 120);
-  };
-
+  const recommendedAesthetic = useMemo(() => computeRecommendedAesthetic(), []);
   const selectedAesthetic = AESTHETICS.includes(aestheticInput as any) ? aestheticInput : null;
-  // Show preview on hover, OR when a direction is selected (unless user explicitly chose to browse the list)
-  const previewAesthetic = hoveredAesthetic ?? (selectedAesthetic && !browsingList ? selectedAesthetic : "");
-  const showPreview = !!hoveredAesthetic || (!!selectedAesthetic && !browsingList);
-  // Preview is in "selected" state when the previewed direction IS the selected one
-  const previewIsSelected = !!selectedAesthetic && previewAesthetic === selectedAesthetic;
-  const previewOpacity = previewIsSelected ? 1.0 : 0.88;
-  const showChartreuseAccent = previewIsSelected;
+  const selectedIsAlternative = Boolean(selectedAesthetic && selectedAesthetic !== recommendedAesthetic);
 
+  // Top-slot card: which aesthetic occupies the hero position
+  const topAesthetic = selectedAesthetic ?? recommendedAesthetic;
+
+  // Moodboard images for the top card
+  const [topMoodboardImages, setTopMoodboardImages] = useState<string[]>(() => loadMoodboardImages(computeRecommendedAesthetic()));
+
+  useEffect(() => {
+    setTopMoodboardImages(loadMoodboardImages(topAesthetic));
+  }, [topAesthetic]);
+
+  // Hovered list card & its moodboard images
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [hoveredImages, setHoveredImages] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!hoveredCard) { setHoveredImages([]); return; }
+    setHoveredImages(loadMoodboardImages(hoveredCard));
+  }, [hoveredCard]);
+
+  const [pulseExpandedRow, setPulseExpandedRow] = useState<string | null>(null);
   const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set());
   const [customChips, setCustomChips] = useState<Record<string, AestheticChip[]>>({});
-
   const toggleElement = (key: string) => {
-    setSelectedElements((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
+    setSelectedElements((prev) => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
   };
 
+  const yourConceptRef = useRef<HTMLDivElement>(null);
   const [freeFormDraft, setFreeFormDraft] = useState("");
   const [freeFormMatch, setFreeFormMatch] = useState<string | null>(null);
   const [freeFormLoading, setFreeFormLoading] = useState(false);
-
   useEffect(() => {
     const trimmed = freeFormDraft.trim();
     if (trimmed.length < 2) { setFreeFormMatch(null); setFreeFormLoading(false); return; }
     setFreeFormLoading(true);
     const timer = window.setTimeout(async () => {
       try {
-        const res = await fetch("/api/match-aesthetic", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ input: trimmed }),
-        });
+        const res = await fetch("/api/match-aesthetic", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: trimmed }) });
         const data = await res.json();
         setFreeFormMatch(data.match ?? null);
-      } catch {
-        setFreeFormMatch(matchFreeFormToAesthetic(trimmed));
-      } finally {
-        setFreeFormLoading(false);
-      }
+      } catch { setFreeFormMatch(matchFreeFormToAesthetic(trimmed)); }
+      finally { setFreeFormLoading(false); }
     }, 400);
     return () => window.clearTimeout(timer);
   }, [freeFormDraft]);
 
   const [refineText, setRefineText] = useState("");
   const [interpretation, setInterpretation] = useState<Interpretation | null>(null);
-
   useEffect(() => {
     if (!selectedAesthetic) { setRefineText(""); setInterpretation(null); return; }
-    const initial = `${selectedAesthetic}, but…`;
-    setRefineText(initial);
+    setRefineText(`${selectedAesthetic}, but…`);
     setInterpretation({ base: selectedAesthetic, modifiers: [], note: `Interpreting this as: ${selectedAesthetic}`, confidence: "high", unsupportedHits: [] });
   }, [selectedAesthetic]);
 
-  const [moodboardImages, setMoodboardImages] = useState<string[]>([]);
-  const [matchedAestheticFolder, setMatchedAestheticFolder] = useState<string | null>(null);
-
-  const moodboardSeedKey = `${previewAesthetic}::`;
-
-  useEffect(() => {
-    if (!previewAesthetic || previewAesthetic.length < 2) { setMoodboardImages([]); setMatchedAestheticFolder(null); return; }
-    const folder = matchAestheticToFolder(previewAesthetic);
-    if (!folder) { setMoodboardImages([]); setMatchedAestheticFolder(null); return; }
-    const allImages = Array.from({ length: 10 }, (_, i) => `/images/aesthetics/${folder}/${i + 1}.jpg`);
-    const shuffled = seededShuffle(allImages, moodboardSeedKey);
-    setMoodboardImages(shuffled.slice(0, 9));
-    setMatchedAestheticFolder(folder);
-  }, [previewAesthetic, moodboardSeedKey]);
-
-  /* ─── Hero direction ──────────────────────────────────────────────────────── */
-  const recommendedAesthetic = useMemo(() => {
-    const getDiffBonus = (velocity: string, saturation: number) => {
-      if (velocity === "emerging") return saturation < 45 ? 100 : saturation < 60 ? 75 : 50;
-      if (velocity === "peak") return saturation < 50 ? 40 : 20;
-      return 0;
-    };
-    const scored = AESTHETICS.map((aesthetic) => {
-      const content = AESTHETIC_CONTENT[aesthetic];
-      const entry = (aestheticsData as Array<{ id: string; name: string; trend_velocity: string; saturation_score: number }>)
-        .find((a) => a.name === aesthetic || a.id === aesthetic.toLowerCase().replace(/\s+/g, "-"));
-      const velocity = entry?.trend_velocity ?? "peak";
-      const saturation = entry?.saturation_score ?? 50;
-      const bonus = getDiffBonus(velocity, saturation);
-      const heroScore = (content?.identityScore ?? 0) * 0.4 + (content?.resonanceScore ?? 0) * 0.4 + bonus * 0.2;
-      return { aesthetic, heroScore };
-    });
-    scored.sort((a, b) => b.heroScore - a.heroScore);
-    return scored[0]?.aesthetic ?? TOP_SUGGESTED[0];
-  }, []);
-
-  /* ─── Score color helper ──────────────────────────────────────────────────── */
-  const scoreColor = (score: number) =>
-    score >= 80 ? CHARTREUSE : score >= 65 ? BRAND.camel : BRAND.rose;
-
-  /* ─── handleSelectAesthetic ───────────────────────────────────────────────── */
-  const handleSelectAesthetic = (aesthetic: string) => {
-    if (aesthetic !== aestheticInput) {
-      setSelectedElements(new Set());
-      setCustomChips({});
-    }
-    setBrowsingList(false);   // stay on preview after selecting
-    setHoveredAesthetic(null); // clear hover (preview driven by selectedAesthetic)
-    setAestheticInput(aesthetic);
-
-    const base = AESTHETIC_CONTENT[aesthetic];
-    const mockIdentity = base?.identityScore ?? Math.floor(Math.random() * 30) + 70;
-    const mockResonance = base?.resonanceScore ?? Math.floor(Math.random() * 30) + 65;
-    const identityStatus = mockIdentity >= 80 ? "green" : mockIdentity >= 60 ? "yellow" : "red";
-    const resonanceStatus = mockResonance >= 80 ? "green" : mockResonance >= 60 ? "yellow" : "red";
-
-    useSessionStore.setState({
-      identityPulse: {
-        score: mockIdentity,
-        status: identityStatus,
-        message: identityStatus === "green" ? "Strong alignment" : identityStatus === "yellow" ? "Moderate alignment" : "Weak alignment",
-      },
-      resonancePulse: {
-        score: mockResonance,
-        status: resonanceStatus,
-        message: resonanceStatus === "green" ? "Strong opportunity" : resonanceStatus === "yellow" ? "Moderate opportunity" : "Saturated market",
-      },
-      conceptLocked: true,
-    });
-
-    try { lockConcept?.(); } catch {}
-  };
-
-  // Pre-populate pulse rail with Muko's Pick data on first visit (no selection made)
+  // Pre-populate pulse rail with Muko's Pick data on first visit
   useEffect(() => {
     if (!aestheticInput && recommendedAesthetic && !identityPulse) {
       const base = AESTHETIC_CONTENT[recommendedAesthetic];
@@ -418,42 +331,70 @@ export default function ConceptStudioPage() {
 
   const identityScore = identityPulse?.score;
   const resonanceScore = resonancePulse?.score;
-
   const selectedAestheticEntry = selectedAesthetic
-    ? (aestheticsData as Array<{ id: string; name: string; trend_velocity: string; saturation_score: number }>)
-        .find((a) => a.name === selectedAesthetic)
+    ? (aestheticsData as Array<{ id: string; name: string; trend_velocity: string; saturation_score: number }>).find((a) => a.name === selectedAesthetic)
     : null;
-
   const idStatus = getIdentityStatus(identityScore);
   const resStatus = getResonanceStatus(resonanceScore, selectedAestheticEntry?.trend_velocity);
+  const scoreColor = (score: number) => score >= 80 ? CHARTREUSE : score >= 65 ? BRAND.camel : BRAND.rose;
 
-  /* ─── Sorted direction list ───────────────────────────────────────────────── */
+  /* ─── Select handler ──────────────────────────────────────────────────────── */
+  const handleSelectAesthetic = (aesthetic: string) => {
+    setSelectedElements(new Set());
+    setCustomChips({});
+    setAestheticInput(aesthetic);
+
+    // If pulse is already pre-populated (e.g. Muko's Pick on first load), just lock — don't recalculate
+    if (!identityPulse) {
+      const base = AESTHETIC_CONTENT[aesthetic];
+      const mockIdentity = base?.identityScore ?? Math.floor(Math.random() * 30) + 70;
+      const mockResonance = base?.resonanceScore ?? Math.floor(Math.random() * 30) + 65;
+      const identityStatus = mockIdentity >= 80 ? "green" : mockIdentity >= 60 ? "yellow" : "red";
+      const resonanceStatus = mockResonance >= 80 ? "green" : mockResonance >= 60 ? "yellow" : "red";
+      useSessionStore.setState({
+        identityPulse: { score: mockIdentity, status: identityStatus, message: identityStatus === "green" ? "Strong alignment" : identityStatus === "yellow" ? "Moderate alignment" : "Weak alignment" },
+        resonancePulse: { score: mockResonance, status: resonanceStatus, message: resonanceStatus === "green" ? "Strong opportunity" : resonanceStatus === "yellow" ? "Moderate opportunity" : "Saturated market" },
+      });
+    }
+    useSessionStore.setState({ conceptLocked: true });
+    try { lockConcept?.(); } catch {}
+    setTimeout(() => { yourConceptRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
+  };
+
+  /* ─── Sorted base list ────────────────────────────────────────────────────── */
   const sortedDirections = useMemo(() => {
     return AESTHETICS
       .filter((a) => a !== recommendedAesthetic)
       .sort((a, b) => {
-        const ca = AESTHETIC_CONTENT[a];
-        const cb = AESTHETIC_CONTENT[b];
-        const sa = ((ca?.identityScore ?? 0) * 0.5) + ((ca?.resonanceScore ?? 0) * 0.5);
-        const sb = ((cb?.identityScore ?? 0) * 0.5) + ((cb?.resonanceScore ?? 0) * 0.5);
+        const sa = ((AESTHETIC_CONTENT[a]?.identityScore ?? 0) * 0.5) + ((AESTHETIC_CONTENT[a]?.resonanceScore ?? 0) * 0.5);
+        const sb = ((AESTHETIC_CONTENT[b]?.identityScore ?? 0) * 0.5) + ((AESTHETIC_CONTENT[b]?.resonanceScore ?? 0) * 0.5);
         return sb - sa;
       });
   }, [recommendedAesthetic]);
 
-  /* ─── Muko Insight content ────────────────────────────────────────────────── */
+  // When alternative is selected: list = all aesthetics except the selected one, sorted by combinedScore
+  // (Muko's Pick is included in this list with a badge)
+  // When hero/nothing selected: list = sortedDirections (excludes hero)
+  const orderedDirections = useMemo(() => {
+    if (selectedIsAlternative) {
+      return AESTHETICS
+        .filter((a) => a !== selectedAesthetic)
+        .sort((a, b) => {
+          const sa = ((AESTHETIC_CONTENT[a]?.identityScore ?? 0) * 0.5) + ((AESTHETIC_CONTENT[a]?.resonanceScore ?? 0) * 0.5);
+          const sb = ((AESTHETIC_CONTENT[b]?.identityScore ?? 0) * 0.5) + ((AESTHETIC_CONTENT[b]?.resonanceScore ?? 0) * 0.5);
+          return sb - sa;
+        });
+    }
+    return sortedDirections;
+  }, [sortedDirections, selectedAesthetic, selectedIsAlternative]);
+
+  /* ─── Muko Insight ────────────────────────────────────────────────────────── */
   const insightContent = useMemo(() => {
     const ae = selectedAesthetic ?? recommendedAesthetic;
     const content = AESTHETIC_CONTENT[ae];
     const chips = getAestheticChips(ae).map((c) => c.label);
-    const entry = (aestheticsData as Array<{ id: string; name: string; trend_velocity: string }>)
-      .find((a) => a.name === ae);
-    return getDirectionInsight(
-      ae,
-      content?.identityScore ?? 80,
-      content?.resonanceScore ?? 75,
-      chips,
-      entry?.trend_velocity ?? "peak"
-    );
+    const entry = (aestheticsData as Array<{ id: string; name: string; trend_velocity: string }>).find((a) => a.name === ae);
+    return getDirectionInsight(ae, content?.identityScore ?? 80, content?.resonanceScore ?? 75, chips, entry?.trend_velocity ?? "peak");
   }, [selectedAesthetic, recommendedAesthetic]);
 
   const sharpenChips = useMemo(() => {
@@ -464,655 +405,266 @@ export default function ConceptStudioPage() {
   }, [selectedAesthetic, selectedElements, insightContent]);
 
   const canContinue = Boolean(selectedAesthetic);
-
-  /* ─── Shared typography styles ────────────────────────────────────────────── */
   const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
   const inter = "var(--font-inter), system-ui, sans-serif";
 
-  /* ─── Pulse row data ──────────────────────────────────────────────────────── */
+  /* ─── Pulse rows ──────────────────────────────────────────────────────────── */
   const pulseRows = [
-    {
-      key: "Identity",
-      label: "IDENTITY",
-      icon: (color: string) => <IconIdentity size={13} color={color} />,
-      score: identityScore,
-      status: idStatus,
-      barColor: idStatus.color,
-      what: `Identity measures how well this direction aligns with your brand DNA — keywords, aesthetic positioning, and customer profile. A high score means this direction reinforces who you already are. A low score signals tension that requires intentional navigation.`,
-      how: `Keyword overlap between your brand profile and this direction's signals, weighted by conflict detection. Intentional tensions acknowledged in onboarding are factored in.`,
-      pending: false,
-    },
-    {
-      key: "Resonance",
-      label: "RESONANCE",
-      icon: (color: string) => <IconResonance size={13} color={color} />,
-      score: resonanceScore,
-      status: resStatus,
-      barColor: resStatus.color,
-      what: `Resonance measures market timing — how much consumer interest exists for this direction right now, and whether you're entering at the right moment. High resonance with ascending velocity means the window is open. Peak saturation means you're late.`,
-      how: `Saturation score from our curated aesthetics library, weighted by trend velocity (emerging / ascending / peak / declining). Updated manually every Monday from WGSN and market data.`,
-      pending: false,
-    },
-    {
-      key: "Execution",
-      label: "EXECUTION",
-      icon: (color: string) => <IconExecution size={13} color={color} />,
-      score: undefined,
-      status: { label: "Pending", color: "rgba(67,67,43,0.35)", sublabel: "Unlocks in Spec Studio" },
-      barColor: "rgba(67,67,43,0.12)",
-      what: `Execution measures whether the physical product you're building is feasible given your timeline, materials, and construction complexity. It unlocks in Spec Studio once you define your product inputs.`,
-      how: `Timeline buffer score based on material lead times and construction complexity relative to your season deadline. Negative buffer scores red. Margin gate applied as a 30% score penalty if COGS exceeds target.`,
-      pending: true,
-    },
+    { key: "identity", label: "Identity", icon: (c: string) => <IconIdentity size={14} color={c} />, score: identityScore != null ? `${identityScore}` : "—", scoreNum: identityScore ?? 0, color: identityScore != null ? scoreColor(identityScore) : "rgba(67,67,43,0.35)", chip: identityScore != null ? { variant: idStatus.color === PULSE_GREEN ? "green" as const : idStatus.color === PULSE_YELLOW ? "amber" as const : idStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: idStatus.label } : null, subLabel: idStatus.sublabel, what: `Identity measures how well this direction aligns with your brand DNA — keywords, aesthetic positioning, and customer profile. A high score means this direction reinforces who you already are. A low score signals tension that requires intentional navigation.`, how: `Keyword overlap between your brand profile and this direction's signals, weighted by conflict detection. Intentional tensions acknowledged in onboarding are factored in.`, pending: false },
+    { key: "resonance", label: "Resonance", icon: (c: string) => <IconResonance size={14} color={c} />, score: resonanceScore != null ? `${resonanceScore}` : "—", scoreNum: resonanceScore ?? 0, color: resonanceScore != null ? scoreColor(resonanceScore) : "rgba(67,67,43,0.35)", chip: resonanceScore != null ? { variant: resStatus.color === PULSE_GREEN ? "green" as const : resStatus.color === PULSE_YELLOW ? "amber" as const : resStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: resStatus.label } : null, subLabel: resStatus.sublabel, what: `Resonance measures market timing — how much consumer interest exists for this direction right now, and whether you're entering at the right moment. High resonance with ascending velocity means the window is open. Peak saturation means you're late.`, how: `Saturation score from our curated aesthetics library, weighted by trend velocity (emerging / ascending / peak / declining). Updated manually every Monday from WGSN and market data.`, pending: false },
+    { key: "execution", label: "Execution", icon: (c: string) => <IconExecution size={14} color={c} />, score: "—", scoreNum: 0, color: "rgba(67,67,43,0.35)", chip: null, subLabel: "Unlocks in Spec Studio", what: `Execution measures whether the physical product you're building is feasible given your timeline, materials, and construction complexity. It unlocks in Spec Studio once you define your product inputs.`, how: `Timeline buffer score based on material lead times and construction complexity relative to your season deadline. Negative buffer scores red. Margin gate applied as a 30% score penalty if COGS exceeds target.`, pending: true },
   ];
+
+  /* ─── Top card chip data ──────────────────────────────────────────────────── */
+  const topChips = getAestheticChips(topAesthetic);
+  const topSpecChips = topChips.filter((c) => c.type === "spec").slice(0, 4);
+  const topMoodChips = topChips.filter((c) => c.type === "mood").slice(0, 2);
+  const topDisplayChips = [...topSpecChips, ...topMoodChips];
+  const topContent = AESTHETIC_CONTENT[topAesthetic];
 
   /* ─── RENDER ──────────────────────────────────────────────────────────────── */
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#FAF9F6", overflow: "hidden" }}>
 
       {/* ── Fixed Header ─────────────────────────────────────────────────────── */}
-      <header
-        style={{
-          position: "fixed",
-          top: 0, left: 0, right: 0,
-          height: 72,
-          background: "rgba(250,249,246,0.92)",
-          backdropFilter: "blur(24px) saturate(160%)",
-          WebkitBackdropFilter: "blur(24px) saturate(160%)",
-          borderBottom: "1px solid rgba(67,67,43,0.09)",
-          zIndex: 200,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 40px",
-          justifyContent: "space-between",
-          gap: 20,
-        }}
-      >
-        {/* Left: logo + stepper */}
+      <header style={{ position: "fixed", top: 0, left: 0, right: 0, height: 72, background: "rgba(250,249,246,0.92)", backdropFilter: "blur(24px) saturate(160%)", WebkitBackdropFilter: "blur(24px) saturate(160%)", borderBottom: "1px solid rgba(67,67,43,0.09)", zIndex: 200, display: "flex", alignItems: "center", padding: "0 40px", justifyContent: "space-between", gap: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <span style={{ fontFamily: sohne, fontWeight: 700, fontSize: 18, letterSpacing: "-0.02em", color: OLIVE }}>muko</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {[
-              { label: "Intent", done: true, active: false },
-              { label: "Concept", done: false, active: true },
-              { label: "Spec", done: false, active: false },
-              { label: "Report", done: false, active: false },
-            ].map((s) => (
-              <div
-                key={s.label}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "6px 12px",
-                  borderRadius: 999,
-                  border: s.done ? `1.5px solid ${CHARTREUSE}` : s.active ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)",
-                  background: s.done ? "rgba(168,180,117,0.08)" : s.active ? "rgba(125,150,172,0.07)" : "rgba(67,67,43,0.03)",
-                  fontFamily: sohne, fontSize: 11, fontWeight: 600, letterSpacing: "0.01em",
-                  color: s.done ? "rgba(67,67,43,0.70)" : s.active ? OLIVE : "rgba(67,67,43,0.35)",
-                }}
-              >
-                {s.done ? (
-                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                    <path d="M4.5 7.2L6.2 8.8L9.5 5.5" stroke={CHARTREUSE} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                ) : s.active ? (
-                  <span style={{ width: 7, height: 7, borderRadius: 999, background: STEEL, boxShadow: `0 0 0 3px rgba(125,150,172,0.20)` }} />
-                ) : (
-                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(67,67,43,0.18)" }} />
-                )}
+            {[{ label: "Intent", done: true, active: false }, { label: "Concept", done: false, active: true }, { label: "Spec", done: false, active: false }, { label: "Report", done: false, active: false }].map((s) => (
+              <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: s.done ? `1.5px solid ${CHARTREUSE}` : s.active ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)", background: s.done ? "rgba(168,180,117,0.08)" : s.active ? "rgba(125,150,172,0.07)" : "rgba(67,67,43,0.03)", fontFamily: sohne, fontSize: 11, fontWeight: 600, letterSpacing: "0.01em", color: s.done ? "rgba(67,67,43,0.70)" : s.active ? OLIVE : "rgba(67,67,43,0.35)" }}>
+                {s.done ? <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M4.5 7.2L6.2 8.8L9.5 5.5" stroke={CHARTREUSE} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg> : s.active ? <span style={{ width: 7, height: 7, borderRadius: 999, background: STEEL, boxShadow: `0 0 0 3px rgba(125,150,172,0.20)` }} /> : <span style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(67,67,43,0.18)" }} />}
                 {s.label}
               </div>
             ))}
           </div>
         </div>
-
-        {/* Right: season/collection + actions */}
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span style={{ fontFamily: sohne, fontSize: 12, fontWeight: 600, color: "rgba(67,67,43,0.50)", letterSpacing: "0.03em" }}>
-            {headerSeasonLabel}<span style={{ padding: "0 7px", opacity: 0.35 }}>·</span>{headerCollectionName}
-          </span>
+          <span style={{ fontFamily: sohne, fontSize: 12, fontWeight: 600, color: "rgba(67,67,43,0.50)", letterSpacing: "0.03em" }}>{headerSeasonLabel}<span style={{ padding: "0 7px", opacity: 0.35 }}>·</span>{headerCollectionName}</span>
           <div style={{ display: "flex", gap: 6 }}>
-            <button
-              onClick={() => window.history.back()}
-              style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px 7px 10px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "rgba(67,67,43,0.62)", cursor: "pointer", letterSpacing: "0.01em" }}
-            >
+            <button onClick={() => window.history.back()} style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px 7px 10px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "rgba(67,67,43,0.62)", cursor: "pointer", letterSpacing: "0.01em" }}>
               <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7L8.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
               Back
             </button>
-            <button
-              onClick={() => {}}
-              style={{ padding: "7px 14px", borderRadius: 999, border: "none", background: OLIVE, fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "#F5F0E8", cursor: "pointer", letterSpacing: "0.01em" }}
-            >
-              SAVE & CLOSE
-            </button>
+            <button onClick={() => {}} style={{ padding: "7px 14px", borderRadius: 999, border: "none", background: OLIVE, fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "#F5F0E8", cursor: "pointer", letterSpacing: "0.01em" }}>SAVE & CLOSE</button>
           </div>
         </div>
       </header>
 
       {/* ── Two-column body ───────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", flex: 1, paddingTop: 72, overflow: "hidden", height: "calc(100vh - 72px)", marginTop: 0 }}>
+      <div style={{ display: "flex", flex: 1, paddingTop: 72, overflow: "hidden", height: "calc(100vh - 72px)" }}>
 
-        {/* ── LEFT COLUMN ── scrollable ────────────────────────────────────────── */}
-        <div
-          style={{ width: "50%", height: "100%", overflowY: "auto", overflowX: "hidden" }}
-          onMouseEnter={() => { if (hoverCloseTimer.current) window.clearTimeout(hoverCloseTimer.current); }}
-          onMouseLeave={closeHoverSoft}
-        >
-          {/* Title section — always visible above list/preview */}
+        {/* ── LEFT COLUMN ──────────────────────────────────────────────────────── */}
+        <div style={{ width: "50%", height: "100%", overflowY: "auto", overflowX: "hidden" }}>
+
+          {/* Title */}
           <div style={{ padding: "36px 44px 24px" }}>
-            <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 28, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1 }}>
-              Concept Studio
-            </h1>
+            <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 28, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1 }}>Concept Studio</h1>
             <p style={{ margin: "10px 0 0", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.52)", lineHeight: 1.55, maxWidth: 460 }}>
               Choose a direction, refine it in your own words — we'll interpret identity and resonance in real time, guided by Muko Insight.
             </p>
           </div>
 
-          {/* ── PREVIEW VIEW ────────────────────────────────────────────────────── */}
-          {showPreview ? (
+          <div style={{ padding: "0 44px 48px" }}>
+
+            {/* ── TOP SLOT ── selected card always here ──────────────────────────── */}
+
+            {/* Section label — switches from "Muko's Pick" to "Your Concept" on any selection */}
+            <div ref={yourConceptRef} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: selectedAesthetic ? CHARTREUSE : BRAND.rose, whiteSpace: "nowrap" }}>
+                {selectedAesthetic ? "Your Concept" : "MUKO\u2019S PICK"}
+              </span>
+              <div style={{ flex: 1, height: 1, background: selectedAesthetic ? "rgba(168,180,117,0.25)" : "rgba(169,123,143,0.25)" }} />
+            </div>
+
+            {/* Top card */}
             <div
-              key="preview"
               style={{
-                padding: "0 44px 48px",
-                opacity: previewOpacity,
-                transition: "opacity 180ms ease",
-                borderLeft: showChartreuseAccent ? `3px solid ${CHARTREUSE}` : "3px solid transparent",
-                background: showChartreuseAccent ? `rgba(168,180,117,0.03)` : "transparent",
+                position: "relative",
+                width: "100%",
+                textAlign: "left",
+                padding: "18px 20px",
+                borderRadius: 10,
+                background: "transparent",
+                border: selectedAesthetic ? `1px solid ${CHARTREUSE}` : "1px solid rgba(67,67,43,0.14)",
+                boxShadow: selectedAesthetic ? "0 4px 16px rgba(168,180,117,0.18), 0 1px 4px rgba(0,0,0,0.06)" : "0 2px 8px rgba(0,0,0,0.04)",
+                marginBottom: 28,
+                overflow: "hidden",
+                boxSizing: "border-box",
               }}
             >
-              {/* "Browse other directions" — top-left, always in preview */}
-              <button
-                onClick={() => { setBrowsingList(true); setHoveredAesthetic(null); }}
-                style={{
-                  marginBottom: 16,
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  fontFamily: inter,
-                  fontSize: 12,
-                  fontWeight: 650,
-                  color: "rgba(67,67,43,0.68)",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  letterSpacing: "0.01em",
-                }}
-              >
-                <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
-                  <path d="M10.5 5.5H3.5M3.5 5.5L6.5 2.5M3.5 5.5L6.5 8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Browse other directions
-              </button>
-
-              {/* Direction name + select button (top row) */}
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
-                <h2
-                  style={{
-                    margin: 0,
-                    fontFamily: sohne,
-                    fontWeight: 500,
-                    fontSize: 24,
-                    color: OLIVE,
-                    letterSpacing: "-0.01em",
-                    lineHeight: 1.15,
-                  }}
-                >
-                  {previewAesthetic}
-                </h2>
-                {previewIsSelected ? (
-                  <div
-                    style={{
-                      flexShrink: 0,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 5,
-                      padding: "5px 13px",
-                      borderRadius: 999,
-                      background: `rgba(168,180,117,0.12)`,
-                      border: `1.5px solid ${CHARTREUSE}`,
-                      fontFamily: inter,
-                      fontSize: 10.5,
-                      fontWeight: 700,
-                      color: CHARTREUSE,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      marginTop: 4,
-                    }}
-                  >
-                    ✓ Selected
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => previewAesthetic && handleSelectAesthetic(previewAesthetic)}
-                    style={{
-                      flexShrink: 0,
-                      padding: "6px 14px",
-                      borderRadius: 6,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: "0.08em",
-                      textTransform: "uppercase",
-                      background: STEEL,
-                      border: "none",
-                      color: "#fff",
-                      fontFamily: inter,
-                      cursor: "pointer",
-                      marginTop: 4,
-                    }}
-                  >
+              {/* Check icon — top-right corner */}
+              {selectedAesthetic && (
+                <div style={{ position: "absolute", top: 10, right: 10, width: 22, height: 22, borderRadius: "50%", background: CHARTREUSE, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </div>
+              )}
+              {/* Name row */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
+                <span style={{ fontFamily: sohne, fontWeight: 500, fontSize: 20, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.15 }}>
+                  {topAesthetic}
+                </span>
+                {!selectedAesthetic && (
+                  <button onClick={() => handleSelectAesthetic(topAesthetic)} style={{ flexShrink: 0, padding: "5px 13px", borderRadius: 999, background: "transparent", border: `1px solid ${CHARTREUSE}`, fontFamily: inter, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.05em", color: CHARTREUSE, cursor: "pointer" }}>
                     Select
                   </button>
                 )}
               </div>
 
               {/* Description */}
-              {AESTHETIC_CONTENT[previewAesthetic]?.description && (
-                <p style={{ margin: "0 0 18px", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.62)", lineHeight: 1.6 }}>
-                  {AESTHETIC_CONTENT[previewAesthetic].description}
+              {topContent?.description && (
+                <p style={{ margin: "0 0 12px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.58)", lineHeight: 1.55 }}>
+                  {topContent.description}
                 </p>
               )}
 
-              {/* Chips — steel blue, no-fill default, distinct hover + active */}
-              {(() => {
-                const chips = getAestheticChips(previewAesthetic);
-                if (!chips.length) return null;
-                return (
-                  <div style={{ marginBottom: 20 }}>
-                    {previewIsSelected && (
-                      <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 10 }}>
-                        Layer these in
-                      </div>
-                    )}
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                    {chips.map((chip) => {
-                      const chipKey = `${previewAesthetic}::${chip.label}`;
-                      const isActive = selectedElements.has(chipKey);
-                      return (
-                        <PreviewChip
-                          key={chip.label}
-                          label={chip.label}
-                          isActive={isActive}
-                          onClick={() => toggleElement(chipKey)}
-                          steel={STEEL}
-                          inter={inter}
-                        />
-                      );
-                    })}
-                    <span
-                      style={{
-                        padding: "5px 12px",
-                        borderRadius: 999,
-                        fontSize: 11,
-                        fontWeight: 500,
-                        background: "transparent",
-                        border: `1.5px dashed rgba(125,150,172,0.50)`,
-                        color: "rgba(125,150,172,0.70)",
-                        fontFamily: inter,
-                        cursor: "pointer",
-                      }}
-                    >
-                      + add
-                    </span>
-                    </div>
-                  </div>
-                );
-              })()}
+              {/* LAYER THESE IN */}
+              {topDisplayChips.length > 0 && (
+                <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 10 }}>
+                  Layer these in
+                </div>
+              )}
 
-              {/* Moodboard 3×3 */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                {moodboardImages.length > 0
-                  ? moodboardImages.map((src, i) => (
-                      <div
-                        key={`${matchedAestheticFolder}-${i}`}
-                        style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", animation: `fadeIn 250ms ease-out ${i * 25}ms both` }}
-                      >
-                        <img src={src} alt={`${previewAesthetic} ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} loading="lazy" />
-                      </div>
-                    ))
-                  : Array.from({ length: 9 }).map((_, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          aspectRatio: "1",
-                          borderRadius: 8,
-                          background: "linear-gradient(90deg, rgba(235,232,228,0.30) 0%, rgba(245,242,238,0.70) 50%, rgba(235,232,228,0.30) 100%)",
-                          backgroundSize: "200% 100%",
-                          animation: "skeleton-loading 1.5s ease-in-out infinite",
-                        }}
-                      />
-                    ))}
+              {/* Chips */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {topDisplayChips.map((chip) => {
+                  const isSpec = chip.type === "spec";
+                  return (
+                    <span key={chip.label} style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, background: isSpec ? `rgba(125,150,172,0.12)` : "transparent", border: isSpec ? `1px solid ${STEEL}` : "1px solid rgba(67,67,43,0.18)", color: isSpec ? STEEL : "rgba(67,67,43,0.52)" }}>
+                      {chip.label}
+                    </span>
+                  );
+                })}
+                <span style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, background: "transparent", border: `1px dashed ${STEEL}`, color: STEEL }}>+ add</span>
+              </div>
+
+              {/* Moodboard — always visible when selected */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 14 }}>
+                {topMoodboardImages.map((src, i) => (
+                  <div key={`top-mb-${i}`} style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", animation: `fadeIn 220ms ease ${i * 20}ms both` }}>
+                    <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} loading="lazy" />
+                  </div>
+                ))}
               </div>
             </div>
-          ) : (
-            /* ── LIST VIEW ────────────────────────────────────────────────────── */
-            <div key="list" style={{ padding: "0 44px 48px", animation: "fadeIn 180ms ease" }}>
 
-              {/* MUKO'S PICK label + horizontal line */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: BRAND.rose, whiteSpace: "nowrap" }}>
-                  MUKO&apos;S PICK
-                </span>
-                <div style={{ flex: 1, height: 1, background: `rgba(169,123,143,0.25)` }} />
+            {/* ── EXPLORE OTHER DIRECTIONS ───────────────────────────────────────── */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 5 }}>EXPLORE OTHER DIRECTIONS</div>
+              <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 12 }}>Type a direction and we'll match it — or select from below.</div>
+              <div style={{ position: "relative" }}>
+                <input
+                  type="text"
+                  value={freeFormDraft}
+                  onChange={(e) => setFreeFormDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && freeFormMatch) { handleSelectAesthetic(freeFormMatch); setFreeFormDraft(""); } }}
+                  placeholder="e.g. quiet luxury with edge, grunge romance, coastal dark…"
+                  style={{ width: "100%", boxSizing: "border-box", padding: "12px 48px 12px 14px", fontSize: 13, borderRadius: 10, border: "1px solid rgba(67,67,43,0.12)", background: "rgba(255,255,255,0.80)", color: OLIVE, fontFamily: inter, outline: "none" }}
+                />
+                <button
+                  onClick={() => { if (freeFormMatch) { handleSelectAesthetic(freeFormMatch); setFreeFormDraft(""); } }}
+                  disabled={!freeFormMatch || !freeFormDraft.trim()}
+                  style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: 999, border: "1px solid rgba(67,67,43,0.12)", background: "rgba(255,255,255,0.90)", cursor: !freeFormMatch || !freeFormDraft.trim() ? "not-allowed" : "pointer", opacity: !freeFormMatch || !freeFormDraft.trim() ? 0.45 : 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "rgba(67,67,43,0.65)" }}
+                >→</button>
               </div>
+              {freeFormLoading && freeFormDraft.trim().length > 1 && <div style={{ marginTop: 7, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.36)" }}>Interpreting…</div>}
+              {!freeFormLoading && freeFormMatch && freeFormDraft.trim().length > 1 && (
+                <div style={{ marginTop: 7, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.40)" }}>Closest match:</span>
+                  <button onClick={() => { handleSelectAesthetic(freeFormMatch); setFreeFormDraft(""); }} style={{ padding: "4px 11px", borderRadius: 999, fontSize: 11.5, fontWeight: 600, background: "rgba(125,150,172,0.08)", border: `1px solid ${STEEL}`, color: STEEL, cursor: "pointer", fontFamily: inter }}>{freeFormMatch} →</button>
+                </div>
+              )}
+            </div>
 
-              {/* Hero card */}
-              {(() => {
-                const heroContent = AESTHETIC_CONTENT[recommendedAesthetic];
-                const heroIsSelected = selectedAesthetic === recommendedAesthetic;
-                const heroChips = getAestheticChips(recommendedAesthetic);
-                const specChips = heroChips.filter((c) => c.type === "spec").slice(0, 4);
-                const moodChips = heroChips.filter((c) => c.type === "mood").slice(0, 2);
-                const displayChips = [...specChips, ...moodChips];
+            {/* ── DIRECTION LIST ─────────────────────────────────────────────────── */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {orderedDirections.map((aesthetic) => {
+                const isHovered = hoveredCard === aesthetic;
+                const isMukosPick = aesthetic === recommendedAesthetic;
+                const content = AESTHETIC_CONTENT[aesthetic];
+                const chips = getAestheticChips(aesthetic).slice(0, 3);
+                const idCol = scoreColor(content?.identityScore ?? 0);
+                const resCol = scoreColor(content?.resonanceScore ?? 0);
+                const cardImages = isHovered ? hoveredImages : [];
+
                 return (
-                  <button
-                    onClick={() => handleSelectAesthetic(recommendedAesthetic)}
-                    onMouseEnter={() => openHover(recommendedAesthetic)}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "18px 20px",
-                      borderRadius: 10,
-                      background: heroIsSelected ? "rgba(169,123,143,0.04)" : "#fff",
-                      border: `1.5px solid rgba(169,123,143,0.28)`,
-                      boxShadow: "0 0 0 3px rgba(169,123,143,0.05), 0 2px 10px rgba(169,123,143,0.07)",
-                      cursor: "pointer",
-                      outline: "none",
-                      marginBottom: 28,
-                      transition: "all 200ms ease",
-                    }}
-                  >
-                    {/* Top row: name + scores inline */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-                      <span style={{ fontFamily: sohne, fontWeight: 500, fontSize: 20, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.15 }}>
-                        {recommendedAesthetic}
-                      </span>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <span style={{ fontFamily: inter, fontSize: 10.5, fontWeight: 650, color: scoreColor(heroContent?.identityScore ?? 0), display: "flex", alignItems: "center", gap: 2 }}>
-                          <IconIdentity size={10} color={scoreColor(heroContent?.identityScore ?? 0)} />{heroContent?.identityScore ?? "—"}
-                        </span>
-                        <span style={{ fontFamily: inter, fontSize: 10.5, fontWeight: 650, color: scoreColor(heroContent?.resonanceScore ?? 0), display: "flex", alignItems: "center", gap: 2 }}>
-                          <IconResonance size={10} color={scoreColor(heroContent?.resonanceScore ?? 0)} />{heroContent?.resonanceScore ?? "—"}
-                        </span>
-                      </div>
-                    </div>
-                    {/* Description */}
-                    {heroContent?.description && (
-                      <p style={{ margin: "0 0 12px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.58)", lineHeight: 1.55 }}>
-                        {heroContent.description}
-                      </p>
-                    )}
-                    {/* Chips */}
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {displayChips.map((chip) => {
-                        const isSpec = chip.type === "spec";
-                        return (
-                          <span
-                            key={chip.label}
-                            style={{
-                              padding: "4px 10px",
-                              borderRadius: 999,
-                              fontSize: 11,
-                              fontWeight: 500,
-                              fontFamily: inter,
-                              background: isSpec ? `rgba(125,150,172,0.12)` : "transparent",
-                              border: isSpec ? `1px solid ${STEEL}` : "1px solid rgba(67,67,43,0.18)",
-                              color: isSpec ? STEEL : "rgba(67,67,43,0.52)",
-                            }}
-                          >
-                            {chip.label}
-                          </span>
-                        );
-                      })}
-                      <span
-                        style={{
-                          padding: "4px 10px",
-                          borderRadius: 999,
-                          fontSize: 11,
-                          fontWeight: 500,
-                          fontFamily: inter,
-                          background: "transparent",
-                          border: `1px dashed ${STEEL}`,
-                          color: STEEL,
-                        }}
-                      >
-                        + add
-                      </span>
-                    </div>
-                  </button>
-                );
-              })()}
-
-              {/* EXPLORE OTHER DIRECTIONS */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 5 }}>
-                  EXPLORE OTHER DIRECTIONS
-                </div>
-                <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 12 }}>
-                  Type a direction and we'll match it — or select from below.
-                </div>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type="text"
-                    value={freeFormDraft}
-                    onChange={(e) => setFreeFormDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && freeFormMatch) { handleSelectAesthetic(freeFormMatch); setFreeFormDraft(""); }
-                    }}
-                    placeholder="e.g. quiet luxury with edge, grunge romance, coastal dark…"
-                    style={{
-                      width: "100%",
-                      boxSizing: "border-box",
-                      padding: "12px 48px 12px 14px",
-                      fontSize: 13,
-                      borderRadius: 10,
-                      border: "1px solid rgba(67,67,43,0.12)",
-                      background: "rgba(255,255,255,0.80)",
-                      color: OLIVE,
-                      fontFamily: inter,
-                      outline: "none",
-                    }}
-                  />
-                  <button
-                    onClick={() => { if (freeFormMatch) { handleSelectAesthetic(freeFormMatch); setFreeFormDraft(""); } }}
-                    disabled={!freeFormMatch || !freeFormDraft.trim()}
-                    style={{
-                      position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
-                      width: 32, height: 32, borderRadius: 999,
-                      border: "1px solid rgba(67,67,43,0.12)",
-                      background: "rgba(255,255,255,0.90)",
-                      cursor: !freeFormMatch || !freeFormDraft.trim() ? "not-allowed" : "pointer",
-                      opacity: !freeFormMatch || !freeFormDraft.trim() ? 0.45 : 1,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 14, color: "rgba(67,67,43,0.65)",
-                    }}
-                  >
-                    →
-                  </button>
-                </div>
-                {freeFormLoading && freeFormDraft.trim().length > 1 && (
-                  <div style={{ marginTop: 7, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.36)" }}>Interpreting…</div>
-                )}
-                {!freeFormLoading && freeFormMatch && freeFormDraft.trim().length > 1 && (
-                  <div style={{ marginTop: 7, display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.40)" }}>Closest match:</span>
-                    <button
-                      onClick={() => { handleSelectAesthetic(freeFormMatch); setFreeFormDraft(""); }}
-                      style={{ padding: "4px 11px", borderRadius: 999, fontSize: 11.5, fontWeight: 600, background: "rgba(125,150,172,0.08)", border: `1px solid ${STEEL}`, color: STEEL, cursor: "pointer", fontFamily: inter }}
-                    >
-                      {freeFormMatch} →
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Direction cards */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {sortedDirections.map((aesthetic) => {
-                  const isSelected = selectedAesthetic === aesthetic;
-                  const content = AESTHETIC_CONTENT[aesthetic];
-                  const chips = getAestheticChips(aesthetic).slice(0, 3);
-                  const idCol = scoreColor(content?.identityScore ?? 0);
-                  const resCol = scoreColor(content?.resonanceScore ?? 0);
-
-                  const selContent = selectedAesthetic ? AESTHETIC_CONTENT[selectedAesthetic] : null;
-                  return (
+                  <motion.div key={aesthetic} layout transition={{ duration: 0.22, ease: "easeInOut" }} style={{ borderRadius: 8 }}>
                     <DirectionCard
-                      key={aesthetic}
                       aesthetic={aesthetic}
                       content={content}
                       chips={chips}
-                      isSelected={isSelected}
+                      isMukosPick={isMukosPick}
+                      isHovered={isHovered}
+                      moodboardImages={cardImages}
                       idColor={idCol}
                       resColor={resCol}
-                      selectedIdScore={selContent?.identityScore ?? null}
-                      selectedResScore={selContent?.resonanceScore ?? null}
-                      hasSelection={!!selectedAesthetic}
-                      onHover={() => openHover(aesthetic)}
-                      onHoverLeave={() => {}}
+                      topIdScore={topContent?.identityScore ?? null}
+                      topResScore={topContent?.resonanceScore ?? null}
+                      onHoverEnter={() => setHoveredCard(aesthetic)}
+                      onHoverLeave={() => setHoveredCard(null)}
                       onSelect={() => handleSelectAesthetic(aesthetic)}
                       inter={inter}
                       sohne={sohne}
                       steelBlue={STEEL}
                       chartreuse={CHARTREUSE}
                     />
-                  );
-                })}
-              </div>
+                  </motion.div>
+                );
+              })}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* ── RIGHT COLUMN ── fixed scroll, independent ────────────────────────── */}
-        <div
-          style={{
-            width: "50%",
-            height: "100%",
-            overflowY: "auto",
-            borderLeft: "1px solid rgba(67,67,43,0.08)",
-            background: "rgba(250,249,246,0.60)",
-          }}
-        >
+        {/* ── RIGHT COLUMN ─────────────────────────────────────────────────────── */}
+        <div style={{ width: "50%", height: "100%", overflowY: "auto", borderLeft: "1px solid rgba(67,67,43,0.08)", background: "rgba(250,249,246,0.60)" }}>
           <div style={{ padding: "36px 44px 48px" }}>
 
-            {/* ── PULSE RAIL ─────────────────────────────────────────────────────── */}
+            {/* PULSE RAIL */}
             <div style={{ marginBottom: 28 }}>
-              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>
-                PULSE
-              </div>
-
+              <div style={{ fontFamily: sohne, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>Pulse</div>
               {pulseRows.map((row) => {
                 const isExpanded = pulseExpandedRow === row.key;
-                const scoreVal = row.score;
-                const barWidth = row.pending ? 0 : scoreVal != null ? scoreVal : 0;
-
+                const pillVariant = row.chip?.variant ?? "amber";
+                const PILL = {
+                  green: { bg: "rgba(77,122,86,0.10)", color: "#4D7A56", border: "rgba(77,122,86,0.20)" },
+                  amber: { bg: "rgba(155,122,58,0.10)", color: "#9B7A3A", border: "rgba(155,122,58,0.20)" },
+                  red: { bg: "rgba(138,58,58,0.10)", color: "#8A3A3A", border: "rgba(138,58,58,0.20)" },
+                };
+                const pill = PILL[pillVariant as keyof typeof PILL] || PILL.amber;
                 return (
-                  <div
-                    key={row.key}
-                    style={{
-                      borderBottom: "1px solid rgba(67,67,43,0.07)",
-                      paddingBottom: 14,
-                      marginBottom: 14,
-                      opacity: row.pending ? 0.55 : 1,
-                    }}
-                  >
-                    {/* Row header */}
-                    <button
-                      onClick={() => setPulseExpandedRow(isExpanded ? null : row.key)}
-                      style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        width: "100%", background: "none", border: "none", padding: 0,
-                        cursor: "pointer", textAlign: "left",
-                        marginBottom: 8,
-                      }}
-                    >
-                      {/* Left: icon + label */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                        <span style={{ display: "flex", alignItems: "center", flexShrink: 0, opacity: row.pending ? 0.35 : 1 }}>
-                          {row.icon(row.pending ? "rgba(67,67,43,0.40)" : row.status.color)}
-                        </span>
-                        <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", color: "rgba(67,67,43,0.68)" }}>
-                          {row.label}
-                        </span>
-                      </div>
-
-                      {/* Right: status tag + score + chevron */}
+                  <div key={row.key} style={{ borderBottom: "1px solid rgba(67,67,43,0.07)", paddingBottom: 14, marginBottom: 14 }}>
+                    <button onClick={() => setPulseExpandedRow(isExpanded ? null : row.key)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", marginBottom: 8 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        {row.pending ? (
-                          <span style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.40)" }}>⚙ Pending</span>
-                        ) : (
-                          <>
-                            <span
-                              style={{
-                                padding: "2px 8px",
-                                borderRadius: 4,
-                                fontSize: 10.5,
-                                fontWeight: 600,
-                                fontFamily: inter,
-                                background: row.status.color === PULSE_GREEN
-                                  ? "rgba(77,122,86,0.10)"
-                                  : row.status.color === PULSE_YELLOW
-                                    ? "rgba(155,122,58,0.10)"
-                                    : row.status.color === PULSE_RED
-                                      ? "rgba(138,58,58,0.10)"
-                                      : "rgba(67,67,43,0.06)",
-                                color: row.status.color,
-                              }}
-                            >
-                              {row.status.label}
-                            </span>
-                            <span style={{ fontFamily: inter, fontSize: 16, fontWeight: 700, color: OLIVE }}>{scoreVal}</span>
-                          </>
+                        <span style={{ color: row.color, opacity: 0.9 }}>{row.icon(row.color)}</span>
+                        <span style={{ fontFamily: sohne, fontWeight: 700, fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.68)" }}>{row.label}</span>
+                        {row.chip && (
+                          <span style={{ fontSize: 10, fontWeight: 600, fontFamily: inter, color: pill.color, background: pill.bg, border: `1px solid ${pill.border}`, borderRadius: 999, padding: "2px 8px" }}>
+                            {row.chip.status}
+                          </span>
                         )}
-                        <span style={{ fontSize: 14, color: "rgba(67,67,43,0.30)", display: "inline-block", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 220ms ease" }}>›</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontFamily: sohne, fontSize: 15, fontWeight: 650, color: "rgba(67,67,43,0.62)" }}>{row.score}</span>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.35, transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 200ms ease" }}>
+                          <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
                       </div>
                     </button>
-
-                    {/* Progress bar */}
-                    {!row.pending && (
-                      <div style={{ height: 2, background: "rgba(67,67,43,0.08)", borderRadius: 1, marginBottom: 6, overflow: "hidden" }}>
-                        <div
-                          style={{
-                            height: "100%",
-                            width: `${barWidth}%`,
-                            background: row.barColor,
-                            borderRadius: 1,
-                            transition: "width 500ms ease",
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    {/* Sub-label */}
-                    <div style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.44)", paddingLeft: 20 }}>
-                      {row.status.sublabel}
+                    <div style={{ height: 2, borderRadius: 1, background: "rgba(67,67,43,0.08)", marginBottom: row.subLabel ? 6 : 0 }}>
+                      <div style={{ height: 2, borderRadius: 1, background: row.color, width: `${row.scoreNum}%`, transition: "width 500ms ease, background 300ms ease" }} />
                     </div>
-
-                    {/* Expanded panel */}
+                    {row.subLabel && (
+                      <div style={{ fontSize: 10, color: "rgba(67,67,43,0.45)", fontFamily: inter, marginTop: 4 }}>{row.subLabel}</div>
+                    )}
                     {isExpanded && (
-                      <div
-                        style={{
-                          marginTop: 12,
-                          paddingTop: 12,
-                          borderTop: "1px solid rgba(67,67,43,0.06)",
-                          overflow: "hidden",
-                          animation: "expandDown 220ms ease",
-                        }}
-                      >
+                      <div style={{ marginTop: 10, padding: "12px 14px", borderRadius: 8, background: "rgba(67,67,43,0.03)", border: "1px solid rgba(67,67,43,0.07)", animation: "fadeIn 200ms ease-out" }}>
                         <div style={{ marginBottom: 10 }}>
-                          <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(67,67,43,0.36)", marginBottom: 4 }}>
-                            What this means
-                          </div>
-                          <div style={{ fontFamily: inter, fontSize: 12, lineHeight: 1.6, color: "rgba(67,67,43,0.58)" }}>
-                            {row.what}
-                          </div>
+                          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 4 }}>What this means</div>
+                          <div style={{ fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.65)", fontFamily: inter }}>{row.what}</div>
                         </div>
                         <div>
-                          <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(67,67,43,0.36)", marginBottom: 4 }}>
-                            How it&apos;s calculated
-                          </div>
-                          <div style={{ fontFamily: inter, fontSize: 12, lineHeight: 1.6, color: "rgba(67,67,43,0.52)" }}>
-                            {row.how}
-                          </div>
+                          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 4 }}>How it&apos;s calculated</div>
+                          <div style={{ fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.65)", fontFamily: inter }}>{row.how}</div>
                         </div>
                       </div>
                     )}
@@ -1121,91 +673,56 @@ export default function ConceptStudioPage() {
               })}
             </div>
 
-            {/* ── MUKO INSIGHT ────────────────────────────────────────────────────── */}
+            {/* MUKO INSIGHT */}
             <div style={{ marginBottom: 28 }}>
-              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>
-                MUKO INSIGHT
-              </div>
-
-              {/* Headline */}
-              <div style={{ fontFamily: sohne, fontWeight: 500, fontSize: 17, color: OLIVE, lineHeight: 1.3, marginBottom: 16 }}>
-                {insightContent.headline}
-              </div>
-
-              {/* 3 paragraphs */}
-              <p style={{ margin: "0 0 12px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.64)", lineHeight: 1.7 }}>
-                {insightContent.p1}
-              </p>
-              <p style={{ margin: "0 0 12px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.60)", lineHeight: 1.7 }}>
-                {insightContent.p2}
-              </p>
-              <p style={{ margin: "0 0 20px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.56)", lineHeight: 1.7 }}>
-                {insightContent.p3}
-              </p>
-
-              {/* THE OPPORTUNITY */}
+              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>MUKO INSIGHT</div>
+              <div style={{ fontFamily: sohne, fontWeight: 500, fontSize: 17, color: OLIVE, lineHeight: 1.3, marginBottom: 16 }}>{insightContent.headline}</div>
+              <p style={{ margin: "0 0 12px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.64)", lineHeight: 1.7 }}>{insightContent.p1}</p>
+              <p style={{ margin: "0 0 12px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.60)", lineHeight: 1.7 }}>{insightContent.p2}</p>
+              <p style={{ margin: "0 0 20px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.56)", lineHeight: 1.7 }}>{insightContent.p3}</p>
               {insightContent.opportunity.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: BRAND.camel, marginBottom: 10 }}>
-                    THE OPPORTUNITY
-                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: BRAND.chartreuse, marginBottom: 4 }}>THE OPPORTUNITY</div>
+                  <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 10 }}>What&apos;s working in your favor right now</div>
                   <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 7 }}>
                     {insightContent.opportunity.map((point, i) => (
                       <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.62)", lineHeight: 1.5 }}>
-                        <span style={{ color: BRAND.camel, flexShrink: 0, marginTop: 1 }}>•</span>
-                        {point}
+                        <span style={{ color: BRAND.chartreuse, flexShrink: 0, marginTop: 1 }}>•</span>{point}
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
-
-              {/* SHARPEN YOUR DIRECTION */}
+              {insightContent.editItems.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: BRAND.camel, marginBottom: 4 }}>THE EDIT</div>
+                  <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 10 }}>Inputs worth revisiting before you commit</div>
+                  <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 7 }}>
+                    {insightContent.editItems.map((item, i) => (
+                      <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.62)", lineHeight: 1.5 }}>
+                        <span style={{ color: BRAND.camel, flexShrink: 0, marginTop: 1 }}>•</span>{item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {sharpenChips.length > 0 && (
                 <div>
-                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 6 }}>
-                    SHARPEN YOUR DIRECTION
-                  </div>
-                  <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 12 }}>
-                    Try adding these signals to strengthen your position:
-                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A9BFD6", marginBottom: 4 }}>SHARPEN YOUR CONCEPT</div>
+                  <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 12 }}>Small additions that improve direction</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                     {sharpenChips.map((chip) => (
-                      <SharpenRow
-                        key={chip}
-                        label={chip}
-                        onAdd={() => {
-                          if (selectedAesthetic) {
-                            const key = `${selectedAesthetic}::${chip}`;
-                            toggleElement(key);
-                          }
-                        }}
-                        inter={inter}
-                        steelBlue={STEEL}
-                      />
+                      <SharpenRow key={chip} label={chip} onAdd={() => { if (selectedAesthetic) toggleElement(`${selectedAesthetic}::${chip}`); }} inter={inter} steelBlue={STEEL} />
                     ))}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* ── AskMuko ─────────────────────────────────────────────────────────── */}
-            <AskMuko
-              step="concept"
-              suggestedQuestions={[
-                "Why is Resonance at this level?",
-                "How does this compare to other directions?",
-                "What brands are doing this well?",
-              ]}
-              context={{
-                aesthetic: selectedAesthetic,
-                refineText,
-                identityScore: identityPulse?.score,
-                resonanceScore: resonancePulse?.score,
-              }}
-            />
+            {/* AskMuko */}
+            <AskMuko step="concept" suggestedQuestions={["Why is Resonance at this level?", "How does this compare to other directions?", "What brands are doing this well?"]} context={{ aesthetic: selectedAesthetic, refineText, identityScore: identityPulse?.score, resonanceScore: resonancePulse?.score }} />
 
-            {/* ── Continue button ──────────────────────────────────────────────────── */}
+            {/* Continue */}
             <button
               onClick={() => {
                 if (!canContinue) return;
@@ -1220,59 +737,23 @@ export default function ConceptStudioPage() {
                   if (custom) return { ...custom, isCustom: true as const };
                   return { label, type: "mood" as const, material: null, silhouette: null, complexity_mod: 0, palette: null, isCustom: false as const };
                 });
-                useSessionStore.setState({
-                  aestheticMatchedId: selectedAesthetic,
-                  refinementModifiers: interpretation?.modifiers ?? [],
-                  moodboardImages,
-                  chipSelection: {
-                    directionId: selectedAesthetic!.toLowerCase().replace(/\s+/g, "-"),
-                    activatedChips,
-                  },
-                });
+                useSessionStore.setState({ aestheticMatchedId: selectedAesthetic, refinementModifiers: interpretation?.modifiers ?? [], moodboardImages: topMoodboardImages, chipSelection: { directionId: selectedAesthetic!.toLowerCase().replace(/\s+/g, "-"), activatedChips } });
                 setCurrentStep(3);
                 router.push("/spec");
               }}
               disabled={!canContinue}
-              style={{
-                marginTop: 16,
-                width: "100%",
-                padding: "14px 16px",
-                borderRadius: 10,
-                fontSize: 12,
-                fontWeight: 700,
-                fontFamily: sohne,
-                letterSpacing: "0.02em",
-                color: canContinue ? STEEL : "rgba(67,67,43,0.30)",
-                background: canContinue ? "rgba(125,150,172,0.07)" : "rgba(255,255,255,0.46)",
-                border: canContinue ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)",
-                cursor: canContinue ? "pointer" : "not-allowed",
-                transition: "all 280ms ease",
-                opacity: canContinue ? 1 : 0.65,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              }}
+              style={{ marginTop: 16, width: "100%", padding: "14px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: sohne, letterSpacing: "0.02em", color: canContinue ? STEEL : "rgba(67,67,43,0.30)", background: canContinue ? "rgba(125,150,172,0.07)" : "rgba(255,255,255,0.46)", border: canContinue ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)", cursor: canContinue ? "pointer" : "not-allowed", transition: "all 280ms ease", opacity: canContinue ? 1 : 0.65, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}
             >
               <span>Lock direction &amp; build specs</span>
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{ opacity: canContinue ? 1 : 0.4 }}>
-                <path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{ opacity: canContinue ? 1 : 0.4 }}><path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
           </div>
         </div>
       </div>
 
       <style>{`
-        @keyframes skeleton-loading {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes expandDown {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes expandDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
         @media (max-width: 860px) {
           .concept-two-col { flex-direction: column !important; }
           .concept-two-col > div { width: 100% !important; height: auto !important; overflow-y: visible !important; }
@@ -1282,69 +763,23 @@ export default function ConceptStudioPage() {
   );
 }
 
-/* ─── Preview chip sub-component (no-fill default, clear hover/active) ───── */
-function PreviewChip({ label, isActive, onClick, steel, inter }: { label: string; isActive: boolean; onClick: () => void; steel: string; inter: string }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        padding: "5px 12px",
-        borderRadius: 999,
-        fontSize: 11,
-        fontWeight: isActive ? 650 : 500,
-        fontFamily: inter,
-        cursor: "pointer",
-        transition: "all 130ms ease",
-        background: isActive
-          ? steel
-          : hovered
-            ? "rgba(125,150,172,0.10)"
-            : "transparent",
-        border: isActive
-          ? `1.5px solid ${steel}`
-          : hovered
-            ? `1.5px solid ${steel}`
-            : "1.5px solid rgba(125,150,172,0.35)",
-        color: isActive ? "#fff" : steel,
-        boxShadow: isActive ? `0 2px 8px rgba(125,150,172,0.25)` : "none",
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-/* ─── Direction Card sub-component ───────────────────────────────────────── */
+/* ─── Direction Card ──────────────────────────────────────────────────────── */
 function DirectionCard({
-  aesthetic,
-  content,
-  chips,
-  isSelected,
-  idColor,
-  resColor,
-  selectedIdScore,
-  selectedResScore,
-  hasSelection,
-  onHover,
-  onSelect,
-  inter,
-  sohne,
-  steelBlue,
-  chartreuse,
+  aesthetic, content, chips, isMukosPick, isHovered, moodboardImages,
+  idColor, resColor, topIdScore, topResScore, onHoverEnter, onHoverLeave, onSelect,
+  inter, sohne, steelBlue, chartreuse,
 }: {
   aesthetic: string;
   content: { description: string; identityScore: number; resonanceScore: number } | undefined;
   chips: AestheticChip[];
-  isSelected: boolean;
+  isMukosPick: boolean;
+  isHovered: boolean;
+  moodboardImages: string[];
   idColor: string;
   resColor: string;
-  selectedIdScore: number | null;
-  selectedResScore: number | null;
-  hasSelection: boolean;
-  onHover: () => void;
+  topIdScore: number | null;
+  topResScore: number | null;
+  onHoverEnter: () => void;
   onHoverLeave: () => void;
   onSelect: () => void;
   inter: string;
@@ -1352,14 +787,10 @@ function DirectionCard({
   steelBlue: string;
   chartreuse: string;
 }) {
-  const [hovered, setHovered] = useState(false);
-
-  // Score display: delta when a direction is selected, raw scores otherwise
   const idScore = content?.identityScore ?? 0;
   const resScore = content?.resonanceScore ?? 0;
-  const idDelta = hasSelection && !isSelected && selectedIdScore != null ? idScore - selectedIdScore : null;
-  const resDelta = hasSelection && !isSelected && selectedResScore != null ? resScore - selectedResScore : null;
-
+  const idDelta = topIdScore != null ? idScore - topIdScore : null;
+  const resDelta = topResScore != null ? resScore - topResScore : null;
   const deltaColor = (d: number) => d > 0 ? "#4D7A56" : d < 0 ? "#8A3A3A" : "rgba(67,67,43,0.35)";
   const deltaLabel = (d: number) => d > 0 ? `+${d}` : `${d}`;
 
@@ -1368,31 +799,26 @@ function DirectionCard({
       style={{
         position: "relative",
         borderRadius: 8,
-        background: isSelected ? `rgba(168,180,117,0.08)` : "rgba(255,255,255,0.75)",
-        border: "1px solid rgba(67,67,43,0.09)",
-        borderLeft: isSelected
-          ? `3px solid ${chartreuse}`
-          : hovered
-            ? `3px solid ${steelBlue}`
-            : "3px solid transparent",
+        background: "transparent",
+        border: isHovered ? "1px solid rgba(67,67,43,0.18)" : "1px solid rgba(67,67,43,0.08)",
+        boxShadow: isHovered ? "0 4px 14px rgba(0,0,0,0.07)" : "none",
         padding: "14px 16px",
         cursor: "pointer",
-        transition: "all 180ms ease",
+        transition: "border-color 150ms ease, box-shadow 150ms ease",
         overflow: "hidden",
       }}
-      onMouseEnter={() => { setHovered(true); onHover(); }}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={onHoverEnter}
+      onMouseLeave={onHoverLeave}
       onClick={onSelect}
     >
-      {/* Top row: dot + name + scores inline, Select top-right */}
+      {/* Top row */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
-        {/* Left: dot + name + scores */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: isSelected ? idColor : "rgba(67,67,43,0.20)", flexShrink: 0, transition: "background 200ms ease" }} />
-          <span style={{ fontFamily: sohne, fontWeight: 500, fontSize: 13.5, color: isSelected ? BRAND.oliveInk : "rgba(67,67,43,0.78)", letterSpacing: "-0.005em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(67,67,43,0.20)", flexShrink: 0 }} />
+          <span style={{ fontFamily: sohne, fontWeight: 500, fontSize: 13.5, color: "rgba(67,67,43,0.78)", letterSpacing: "-0.005em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {aesthetic}
           </span>
-          {/* Scores inline, right after name */}
+          {/* Delta scores against the top selected card */}
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0, marginLeft: 4 }}>
             {idDelta !== null ? (
               <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 650, color: deltaColor(idDelta), display: "flex", alignItems: "center", gap: 2 }}>
@@ -1415,28 +841,20 @@ function DirectionCard({
           </div>
         </div>
 
-        {/* Select button — top-right, hover only */}
-        {!isSelected && (
-          <span
-            style={{
-              flexShrink: 0,
-              padding: "3px 9px",
-              borderRadius: 4,
-              fontSize: 9.5,
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              background: steelBlue,
-              color: "#fff",
-              fontFamily: inter,
-              opacity: hovered ? 1 : 0,
-              transition: "opacity 150ms ease",
-              pointerEvents: "none",
-            }}
-          >
-            Select
-          </span>
-        )}
+        {/* Right: select slides in, muko's pick stays anchored to the right */}
+        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+          {/* Select button — clips to 0 width when not hovered */}
+          <div style={{ overflow: "hidden", maxWidth: isHovered ? "80px" : "0px", opacity: isHovered ? 1 : 0, transition: "max-width 180ms ease, opacity 150ms ease", marginRight: isHovered && isMukosPick ? 6 : 0 }}>
+            <span style={{ display: "block", whiteSpace: "nowrap", padding: "4px 11px", borderRadius: 999, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em", border: `1px solid ${chartreuse}`, background: "transparent", color: chartreuse, fontFamily: inter, pointerEvents: "none" }}>
+              Select
+            </span>
+          </div>
+          {isMukosPick && (
+            <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", background: "rgba(169,123,143,0.10)", border: `1px solid rgba(169,123,143,0.30)`, color: BRAND.rose, fontFamily: inter, whiteSpace: "nowrap" }}>
+              Muko&apos;s Pick
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Description */}
@@ -1446,66 +864,38 @@ function DirectionCard({
         </div>
       )}
 
-      {/* Chips — muted no-fill */}
+      {/* Chips */}
       {chips.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 5, paddingLeft: 12 }}>
           {chips.map((chip) => (
-            <span
-              key={chip.label}
-              style={{
-                padding: "3px 8px",
-                borderRadius: 999,
-                fontSize: 10.5,
-                fontWeight: 500,
-                background: "transparent",
-                border: "1px solid rgba(67,67,43,0.14)",
-                color: "rgba(67,67,43,0.46)",
-                fontFamily: inter,
-              }}
-            >
+            <span key={chip.label} style={{ padding: "3px 8px", borderRadius: 999, fontSize: 10.5, fontWeight: 500, background: "transparent", border: "1px solid rgba(67,67,43,0.14)", color: "rgba(67,67,43,0.46)", fontFamily: inter }}>
               {chip.label}
             </span>
           ))}
         </div>
       )}
+
+      {/* Moodboard — reveals on hover */}
+      <div style={{ maxHeight: isHovered ? "1200px" : "0", overflow: "hidden", transition: "max-height 220ms ease" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 10 }}>
+          {moodboardImages.map((src, i) => (
+            <div key={`mb-${aesthetic}-${i}`} style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", opacity: isHovered ? 1 : 0, transition: `opacity 180ms ease ${i * 20}ms` }}>
+              <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} loading="lazy" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
-/* ─── SharpenRow sub-component ────────────────────────────────────────────── */
+/* ─── SharpenRow ──────────────────────────────────────────────────────────── */
 function SharpenRow({ label, onAdd, inter, steelBlue }: { label: string; onAdd: () => void; inter: string; steelBlue: string }) {
   const [hovered, setHovered] = useState(false);
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "10px 12px",
-        borderRadius: 6,
-        border: `1px dashed ${hovered ? steelBlue : "rgba(67,67,43,0.16)"}`,
-        marginBottom: 6,
-        transition: "border-color 150ms ease",
-        cursor: "pointer",
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={onAdd}
-    >
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 6, border: `1px dashed ${hovered ? steelBlue : "rgba(67,67,43,0.16)"}`, marginBottom: 6, transition: "border-color 150ms ease", cursor: "pointer" }} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={onAdd}>
       <span style={{ fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.65)" }}>{label}</span>
-      <span
-        style={{
-          fontFamily: inter,
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: "0.08em",
-          color: steelBlue,
-          opacity: hovered ? 1 : 0.6,
-          transition: "opacity 150ms ease",
-        }}
-      >
-        ADD
-      </span>
+      <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: steelBlue, opacity: hovered ? 1 : 0.6, transition: "opacity 150ms ease" }}>ADD</span>
     </div>
   );
 }
