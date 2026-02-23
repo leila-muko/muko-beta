@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import keywordsData from '@/data/keywords.json';
+import { BRAND } from '@/lib/concept-studio/constants';
+
+const OLIVE = BRAND.oliveInk;
+const STEEL = BRAND.steelBlue;
+const CHARTREUSE = '#A8B475';
+const inter = 'var(--font-inter), system-ui, sans-serif';
+const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
 
 interface StepProps {
   value: string[];
@@ -10,31 +17,20 @@ interface StepProps {
 }
 
 export default function Step2Keywords({ value, onChange, onTensionContextChange }: StepProps) {
-  const BRAND = {
-    oliveInk: '#43432B',
-    rose: '#A97B8F',
-    steelBlue: '#7D96AC',
-    chartreuse: '#ABAB63',
-  };
-
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [detectedConflict, setDetectedConflict] = useState<string[] | null>(null);
-  const [resolvedConflicts, setResolvedConflicts] = useState<Set<string>>(new Set()); // Track resolved conflicts
+  const [resolvedConflicts, setResolvedConflicts] = useState<Set<string>>(new Set());
 
-  // Create a unique key for a conflict pair
   const getConflictKey = (word1: string, word2: string) => {
     return [word1, word2].sort().join('|');
   };
 
-  // Check if selecting a keyword would create a NEW unresolved conflict
   const checkForConflicts = (keyword: string, currentKeywords: string[]) => {
     const allKeywords = [...currentKeywords, keyword];
-    
     for (const conflict of keywordsData.conflicts) {
       const [word1, word2] = conflict;
       if (allKeywords.includes(word1) && allKeywords.includes(word2)) {
         const conflictKey = getConflictKey(word1, word2);
-        // Only return conflict if it hasn't been resolved yet
         if (!resolvedConflicts.has(conflictKey)) {
           return [word1, word2];
         }
@@ -45,18 +41,14 @@ export default function Step2Keywords({ value, onChange, onTensionContextChange 
 
   const handleKeywordToggle = (keyword: string) => {
     if (value.includes(keyword)) {
-      // Remove keyword
-      onChange(value.filter(k => k !== keyword));
+      onChange(value.filter((k) => k !== keyword));
     } else {
-      // Check for conflicts before adding
       const conflict = checkForConflicts(keyword, value);
       if (conflict) {
         setDetectedConflict(conflict);
         setShowConflictModal(true);
-        // Still add the keyword - they'll resolve the conflict
         onChange([...value, keyword]);
       } else {
-        // No conflict, just add
         onChange([...value, keyword]);
       }
     }
@@ -64,9 +56,8 @@ export default function Step2Keywords({ value, onChange, onTensionContextChange 
 
   const handleConflictResolved = (tensionContext: string) => {
     if (detectedConflict) {
-      // Mark this specific conflict as resolved
       const conflictKey = getConflictKey(detectedConflict[0], detectedConflict[1]);
-      setResolvedConflicts(prev => new Set(prev).add(conflictKey));
+      setResolvedConflicts((prev) => new Set(prev).add(conflictKey));
     }
     onTensionContextChange(tensionContext);
     setShowConflictModal(false);
@@ -80,113 +71,61 @@ export default function Step2Keywords({ value, onChange, onTensionContextChange 
 
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
-        {/* Label */}
-        <div style={{ textAlign: 'center' }}>
-          <label
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+        {/* Section header */}
+        <div>
+          <div
             style={{
-              display: 'block',
-              fontSize: '11px',
+              fontFamily: sohne,
+              fontSize: 15,
               fontWeight: 500,
-              color: 'rgba(67, 67, 43, 0.50)',
-              marginBottom: '12px',
-              letterSpacing: '0.10em',
-              textTransform: 'uppercase',
-              fontFamily: 'var(--font-inter), system-ui, sans-serif',
+              color: OLIVE,
+              marginBottom: 6,
             }}
           >
             Select your brand DNA keywords
-          </label>
-          <p
+          </div>
+          <div
             style={{
-              fontSize: '14px',
-              color: 'rgba(67, 67, 43, 0.50)',
-              fontFamily: 'var(--font-inter), system-ui, sans-serif',
+              fontFamily: inter,
+              fontSize: 12,
+              fontStyle: 'italic',
+              color: 'rgba(67,67,43,0.44)',
             }}
           >
-            Choose 3-8 keywords that best describe your brand
-          </p>
+            Choose 3-8 keywords that best describe your brand.
+          </div>
         </div>
 
         {/* Keywords by category */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           {categories.map((category) => (
             <div key={category.name}>
               {/* Category label */}
               <div
                 style={{
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  color: 'rgba(67, 67, 43, 0.45)',
-                  letterSpacing: '0.08em',
+                  fontFamily: inter,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: '0.12em',
                   textTransform: 'uppercase',
-                  fontFamily: 'var(--font-inter), system-ui, sans-serif',
-                  marginBottom: '16px',
+                  color: 'rgba(67,67,43,0.38)',
+                  marginBottom: 12,
                 }}
               >
                 {category.name}
               </div>
 
               {/* Keyword chips */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '10px',
-                }}
-              >
-                {category.keywords.map((keyword) => {
-                  const isSelected = value.includes(keyword);
-
-                  return (
-                    <button
-                      key={keyword}
-                      onClick={() => handleKeywordToggle(keyword)}
-                      style={{
-                        padding: '12px 24px',
-                        fontSize: '15px',
-                        fontWeight: isSelected ? 520 : 400,
-                        color: isSelected ? BRAND.oliveInk : 'rgba(67, 67, 43, 0.65)',
-                        backgroundColor: isSelected
-                          ? 'rgba(125, 150, 172, 0.25)'
-                          : 'rgba(255, 255, 255, 0.55)',
-                        backdropFilter: 'blur(8px)',
-                        WebkitBackdropFilter: 'blur(8px)',
-                        border: isSelected
-                          ? '1px solid rgba(125, 150, 172, 0.35)'
-                          : '1px solid rgba(67, 67, 43, 0.15)',
-                        borderRadius: '999px',
-                        cursor: 'pointer',
-                        fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
-                        transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
-                        boxShadow: isSelected
-                          ? '0 4px 16px rgba(125, 150, 172, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.40)'
-                          : '0 2px 8px rgba(67, 67, 43, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.60)',
-                        transform: isSelected ? 'translateY(-1px)' : 'translateY(0)',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.backgroundColor = 'rgba(125, 150, 172, 0.15)';
-                          e.currentTarget.style.borderColor = 'rgba(125, 150, 172, 0.25)';
-                          e.currentTarget.style.transform = 'translateY(-1px)';
-                          e.currentTarget.style.boxShadow =
-                            '0 4px 16px rgba(125, 150, 172, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.60)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.55)';
-                          e.currentTarget.style.borderColor = 'rgba(67, 67, 43, 0.15)';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow =
-                            '0 2px 8px rgba(67, 67, 43, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.60)';
-                        }
-                      }}
-                    >
-                      {keyword}
-                    </button>
-                  );
-                })}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {category.keywords.map((keyword) => (
+                  <KeywordChip
+                    key={keyword}
+                    label={keyword}
+                    selected={value.includes(keyword)}
+                    onClick={() => handleKeywordToggle(keyword)}
+                  />
+                ))}
               </div>
             </div>
           ))}
@@ -196,10 +135,10 @@ export default function Step2Keywords({ value, onChange, onTensionContextChange 
         {value.length > 0 && (
           <div
             style={{
-              fontSize: '14px',
-              color: 'rgba(67, 67, 43, 0.50)',
-              fontFamily: 'var(--font-inter), system-ui, sans-serif',
-              textAlign: 'center',
+              fontSize: 12.5,
+              color: 'rgba(67,67,43,0.52)',
+              fontFamily: inter,
+              lineHeight: 1.6,
             }}
           >
             {value.length} keyword{value.length !== 1 ? 's' : ''} selected
@@ -219,7 +158,54 @@ export default function Step2Keywords({ value, onChange, onTensionContextChange 
   );
 }
 
-// Conflict Modal Component (keep the same)
+/* ─── KeywordChip ────────────────────────────────────────────────────────── */
+function KeywordChip({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: '9px 18px',
+        fontSize: 13,
+        fontWeight: selected ? 600 : 500,
+        color: selected ? OLIVE : hovered ? 'rgba(67,67,43,0.72)' : 'rgba(67,67,43,0.58)',
+        backgroundColor: selected
+          ? 'rgba(168,180,117,0.12)'
+          : hovered
+          ? 'rgba(255,255,255,0.90)'
+          : 'rgba(255,255,255,0.75)',
+        border: selected
+          ? `1.5px solid ${CHARTREUSE}`
+          : hovered
+          ? '1.5px solid rgba(67,67,43,0.18)'
+          : '1.5px solid rgba(67,67,43,0.10)',
+        borderRadius: 999,
+        cursor: 'pointer',
+        fontFamily: sohne,
+        letterSpacing: '0.01em',
+        transition: 'all 200ms ease',
+        boxShadow: selected ? '0 2px 8px rgba(168,180,117,0.12)' : '0 2px 8px rgba(0,0,0,0.04)',
+        transform: selected ? 'translateY(-1px)' : 'translateY(0)',
+        outline: 'none',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+/* ─── ConflictModal ──────────────────────────────────────────────────────── */
 interface ConflictModalProps {
   conflict: string[];
   onClose: () => void;
@@ -227,12 +213,6 @@ interface ConflictModalProps {
 }
 
 function ConflictModal({ conflict, onClose, onConfirm }: ConflictModalProps) {
-  const BRAND = {
-    oliveInk: '#43432B',
-    rose: '#A97B8F',
-    steelBlue: '#7D96AC',
-  };
-
   const [selected, setSelected] = useState<string | null>(null);
 
   const resolutionOptions = [
@@ -264,55 +244,53 @@ function ConflictModal({ conflict, onClose, onConfirm }: ConflictModalProps) {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(25, 25, 25, 0.40)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        backgroundColor: 'rgba(250,249,246,0.80)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
-        padding: '24px',
+        padding: 24,
       }}
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: '24px',
-          padding: '48px',
-          maxWidth: '560px',
+          backgroundColor: 'rgba(255,255,255,0.98)',
+          borderRadius: 10,
+          padding: '32px 36px',
+          maxWidth: 480,
           width: '100%',
-          boxShadow: '0 24px 80px rgba(67, 67, 43, 0.20)',
-          border: '1px solid rgba(67, 67, 43, 0.10)',
+          boxShadow: '0 12px 48px rgba(67,67,43,0.12)',
+          border: '1px solid rgba(67,67,43,0.09)',
         }}
       >
-        {/* Warning icon */}
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        {/* Header */}
+        <div style={{ marginBottom: 24 }}>
           <div
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              backgroundColor: 'rgba(169, 123, 143, 0.12)',
-              marginBottom: '16px',
+              fontFamily: inter,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: BRAND.rose,
+              marginBottom: 10,
             }}
           >
-            <span style={{ fontSize: '28px' }}>⚠️</span>
+            TENSION DETECTED
           </div>
 
           <h3
             style={{
-              fontSize: '22px',
-              fontWeight: 520,
-              color: BRAND.oliveInk,
-              fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
-              marginBottom: '8px',
+              fontSize: 18,
+              fontWeight: 500,
+              color: OLIVE,
+              fontFamily: sohne,
+              margin: '0 0 8px 0',
+              letterSpacing: '-0.01em',
             }}
           >
             Heads up
@@ -320,111 +298,60 @@ function ConflictModal({ conflict, onClose, onConfirm }: ConflictModalProps) {
 
           <p
             style={{
-              fontSize: '15px',
-              color: 'rgba(67, 67, 43, 0.65)',
-              fontFamily: 'var(--font-inter), system-ui, sans-serif',
+              fontSize: 13,
+              color: 'rgba(67,67,43,0.58)',
+              fontFamily: inter,
               lineHeight: 1.6,
+              margin: 0,
             }}
           >
-            <span style={{ fontWeight: 600 }}>{conflict[0]}</span> and{' '}
-            <span style={{ fontWeight: 600 }}>{conflict[1]}</span> can create tension.
+            <span style={{ fontWeight: 600, color: OLIVE }}>{conflict[0]}</span> and{' '}
+            <span style={{ fontWeight: 600, color: OLIVE }}>{conflict[1]}</span> can create
+            tension. How do you want to resolve it?
           </p>
         </div>
 
-        {/* Question */}
-        <div
-          style={{
-            fontSize: '14px',
-            fontWeight: 500,
-            color: 'rgba(67, 67, 43, 0.60)',
-            fontFamily: 'var(--font-inter), system-ui, sans-serif',
-            marginBottom: '20px',
-            textAlign: 'center',
-          }}
-        >
-          Are you:
-        </div>
-
         {/* Options */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
-          {resolutionOptions.map((option) => (
-            <button
-              key={option.id}
-              onClick={() => setSelected(option.id)}
-              style={{
-                padding: '16px 20px',
-                textAlign: 'left',
-                backgroundColor: selected === option.id
-                  ? 'rgba(125, 150, 172, 0.15)'
-                  : 'rgba(255, 255, 255, 0.60)',
-                border: selected === option.id
-                  ? '1.5px solid rgba(125, 150, 172, 0.35)'
-                  : '1.5px solid rgba(67, 67, 43, 0.12)',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                transition: 'all 200ms ease',
-                fontFamily: 'var(--font-inter), system-ui, sans-serif',
-              }}
-              onMouseEnter={(e) => {
-                if (selected !== option.id) {
-                  e.currentTarget.style.backgroundColor = 'rgba(125, 150, 172, 0.08)';
-                  e.currentTarget.style.borderColor = 'rgba(125, 150, 172, 0.20)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (selected !== option.id) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.60)';
-                  e.currentTarget.style.borderColor = 'rgba(67, 67, 43, 0.12)';
-                }
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '15px',
-                  fontWeight: 500,
-                  color: BRAND.oliveInk,
-                  marginBottom: '4px',
-                }}
-              >
-                {option.label}
-              </div>
-              <div
-                style={{
-                  fontSize: '13px',
-                  color: 'rgba(67, 67, 43, 0.55)',
-                }}
-              >
-                {option.description}
-              </div>
-            </button>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
+          {resolutionOptions.map((option) => {
+            const active = selected === option.id;
+            return (
+              <ModalOption
+                key={option.id}
+                label={option.label}
+                description={option.description}
+                active={active}
+                onClick={() => setSelected(option.id)}
+              />
+            );
+          })}
         </div>
 
         {/* Actions */}
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: 10 }}>
           <button
             onClick={onClose}
             style={{
               flex: 1,
-              padding: '14px 24px',
-              fontSize: '14px',
+              padding: '11px 20px',
+              fontSize: 12,
               fontWeight: 600,
-              color: 'rgba(67, 67, 43, 0.65)',
+              color: 'rgba(67,67,43,0.62)',
               backgroundColor: 'transparent',
-              border: '1.5px solid rgba(67, 67, 43, 0.20)',
-              borderRadius: '999px',
+              border: '1px solid rgba(67,67,43,0.14)',
+              borderRadius: 999,
               cursor: 'pointer',
-              fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
-              letterSpacing: '0.05em',
+              fontFamily: sohne,
+              letterSpacing: '0.01em',
               transition: 'all 200ms ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(67, 67, 43, 0.04)';
-              e.currentTarget.style.borderColor = 'rgba(67, 67, 43, 0.30)';
+              e.currentTarget.style.backgroundColor = 'rgba(67,67,43,0.04)';
+              e.currentTarget.style.borderColor = 'rgba(67,67,43,0.22)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.borderColor = 'rgba(67, 67, 43, 0.20)';
+              e.currentTarget.style.borderColor = 'rgba(67,67,43,0.14)';
             }}
           >
             Cancel
@@ -435,32 +362,28 @@ function ConflictModal({ conflict, onClose, onConfirm }: ConflictModalProps) {
             disabled={!selected}
             style={{
               flex: 1,
-              padding: '14px 24px',
-              fontSize: '14px',
-              fontWeight: 600,
-              color: selected ? BRAND.steelBlue : 'rgba(67, 67, 43, 0.30)',
-              backgroundColor: 'rgba(255, 255, 255, 0.25)',
+              padding: '11px 20px',
+              fontSize: 12,
+              fontWeight: 700,
+              fontFamily: sohne,
+              letterSpacing: '0.02em',
+              color: selected ? STEEL : 'rgba(67,67,43,0.30)',
+              background: selected ? 'rgba(125,150,172,0.07)' : 'rgba(255,255,255,0.46)',
               border: selected
-                ? '1.5px solid rgba(125, 150, 172, 0.42)'
-                : '1.5px solid rgba(67, 67, 43, 0.12)',
-              borderRadius: '999px',
+                ? `1.5px solid ${STEEL}`
+                : '1.5px solid rgba(67,67,43,0.10)',
+              borderRadius: 10,
               cursor: selected ? 'pointer' : 'not-allowed',
-              fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
-              letterSpacing: '0.05em',
-              transition: 'all 200ms ease',
-              opacity: selected ? 1 : 0.5,
+              transition: 'all 280ms ease',
+              opacity: selected ? 1 : 0.6,
             }}
             onMouseEnter={(e) => {
-              if (selected) {
-                e.currentTarget.style.backgroundColor = 'rgba(125, 150, 172, 0.08)';
-                e.currentTarget.style.borderColor = 'rgba(125, 150, 172, 0.55)';
-              }
+              if (!selected) return;
+              e.currentTarget.style.background = 'rgba(125,150,172,0.14)';
             }}
             onMouseLeave={(e) => {
-              if (selected) {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                e.currentTarget.style.borderColor = 'rgba(125, 150, 172, 0.42)';
-              }
+              if (!selected) return;
+              e.currentTarget.style.background = 'rgba(125,150,172,0.07)';
             }}
           >
             Confirm
@@ -468,5 +391,100 @@ function ConflictModal({ conflict, onClose, onConfirm }: ConflictModalProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ─── ModalOption — matches IntentCard pattern ───────────────────────────── */
+function ModalOption({
+  label,
+  description,
+  active,
+  onClick,
+}: {
+  label: string;
+  description: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: '100%',
+        textAlign: 'left',
+        borderRadius: 8,
+        padding: '14px 16px',
+        background: active ? 'rgba(168,180,117,0.08)' : 'rgba(255,255,255,0.75)',
+        border: '1px solid rgba(67,67,43,0.09)',
+        borderLeft: active
+          ? `3px solid ${CHARTREUSE}`
+          : hovered
+          ? `3px solid ${STEEL}`
+          : '3px solid transparent',
+        cursor: 'pointer',
+        outline: 'none',
+        transition: 'all 180ms ease',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+      }}
+    >
+      {/* Radio dot */}
+      <span
+        style={{
+          width: 13,
+          height: 13,
+          borderRadius: 999,
+          border: active ? `1.5px solid ${CHARTREUSE}` : '1.5px solid rgba(67,67,43,0.22)',
+          background: active ? CHARTREUSE : 'transparent',
+          flexShrink: 0,
+          transition: 'all 150ms ease',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        aria-hidden
+      >
+        {active && (
+          <svg width="7" height="6" viewBox="0 0 7 6" fill="none">
+            <path
+              d="M1 3L2.8 4.8L6 1.5"
+              stroke="white"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </span>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: inter,
+            fontSize: 13,
+            fontWeight: 500,
+            color: active ? OLIVE : 'rgba(67,67,43,0.78)',
+          }}
+        >
+          {label}
+        </div>
+        <div
+          style={{
+            marginTop: 3,
+            fontFamily: inter,
+            fontSize: 12,
+            color: 'rgba(67,67,43,0.52)',
+            lineHeight: 1.4,
+          }}
+        >
+          {description}
+        </div>
+      </div>
+    </button>
   );
 }

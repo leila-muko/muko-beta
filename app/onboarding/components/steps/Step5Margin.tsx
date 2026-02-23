@@ -1,42 +1,55 @@
 'use client';
 
+import { BRAND } from '@/lib/concept-studio/constants';
+
+const OLIVE = BRAND.oliveInk;
+const STEEL = BRAND.steelBlue;
+const inter = 'var(--font-inter), system-ui, sans-serif';
+const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
+
 interface StepProps {
   value: number;
   onChange: (value: number) => void;
 }
 
 export default function Step5Margin({ value, onChange }: StepProps) {
-  const BRAND = {
-    oliveInk: '#43432B',
-    steelBlue: '#7D96AC',
-  };
+  const fillPercent = ((value - 40) / 35) * 100;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
-      {/* Label */}
-      <label
-        style={{
-          display: 'block',
-          fontSize: '11px',
-          fontWeight: 500,
-          color: 'rgba(67, 67, 43, 0.50)',
-          letterSpacing: '0.10em',
-          textTransform: 'uppercase',
-          fontFamily: 'var(--font-inter), system-ui, sans-serif',
-          textAlign: 'center',
-        }}
-      >
-        Target margin percentage
-      </label>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+      {/* Section header */}
+      <div>
+        <div
+          style={{
+            fontFamily: sohne,
+            fontSize: 15,
+            fontWeight: 500,
+            color: OLIVE,
+            marginBottom: 6,
+          }}
+        >
+          Target margin percentage
+        </div>
+        <div
+          style={{
+            fontFamily: inter,
+            fontSize: 12,
+            fontStyle: 'italic',
+            color: 'rgba(67,67,43,0.44)',
+          }}
+        >
+          Set the margin Muko should target when evaluating cost structures.
+        </div>
+      </div>
 
       {/* Large display */}
       <div style={{ textAlign: 'center' }}>
         <div
           style={{
-            fontSize: 'clamp(56px, 8vw, 72px)',
-            fontWeight: 400,
-            color: BRAND.oliveInk,
-            fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
+            fontSize: 'clamp(48px, 7vw, 64px)',
+            fontWeight: 500,
+            color: OLIVE,
+            fontFamily: sohne,
             letterSpacing: '-0.02em',
             lineHeight: 1,
           }}
@@ -46,7 +59,7 @@ export default function Step5Margin({ value, onChange }: StepProps) {
       </div>
 
       {/* Slider */}
-      <div style={{ paddingLeft: '24px', paddingRight: '24px' }}>
+      <div style={{ padding: '0 8px' }}>
         <input
           type="range"
           min="40"
@@ -55,49 +68,50 @@ export default function Step5Margin({ value, onChange }: StepProps) {
           onChange={(e) => onChange(Number(e.target.value))}
           style={{
             width: '100%',
-            height: '6px',
-            borderRadius: '999px',
+            height: 3,
+            borderRadius: 999,
             outline: 'none',
-            background: `linear-gradient(to right, 
-              rgba(125, 150, 172, 0.45) 0%, 
-              rgba(125, 150, 172, 0.45) ${((value - 40) / 35) * 100}%, 
-              rgba(67, 67, 43, 0.12) ${((value - 40) / 35) * 100}%, 
-              rgba(67, 67, 43, 0.12) 100%)`,
+            background: `linear-gradient(to right,
+              ${STEEL} 0%,
+              ${STEEL} ${fillPercent}%,
+              rgba(67,67,43,0.10) ${fillPercent}%,
+              rgba(67,67,43,0.10) 100%)`,
             WebkitAppearance: 'none',
             appearance: 'none',
+            cursor: 'pointer',
           }}
         />
         <style>{`
           input[type='range']::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 24px;
-            height: 24px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
-            background: rgba(125, 150, 172, 0.85);
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(125, 150, 172, 0.30);
-            transition: all 220ms ease;
+            background: #fff;
+            border: 1.5px solid rgba(125,150,172,0.85);
+            cursor: grab;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.14), 0 0 0 2px rgba(125,150,172,0.15);
+            transition: all 200ms ease;
           }
           input[type='range']::-webkit-slider-thumb:hover {
-            background: rgba(125, 150, 172, 1);
-            box-shadow: 0 6px 20px rgba(125, 150, 172, 0.45);
-            transform: scale(1.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 0 3px rgba(125,150,172,0.20);
+          }
+          input[type='range']::-webkit-slider-thumb:active {
+            cursor: grabbing;
           }
           input[type='range']::-moz-range-thumb {
-            width: 24px;
-            height: 24px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
-            background: rgba(125, 150, 172, 0.85);
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 4px 12px rgba(125, 150, 172, 0.30);
-            transition: all 220ms ease;
+            background: #fff;
+            border: 1.5px solid rgba(125,150,172,0.85);
+            cursor: grab;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.14), 0 0 0 2px rgba(125,150,172,0.15);
+            transition: all 200ms ease;
           }
           input[type='range']::-moz-range-thumb:hover {
-            background: rgba(125, 150, 172, 1);
-            box-shadow: 0 6px 20px rgba(125, 150, 172, 0.45);
-            transform: scale(1.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 0 3px rgba(125,150,172,0.20);
           }
         `}</style>
 
@@ -106,10 +120,11 @@ export default function Step5Margin({ value, onChange }: StepProps) {
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            marginTop: '12px',
-            fontSize: '12px',
-            color: 'rgba(67, 67, 43, 0.40)',
-            fontFamily: 'var(--font-inter), system-ui, sans-serif',
+            marginTop: 10,
+            fontSize: 11,
+            color: 'rgba(67,67,43,0.38)',
+            fontFamily: inter,
+            fontWeight: 600,
           }}
         >
           <span>40%</span>
@@ -120,10 +135,9 @@ export default function Step5Margin({ value, onChange }: StepProps) {
       {/* Helper text */}
       <div
         style={{
-          fontSize: '14px',
-          color: 'rgba(67, 67, 43, 0.50)',
-          fontFamily: 'var(--font-inter), system-ui, sans-serif',
-          textAlign: 'center',
+          fontSize: 12.5,
+          color: 'rgba(67,67,43,0.52)',
+          fontFamily: inter,
           lineHeight: 1.6,
         }}
       >

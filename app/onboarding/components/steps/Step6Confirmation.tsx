@@ -1,5 +1,12 @@
 'use client';
 
+import { BRAND } from '@/lib/concept-studio/constants';
+
+const OLIVE = BRAND.oliveInk;
+const CHARTREUSE = '#A8B475';
+const inter = 'var(--font-inter), system-ui, sans-serif';
+const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
+
 interface StepProps {
   formData: {
     brandName: string;
@@ -11,11 +18,6 @@ interface StepProps {
 }
 
 export default function Step6Confirmation({ formData }: StepProps) {
-  const BRAND = {
-    oliveInk: '#43432B',
-    rose: '#A97B8F',
-  };
-
   const priceTierLabels: Record<string, string> = {
     Accessible: 'Accessible ($50-100)',
     Contemporary: 'Contemporary ($100-300)',
@@ -27,95 +29,119 @@ export default function Step6Confirmation({ formData }: StepProps) {
     {
       label: 'Brand Name',
       value: formData.brandName || 'Not provided',
+      filled: !!formData.brandName,
     },
     {
       label: 'Brand DNA Keywords',
       value: formData.keywords.length > 0 ? formData.keywords.join(', ') : 'None selected',
+      filled: formData.keywords.length > 0,
     },
     {
       label: 'Customer Profile',
       value: formData.customerProfile || 'Not provided',
+      filled: !!formData.customerProfile,
     },
     {
       label: 'Price Tier',
       value: formData.priceTier ? priceTierLabels[formData.priceTier] : 'Not selected',
+      filled: !!formData.priceTier,
     },
     {
       label: 'Target Margin',
       value: `${formData.targetMargin}%`,
+      filled: true,
     },
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-      {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-        <h3
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Section header */}
+      <div>
+        <div
           style={{
-            fontSize: 'clamp(20px, 2.5vw, 24px)',
-            fontWeight: 520,
-            color: BRAND.oliveInk,
-            fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
-            marginBottom: '8px',
+            fontFamily: sohne,
+            fontSize: 15,
+            fontWeight: 500,
+            color: OLIVE,
+            marginBottom: 6,
           }}
         >
           Review your profile
-        </h3>
-        <p
+        </div>
+        <div
           style={{
-            fontSize: '14px',
-            color: 'rgba(67, 67, 43, 0.50)',
-            fontFamily: 'var(--font-inter), system-ui, sans-serif',
+            fontFamily: inter,
+            fontSize: 12,
+            fontStyle: 'italic',
+            color: 'rgba(67,67,43,0.44)',
           }}
         >
           Make sure everything looks correct before continuing.
-        </p>
+        </div>
       </div>
 
       {/* Summary card */}
       <div
         style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.62)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          border: '1px solid rgba(67, 67, 43, 0.10)',
-          borderRadius: '24px',
-          padding: 'clamp(28px, 3.5vw, 40px)',
-          boxShadow: '0 12px 44px rgba(67, 67, 43, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.90)',
+          borderRadius: 10,
+          border: '1px solid rgba(67,67,43,0.09)',
+          background: 'rgba(255,255,255,0.75)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+          overflow: 'hidden',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           {fields.map((field, index) => (
             <div
               key={index}
               style={{
-                paddingBottom: index < fields.length - 1 ? '28px' : '0',
-                borderBottom: index < fields.length - 1 ? '1px solid rgba(67, 67, 43, 0.08)' : 'none',
+                padding: '18px 22px',
+                borderBottom:
+                  index < fields.length - 1 ? '1px solid rgba(67,67,43,0.07)' : 'none',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
               }}
             >
-              <div
+              {/* Status dot */}
+              <span
                 style={{
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  color: 'rgba(67, 67, 43, 0.45)',
-                  letterSpacing: '0.10em',
-                  textTransform: 'uppercase',
-                  fontFamily: 'var(--font-inter), system-ui, sans-serif',
-                  marginBottom: '8px',
+                  width: 7,
+                  height: 7,
+                  borderRadius: 999,
+                  background: field.filled ? CHARTREUSE : 'rgba(67,67,43,0.18)',
+                  flexShrink: 0,
+                  marginTop: 5,
+                  transition: 'background 250ms ease',
+                  boxShadow: field.filled ? '0 0 0 3px rgba(168,180,117,0.18)' : 'none',
                 }}
-              >
-                {field.label}
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(15px, 1.8vw, 17px)',
-                  fontWeight: 400,
-                  color: BRAND.oliveInk,
-                  fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
-                  lineHeight: 1.5,
-                }}
-              >
-                {field.value}
+              />
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(67,67,43,0.38)',
+                    marginBottom: 5,
+                  }}
+                >
+                  {field.label}
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: field.filled ? OLIVE : 'rgba(67,67,43,0.42)',
+                    fontFamily: inter,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {field.value}
+                </div>
               </div>
             </div>
           ))}
@@ -125,10 +151,9 @@ export default function Step6Confirmation({ formData }: StepProps) {
       {/* Note */}
       <div
         style={{
-          fontSize: '13px',
-          color: 'rgba(67, 67, 43, 0.45)',
-          fontFamily: 'var(--font-inter), system-ui, sans-serif',
-          textAlign: 'center',
+          fontSize: 12,
+          color: 'rgba(67,67,43,0.42)',
+          fontFamily: inter,
           lineHeight: 1.6,
         }}
       >

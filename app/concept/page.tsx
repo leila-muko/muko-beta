@@ -461,7 +461,7 @@ export default function ConceptStudioPage() {
           <div style={{ padding: "36px 44px 24px" }}>
             <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 28, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1 }}>Concept Studio</h1>
             <p style={{ margin: "10px 0 0", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.52)", lineHeight: 1.55, maxWidth: 460 }}>
-              Choose a direction, refine it in your own words — we'll interpret identity and resonance in real time, guided by Muko Insight.
+              We analyzed your brand DNA against live market data to find your strongest direction. Start with our pick or explore all eight below.
             </p>
           </div>
 

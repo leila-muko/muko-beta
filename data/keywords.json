@@ -2,7 +2,8 @@
     "aesthetic": [
       "Minimalist", "Maximalist", "Romantic", "Edgy", "Sporty",
       "Bohemian", "Preppy", "Grunge", "Western", "Coastal",
-      "Urban", "Rustic", "Gothic", "Feminine", "Masculine"
+      "Urban", "Rustic", "Gothic", "Feminine", "Masculine",
+      "Formal", "Casual", "Classic"
     ],
     "values": [
       "Sustainable", "Luxe", "Accessible", "Innovative",
@@ -11,7 +12,7 @@
     ],
     "mood": [
       "Moody", "Serene", "Bold", "Rebellious",
-      "Soft", "Dramatic", "Minimalist", "Vibrant"
+      "Soft", "Dramatic", "Vibrant"
     ],
     "conflicts": [
       ["Minimalist", "Maximalist"],

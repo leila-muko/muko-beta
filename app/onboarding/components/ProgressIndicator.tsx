@@ -5,26 +5,30 @@ interface ProgressIndicatorProps {
   totalSteps: number;
 }
 
+const CHARTREUSE = '#A8B475';
+const STEEL = '#7D96AC';
+
 export default function ProgressIndicator({ currentStep, totalSteps }: ProgressIndicatorProps) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => {
         const isCompleted = step < currentStep;
         const isCurrent = step === currentStep;
-        const isFuture = step > currentStep;
 
         return (
           <div
             key={step}
             style={{
-              width: isCurrent ? '48px' : '32px',
-              height: '4px',
-              borderRadius: '999px',
-              background: isCompleted || isCurrent
-                ? 'rgba(125, 150, 172, 0.65)'
-                : 'rgba(67, 67, 43, 0.12)',
+              width: isCurrent ? 40 : 24,
+              height: 3,
+              borderRadius: 999,
+              background: isCompleted
+                ? CHARTREUSE
+                : isCurrent
+                ? STEEL
+                : 'rgba(67,67,43,0.10)',
               transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)',
-              opacity: isCompleted ? 1 : isCurrent ? 0.85 : 0.4,
+              opacity: isCompleted ? 0.85 : isCurrent ? 1 : 0.5,
             }}
           />
         );
