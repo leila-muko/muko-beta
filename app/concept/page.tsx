@@ -17,6 +17,9 @@ import {
 } from "../../lib/concept-studio/utils";
 import AskMuko from "@/components/AskMuko";
 import aestheticsData from "@/data/aesthetics.json";
+import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
+import { PulseScoreRow } from "@/components/ui/PulseScoreRow";
+import { MukoInsightSection } from "@/components/ui/MukoInsightSection";
 
 /* ─── Pulse icons ─────────────────────────────────────────────────────────── */
 function IconIdentity({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
@@ -83,6 +86,69 @@ function getAestheticChips(aestheticName: string): AestheticChip[] {
   return entry?.chips ?? [];
 }
 
+/* ─── Universal silhouettes ──────────────────────────────────────────────── */
+const CONCEPT_SILHOUETTES = [
+  { id: "straight", name: "Straight", descriptor: "Clean lines, no distraction — lets the fabric carry the concept" },
+  { id: "relaxed", name: "Relaxed", descriptor: "Ease with intention — comfort-forward without losing editorial quality" },
+  { id: "structured", name: "Structured", descriptor: "Architectural precision — construction and shape are the design" },
+  { id: "oversized", name: "Oversized", descriptor: "Statement through scale — confident volume that commands space" },
+] as const;
+
+/* ─── Silhouette icons for concept cards ─────────────────────────────────── */
+const SILHOUETTE_ICONS: Record<string, React.ReactNode> = {
+  straight: (
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none">
+      <rect x="6" y="1" width="8" height="22" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+    </svg>
+  ),
+  relaxed: (
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none">
+      <path d="M7 1h6l2 22H5L7 1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  structured: (
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none">
+      <path d="M3 1h14l-1 8-3 3 3 3 1 8H3l1-8 3-3-3-3-1-8z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  oversized: (
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none">
+      <path d="M1 1h18v19a2 2 0 01-2 2H3a2 2 0 01-2-2V1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+    </svg>
+  ),
+};
+
+/* ─── Silhouette keyword map for scoring ─────────────────────────────────── */
+const SILHOUETTE_KEYWORD_MAP: Record<string, string[]> = {
+  straight: ["minimalist", "clean", "structured", "timeless", "architectural", "restrained"],
+  relaxed: ["bohemian", "casual", "effortless", "soft", "romantic", "natural"],
+  structured: ["architectural", "tailored", "sophisticated", "premium", "intentional", "refined"],
+  oversized: ["bold", "rebellious", "deconstructed", "nonchalant", "dramatic", "edgy"],
+};
+
+/* ─── Palette keyword map for scoring ────────────────────────────────────── */
+const PALETTE_KEYWORD_MAP: Record<string, string[]> = {
+  cool_mineral: ["minimalist", "sophisticated", "moody", "urban", "restrained", "architectural"],
+  warm_neutrals: ["timeless", "grounded", "tactile", "natural", "soft", "artisanal"],
+  earth_tones: ["rustic", "sustainable", "natural", "grounded", "functional", "raw"],
+  muted_pastels: ["romantic", "soft", "feminine", "playful", "nostalgic", "sweet"],
+  high_contrast: ["bold", "dramatic", "edgy", "rebellious", "maximalist", "expressive"],
+  tonal_darks: ["moody", "urban", "grunge", "protective", "utilitarian", "deconstructed"],
+};
+
+/* ─── Aesthetic data type with new fields ────────────────────────────────── */
+interface AestheticDataEntry {
+  id: string;
+  name: string;
+  trend_velocity: string;
+  saturation_score: number;
+  keywords: string[];
+  silhouette_affinity?: string[];
+  palette_affinity?: string[];
+  palette_options?: Array<{ id: string; name: string; swatches: string[]; descriptor: string }>;
+  chips: AestheticChip[];
+}
+
 /* ─── Free-form aesthetic matcher ─────────────────────────────────────────── */
 function matchFreeFormToAesthetic(input: string): string | null {
   if (!input.trim() || input.trim().length < 2) return null;
@@ -141,6 +207,45 @@ function getResonanceStatus(score: number | undefined, velocity?: string): { lab
   if (score >= 80) return { label: "Growing", color: PULSE_GREEN, sublabel: "Strong market pull" };
   if (score >= 65) return { label: "Growing", color: PULSE_YELLOW, sublabel: "Early momentum building" };
   return { label: "Saturated", color: PULSE_RED, sublabel: "Market is crowded" };
+}
+
+/* ─── Aesthetic chip button (hover + selected states) ─────────────────────── */
+function AestheticChipButton({ label, isActive, isClickable, onClick }: { label: string; isActive: boolean; isClickable: boolean; onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const inter = "var(--font-inter), system-ui, sans-serif";
+  return (
+    <span
+      onClick={isClickable ? onClick : undefined}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: "4px 10px",
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 500,
+        fontFamily: inter,
+        cursor: isClickable ? "pointer" : "default",
+        background: isActive
+          ? "rgba(125,150,172,0.08)"
+          : hovered && isClickable
+            ? "rgba(125,150,172,0.05)"
+            : "transparent",
+        border: isActive
+          ? "1px solid rgba(125,150,172,0.55)"
+          : hovered && isClickable
+            ? "1px solid rgba(125,150,172,0.35)"
+            : "1px solid rgba(67,67,43,0.18)",
+        color: isActive
+          ? "#7D96AC"
+          : hovered && isClickable
+            ? "rgba(125,150,172,0.80)"
+            : "rgba(67,67,43,0.52)",
+        transition: "all 150ms ease",
+      }}
+    >
+      {label}
+    </span>
+  );
 }
 
 /* ─── Direction insight ───────────────────────────────────────────────────── */
@@ -242,6 +347,10 @@ export default function ConceptStudioPage() {
     conceptLocked,
     lockConcept,
     setCurrentStep,
+    conceptSilhouette,
+    setConceptSilhouette,
+    conceptPalette,
+    setConceptPalette,
   } = useSessionStore();
 
   const [headerCollectionName, setHeaderCollectionName] = useState<string>("Collection");
@@ -288,6 +397,25 @@ export default function ConceptStudioPage() {
     setSelectedElements((prev) => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
   };
 
+  const removeElement = (chip: string) => {
+    if (!selectedAesthetic) return;
+    setSelectedElements((prev) => {
+      const next = new Set(prev);
+      next.delete(`${selectedAesthetic}::${chip}`);
+      return next;
+    });
+  };
+
+  const addedChipLabels = useMemo(() => {
+    if (!selectedAesthetic) return new Set<string>();
+    const prefix = `${selectedAesthetic}::`;
+    const rawLabels = new Set<string>();
+    selectedElements.forEach((key) => {
+      if (key.startsWith(prefix)) rawLabels.add(key.replace(prefix, ""));
+    });
+    return rawLabels;
+  }, [selectedAesthetic, selectedElements]);
+
   const yourConceptRef = useRef<HTMLDivElement>(null);
   const [freeFormDraft, setFreeFormDraft] = useState("");
   const [freeFormMatch, setFreeFormMatch] = useState<string | null>(null);
@@ -329,10 +457,70 @@ export default function ConceptStudioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ─── Recalculate pulse when silhouette/palette changes ───────────────────
+  useEffect(() => {
+    if (!selectedAesthetic || !identityPulse) return;
+    const base = AESTHETIC_CONTENT[selectedAesthetic];
+    const baseIdentity = base?.identityScore ?? 80;
+    const baseResonance = base?.resonanceScore ?? 75;
+    const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
+      (a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-")
+    );
+    const silAffinity = entry?.silhouette_affinity ?? [];
+    const palAffinity = entry?.palette_affinity ?? [];
+    const keywords = entry?.keywords?.map((k) => k.toLowerCase()) ?? [];
+
+    let idMod = 0;
+    let resMod = 0;
+
+    // Silhouette scoring
+    if (conceptSilhouette) {
+      const silKeywords = SILHOUETTE_KEYWORD_MAP[conceptSilhouette] ?? [];
+      const silOverlap = silKeywords.filter((k) => keywords.includes(k)).length;
+      if (silAffinity.includes(conceptSilhouette)) {
+        idMod += 5;
+      } else {
+        idMod -= 3;
+      }
+      resMod += silOverlap >= 2 ? 3 : silOverlap >= 1 ? 1 : -1;
+    }
+
+    // Palette scoring
+    if (conceptPalette) {
+      const palKeywords = PALETTE_KEYWORD_MAP[conceptPalette] ?? [];
+      const palOverlap = palKeywords.filter((k) => keywords.includes(k)).length;
+      if (palAffinity.includes(conceptPalette)) {
+        idMod += 5;
+      } else {
+        idMod -= 3;
+      }
+      resMod += palOverlap >= 2 ? 3 : palOverlap >= 1 ? 1 : -1;
+    }
+
+    const newIdentity = Math.max(0, Math.min(100, baseIdentity + idMod));
+    const newResonance = Math.max(0, Math.min(100, baseResonance + resMod));
+
+    useSessionStore.setState({
+      identityPulse: {
+        score: newIdentity,
+        status: newIdentity >= 80 ? "green" : newIdentity >= 60 ? "yellow" : "red",
+        message: newIdentity >= 80 ? "Strong alignment" : newIdentity >= 60 ? "Moderate alignment" : "Weak alignment",
+      },
+      resonancePulse: {
+        score: newResonance,
+        status: newResonance >= 80 ? "green" : newResonance >= 60 ? "yellow" : "red",
+        message: newResonance >= 80 ? "Strong opportunity" : newResonance >= 60 ? "Moderate opportunity" : "Saturated market",
+      },
+    });
+  }, [conceptSilhouette, conceptPalette, selectedAesthetic, identityPulse?.score !== undefined]);
+
   const identityScore = identityPulse?.score;
   const resonanceScore = resonancePulse?.score;
   const selectedAestheticEntry = selectedAesthetic
-    ? (aestheticsData as Array<{ id: string; name: string; trend_velocity: string; saturation_score: number }>).find((a) => a.name === selectedAesthetic)
+    ? (aestheticsData as unknown as AestheticDataEntry[]).find((a) => a.name === selectedAesthetic)
+    : null;
+  const selectedAestheticData = selectedAesthetic
+    ? (aestheticsData as unknown as AestheticDataEntry[]).find((a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-"))
     : null;
   const idStatus = getIdentityStatus(identityScore);
   const resStatus = getResonanceStatus(resonanceScore, selectedAestheticEntry?.trend_velocity);
@@ -342,6 +530,9 @@ export default function ConceptStudioPage() {
   const handleSelectAesthetic = (aesthetic: string) => {
     setSelectedElements(new Set());
     setCustomChips({});
+    // Clear silhouette/palette when aesthetic changes (affinity recommendations change)
+    setConceptSilhouette('');
+    setConceptPalette(null);
     setAestheticInput(aesthetic);
 
     // If pulse is already pre-populated (e.g. Muko's Pick on first load), just lock — don't recalculate
@@ -393,18 +584,103 @@ export default function ConceptStudioPage() {
     const ae = selectedAesthetic ?? recommendedAesthetic;
     const content = AESTHETIC_CONTENT[ae];
     const chips = getAestheticChips(ae).map((c) => c.label);
-    const entry = (aestheticsData as Array<{ id: string; name: string; trend_velocity: string }>).find((a) => a.name === ae);
-    return getDirectionInsight(ae, content?.identityScore ?? 80, content?.resonanceScore ?? 75, chips, entry?.trend_velocity ?? "peak");
-  }, [selectedAesthetic, recommendedAesthetic]);
+    const entry = (aestheticsData as unknown as AestheticDataEntry[]).find((a) => a.name === ae);
+    const base = getDirectionInsight(ae, content?.identityScore ?? 80, content?.resonanceScore ?? 75, chips, entry?.trend_velocity ?? "peak");
 
-  const sharpenChips = useMemo(() => {
-    if (!selectedAesthetic) return insightContent.sharpenChips;
-    const activeKeys = Array.from(selectedElements).filter((k) => k.startsWith(`${selectedAesthetic}::`));
-    const activeLabels = activeKeys.map((k) => k.replace(`${selectedAesthetic}::`, ""));
-    return insightContent.sharpenChips.filter((c) => !activeLabels.includes(c)).slice(0, 3);
-  }, [selectedAesthetic, selectedElements, insightContent]);
+    // Extend headline with silhouette/palette context
+    if (conceptSilhouette && selectedAesthetic) {
+      const silName = CONCEPT_SILHOUETTES.find((s) => s.id === conceptSilhouette)?.name ?? conceptSilhouette;
+      const silAffinity = entry?.silhouette_affinity ?? [];
+      const isAligned = silAffinity.includes(conceptSilhouette);
+      const silNote = isAligned
+        ? `a ${silName} silhouette reinforces the ${ae} mood`
+        : `a ${silName} silhouette adds creative tension with ${ae}`;
 
-  const canContinue = Boolean(selectedAesthetic);
+      if (conceptPalette) {
+        const palOption = entry?.palette_options?.find((p) => p.id === conceptPalette);
+        const palName = palOption?.name ?? conceptPalette;
+        base.headline = `${ae} with ${silName} proportions and ${palName} — ${silNote}.`;
+      } else {
+        base.headline = `${ae} with ${silName} proportions — ${silNote}.`;
+      }
+    }
+
+    return base;
+  }, [selectedAesthetic, recommendedAesthetic, conceptSilhouette, conceptPalette]);
+
+  const nextMoveItems = useMemo(() => {
+    const ae = selectedAesthetic ?? recommendedAesthetic;
+    const allChips = getAestheticChips(ae);
+    const labels = insightContent.sharpenChips.slice(0, 3);
+
+    // Rotating action-phrase prefixes for micro-trend chip titles
+    const chipPrefixes = [
+      (l: string) => `Layer in ${l}`,
+      (l: string) => `Consider ${l}`,
+      (l: string) => `Try ${l}`,
+    ];
+
+    // Collection-health rationale per dimension / chip type
+    const dimensionRationale: Record<string, string> = {
+      identity: "Strengthens brand alignment for this direction",
+      resonance: "Adds trend-aware commercial traction",
+      execution: "Improves build specificity and production clarity",
+    };
+    const typeRationale: Record<string, string> = {
+      spec: "Sharpens the spec language",
+      mood: "Reinforces the mood and visual tone",
+    };
+
+    const items: Array<{ label: string; rationale: string; type?: 'chip' | 'silhouette_swap' | 'palette_swap' }> = labels.map((label, idx) => {
+      const chip = allChips.find((c) => c.label === label);
+      const dim = (chip as unknown as Record<string, unknown>)?.primary_dimension as string | undefined;
+      const rationale = dim && dimensionRationale[dim]
+        ? dimensionRationale[dim]
+        : chip?.type && typeRationale[chip.type]
+          ? typeRationale[chip.type]
+          : "Adds specificity to this direction";
+      const prefix = chipPrefixes[idx % chipPrefixes.length];
+      return { label: prefix(label), rationale, type: 'chip' };
+    });
+
+    // Add silhouette swap suggestion if not aligned
+    if (selectedAesthetic && conceptSilhouette) {
+      const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
+        (a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-")
+      );
+      const silAffinity = entry?.silhouette_affinity ?? [];
+      if (!silAffinity.includes(conceptSilhouette)) {
+        const suggested = silAffinity[0];
+        if (suggested) {
+          const suggestedName = CONCEPT_SILHOUETTES.find((s) => s.id === suggested)?.name ?? suggested;
+          items.unshift({
+            label: `Swap to ${suggestedName} silhouette`,
+            rationale: `Strengthens the ${ae} proportion language`,
+            type: 'silhouette_swap',
+          });
+        }
+      }
+
+      // Add palette swap suggestion if not aligned
+      const palAffinity = entry?.palette_affinity ?? [];
+      if (conceptPalette && !palAffinity.includes(conceptPalette)) {
+        const suggestedPal = palAffinity[0];
+        if (suggestedPal) {
+          const palOption = entry?.palette_options?.find((p) => p.id === suggestedPal);
+          const palName = palOption?.name ?? suggestedPal;
+          items.unshift({
+            label: `Swap to ${palName} palette`,
+            rationale: `Better alignment with ${ae} visual language`,
+            type: 'palette_swap',
+          });
+        }
+      }
+    }
+
+    return items.slice(0, 4);
+  }, [selectedAesthetic, recommendedAesthetic, insightContent, conceptSilhouette, conceptPalette]);
+
+  const canContinue = Boolean(selectedAesthetic) && Boolean(conceptSilhouette);
   const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
   const inter = "var(--font-inter), system-ui, sans-serif";
 
@@ -452,11 +728,12 @@ export default function ConceptStudioPage() {
       </header>
 
       {/* ── Two-column body ───────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", flex: 1, paddingTop: 72, overflow: "hidden", height: "calc(100vh - 72px)" }}>
-
-        {/* ── LEFT COLUMN ──────────────────────────────────────────────────────── */}
-        <div style={{ width: "50%", height: "100%", overflowY: "auto", overflowX: "hidden" }}>
-
+      <ResizableSplitPanel
+        defaultLeftPercent={50}
+        storageKey="muko_concept_splitPanel"
+        topOffset={72}
+        leftContent={
+          <>
           {/* Title */}
           <div style={{ padding: "36px 44px 24px" }}>
             <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 28, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1 }}>Concept Studio</h1>
@@ -518,25 +795,20 @@ export default function ConceptStudioPage() {
                 </p>
               )}
 
-              {/* LAYER THESE IN */}
-              {topDisplayChips.length > 0 && (
-                <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 10 }}>
-                  Layer these in
+              {/* Chips — unselected: show directly under description */}
+              {!selectedAesthetic && topDisplayChips.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {topDisplayChips.map((chip) => (
+                    <AestheticChipButton
+                      key={chip.label}
+                      label={chip.label}
+                      isActive={false}
+                      isClickable={false}
+                      onClick={() => {}}
+                    />
+                  ))}
                 </div>
               )}
-
-              {/* Chips */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {topDisplayChips.map((chip) => {
-                  const isSpec = chip.type === "spec";
-                  return (
-                    <span key={chip.label} style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, background: isSpec ? `rgba(125,150,172,0.12)` : "transparent", border: isSpec ? `1px solid ${STEEL}` : "1px solid rgba(67,67,43,0.18)", color: isSpec ? STEEL : "rgba(67,67,43,0.52)" }}>
-                      {chip.label}
-                    </span>
-                  );
-                })}
-                <span style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, background: "transparent", border: `1px dashed ${STEEL}`, color: STEEL }}>+ add</span>
-              </div>
 
               {/* Moodboard — always visible when selected */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 14 }}>
@@ -546,6 +818,150 @@ export default function ConceptStudioPage() {
                   </div>
                 ))}
               </div>
+
+              {/* ── SHAPE YOUR DIRECTION (inside card) ── */}
+              {selectedAesthetic && (
+                <>
+                  <div style={{ height: 1, background: "rgba(67,67,43,0.10)", margin: "18px 0 16px" }} />
+                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(67,67,43,0.50)", marginBottom: 6 }}>
+                    SHAPE YOUR DIRECTION
+                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 16 }}>
+                    Complete your creative vision before moving to production specs.
+                  </div>
+
+                  {/* Silhouette selector (required) */}
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 10 }}>
+                      Silhouette <span style={{ fontWeight: 500, letterSpacing: "0.04em", textTransform: "none", color: "rgba(67,67,43,0.32)" }}>(required)</span>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+                      {CONCEPT_SILHOUETTES.map((sil) => {
+                        const isSel = conceptSilhouette === sil.id;
+                        const isAffinity = selectedAestheticData?.silhouette_affinity?.includes(sil.id) ?? false;
+                        return (
+                          <button
+                            key={sil.id}
+                            onClick={() => setConceptSilhouette(sil.id)}
+                            style={{
+                              textAlign: "left",
+                              borderRadius: 14,
+                              padding: "14px 14px 12px",
+                              background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
+                              border: isSel ? `1.5px solid ${CHARTREUSE}` : "1px solid rgba(67,67,43,0.10)",
+                              boxShadow: isSel ? "0 14px 40px rgba(67,67,43,0.10)" : "0 8px 24px rgba(67,67,43,0.05)",
+                              cursor: "pointer",
+                              outline: "none",
+                              transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+                              transform: isSel ? "translateY(-1px)" : "translateY(0)",
+                              position: "relative",
+                            }}
+                          >
+                            {isAffinity && !isSel && (
+                              <div style={{ position: "absolute", top: 8, right: 8 }}>
+                                <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(169,123,143,0.10)", border: "1px solid rgba(169,123,143,0.30)", color: BRAND.rose, fontFamily: inter, whiteSpace: "nowrap" }}>
+                                  Best fit
+                                </span>
+                              </div>
+                            )}
+                            <div style={{ fontSize: 13, marginBottom: 4, color: "rgba(67,67,43,0.35)" }}>
+                              {SILHOUETTE_ICONS[sil.id]}
+                            </div>
+                            <div style={{ fontSize: 14, fontWeight: 650, color: OLIVE, fontFamily: sohne, marginBottom: 2 }}>
+                              {sil.name}
+                            </div>
+                            <div style={{ fontSize: 11, color: "rgba(67,67,43,0.45)", fontFamily: inter, marginTop: 6, lineHeight: 1.4 }}>
+                              {sil.descriptor}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Palette selector (optional) */}
+                  {selectedAestheticData?.palette_options && selectedAestheticData.palette_options.length > 0 && (
+                    <div>
+                      <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 10 }}>
+                        Palette <span style={{ fontWeight: 500, letterSpacing: "0.04em", textTransform: "none", color: "rgba(67,67,43,0.32)" }}>(optional)</span>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+                        {selectedAestheticData.palette_options.map((pal) => {
+                          const isSel = conceptPalette === pal.id;
+                          const isAffinity = selectedAestheticData?.palette_affinity?.includes(pal.id) ?? false;
+                          return (
+                            <button
+                              key={pal.id}
+                              onClick={() => setConceptPalette(isSel ? null : pal.id)}
+                              style={{
+                                textAlign: "left",
+                                borderRadius: 14,
+                                padding: "14px 14px 12px",
+                                background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
+                                border: isSel ? `1.5px solid ${CHARTREUSE}` : "1px solid rgba(67,67,43,0.10)",
+                                boxShadow: isSel ? "0 14px 40px rgba(67,67,43,0.10)" : "0 8px 24px rgba(67,67,43,0.05)",
+                                cursor: "pointer",
+                                outline: "none",
+                                transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+                                transform: isSel ? "translateY(-1px)" : "translateY(0)",
+                                position: "relative",
+                              }}
+                            >
+                              {isAffinity && !isSel && (
+                                <div style={{ position: "absolute", top: 8, right: 8 }}>
+                                  <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(169,123,143,0.10)", border: "1px solid rgba(169,123,143,0.30)", color: BRAND.rose, fontFamily: inter, whiteSpace: "nowrap" }}>
+                                    Best fit
+                                  </span>
+                                </div>
+                              )}
+                              <div style={{ display: "flex", gap: 3, marginBottom: 8 }}>
+                                {pal.swatches.slice(0, 6).map((hex, i) => (
+                                  <div key={i} style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: hex, border: "1px solid rgba(0,0,0,0.06)" }} />
+                                ))}
+                              </div>
+                              <div style={{ fontSize: 14, fontWeight: 650, color: OLIVE, fontFamily: sohne, marginBottom: 2 }}>
+                                {pal.name}
+                              </div>
+                              <div style={{ fontSize: 11, color: "rgba(67,67,43,0.45)", fontFamily: inter, marginTop: 6, lineHeight: 1.4 }}>
+                                {pal.descriptor}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* LAYER THESE IN — selected: at bottom after palette */}
+                  {topDisplayChips.length > 0 && (
+                    <>
+                      <div style={{ height: 1, background: "rgba(67,67,43,0.07)", margin: "16px 0 14px" }} />
+                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(67,67,43,0.50)", marginBottom: 4 }}>
+                        Layer these in
+                      </div>
+                      <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 12 }}>
+                        Creative signals that shape this direction — activate the ones that feel right to amplify your vision.
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {topDisplayChips.map((chip) => {
+                          const chipKey = `${topAesthetic}::${chip.label}`;
+                          const isActive = selectedElements.has(chipKey);
+                          return (
+                            <AestheticChipButton
+                              key={chip.label}
+                              label={chip.label}
+                              isActive={isActive}
+                              isClickable={true}
+                              onClick={() => toggleElement(chipKey)}
+                            />
+                          );
+                        })}
+                        <span style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, background: "transparent", border: `1px dashed ${STEEL}`, color: STEEL }}>+ add</span>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
             </div>
 
             {/* ── EXPLORE OTHER DIRECTIONS ───────────────────────────────────────── */}
@@ -612,117 +1028,12 @@ export default function ConceptStudioPage() {
                 );
               })}
             </div>
+            {/* Spacer for sticky footer */}
+            <div style={{ height: 72 }} />
           </div>
-        </div>
 
-        {/* ── RIGHT COLUMN ─────────────────────────────────────────────────────── */}
-        <div style={{ width: "50%", height: "100%", overflowY: "auto", borderLeft: "1px solid rgba(67,67,43,0.08)", background: "rgba(250,249,246,0.60)" }}>
-          <div style={{ padding: "36px 44px 48px" }}>
-
-            {/* PULSE RAIL */}
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ fontFamily: sohne, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>Pulse</div>
-              {pulseRows.map((row) => {
-                const isExpanded = pulseExpandedRow === row.key;
-                const pillVariant = row.chip?.variant ?? "amber";
-                const PILL = {
-                  green: { bg: "rgba(77,122,86,0.10)", color: "#4D7A56", border: "rgba(77,122,86,0.20)" },
-                  amber: { bg: "rgba(155,122,58,0.10)", color: "#9B7A3A", border: "rgba(155,122,58,0.20)" },
-                  red: { bg: "rgba(138,58,58,0.10)", color: "#8A3A3A", border: "rgba(138,58,58,0.20)" },
-                };
-                const pill = PILL[pillVariant as keyof typeof PILL] || PILL.amber;
-                return (
-                  <div key={row.key} style={{ borderBottom: "1px solid rgba(67,67,43,0.07)", paddingBottom: 14, marginBottom: 14 }}>
-                    <button onClick={() => setPulseExpandedRow(isExpanded ? null : row.key)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", marginBottom: 8 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ color: row.color, opacity: 0.9 }}>{row.icon(row.color)}</span>
-                        <span style={{ fontFamily: sohne, fontWeight: 700, fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.68)" }}>{row.label}</span>
-                        {row.chip && (
-                          <span style={{ fontSize: 10, fontWeight: 600, fontFamily: inter, color: pill.color, background: pill.bg, border: `1px solid ${pill.border}`, borderRadius: 999, padding: "2px 8px" }}>
-                            {row.chip.status}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontFamily: sohne, fontSize: 15, fontWeight: 650, color: "rgba(67,67,43,0.62)" }}>{row.score}</span>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.35, transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 200ms ease" }}>
-                          <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </div>
-                    </button>
-                    <div style={{ height: 2, borderRadius: 1, background: "rgba(67,67,43,0.08)", marginBottom: row.subLabel ? 6 : 0 }}>
-                      <div style={{ height: 2, borderRadius: 1, background: row.color, width: `${row.scoreNum}%`, transition: "width 500ms ease, background 300ms ease" }} />
-                    </div>
-                    {row.subLabel && (
-                      <div style={{ fontSize: 10, color: "rgba(67,67,43,0.45)", fontFamily: inter, marginTop: 4 }}>{row.subLabel}</div>
-                    )}
-                    {isExpanded && (
-                      <div style={{ marginTop: 10, padding: "12px 14px", borderRadius: 8, background: "rgba(67,67,43,0.03)", border: "1px solid rgba(67,67,43,0.07)", animation: "fadeIn 200ms ease-out" }}>
-                        <div style={{ marginBottom: 10 }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 4 }}>What this means</div>
-                          <div style={{ fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.65)", fontFamily: inter }}>{row.what}</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 4 }}>How it&apos;s calculated</div>
-                          <div style={{ fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.65)", fontFamily: inter }}>{row.how}</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* MUKO INSIGHT */}
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>MUKO INSIGHT</div>
-              <div style={{ fontFamily: sohne, fontWeight: 500, fontSize: 17, color: OLIVE, lineHeight: 1.3, marginBottom: 16 }}>{insightContent.headline}</div>
-              <p style={{ margin: "0 0 12px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.64)", lineHeight: 1.7 }}>{insightContent.p1}</p>
-              <p style={{ margin: "0 0 12px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.60)", lineHeight: 1.7 }}>{insightContent.p2}</p>
-              <p style={{ margin: "0 0 20px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.56)", lineHeight: 1.7 }}>{insightContent.p3}</p>
-              {insightContent.opportunity.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: BRAND.chartreuse, marginBottom: 4 }}>THE OPPORTUNITY</div>
-                  <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 10 }}>What&apos;s working in your favor right now</div>
-                  <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 7 }}>
-                    {insightContent.opportunity.map((point, i) => (
-                      <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.62)", lineHeight: 1.5 }}>
-                        <span style={{ color: BRAND.chartreuse, flexShrink: 0, marginTop: 1 }}>•</span>{point}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {insightContent.editItems.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: BRAND.camel, marginBottom: 4 }}>THE EDIT</div>
-                  <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 10 }}>Inputs worth revisiting before you commit</div>
-                  <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 7 }}>
-                    {insightContent.editItems.map((item, i) => (
-                      <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.62)", lineHeight: 1.5 }}>
-                        <span style={{ color: BRAND.camel, flexShrink: 0, marginTop: 1 }}>•</span>{item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {sharpenChips.length > 0 && (
-                <div>
-                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A9BFD6", marginBottom: 4 }}>SHARPEN YOUR CONCEPT</div>
-                  <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 12 }}>Small additions that improve direction</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                    {sharpenChips.map((chip) => (
-                      <SharpenRow key={chip} label={chip} onAdd={() => { if (selectedAesthetic) toggleElement(`${selectedAesthetic}::${chip}`); }} inter={inter} steelBlue={STEEL} />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* AskMuko */}
-            <AskMuko step="concept" suggestedQuestions={["Why is Resonance at this level?", "How does this compare to other directions?", "What brands are doing this well?"]} context={{ aesthetic: selectedAesthetic, refineText, identityScore: identityPulse?.score, resonanceScore: resonancePulse?.score }} />
-
-            {/* Continue */}
+          {/* Sticky CTA */}
+          <div style={{ position: "sticky", bottom: 0, padding: "0 44px 24px", background: "linear-gradient(to bottom, rgba(250,249,246,0) 0%, rgba(250,249,246,0.92) 16%, rgba(250,249,246,1) 100%)", paddingTop: 20, zIndex: 10 }}>
             <button
               onClick={() => {
                 if (!canContinue) return;
@@ -737,27 +1048,101 @@ export default function ConceptStudioPage() {
                   if (custom) return { ...custom, isCustom: true as const };
                   return { label, type: "mood" as const, material: null, silhouette: null, complexity_mod: 0, palette: null, isCustom: false as const };
                 });
-                useSessionStore.setState({ aestheticMatchedId: selectedAesthetic, refinementModifiers: interpretation?.modifiers ?? [], moodboardImages: topMoodboardImages, chipSelection: { directionId: selectedAesthetic!.toLowerCase().replace(/\s+/g, "-"), activatedChips } });
+                useSessionStore.setState({ aestheticMatchedId: selectedAesthetic, refinementModifiers: interpretation?.modifiers ?? [], moodboardImages: topMoodboardImages, chipSelection: { directionId: selectedAesthetic!.toLowerCase().replace(/\s+/g, "-"), activatedChips }, conceptSilhouette, conceptPalette });
                 setCurrentStep(3);
                 router.push("/spec");
               }}
               disabled={!canContinue}
-              style={{ marginTop: 16, width: "100%", padding: "14px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: sohne, letterSpacing: "0.02em", color: canContinue ? STEEL : "rgba(67,67,43,0.30)", background: canContinue ? "rgba(125,150,172,0.07)" : "rgba(255,255,255,0.46)", border: canContinue ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)", cursor: canContinue ? "pointer" : "not-allowed", transition: "all 280ms ease", opacity: canContinue ? 1 : 0.65, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}
+              style={{ width: "100%", padding: "14px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: sohne, letterSpacing: "0.02em", color: canContinue ? STEEL : "rgba(67,67,43,0.30)", background: canContinue ? "rgba(125,150,172,0.07)" : "rgba(255,255,255,0.46)", border: canContinue ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)", cursor: canContinue ? "pointer" : "not-allowed", transition: "all 280ms ease", opacity: canContinue ? 1 : 0.65, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}
             >
-              <span>Lock direction &amp; build specs</span>
+              <span>{selectedAesthetic && !conceptSilhouette ? "Select a silhouette to continue" : "Lock direction & build specs"}</span>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{ opacity: canContinue ? 1 : 0.4 }}><path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
           </div>
-        </div>
-      </div>
+          </>
+        }
+        rightContent={
+          <>
+          <div style={{ padding: "36px 44px 0" }}>
+
+            {/* PULSE RAIL */}
+            <div style={{ marginBottom: 0 }}>
+              <div style={{ fontFamily: sohne, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>Pulse</div>
+              {pulseRows.map((row) => (
+                <PulseScoreRow
+                  key={row.key}
+                  dimensionKey={row.key}
+                  label={row.label}
+                  icon={row.icon(row.color)}
+                  displayScore={row.score}
+                  numericPercent={row.scoreNum}
+                  scoreColor={row.color}
+                  pill={row.chip ? { variant: row.chip.variant, label: row.chip.status } : null}
+                  subLabel={row.subLabel}
+                  whatItMeans={row.what}
+                  howCalculated={row.how}
+                  isPending={row.pending}
+                  isExpanded={pulseExpandedRow === row.key}
+                  onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === row.key ? null : row.key)}
+                />
+              ))}
+            </div>
+
+            {/* MUKO INSIGHT */}
+            <MukoInsightSection
+              headline={insightContent.headline}
+              paragraphs={[insightContent.p1, insightContent.p2, insightContent.p3]}
+              opportunity={{ items: insightContent.opportunity }}
+              edit={{ items: insightContent.editItems }}
+              nextMove={{
+                mode: "concept",
+                items: nextMoveItems,
+                onAdd: (label) => {
+                  const item = nextMoveItems.find((i) => i.label === label);
+                  if (item?.type === 'silhouette_swap') {
+                    // Extract silhouette id from label like "Swap to Straight silhouette"
+                    const match = label.match(/(\w+) silhouette/);
+                    if (match) setConceptSilhouette(match[1].toLowerCase());
+                  } else if (item?.type === 'palette_swap') {
+                    const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
+                      (a) => a.name === selectedAesthetic || a.id === selectedAesthetic?.toLowerCase().replace(/\s+/g, "-")
+                    );
+                    const palAffinity = entry?.palette_affinity ?? [];
+                    if (palAffinity[0]) setConceptPalette(palAffinity[0]);
+                  } else if (selectedAesthetic) {
+                    // Strip the action prefix ("Layer in ", "Consider ", "Try ") to get the chip name
+                    const chipName = label.replace(/^(Layer in |Consider |Try )/, "");
+                    toggleElement(`${selectedAesthetic}::${chipName}`);
+                  }
+                },
+                onRemove: (label) => {
+                  const chipName = label.replace(/^(Layer in |Consider |Try |Swap to )/, "");
+                  removeElement(chipName);
+                },
+                addedItems: new Set(
+                  nextMoveItems
+                    .filter((i) => {
+                      if (i.type === 'silhouette_swap' || i.type === 'palette_swap') return false;
+                      const chipName = i.label.replace(/^(Layer in |Consider |Try )/, "");
+                      return addedChipLabels.has(chipName);
+                    })
+                    .map((i) => i.label)
+                ),
+              }}
+            />
+
+            {/* AskMuko */}
+            <AskMuko step="concept" suggestedQuestions={["Why is Resonance at this level?", "How does this compare to other directions?", "What brands are doing this well?"]} context={{ aesthetic: selectedAesthetic, refineText, identityScore: identityPulse?.score, resonanceScore: resonancePulse?.score }} />
+
+          </div>
+          </>
+        }
+      />
 
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes expandDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-        @media (max-width: 860px) {
-          .concept-two-col { flex-direction: column !important; }
-          .concept-two-col > div { width: 100% !important; height: auto !important; overflow-y: visible !important; }
-        }
+        /* ResizableSplitPanel handles mobile stacking */
       `}</style>
     </div>
   );

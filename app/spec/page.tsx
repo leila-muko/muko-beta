@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import type { ActivatedChip } from "@/lib/store/sessionStore";
@@ -9,26 +9,31 @@ import type {
   Category,
   ConstructionTier,
   ConceptContext as ConceptContextType,
-  PaletteColor,
 } from "@/lib/types/spec-studio";
 import { calculateCOGS, generateInsight } from "@/lib/spec-studio/calculator";
 import { findAlternativeMaterial } from "@/lib/spec-studio/material-matcher";
 import {
-  SMART_DEFAULTS,
   CONSTRUCTION_INFO,
   getOverrideWarning,
+  getSmartDefault,
 } from "@/lib/spec-studio/smart-defaults";
+import type { SubcategoryEntry } from "@/lib/spec-studio/smart-defaults";
 
 import categoriesData from "@/data/categories.json";
 import materialsData from "@/data/materials.json";
+import subcategoriesData from "@/data/subcategories.json";
 import aestheticsData from "@/data/aesthetics.json";
 import AskMuko from "@/components/AskMuko";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
+import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
+import { PulseScoreRow } from "@/components/ui/PulseScoreRow";
+import { MukoInsightSection } from "@/components/ui/MukoInsightSection";
 import { PulseChip } from "@/components/ui/PulseChip";
 import type { PulseChipProps } from "@/components/ui/PulseChip";
 import { InsightPanel } from "@/components/ui/InsightPanel";
 import { SuggestionCard } from "@/components/ui/SuggestionCard";
 import type { InsightData, SpecInsightMode } from "@/lib/types/insight";
+import type { SpecSuggestion } from "@/lib/types/next-move";
 
 /* ─── Icons: matched to Concept Studio (star, users, cog) ─── */
 function IconIdentity({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
@@ -171,102 +176,6 @@ const microLabel: React.CSSProperties = {
 };
 
 /* ─── Aesthetic palettes (3 options per aesthetic) ─── */
-const AESTHETIC_PALETTE_OPTIONS: Record<
-  string,
-  { name: string; palette: PaletteColor[] }[]
-> = {
-  "quiet-structure": [
-    {
-      name: "Monochrome Authority",
-      palette: [
-        { hex: "#2C2C2C", name: "Charcoal" },
-        { hex: "#F5F0E8", name: "Ivory" },
-        { hex: "#8B8B7A", name: "Stone" },
-        { hex: "#4A4A4A", name: "Graphite" },
-        { hex: "#E8E0D4", name: "Parchment" },
-        { hex: "#1A1A1A", name: "Ink" },
-      ],
-    },
-    {
-      name: "Warm Neutrals",
-      palette: [
-        { hex: "#C4B5A0", name: "Sandstone" },
-        { hex: "#E8DFD0", name: "Linen" },
-        { hex: "#8B7D6B", name: "Taupe" },
-        { hex: "#F5EDE3", name: "Cream" },
-        { hex: "#6B5E4E", name: "Walnut" },
-        { hex: "#D4C8B8", name: "Oat" },
-      ],
-    },
-    {
-      name: "Cool Mineral",
-      palette: [
-        { hex: "#9BA8B4", name: "Slate Blue" },
-        { hex: "#F0EFED", name: "Cloud" },
-        { hex: "#6B7B8A", name: "Pewter" },
-        { hex: "#D8D6D2", name: "Ash" },
-        { hex: "#3D4A54", name: "Steel" },
-        { hex: "#B8BFC6", name: "Mist" },
-      ],
-    },
-  ],
-  default: [
-    {
-      name: "Signature Muko",
-      palette: [
-        { hex: "#43432B", name: "Olive Ink" },
-        { hex: "#F5F2EB", name: "Cream" },
-        { hex: "#A97B8F", name: "Dusty Rose" },
-        { hex: "#A9BFD6", name: "Steel Blue" },
-        { hex: "#B8876B", name: "Camel" },
-        { hex: "#ABAB63", name: "Chartreuse" },
-      ],
-    },
-    {
-      name: "Earth & Stone",
-      palette: [
-        { hex: "#8B7355", name: "Desert Sand" },
-        { hex: "#A0522D", name: "Sienna" },
-        { hex: "#D2B48C", name: "Tan" },
-        { hex: "#556B2F", name: "Olive" },
-        { hex: "#F5F0E8", name: "Bone" },
-        { hex: "#2F4F4F", name: "Slate" },
-      ],
-    },
-    {
-      name: "Muted Jewel",
-      palette: [
-        { hex: "#5B4A5E", name: "Plum" },
-        { hex: "#6B7B6B", name: "Forest" },
-        { hex: "#8B6F5E", name: "Umber" },
-        { hex: "#D4C8B8", name: "Oat" },
-        { hex: "#7A8A9A", name: "Thistle" },
-        { hex: "#3D3D2E", name: "Moss" },
-      ],
-    },
-  ],
-};
-
-/* ─── Silhouette aesthetic affinity ─── */
-const SILHOUETTE_AFFINITY: Record<string, string[]> = {
-  cocoon: ["soft", "volume", "romantic", "bohemian", "oversized"],
-  belted: ["structured", "refined", "feminine", "tailored", "classic"],
-  straight: ["minimal", "modern", "clean", "refined", "masculine"],
-  cropped: ["edgy", "playful", "sporty", "modern", "youthful"],
-  relaxed: ["casual", "bohemian", "soft", "minimal", "effortless"],
-  fitted: ["refined", "feminine", "structured", "classic", "polished"],
-  oversized: ["volume", "modern", "edgy", "street", "grunge"],
-  boxy: ["minimal", "modern", "clean", "architectural", "androgynous"],
-  "wide-leg": ["refined", "feminine", "fluid", "elegant", "minimal"],
-  "straight-leg": ["clean", "modern", "minimal", "classic", "versatile"],
-  slim: ["fitted", "modern", "sleek", "polished", "tailored"],
-  flare: ["retro", "feminine", "romantic", "bohemian", "playful"],
-  column: ["refined", "minimal", "elegant", "architectural", "modern"],
-  "a-line": ["feminine", "classic", "soft", "romantic", "versatile"],
-  wrap: ["feminine", "fluid", "refined", "flattering", "classic"],
-  shift: ["minimal", "modern", "clean", "architectural", "edgy"],
-};
-
 /* ─── Aesthetic keywords for matching ─── */
 const AESTHETIC_KEYWORDS: Record<string, string[]> = {
   "quiet-structure": [
@@ -288,28 +197,6 @@ const AESTHETIC_KEYWORDS: Record<string, string[]> = {
   "sweet-subversion": ["cute", "kawaii", "soft", "colorful", "adorable", "whimsical"],
   default: ["modern", "clean", "versatile"],
 };
-
-function getSilhouetteAffinity(
-  silhouetteId: string,
-  aestheticId: string
-): { aligned: boolean; note: string | null } {
-  const silAffinity = SILHOUETTE_AFFINITY[silhouetteId] || [];
-  const aestheticKws = AESTHETIC_KEYWORDS[aestheticId] || AESTHETIC_KEYWORDS.default;
-
-  const overlap = silAffinity.filter((kw) => aestheticKws.includes(kw));
-  const overlapRatio = silAffinity.length > 0 ? overlap.length / silAffinity.length : 0;
-
-  if (overlapRatio >= 0.2) return { aligned: true, note: null };
-
-  return {
-    aligned: false,
-    note: `This silhouette leans ${silAffinity.slice(0, 2).join(", ")} — your ${aestheticId
-      .replace("-", " ")
-      .replace(/\b\w/g, (m) => m.toUpperCase())} direction favors ${aestheticKws
-      .slice(0, 2)
-      .join(", ")} shapes.`,
-  };
-}
 
 /* ─── Complexity (formerly Construction) ─── */
 const COMPLEXITY_CONTEXT: Record<
@@ -393,6 +280,22 @@ const COMPLEXITY_DESCRIPTIONS: Record<ConstructionTier, { hover: string; why: st
     hover: "Full construction — hardware, tailoring, structural seaming. Adds real labor cost; plan margin accordingly.",
     why: "Delivers the craft your concept signals — construction becomes part of the identity.",
   },
+};
+
+/* ─── Concept silhouette yardage modifiers ─── */
+const SILHOUETTE_YARDAGE_MODIFIERS: Record<string, number> = {
+  straight: 0,
+  relaxed: 0.3,
+  structured: 0.2,
+  oversized: 0.5,
+};
+
+const CATEGORY_BASE_YARDAGE: Record<string, number> = {
+  outerwear: 3.5,
+  tops: 2.0,
+  bottoms: 2.5,
+  dresses: 3.0,
+  knitwear: 2.5,
 };
 
 /* ─── Slug helper ─── */
@@ -552,24 +455,24 @@ function getSpecInsightData(
 
 export default function SpecStudioPage() {
   const router = useRouter();
-  const { setCategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection } = useSessionStore();
+  const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection } = useSessionStore();
   const categories: Category[] = categoriesData.categories as unknown as Category[];
   const materials: Material[] = materialsData as unknown as Material[];
+  const allSubcategories = subcategoriesData as Record<string, SubcategoryEntry[]>;
 
   const [categoryId, setCategoryId] = useState(categories[0].id);
+  const [subcategoryId, setSubcategoryId] = useState("");
   const [targetMSRP, setTargetMSRP] = useState(450);
   const [materialId, setMaterialId] = useState("");
-  const [silhouetteId, setSilhouetteId] = useState("");
   const [constructionTier, setConstructionTier] = useState<ConstructionTier | null>(null);
   const [overrideWarning, setOverrideWarning] = useState<string | null>(null);
   const [pulseUpdated, setPulseUpdated] = useState(false);
-  const [selectedPaletteIdx, setSelectedPaletteIdx] = useState(-1);
 
   const [hasInitialized, setHasInitialized] = useState(false);
 
+  const [userManuallySelected, setUserManuallySelected] = useState(false);
+
   const [hoveredMaterialId, setHoveredMaterialId] = useState<string | null>(null);
-  const [hoveredSilhouetteId, setHoveredSilhouetteId] = useState<string | null>(null);
-  const [hoveredPaletteIdx, setHoveredPaletteIdx] = useState<number | null>(null);
   const [hoveredComplexity, setHoveredComplexity] = useState<ConstructionTier | null>(null);
   const [pulseExpandedRow, setPulseExpandedRow] = useState<string | null>(null);
 
@@ -577,6 +480,8 @@ export default function SpecStudioPage() {
   const storeModifiers = useSessionStore((s) => s.refinementModifiers);
   const storeMoodboard = useSessionStore((s) => s.moodboardImages);
   const chipSelection = useSessionStore((s) => s.chipSelection);
+  const conceptSilhouette = useSessionStore((s) => s.conceptSilhouette);
+  const conceptPalette = useSessionStore((s) => s.conceptPalette);
 
   const conceptContext = useMemo<ConceptContextType>(() => {
     if (!storeAesthetic) return FALLBACK_CONCEPT;
@@ -629,45 +534,29 @@ export default function SpecStudioPage() {
     () => materials.find((m) => m.id === materialId) || null,
     [materialId, materials]
   );
-  const selectedSilhouette = useMemo(
-    () => (selectedCategory.silhouettes || []).find((s) => s.id === silhouetteId) || null,
-    [silhouetteId, selectedCategory]
+  // Subcategory lookups
+  const categorySubcategories = useMemo(
+    () => allSubcategories[categoryId] ?? [],
+    [categoryId, allSubcategories]
   );
+  const selectedSubcategory = useMemo(
+    () => categorySubcategories.find((s) => s.id === subcategoryId) || null,
+    [subcategoryId, categorySubcategories]
+  );
+  // Compute yardage from subcategory base_yardage + silhouette modifier (falls back to category base)
+  const conceptYardage = useMemo(() => {
+    const base = selectedSubcategory
+      ? selectedSubcategory.base_yardage
+      : CATEGORY_BASE_YARDAGE[categoryId] ?? 2.5;
+    const mod = SILHOUETTE_YARDAGE_MODIFIERS[conceptSilhouette] ?? 0;
+    return Math.round((base + mod) * 10) / 10;
+  }, [categoryId, conceptSilhouette, selectedSubcategory]);
 
-  const hasUserSelection = materialId !== "" || silhouetteId !== "" || constructionTier !== null || selectedPaletteIdx >= 0;
-
-  const paletteOptions =
-    AESTHETIC_PALETTE_OPTIONS[conceptContext.aestheticMatchedId] ||
-    AESTHETIC_PALETTE_OPTIONS.default;
-
-  const silhouetteAffinity = useMemo(() => {
-    if (!silhouetteId) return null;
-    return getSilhouetteAffinity(silhouetteId, conceptContext.aestheticMatchedId);
-  }, [silhouetteId, conceptContext.aestheticMatchedId]);
+  const hasUserSelection = userManuallySelected && (materialId !== "" || constructionTier !== null);
 
   const aestheticKws =
     AESTHETIC_KEYWORDS[conceptContext.aestheticMatchedId] ||
     AESTHETIC_KEYWORDS.default;
-
-  const recommendedPaletteIdx = useMemo(() => {
-    // If a chip targets a palette, find the first matching palette option
-    if (chipSelection?.activatedChips) {
-      const opts = AESTHETIC_PALETTE_OPTIONS[conceptContext.aestheticMatchedId] || AESTHETIC_PALETTE_OPTIONS.default;
-      for (let idx = 0; idx < opts.length; idx++) {
-        const opt = opts[idx];
-        for (const chip of chipSelection.activatedChips) {
-          if (!chip.palette || chip.isCustom) continue;
-          const chipTerms = chip.palette.toLowerCase().split(/[\s,]+/).filter((w) => w.length > 2);
-          const nameWords = opt.name.toLowerCase().split(/\s+/);
-          const colorNames = opt.palette.map((c) => c.name.toLowerCase());
-          if (chipTerms.some((t) => nameWords.some((w) => w.includes(t) || t.includes(w)) || colorNames.some((c) => c.includes(t)))) {
-            return idx;
-          }
-        }
-      }
-    }
-    return conceptContext.aestheticMatchedId === "quiet-structure" ? 2 : 0;
-  }, [chipSelection, conceptContext.aestheticMatchedId]);
 
   const recommendedMaterialId = useMemo(() => {
     // If a chip specifies a material, prefer it (first chip with a material wins)
@@ -699,31 +588,6 @@ export default function SpecStudioPage() {
     return mats[0]?.id || "";
   }, [materials, aestheticKws, chipSelection]);
 
-  const recommendedSilhouetteId = useMemo(() => {
-    const silhouettes = selectedCategory.silhouettes || [];
-    const silhouetteIds = silhouettes.map((s) => s.id);
-
-    // If a chip targets the current category's silhouette, prefer it
-    if (chipSelection?.activatedChips) {
-      for (const chip of chipSelection.activatedChips) {
-        if (chip.silhouette) {
-          const chipSil = chip.silhouette[categoryId];
-          if (chipSil && silhouetteIds.includes(chipSil)) return chipSil;
-        }
-      }
-    }
-
-    const rank = (sid: string) => {
-      const aff = SILHOUETTE_AFFINITY[sid] || [];
-      const overlap = aff.filter((kw) => aestheticKws.includes(kw)).length;
-      return overlap;
-    };
-    const ranked = silhouettes
-      .map((s) => ({ id: s.id, score: rank(s.id) }))
-      .sort((a, b) => b.score - a.score);
-    return ranked[0]?.id || "";
-  }, [selectedCategory.silhouettes, aestheticKws, chipSelection]);
-
   const alternativeMaterial = useMemo(
     () => (selectedMaterial ? findAlternativeMaterial(selectedMaterial, materials) : null),
     [selectedMaterial, materials]
@@ -741,49 +605,18 @@ export default function SpecStudioPage() {
     return map;
   }, [chipSelection]);
 
-  const chipsBySilhouette = useMemo((): Record<string, ActivatedChip[]> => {
-    const map: Record<string, ActivatedChip[]> = {};
-    if (!chipSelection) return map;
-    for (const chip of chipSelection.activatedChips) {
-      if (chip.silhouette && !chip.isCustom) {
-        // Only use the silhouette value for the current category — no cross-category bleed
-        const silId = chip.silhouette[categoryId];
-        if (silId) {
-          map[silId] = [...(map[silId] || []), chip];
-        }
-      }
-    }
-    return map;
-  }, [chipSelection, categoryId]);
-
-  const chipsByPaletteIdx = useMemo((): Record<number, ActivatedChip[]> => {
-    const map: Record<number, ActivatedChip[]> = {};
-    if (!chipSelection) return map;
-    for (const chip of chipSelection.activatedChips) {
-      if (!chip.palette || chip.isCustom) continue;
-      const chipTerms = chip.palette.toLowerCase().split(/[\s,]+/).filter((w) => w.length > 2);
-      paletteOptions.forEach((opt, idx) => {
-        const nameWords = opt.name.toLowerCase().split(/\s+/);
-        const colorNames = opt.palette.map((c) => c.name.toLowerCase());
-        const matches = chipTerms.some(
-          (t) => nameWords.some((w) => w.includes(t) || t.includes(w)) || colorNames.some((c) => c.includes(t))
-        );
-        if (matches) map[idx] = [...(map[idx] || []), chip];
-      });
-    }
-    return map;
-  }, [chipSelection, paletteOptions]);
-
   const chipsForHighComplexity = useMemo((): ActivatedChip[] => {
     if (!chipSelection) return [];
     return chipSelection.activatedChips.filter((c) => c.complexity_mod > 0);
   }, [chipSelection]);
 
   const insight = useMemo(() => {
-    if (!selectedMaterial || !selectedSilhouette || !constructionTier) return null;
+    if (!selectedMaterial || !constructionTier) return null;
+    const yardage = conceptYardage;
+    const silName = conceptSilhouette ? conceptSilhouette.charAt(0).toUpperCase() + conceptSilhouette.slice(1) : "Standard";
     const breakdown = calculateCOGS(
       selectedMaterial,
-      selectedSilhouette.yardage,
+      yardage,
       constructionTier,
       false,
       targetMSRP,
@@ -792,15 +625,16 @@ export default function SpecStudioPage() {
     return generateInsight(
       breakdown,
       selectedMaterial,
-      selectedSilhouette.name,
+      silName,
       constructionTier,
       false,
-      selectedSilhouette.yardage,
+      yardage,
       alternativeMaterial
     );
   }, [
     selectedMaterial,
-    selectedSilhouette,
+    conceptYardage,
+    conceptSilhouette,
     constructionTier,
     targetMSRP,
     brandTargetMargin,
@@ -834,61 +668,69 @@ export default function SpecStudioPage() {
 
   const handleCategoryChange = (newId: string) => {
     setCategoryId(newId);
-    setSilhouetteId("");
-    setConstructionTier(SMART_DEFAULTS[newId] || "moderate");
+    setSubcategoryId(""); // reset type when category changes
+    setStoreSubcategory("");
+    setConstructionTier(getSmartDefault(newId, conceptSilhouette || undefined));
     setOverrideWarning(null);
+    setUserManuallySelected(false);
+  };
+
+  const handleSubcategoryChange = (newSubId: string) => {
+    setSubcategoryId(newSubId);
+    setStoreSubcategory(newSubId);
+    // Update smart complexity based on subcategory affinity
+    const sub = (allSubcategories[categoryId] ?? []).find((s) => s.id === newSubId);
+    if (sub) {
+      const smartTier = getSmartDefault(categoryId, conceptSilhouette || undefined, sub.complexity_affinity as 'low' | 'moderate' | 'high');
+      setConstructionTier(smartTier);
+      setOverrideWarning(null);
+    }
   };
 
   const handleComplexityChange = (tier: ConstructionTier) => {
     setConstructionTier(tier);
+    setUserManuallySelected(true);
     setOverrideWarning(
       getOverrideWarning(
         categoryId,
         selectedCategory.name,
         tier,
-        SMART_DEFAULTS[categoryId] || "moderate"
+        getSmartDefault(categoryId, conceptSilhouette || undefined)
       )
     );
   };
 
-  const applyMukosPick = () => {
-    if (recommendedMaterialId) setMaterialId(recommendedMaterialId);
-    if (recommendedSilhouetteId) setSilhouetteId(recommendedSilhouetteId);
-    setSelectedPaletteIdx(recommendedPaletteIdx);
-    handleComplexityChange(baselineComplexity);
+  const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
+  const [undoStack, setUndoStack] = useState<Map<string, () => void>>(new Map());
+  const isApplyingRef = useRef(false);
+
+  // Clear applied state when inputs change (but not during programmatic apply)
+  useEffect(() => {
+    if (isApplyingRef.current) return;
+    setAppliedSuggestions(new Set());
+    setUndoStack(new Map());
+  }, [materialId, constructionTier]);
+
+  const applySuggestion = (id: string, suggestions: SpecSuggestion[]) => {
+    const suggestion = suggestions.find((s) => s.id === id);
+    if (!suggestion) return;
+
+    isApplyingRef.current = true;
+    suggestion.action();
+    setAppliedSuggestions((prev) => new Set([...prev, id]));
+    setUndoStack((prev) => new Map([...prev, [id, suggestion.undoAction]]));
+    requestAnimationFrame(() => { isApplyingRef.current = false; });
   };
 
-  const [addedSharpenItems, setAddedSharpenItems] = useState<Set<string>>(new Set());
-
-  // Extract the core noun phrase from a suggestion like "Add tonal topstitching for craft credibility"
-  function sharpenChipLabel(text: string): string {
-    let s = text.trim();
-    // Strip leading verb: "Add ", "Consider ", "Upgrade to ", "Switch to ", "Verify ", "Lock ", "Reduce "
-    s = s.replace(/^(Add|Consider|Upgrade to|Switch to|Verify|Lock|Reduce)\s+/i, "");
-    // Trim trailing qualifier: " for ...", " — ...", " to ..."
-    s = s.replace(/\s+(for|—|to)\s+.*/i, "");
-    // Lowercase first char for chip display
-    return s.charAt(0).toLowerCase() + s.slice(1);
-  }
-
-  const addSharpenChip = (fullText: string) => {
-    setAddedSharpenItems((prev) => new Set([...prev, fullText]));
-    const chipLabel = sharpenChipLabel(fullText);
-    const existing = chipSelection?.activatedChips ?? [];
-    if (existing.some((c) => c.label === chipLabel)) return;
-    const newChip: ActivatedChip = {
-      label: chipLabel,
-      type: "spec",
-      material: null,
-      silhouette: null,
-      complexity_mod: 1,
-      palette: null,
-      isCustom: true,
-    };
-    setChipSelection({
-      directionId: chipSelection?.directionId ?? (conceptContext.aestheticMatchedId || "custom"),
-      activatedChips: [...existing, newChip],
-    });
+  const undoSuggestion = (id: string) => {
+    const undoFn = undoStack.get(id);
+    if (undoFn) {
+      isApplyingRef.current = true;
+      undoFn();
+      setAppliedSuggestions((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      setUndoStack((prev) => { const next = new Map(prev); next.delete(id); return next; });
+      requestAnimationFrame(() => { isApplyingRef.current = false; });
+    }
   };
 
   const removeSpecChip = (chipLabel: string) => {
@@ -897,37 +739,25 @@ export default function SpecStudioPage() {
       ...chipSelection,
       activatedChips: chipSelection.activatedChips.filter((c) => c.label !== chipLabel),
     });
-    // Revert the matching addedSharpenItems entry
-    setAddedSharpenItems((prev) => {
-      const next = new Set(prev);
-      for (const fullText of prev) {
-        if (sharpenChipLabel(fullText) === chipLabel) next.delete(fullText);
-      }
-      return next;
-    });
   };
 
-  const isComplete = materialId && silhouetteId && constructionTier;
+  const isComplete = materialId && constructionTier;
   const marginCeiling = Math.round(targetMSRP * (1 - brandTargetMargin));
 
   const baselineComplexity: ConstructionTier = useMemo(() => {
-    const base: ConstructionTier = SMART_DEFAULTS[categoryId] || "moderate";
+    const subAffinity = selectedSubcategory?.complexity_affinity as 'low' | 'moderate' | 'high' | undefined;
+    const base: ConstructionTier = getSmartDefault(categoryId, conceptSilhouette || undefined, subAffinity);
     // If any complexity chip is active, recommend High
     if (chipSelection?.activatedChips.some((c) => c.complexity_mod > 0 && !c.isCustom)) {
       return "high";
     }
     return base;
-  }, [categoryId, chipSelection]);
+  }, [categoryId, conceptSilhouette, chipSelection, selectedSubcategory]);
 
   const baselineMaterial = useMemo(() => {
     const id = recommendedMaterialId || materialId || "";
     return materials.find((m) => m.id === id) || null;
   }, [materials, recommendedMaterialId, materialId]);
-
-  const baselineSilhouette = useMemo(() => {
-    const id = recommendedSilhouetteId || silhouetteId || "";
-    return (selectedCategory.silhouettes || []).find((s) => s.id === id) || null;
-  }, [selectedCategory.silhouettes, recommendedSilhouetteId, silhouetteId]);
 
   // Set step indicator and pre-select Muko's recommended values on first mount
   useEffect(() => { setCurrentStep(3); }, [setCurrentStep]);
@@ -944,16 +774,6 @@ export default function SpecStudioPage() {
       return recMat?.cost_per_yard || 25;
     }
     return baselineMaterial.cost_per_yard || 25;
-  }
-
-  function getBaselineSilhouetteYardage() {
-    if (!baselineSilhouette) {
-      const recSil = (selectedCategory.silhouettes || []).find(
-        (s) => s.id === recommendedSilhouetteId
-      );
-      return recSil?.yardage || 3;
-    }
-    return baselineSilhouette.yardage || 3;
   }
 
   function scoreMaterialDeltas(m: Material): Deltas {
@@ -987,27 +807,6 @@ export default function SpecStudioPage() {
     };
   }
 
-  function scoreSilhouetteDeltas(sid: string): Deltas {
-    const aff = SILHOUETTE_AFFINITY[sid] || [];
-    const overlap = aff.filter((kw) => aestheticKws.includes(kw)).length;
-
-    const id = clamp(overlap >= 3 ? 3 : overlap >= 2 ? 2 : overlap >= 1 ? 1 : -1, -2, 4);
-    const res = clamp(overlap >= 3 ? 2 : overlap >= 2 ? 1 : 0, -1, 3);
-
-    const sil = (selectedCategory.silhouettes || []).find((x) => x.id === sid) || null;
-    const baseY = getBaselineSilhouetteYardage();
-    const y = sil?.yardage || 0;
-    const yDiff = y - baseY;
-    const exec = clamp(Math.round(-yDiff * 2), -4, 4);
-
-    return { identity: id, resonance: res, execution: exec };
-  }
-
-  function scorePaletteDeltas(idx: number): Deltas {
-    if (idx === recommendedPaletteIdx) return { identity: 2, resonance: 1, execution: 0 };
-    return { identity: 0, resonance: 0, execution: 0 };
-  }
-
   function scoreComplexityDeltas(tier: ConstructionTier): Deltas {
     const base = baselineComplexity;
     const map: Record<ConstructionTier, number> = { low: 0, moderate: 1, high: 2 };
@@ -1029,66 +828,50 @@ export default function SpecStudioPage() {
   }
 
   const dynamicIdentityScore = useMemo(() => {
-    if (!selectedMaterial && !silhouetteId) return conceptContext.identityScore;
+    if (!selectedMaterial) return conceptContext.identityScore;
 
     const baseScore = conceptContext.identityScore;
     const materialDelta = selectedMaterial ? scoreMaterialDeltas(selectedMaterial).identity : 0;
-    const silhouetteDelta = silhouetteId ? scoreSilhouetteDeltas(silhouetteId).identity : 0;
-    const paletteDelta = scorePaletteDeltas(selectedPaletteIdx).identity;
     const complexityDelta = constructionTier ? scoreComplexityDeltas(constructionTier).identity : 0;
 
     return clamp(
-      baseScore + materialDelta + silhouetteDelta + paletteDelta + complexityDelta,
+      baseScore + materialDelta + complexityDelta,
       0,
       100
     );
   }, [
     selectedMaterial,
-    silhouetteId,
-    selectedPaletteIdx,
     constructionTier,
     conceptContext.identityScore,
     baselineMaterial,
-    baselineSilhouette,
     baselineComplexity,
     recommendedMaterialId,
-    recommendedSilhouetteId,
-    recommendedPaletteIdx,
     categoryId,
     materials,
-    selectedCategory.silhouettes,
     aestheticKws,
   ]);
 
   const dynamicResonanceScore = useMemo(() => {
-    if (!selectedMaterial && !silhouetteId) return conceptContext.resonanceScore;
+    if (!selectedMaterial) return conceptContext.resonanceScore;
 
     const baseScore = conceptContext.resonanceScore;
     const materialDelta = selectedMaterial ? scoreMaterialDeltas(selectedMaterial).resonance : 0;
-    const silhouetteDelta = silhouetteId ? scoreSilhouetteDeltas(silhouetteId).resonance : 0;
-    const paletteDelta = scorePaletteDeltas(selectedPaletteIdx).resonance;
     const complexityDelta = constructionTier ? scoreComplexityDeltas(constructionTier).resonance : 0;
 
     return clamp(
-      baseScore + materialDelta + silhouetteDelta + paletteDelta + complexityDelta,
+      baseScore + materialDelta + complexityDelta,
       0,
       100
     );
   }, [
     selectedMaterial,
-    silhouetteId,
-    selectedPaletteIdx,
     constructionTier,
     conceptContext.resonanceScore,
     baselineMaterial,
-    baselineSilhouette,
     baselineComplexity,
     recommendedMaterialId,
-    recommendedSilhouetteId,
-    recommendedPaletteIdx,
     categoryId,
     materials,
-    selectedCategory.silhouettes,
     aestheticKws,
   ]);
 
@@ -1157,19 +940,17 @@ export default function SpecStudioPage() {
   const specInsightData = getSpecInsightData(executionScore, marginGatePassed, timelineBuffer);
 
   const selectedImpact: Deltas = useMemo(() => {
-    if (!selectedMaterial || !silhouetteId) return { identity: 0, resonance: 0, execution: 0 };
+    if (!selectedMaterial) return { identity: 0, resonance: 0, execution: 0 };
     const m = scoreMaterialDeltas(selectedMaterial);
-    const s = scoreSilhouetteDeltas(silhouetteId);
-    const p = scorePaletteDeltas(selectedPaletteIdx);
     const c = constructionTier ? scoreComplexityDeltas(constructionTier) : { identity: 0, resonance: 0, execution: 0 };
-    return addDeltas(addDeltas(m, s), addDeltas(p, c));
-  }, [selectedMaterial, silhouetteId, selectedPaletteIdx, constructionTier]);
+    return addDeltas(m, c);
+  }, [selectedMaterial, constructionTier]);
 
   const mukoSynthesis = useMemo(() => {
     if (!selectedMaterial) return null;
-    if (!insight || !selectedSilhouette) {
+    if (!insight) {
       return {
-        headline: "Select a silhouette to see full cost analysis",
+        headline: "Select a material and complexity to see full cost analysis",
         overall: `You've selected ${selectedMaterial.name} — this material ${
           scoreMaterialDeltas(selectedMaterial).identity > 0
             ? "supports"
@@ -1183,7 +964,7 @@ export default function SpecStudioPage() {
             : (selectedMaterial.cost_per_yard || 0) > 20
               ? "sits at a moderate price point"
               : "is cost-effective and helps preserve margin"
-        }. Choose a silhouette to see the full COGS breakdown.`,
+        }. Select complexity to see the full COGS breakdown.`,
         suggestions: [],
       };
     }
@@ -1193,8 +974,6 @@ export default function SpecStudioPage() {
     const overBy = cogs - ceiling;
 
     const isOnRecommendedMaterial = materialId === recommendedMaterialId;
-    const isOnRecommendedSilhouette = silhouetteId === recommendedSilhouetteId;
-    const isOnRecommendedPalette = selectedPaletteIdx === recommendedPaletteIdx;
     const isOnRecommendedComplexity = constructionTier === baselineComplexity;
 
     const idLine =
@@ -1224,86 +1003,63 @@ export default function SpecStudioPage() {
 
     const overall = `Overall: ${idLine} + ${resLine}, ${execLine}.`;
 
-    const suggestions: {
-      label: string;
-      kind: "material" | "silhouette" | "palette" | "complexity";
-      action: () => void;
-      sub?: string;
-    }[] = [];
+    const currentCogs = cogs;
+    const currentTier = constructionTier!;
+    const currentMatId = materialId;
+
+    const projCOGS = (mat: Material, yardage: number, tier: ConstructionTier) =>
+      calculateCOGS(mat, yardage, tier, false, targetMSRP, brandTargetMargin).totalCOGS;
+
+    const suggestions: SpecSuggestion[] = [];
 
     if (overBy > 0) {
       if (constructionTier === "high" && !isOnRecommendedComplexity) {
+        const projected = projCOGS(selectedMaterial, conceptYardage, "moderate");
         suggestions.push({
+          id: "complexity-moderate",
           label: "Reduce complexity to Moderate",
           kind: "complexity",
           action: () => handleComplexityChange("moderate"),
-          sub: "Keeps the design intent, lowers build risk and cost.",
+          undoAction: () => handleComplexityChange(currentTier),
+          sub: `Reduces cost by ~$${Math.round(currentCogs - projected)} and lowers build risk`,
+          before: { label: "High", cogs: Math.round(currentCogs) },
+          after: { label: "Moderate", projectedCogs: Math.round(projected), saving: Math.round(currentCogs - projected) },
         });
       } else if (constructionTier === "moderate" && !isOnRecommendedComplexity) {
+        const projected = projCOGS(selectedMaterial, conceptYardage, "low");
         suggestions.push({
+          id: "complexity-low",
           label: "Reduce complexity to Low",
           kind: "complexity",
           action: () => handleComplexityChange("low"),
-          sub: "Simplifies construction to pull COGS back under ceiling.",
+          undoAction: () => handleComplexityChange(currentTier),
+          sub: `Simplifies construction and reduces cost by ~$${Math.round(currentCogs - projected)}`,
+          before: { label: "Moderate", cogs: Math.round(currentCogs) },
+          after: { label: "Low", projectedCogs: Math.round(projected), saving: Math.round(currentCogs - projected) },
         });
       }
 
       if (alternativeMaterial && !isOnRecommendedMaterial) {
+        const projected = projCOGS(alternativeMaterial, conceptYardage, constructionTier!);
         suggestions.push({
+          id: `material-${alternativeMaterial.id}`,
           label: `Swap material to ${alternativeMaterial.name}`,
           kind: "material",
           action: () => {
             const alt = materials.find((m) => m.id === alternativeMaterial.id);
-            if (alt) setMaterialId(alt.id);
+            if (alt) { setMaterialId(alt.id); setUserManuallySelected(true); }
           },
-          sub: `$${alternativeMaterial.cost_per_yard}/yd · typically saves ~${Math.round(
-            (selectedSilhouette?.yardage || 0) *
-              ((selectedMaterial.cost_per_yard || 0) -
-                (alternativeMaterial.cost_per_yard || 0))
-          )}`,
+          undoAction: () => { setMaterialId(currentMatId); if (!currentMatId) setUserManuallySelected(false); },
+          sub: `Reduces cost by ~$${Math.round(currentCogs - projected)} at $${alternativeMaterial.cost_per_yard}/yd`,
+          before: { label: selectedMaterial.name, cogs: Math.round(currentCogs) },
+          after: { label: alternativeMaterial.name, projectedCogs: Math.round(projected), saving: Math.round(currentCogs - projected) },
         });
       }
 
-      if (!isOnRecommendedSilhouette) {
-        const currentY = selectedSilhouette.yardage || 0;
-        const candidates = (selectedCategory.silhouettes || [])
-          .map((s) => ({
-            id: s.id,
-            name: s.name,
-            yardage: s.yardage,
-            delta: scoreSilhouetteDeltas(s.id),
-          }))
-          .filter((s) => s.yardage < currentY)
-          .sort((a, b) => b.delta.identity - a.delta.identity);
-
-        if (candidates[0] && candidates[0].id !== silhouetteId) {
-          suggestions.push({
-            label: `Try silhouette: ${candidates[0].name}`,
-            kind: "silhouette",
-            action: () => setSilhouetteId(candidates[0].id),
-            sub: `Lower yardage (~${candidates[0].yardage} yd) to ease COGS while staying aligned.`,
-          });
-        }
-      }
+      // Silhouette is locked from Concept Studio — no silhouette suggestions
     }
 
-    if (silhouetteAffinity && !silhouetteAffinity.aligned && !isOnRecommendedSilhouette) {
-      suggestions.push({
-        label: "Explore a more aligned silhouette",
-        kind: "silhouette",
-        action: () => setSilhouetteId(recommendedSilhouetteId || silhouetteId),
-        sub: "Keeps the concept legible against your aesthetic direction.",
-      });
-    }
-
-    if (!isOnRecommendedPalette && selectedImpact.identity <= -1) {
-      suggestions.push({
-        label: `Switch to palette: ${paletteOptions[recommendedPaletteIdx].name}`,
-        kind: "palette",
-        action: () => setSelectedPaletteIdx(recommendedPaletteIdx),
-        sub: "Re-centers the direction and improves brand clarity.",
-      });
-    }
+    // Palette is locked from Concept Studio — no palette suggestions
 
     const headline =
       overBy > 0
@@ -1312,31 +1068,24 @@ export default function SpecStudioPage() {
 
     const detail =
       overBy > 0
-        ? `Your biggest cost driver is ${selectedMaterial.name} at $${selectedMaterial.cost_per_yard}/yd. Keep the silhouette if it’s core to the concept — pull cost back through complexity or material first.`
+        ? `Your biggest cost driver is ${selectedMaterial.name} at $${selectedMaterial.cost_per_yard}/yd. Pull cost back through complexity or material first.`
         : `You’re in a safe zone. If you want to push the piece into more “statement” territory, you have room to invest in finishing details without breaking margin.`;
 
     return { headline, overall, detail, suggestions };
   }, [
     insight,
     selectedMaterial,
-    selectedSilhouette,
     selectedImpact,
-    silhouetteAffinity,
     constructionTier,
     alternativeMaterial,
     materials,
-    paletteOptions,
-    selectedPaletteIdx,
-    recommendedPaletteIdx,
-    recommendedSilhouetteId,
-    silhouetteId,
-    selectedCategory.silhouettes,
     materialId,
     recommendedMaterialId,
     baselineComplexity,
     conceptContext.aestheticName,
     conceptContext.aestheticMatchedId,
-    aestheticKws,
+    conceptYardage,
+    targetMSRP,
   ]);
 
 
@@ -1354,7 +1103,6 @@ export default function SpecStudioPage() {
         p3: `Select a material and silhouette to see your full execution readout. Identity and Resonance carry forward from Concept Studio — Execution is the score to optimize here.`,
         opportunity: [] as string[],
         editItems: [] as string[],
-        sharpenItems: [] as string[],
       };
     }
 
@@ -1424,16 +1172,11 @@ export default function SpecStudioPage() {
           ]
         : [];
 
-    const sharpenItems = [
-      ...(mukoSynthesis?.suggestions?.slice(0, 2).map((s) => s.label) ?? []),
-      !isOver ? `Add ${baselineComplexity === "low" ? "moderate seaming detail" : "tonal topstitching"} for craft credibility` : "",
-    ].filter(Boolean).slice(0, 3) as string[];
-
     return {
       headline: `${mat.name} is your starting point for ${dir}.`,
-      p1, p2, p3, opportunity, editItems, sharpenItems,
+      p1, p2, p3, opportunity, editItems,
     };
-  }, [selectedMaterial, baselineMaterial, conceptContext.aestheticName, marginCeiling, insight, alternativeMaterial, mukoSynthesis, baselineComplexity]);
+  }, [selectedMaterial, baselineMaterial, conceptContext.aestheticName, marginCeiling, insight, alternativeMaterial, baselineComplexity]);
 
   const suggestedQuestions = useMemo(() => {
     const qs = [
@@ -1529,10 +1272,12 @@ export default function SpecStudioPage() {
       </header>
 
       {/* ── Two-column body ────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", flex: 1, paddingTop: 72, overflow: "hidden", height: "calc(100vh - 72px)" }}>
-
-        {/* ── LEFT COLUMN ── scrollable ─────────────────────────────────────── */}
-        <div style={{ width: "50%", height: "100%", overflowY: "auto", overflowX: "hidden" }}>
+      <ResizableSplitPanel
+        defaultLeftPercent={60}
+        storageKey="muko_spec_splitPanel"
+        topOffset={72}
+        leftContent={
+          <>
 
           {/* Title */}
           <div style={{ padding: "36px 44px 24px" }}>
@@ -1540,7 +1285,7 @@ export default function SpecStudioPage() {
               Spec Studio
             </h1>
             <p style={{ margin: "10px 0 0", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.52)", lineHeight: 1.55, maxWidth: 460 }}>
-              Define the physical product — Muko checks your margins and feasibility in real time.
+              We translated your concept into a recommended spec. Select your garment type, explore materials and construction — Muko scores every combination in real time.
             </p>
           </div>
 
@@ -1561,10 +1306,32 @@ export default function SpecStudioPage() {
               flexWrap: "wrap" as const,
             }}
           >
-            {/* Direction name */}
+            {/* Direction name + silhouette + palette */}
             <span style={{ fontFamily: sohne, fontSize: 13.5, fontWeight: 500, color: OLIVE, letterSpacing: "-0.01em", flexShrink: 0 }}>
               {refinement.base}
             </span>
+            {conceptSilhouette && (
+              <>
+                <span style={{ color: "rgba(67,67,43,0.30)", fontSize: 11 }}>&middot;</span>
+                <span style={{ fontFamily: inter, fontSize: 12, fontWeight: 400, color: "rgba(67,67,43,0.60)" }}>
+                  {conceptSilhouette.charAt(0).toUpperCase() + conceptSilhouette.slice(1)}
+                </span>
+              </>
+            )}
+            {conceptPalette && (() => {
+              const entry = (aestheticsData as unknown as Array<{ id: string; palette_options?: Array<{ id: string; name: string }> }>).find(
+                (a) => a.id === conceptContext.aestheticMatchedId
+              );
+              const palName = entry?.palette_options?.find((p) => p.id === conceptPalette)?.name ?? conceptPalette;
+              return (
+                <>
+                  <span style={{ color: "rgba(67,67,43,0.30)", fontSize: 11 }}>&middot;</span>
+                  <span style={{ fontFamily: inter, fontSize: 12, fontWeight: 400, color: "rgba(67,67,43,0.60)" }}>
+                    {palName}
+                  </span>
+                </>
+              );
+            })()}
 
             {/* Scores inline — identity + resonance only */}
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
@@ -1576,53 +1343,26 @@ export default function SpecStudioPage() {
               </span>
             </div>
 
-            {/* Chips — concept chips (dark blue, locked), spec chips (light blue + removable x) */}
+            {/* Chips — unified style */}
             {chipSelection && chipSelection.activatedChips.length > 0 && (
               <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" as const }}>
-                {chipSelection.activatedChips.map((chip) => {
-                  const isSpecChip = chip.type === "spec";
-                  return isSpecChip ? (
-                    <span
-                      key={chip.label}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 5,
-                        padding: "4px 8px 4px 10px",
-                        borderRadius: 999,
-                        fontSize: 11,
-                        fontWeight: 500,
-                        color: STEEL,
-                        background: "rgba(125,150,172,0.07)",
-                        border: `1px solid rgba(125,150,172,0.28)`,
-                        fontFamily: inter,
-                      }}
-                    >
-                      {chip.label}
-                      <button
-                        onClick={() => removeSpecChip(chip.label)}
-                        style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 13, height: 13, borderRadius: "50%", background: "rgba(125,150,172,0.18)", border: "none", cursor: "pointer", padding: 0, color: STEEL, fontSize: 9, fontWeight: 700, lineHeight: 1, flexShrink: 0 }}
-                        aria-label={`Remove ${chip.label}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ) : (
-                    <span
-                      key={chip.label}
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: 999,
-                        fontSize: 11,
-                        fontWeight: 500,
-                        color: "#4D7390",
-                        background: "rgba(125,150,172,0.14)",
-                        border: `1px solid rgba(125,150,172,0.38)`,
-                        fontFamily: inter,
-                      }}
-                    >
-                      {chip.label}
-                    </span>
-                  );
-                })}
+                {chipSelection.activatedChips.map((chip) => (
+                  <span
+                    key={chip.label}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: 999,
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: STEEL,
+                      background: "rgba(125,150,172,0.10)",
+                      border: "1px solid rgba(125,150,172,0.28)",
+                      fontFamily: inter,
+                    }}
+                  >
+                    {chip.label}
+                  </span>
+                ))}
               </div>
             )}
           </div>
@@ -1671,6 +1411,42 @@ export default function SpecStudioPage() {
                 ))}
               </select>
             </div>
+
+            {categorySubcategories.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={microLabel}>Type</span>
+                <select
+                  value={subcategoryId}
+                  onChange={(e) => handleSubcategoryChange(e.target.value)}
+                  style={{
+                    padding: "8px 28px 8px 12px",
+                    borderRadius: 12,
+                    width: 170,
+                    border: "1px solid rgba(67, 67, 43, 0.12)",
+                    background: "rgba(255,255,255,0.78)",
+                    fontFamily: "var(--font-inter), system-ui, sans-serif",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: subcategoryId ? BRAND.oliveInk : "rgba(67, 67, 43, 0.40)",
+                    cursor: "pointer",
+                    outline: "none",
+                    boxShadow: "0 10px 26px rgba(67, 67, 43, 0.06)",
+                    appearance: "none" as const,
+                    backgroundImage:
+                      `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2343432B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.4'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 14px center",
+                  }}
+                >
+                  <option value="" disabled>Select type...</option>
+                  {categorySubcategories.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={microLabel}>MSRP</span>
@@ -1749,20 +1525,20 @@ export default function SpecStudioPage() {
             const cellValueStyle = { fontFamily: sohne, fontSize: 13, fontWeight: 650 as const, color: OLIVE, marginBottom: 3 };
             const cellDetailStyle = { fontFamily: inter, fontSize: 10, color: "rgba(67,67,43,0.45)" };
 
-            // Muko's Pick: show all 4 baseline cells
-            // Selected: only show cells user has actually chosen, order: Material, Silhouette, Palette, Complexity
+            // Muko's Pick: show Material + Complexity cells
+            // Silhouette & Palette are already visible in the locked concept direction bar above
+            const mukoMatChips = baselineMaterial ? (chipsByMaterial[baselineMaterial.id] || []) : [];
+            const mukoComplexChips = baselineComplexity === "high" ? chipsForHighComplexity : [];
             const mukoCells = [
-              { key: "material", label: "Material", name: baselineMaterial?.name ?? "—", detail: baselineMaterial ? `$${baselineMaterial.cost_per_yard}/yd · ${baselineMaterial.lead_time_weeks}wk` : "—" },
-              { key: "silhouette", label: "Silhouette", name: baselineSilhouette?.name ?? "—", detail: baselineSilhouette ? `~${baselineSilhouette.yardage} yards` : "—" },
-              { key: "palette", label: "Palette", name: paletteOptions[recommendedPaletteIdx]?.name ?? "—", detail: null, swatches: paletteOptions[recommendedPaletteIdx]?.palette },
-              { key: "complexity", label: "Complexity", name: COMPLEXITY_CONTEXT[baselineComplexity].label, detail: COMPLEXITY_CONTEXT[baselineComplexity].description },
+              { key: "material", label: "Material", name: baselineMaterial?.name ?? "—", detail: baselineMaterial ? `$${baselineMaterial.cost_per_yard}/yd · ${baselineMaterial.lead_time_weeks}wk` : "—", locked: false, chips: mukoMatChips },
+              { key: "complexity", label: "Complexity", name: COMPLEXITY_CONTEXT[baselineComplexity].label, detail: COMPLEXITY_CONTEXT[baselineComplexity].description, locked: false, chips: mukoComplexChips },
             ];
 
+            const selMatChips = selectedMaterial ? (chipsByMaterial[selectedMaterial.id] || []) : [];
+            const selComplexChips = constructionTier === "high" ? chipsForHighComplexity : [];
             const selectedCells = [
-              ...(materialId ? [{ key: "material", label: "Material", name: selectedMaterial?.name ?? "—", detail: selectedMaterial ? `$${selectedMaterial.cost_per_yard}/yd · ${selectedMaterial.lead_time_weeks}wk` : "—" }] : []),
-              ...(silhouetteId ? [{ key: "silhouette", label: "Silhouette", name: selectedSilhouette?.name ?? "—", detail: selectedSilhouette ? `~${selectedSilhouette.yardage} yards` : "—" }] : []),
-              ...(selectedPaletteIdx >= 0 ? [{ key: "palette", label: "Palette", name: paletteOptions[selectedPaletteIdx]?.name ?? "—", detail: null, swatches: paletteOptions[selectedPaletteIdx]?.palette }] : []),
-              ...(constructionTier ? [{ key: "complexity", label: "Complexity", name: COMPLEXITY_CONTEXT[constructionTier].label, detail: COMPLEXITY_CONTEXT[constructionTier].description }] : []),
+              ...(materialId ? [{ key: "material", label: "Material", name: selectedMaterial?.name ?? "—", detail: selectedMaterial ? `$${selectedMaterial.cost_per_yard}/yd · ${selectedMaterial.lead_time_weeks}wk` : "—", locked: false, chips: selMatChips }] : []),
+              ...(constructionTier ? [{ key: "complexity", label: "Complexity", name: COMPLEXITY_CONTEXT[constructionTier].label, detail: COMPLEXITY_CONTEXT[constructionTier].description, locked: false, chips: selComplexChips }] : []),
             ];
 
             const cells = hasUserSelection ? selectedCells : mukoCells;
@@ -1790,25 +1566,53 @@ export default function SpecStudioPage() {
                 }}>
                   {/* Mini-cells */}
                   <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 8, marginBottom: 14 }}>
-                    {cells.map((cell) => (
-                      <div key={cell.key} style={{ ...cellStyle, position: "relative" as const }}>
-                        {hasUserSelection && (
-                          <div style={{ position: "absolute", top: 6, right: 6, width: 18, height: 18, borderRadius: "50%", background: CHARTREUSE, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          </div>
-                        )}
-                        <div style={cellLabelStyle}>{cell.label}</div>
-                        <div style={cellValueStyle}>{cell.name}</div>
-                        {cell.detail && <div style={cellDetailStyle}>{cell.detail}</div>}
-                        {(cell as any).swatches && (
-                          <div style={{ display: "flex", gap: 3, marginTop: 2 }}>
-                            {((cell as any).swatches as Array<{ hex: string }>).slice(0, 5).map((c, ci) => (
-                              <div key={ci} style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: c.hex, border: "1px solid rgba(0,0,0,0.06)" }} />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                    {cells.map((cell) => {
+                      const isLocked = (cell as any).locked === true;
+                      return (
+                        <div key={cell.key} style={{ ...cellStyle, position: "relative" as const, opacity: isLocked ? 0.7 : 1 }}>
+                          {isLocked ? (
+                            <div style={{ position: "absolute", top: 6, right: 6, width: 18, height: 18, borderRadius: "50%", background: "rgba(67,67,43,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }} title="Set in Concept Studio — go back to change">
+                              <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><rect x="3" y="6" width="8" height="6" rx="1.5" stroke="rgba(67,67,43,0.40)" strokeWidth="1.2" /><path d="M5 6V4.5a2 2 0 0 1 4 0V6" stroke="rgba(67,67,43,0.40)" strokeWidth="1.2" strokeLinecap="round" /></svg>
+                            </div>
+                          ) : hasUserSelection ? (
+                            <div style={{ position: "absolute", top: 6, right: 6, width: 18, height: 18, borderRadius: "50%", background: CHARTREUSE, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            </div>
+                          ) : null}
+                          <div style={cellLabelStyle}>{cell.label}</div>
+                          <div style={cellValueStyle}>{cell.name}</div>
+                          {cell.detail && <div style={cellDetailStyle}>{cell.detail}</div>}
+                          {(cell as any).chips && (cell as any).chips.length > 0 && (
+                            <div style={{ marginTop: 5, display: "flex", flexWrap: "wrap", gap: 3 }}>
+                              {((cell as any).chips as ActivatedChip[]).map((chip) => (
+                                <span
+                                  key={chip.label}
+                                  style={{
+                                    padding: "2px 7px",
+                                    borderRadius: 999,
+                                    fontSize: 9,
+                                    fontWeight: 550,
+                                    color: STEEL,
+                                    background: "rgba(125,150,172,0.10)",
+                                    border: "1px solid rgba(125,150,172,0.28)",
+                                    fontFamily: inter,
+                                  }}
+                                >
+                                  {chip.label}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {(cell as any).swatches && (
+                            <div style={{ display: "flex", gap: 3, marginTop: 2 }}>
+                              {((cell as any).swatches as Array<{ hex: string }>).slice(0, 5).map((c, ci) => (
+                                <div key={ci} style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: c.hex, border: "1px solid rgba(0,0,0,0.06)" }} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Footer */}
@@ -1855,28 +1659,22 @@ export default function SpecStudioPage() {
                     const deltas = scoreMaterialDeltas(mat);
                     const matchingChips = chipsByMaterial[mat.id] || [];
 
-                    const roseGlow = isRec
-                      ? {
-                          boxShadow:
-                            "0 18px 50px rgba(169,123,143,0.16), 0 0 0 1px rgba(169,123,143,0.22), inset 0 1px 0 rgba(255,255,255,0.60)",
-                          border: "1.5px solid rgba(169,123,143,0.28)",
-                        }
-                      : {};
-
                     return (
                       <button
                         key={mat.id}
-                        onClick={() => setMaterialId(mat.id)}
+                        onClick={() => { setMaterialId(mat.id); setUserManuallySelected(true); }}
                         onMouseEnter={() => setHoveredMaterialId(mat.id)}
                         onMouseLeave={() => setHoveredMaterialId(null)}
                         style={{
                           textAlign: "left",
                           borderRadius: 14,
                           padding: "14px 14px 12px",
-                          background: isSel ? "rgba(255,255,255,0.88)" : isRec ? "rgba(169,123,143,0.04)" : "rgba(255,255,255,0.55)",
+                          background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
                           border: isSel
                             ? `1.5px solid ${CHARTREUSE}`
-                            : "1px solid rgba(67, 67, 43, 0.10)",
+                            : isRec && !isSel
+                              ? "1.5px solid rgba(169,123,143,0.35)"
+                              : "1px solid rgba(67, 67, 43, 0.10)",
                           boxShadow: isSel
                             ? "0 14px 40px rgba(67,67,43,0.10)"
                             : "0 8px 24px rgba(67,67,43,0.05)",
@@ -1885,7 +1683,6 @@ export default function SpecStudioPage() {
                           transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
                           transform: isSel ? "translateY(-1px)" : "translateY(0)",
                           position: "relative",
-                          ...(isRec && !isSel ? roseGlow : {}),
                         }}
                       >
                         {isRec && !isSel && (
@@ -1984,404 +1781,6 @@ export default function SpecStudioPage() {
                 </div>
               </div>
 
-              {/* Silhouette */}
-              <div>
-                <div style={{ marginBottom: 12 }}>
-                  <span style={sectionHeading}>Silhouette</span>
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: "rgba(67,67,43,0.40)",
-                      fontFamily: "var(--font-inter), system-ui, sans-serif",
-                      marginLeft: 10,
-                    }}
-                  >
-                    for {selectedCategory.name}
-                  </span>
-                </div>
-
-                <div style={{ display: "flex", gap: 10 }}>
-                  {(selectedCategory.silhouettes || []).map((sil) => {
-                    const isSel = silhouetteId === sil.id;
-                    const isRec = sil.id === recommendedSilhouetteId;
-                    const isHover = hoveredSilhouetteId === sil.id;
-                    const deltas = scoreSilhouetteDeltas(sil.id);
-                    const matchingChips = chipsBySilhouette[sil.id] || [];
-
-                    const roseGlow = isRec
-                      ? {
-                          boxShadow:
-                            "0 18px 50px rgba(169,123,143,0.16), 0 0 0 1px rgba(169,123,143,0.22), inset 0 1px 0 rgba(255,255,255,0.60)",
-                          border: "1.5px solid rgba(169,123,143,0.28)",
-                        }
-                      : {};
-
-                    return (
-                      <button
-                        key={sil.id}
-                        onClick={() => setSilhouetteId(sil.id)}
-                        onMouseEnter={() => setHoveredSilhouetteId(sil.id)}
-                        onMouseLeave={() => setHoveredSilhouetteId(null)}
-                        style={{
-                          flex: 1,
-                          textAlign: "left",
-                          borderRadius: 14,
-                          padding: "16px 14px 14px",
-                          background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
-                          border: isSel
-                            ? `1.5px solid ${CHARTREUSE}`
-                            : "1px solid rgba(67,67,43,0.10)",
-                          boxShadow: isSel
-                            ? "0 14px 40px rgba(67,67,43,0.10)"
-                            : "0 8px 24px rgba(67,67,43,0.05)",
-                          cursor: "pointer",
-                          outline: "none",
-                          transition: "all 200ms ease",
-                          position: "relative",
-                          ...(isRec ? roseGlow : {}),
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "flex-start",
-                            gap: 10,
-                          }}
-                        >
-                          <div>
-                            <div
-                              style={{
-                                fontSize: 14,
-                                fontWeight: 650,
-                                color: OLIVE,
-                                fontFamily: sohne,
-                              }}
-                            >
-                              {sil.name}
-                            </div>
-                            {isRec && !isSel && (
-                              <span style={{ display: "inline-block", marginTop: 3, padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(169,123,143,0.10)", border: "1px solid rgba(169,123,143,0.30)", color: ROSE, fontFamily: inter }}>
-                                Muko&apos;s Pick
-                              </span>
-                            )}
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: "rgba(67,67,43,0.38)",
-                                fontFamily: inter,
-                                marginTop: 4,
-                              }}
-                            >
-                              ~{sil.yardage} yards
-                            </div>
-
-                            {matchingChips.length > 0 && (
-                              <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                                {matchingChips.map((chip) => (
-                                  <span
-                                    key={chip.label}
-                                    style={{
-                                      padding: "3px 8px",
-                                      borderRadius: 999,
-                                      fontSize: 10,
-                                      fontWeight: 550,
-                                      color: STEEL,
-                                      background: "rgba(125,150,172,0.10)",
-                                      border: "1px solid rgba(125,150,172,0.28)",
-                                      fontFamily: inter,
-                                    }}
-                                  >
-                                    {chip.label}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {isHover && !isSel ? (
-                            compactDeltaCluster({
-                              deltas,
-                              isHoverOrActive: true,
-                              isRecommended: isRec,
-                            })
-                          ) : !isSel ? (
-                            aggregateDeltaDot({ deltas })
-                          ) : null}
-                        </div>
-
-                        {(isHover || isSel) && (
-                          <div style={{ marginTop: 10 }}>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                lineHeight: 1.5,
-                                color: "rgba(67,67,43,0.70)",
-                                fontFamily: "var(--font-inter), system-ui, sans-serif",
-                              }}
-                            >
-                              {SILHOUETTE_DESCRIPTIONS[sil.id] || "Sets proportion and posture — this will drive both fabric behavior and cost."}
-                            </div>
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {silhouetteAffinity && !silhouetteAffinity.aligned && (
-                  <div
-                    style={{
-                      marginTop: 10,
-                      padding: "10px 14px",
-                      borderRadius: 12,
-                      background: "rgba(184,135,107,0.08)",
-                      border: "1px solid rgba(184,135,107,0.22)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      animation: "fadeIn 300ms ease-out",
-                    }}
-                  >
-                    <span style={{ fontSize: 13, color: BRAND.camel }}>⚠</span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        color: "rgba(67,67,43,0.65)",
-                        fontFamily: "var(--font-inter), system-ui, sans-serif",
-                      }}
-                    >
-                      {silhouetteAffinity.note}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Palette */}
-              <div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 12,
-                  }}
-                >
-                  <div style={sectionHeading}>Palette</div>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: "rgba(67,67,43,0.35)",
-                      fontFamily: "var(--font-inter), system-ui, sans-serif",
-                    }}
-                  >
-                    Recommended for {conceptContext.aestheticName}
-                  </span>
-                </div>
-
-                <div style={{ display: "flex", gap: 10 }}>
-                  {paletteOptions.map((opt, idx) => {
-                    const isSel = selectedPaletteIdx === idx;
-                    const isRec = idx === recommendedPaletteIdx;
-                    const isHover = hoveredPaletteIdx === idx;
-                    const deltas = scorePaletteDeltas(idx);
-                    const matchingChips = chipsByPaletteIdx[idx] || [];
-
-                    const roseGlow = isRec
-                      ? {
-                          boxShadow:
-                            "0 18px 50px rgba(169,123,143,0.16), 0 0 0 1px rgba(169,123,143,0.22), inset 0 1px 0 rgba(255,255,255,0.60)",
-                          border: "1.5px solid rgba(169,123,143,0.28)",
-                        }
-                      : {};
-
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => setSelectedPaletteIdx(idx)}
-                        onMouseEnter={() => setHoveredPaletteIdx(idx)}
-                        onMouseLeave={() => setHoveredPaletteIdx(null)}
-                        style={{
-                          flex: 1,
-                          textAlign: "left",
-                          borderRadius: 14,
-                          padding: "14px 14px 12px",
-                          background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
-                          border: isSel
-                            ? `1.5px solid ${CHARTREUSE}`
-                            : "1px solid rgba(67,67,43,0.10)",
-                          boxShadow: isSel
-                            ? "0 14px 40px rgba(67,67,43,0.10)"
-                            : "0 8px 24px rgba(67,67,43,0.05)",
-                          cursor: "pointer",
-                          outline: "none",
-                          transition: "all 200ms ease",
-                          position: "relative",
-                          ...(isRec ? roseGlow : {}),
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "flex-start",
-                            gap: 10,
-                          }}
-                        >
-                          <div>
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: 4,
-                                marginBottom: 10,
-                                justifyContent: "flex-start",
-                              }}
-                            >
-                              {opt.palette.map((c, ci) => (
-                                <div
-                                  key={ci}
-                                  style={{
-                                    width: 16,
-                                    height: 16,
-                                    borderRadius: 5,
-                                    backgroundColor: c.hex,
-                                    border: "1px solid rgba(0,0,0,0.06)",
-                                  }}
-                                />
-                              ))}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 14,
-                                fontWeight: 650,
-                                color: BRAND.oliveInk,
-                                fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                                lineHeight: 1.3,
-                              }}
-                            >
-                              {opt.name}
-                            </div>
-
-                            {isRec && !isSel && (
-                              <span style={{ display: "inline-block", marginTop: 4, padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(169,123,143,0.10)", border: "1px solid rgba(169,123,143,0.30)", color: ROSE, fontFamily: inter }}>
-                                Muko&apos;s Pick
-                              </span>
-                            )}
-
-                            {matchingChips.length > 0 && (
-                              <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                                {matchingChips.map((chip) => (
-                                  <span
-                                    key={chip.label}
-                                    style={{
-                                      padding: "3px 8px",
-                                      borderRadius: 999,
-                                      fontSize: 10,
-                                      fontWeight: 550,
-                                      color: STEEL,
-                                      background: "rgba(125,150,172,0.10)",
-                                      border: "1px solid rgba(125,150,172,0.28)",
-                                      fontFamily: inter,
-                                    }}
-                                  >
-                                    {chip.label}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {isHover && !isSel ? (
-                            compactDeltaCluster({
-                              deltas,
-                              isHoverOrActive: true,
-                              isRecommended: isRec,
-                            })
-                          ) : !isSel ? (
-                            aggregateDeltaDot({ deltas })
-                          ) : null}
-                        </div>
-
-                        {(isHover || isSel) && (
-                          <div style={{ marginTop: 10 }}>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                lineHeight: 1.5,
-                                color: "rgba(67,67,43,0.70)",
-                                fontFamily: "var(--font-inter), system-ui, sans-serif",
-                              }}
-                            >
-                              {PALETTE_DESCRIPTIONS[opt.name] || "Shifts mood and perceived value — palette is one of your strongest 'intent' levers."}
-                            </div>
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Palette preview */}
-                {selectedPaletteIdx >= 0 && (
-                <div
-                  style={{
-                    marginTop: 12,
-                    display: "flex",
-                    gap: 10,
-                    justifyContent:
-                      selectedPaletteIdx === 0
-                        ? "flex-start"
-                        : selectedPaletteIdx === 2
-                          ? "flex-end"
-                          : "center",
-                    animation: "fadeIn 300ms ease-out",
-                  }}
-                >
-                  {paletteOptions[selectedPaletteIdx].palette.map((c, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        width: 62,
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 56,
-                          height: 56,
-                          borderRadius: 12,
-                          backgroundColor: c.hex,
-                          border: "1px solid rgba(0,0,0,0.05)",
-                          boxShadow: "0 6px 16px rgba(67,67,43,0.08)",
-                        }}
-                      />
-                      <span
-                        style={{
-                          fontSize: 10,
-                          color: "rgba(67,67,43,0.50)",
-                          fontFamily: "var(--font-inter), system-ui, sans-serif",
-                        }}
-                      >
-                        {c.name}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 9,
-                          color: "rgba(67,67,43,0.28)",
-                          fontFamily: "var(--font-inter), system-ui, sans-serif",
-                        }}
-                      >
-                        {c.hex}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                )}
-              </div>
-
               {/* Complexity */}
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
@@ -2398,7 +1797,7 @@ export default function SpecStudioPage() {
                       fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
                     }}
                   >
-                    Default: {CONSTRUCTION_INFO[SMART_DEFAULTS[categoryId] || "moderate"].label}
+                    Default: {CONSTRUCTION_INFO[getSmartDefault(categoryId, conceptSilhouette || undefined)].label}
                   </span>
                 </div>
 
@@ -2410,14 +1809,6 @@ export default function SpecStudioPage() {
                     const isHover = hoveredComplexity === tier;
                     const deltas = scoreComplexityDeltas(tier);
                     const matchingChips = tier === "high" ? chipsForHighComplexity : [];
-
-                    const roseGlow = isRec
-                      ? {
-                          boxShadow:
-                            "0 18px 50px rgba(169,123,143,0.16), 0 0 0 1px rgba(169,123,143,0.22), inset 0 1px 0 rgba(255,255,255,0.60)",
-                          border: "1.5px solid rgba(169,123,143,0.28)",
-                        }
-                      : {};
 
                     return (
                       <button
@@ -2433,7 +1824,9 @@ export default function SpecStudioPage() {
                           background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
                           border: isSel
                             ? `1.5px solid ${CHARTREUSE}`
-                            : "1px solid rgba(67,67,43,0.10)",
+                            : isRec && !isSel
+                              ? "1.5px solid rgba(169,123,143,0.35)"
+                              : "1px solid rgba(67,67,43,0.10)",
                           boxShadow: isSel
                             ? "0 14px 40px rgba(67,67,43,0.10)"
                             : "0 8px 24px rgba(67,67,43,0.05)",
@@ -2441,7 +1834,6 @@ export default function SpecStudioPage() {
                           outline: "none",
                           transition: "all 200ms ease",
                           position: "relative",
-                          ...(isRec ? roseGlow : {}),
                         }}
                       >
                         <div
@@ -2585,193 +1977,76 @@ export default function SpecStudioPage() {
           `}</style>
 
         </div>{/* end left content padding */}
-      </div>{/* end left column */}
-
-      {/* ── RIGHT COLUMN ── scrollable ─────────────────────────────────── */}
-      <div style={{ width: "50%", height: "100%", overflowY: "auto", overflowX: "hidden", borderLeft: "1px solid rgba(67,67,43,0.07)" }}>
-        <div style={{ padding: "36px 36px 48px" }}>
+          </>
+        }
+        rightContent={
+        <>
+        <div style={{ padding: "36px 36px 0" }}>
           {/* Pulse Rail */}
-          <div style={{ marginBottom: 28 }}>
+          <div style={{ marginBottom: 0 }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 16 }}>Pulse</div>
-            {([
-              {
-                label: "Identity",
-                key: "identity",
-                icon: <IconIdentity size={14} />,
-                score: `${dynamicIdentityScore}`,
-                scoreNum: dynamicIdentityScore,
-                color: identityColor,
-                chip: identityChipData,
-                subLabel: "Locked from Concept" as string | null,
-                what: "Identity measures how well your material, silhouette, palette, and construction choices reinforce the locked direction's brand signals.",
-                how: "Delta scoring against your locked aesthetic — each spec choice adds or subtracts from the base concept identity score.",
-              },
-              {
-                label: "Resonance",
-                key: "resonance",
-                icon: <IconResonance size={14} />,
-                score: `${dynamicResonanceScore}`,
-                scoreNum: dynamicResonanceScore,
-                color: resonanceColor,
-                chip: resonanceChipData,
-                subLabel: "Locked from Concept" as string | null,
-                what: "Resonance measures whether your choices are commercially timed — does the market appetite exist for this spec combination right now?",
-                how: "Material trend alignment + silhouette saturation score, weighted against your direction's velocity data.",
-              },
-              {
-                label: "Execution",
-                key: "execution",
-                icon: <IconExecution size={14} />,
-                score: !insight ? "—" : `$${insight.cogs}`,
-                scoreNum: !insight ? 0 : Math.min((insight.cogs / insight.ceiling) * 100, 100),
-                color: executionColor,
-                chip: executionChipData,
-                subLabel: null as string | null,
-                what: "Execution measures cost feasibility — whether your build is viable at the target margin. COGS is calculated from material cost × yardage + complexity multiplier.",
-                how: "COGS vs margin ceiling: green if under, amber within 5%, red if over. Lead time scored separately against season deadline.",
-              },
-            ]).map((row) => {
-              const isExpanded = pulseExpandedRow === row.key;
-              const pillVariant = row.chip?.variant ?? "amber";
-              const PILL = {
-                green: { bg: "rgba(77,122,86,0.10)", color: "#4D7A56", border: "rgba(77,122,86,0.20)" },
-                amber: { bg: "rgba(155,122,58,0.10)", color: "#9B7A3A", border: "rgba(155,122,58,0.20)" },
-                red: { bg: "rgba(138,58,58,0.10)", color: "#8A3A3A", border: "rgba(138,58,58,0.20)" },
-              };
-              const pill = PILL[pillVariant as keyof typeof PILL] || PILL.amber;
-              return (
-                <div key={row.key} style={{ borderBottom: "1px solid rgba(67,67,43,0.07)", paddingBottom: 14, marginBottom: 14 }}>
-                  <button
-                    onClick={() => setPulseExpandedRow(isExpanded ? null : row.key)}
-                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", marginBottom: 8 }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ color: row.color, opacity: 0.9 }}>{row.icon}</span>
-                      <span style={{ fontFamily: sohne, fontWeight: 700, fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.68)" }}>
-                        {row.label}
-                      </span>
-                      {row.chip && (
-                        <span style={{ fontSize: 10, fontWeight: 600, fontFamily: inter, color: pill.color, background: pill.bg, border: `1px solid ${pill.border}`, borderRadius: 999, padding: "2px 8px" }}>
-                          {row.chip.status}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ ...scoreTextStyle, fontSize: 13 }}>{row.score}</span>
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.35, transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 200ms ease" }}>
-                        <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </div>
-                  </button>
-                  <div style={{ height: 2, borderRadius: 1, background: "rgba(67,67,43,0.08)", marginBottom: (row.subLabel || row.chip?.consequence) ? 6 : 0 }}>
-                    <div style={{ height: 2, borderRadius: 1, background: row.color, width: `${row.scoreNum}%`, transition: "width 500ms ease, background 300ms ease" }} />
-                  </div>
-                  {(row.subLabel || row.chip?.consequence) && (
-                    <div style={{ fontSize: 10, color: "rgba(67,67,43,0.45)", fontFamily: inter, marginTop: 4 }}>
-                      {row.subLabel ?? row.chip?.consequence}
-                    </div>
-                  )}
-                  {isExpanded && (
-                    <div style={{ marginTop: 10, padding: "12px 14px", borderRadius: 8, background: "rgba(67,67,43,0.03)", border: "1px solid rgba(67,67,43,0.07)", animation: "fadeIn 200ms ease-out" }}>
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 4 }}>What this means</div>
-                        <div style={{ fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.65)", fontFamily: inter }}>{row.what}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 4 }}>How it&apos;s calculated</div>
-                        <div style={{ fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.65)", fontFamily: inter }}>{row.how}</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            <PulseScoreRow
+              dimensionKey="identity"
+              label="Identity"
+              icon={<IconIdentity size={14} />}
+              displayScore={`${dynamicIdentityScore}`}
+              numericPercent={dynamicIdentityScore}
+              scoreColor={identityColor}
+              pill={identityChipData ? { variant: identityChipData.variant, label: identityChipData.status } : null}
+              subLabel="Locked from Concept"
+              whatItMeans="Identity measures how well your material, silhouette, palette, and construction choices reinforce the locked direction's brand signals."
+              howCalculated="Delta scoring against your locked aesthetic — each spec choice adds or subtracts from the base concept identity score."
+              isPending={false}
+              isExpanded={pulseExpandedRow === "identity"}
+              onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === "identity" ? null : "identity")}
+            />
+            <PulseScoreRow
+              dimensionKey="resonance"
+              label="Resonance"
+              icon={<IconResonance size={14} />}
+              displayScore={`${dynamicResonanceScore}`}
+              numericPercent={dynamicResonanceScore}
+              scoreColor={resonanceColor}
+              pill={resonanceChipData ? { variant: resonanceChipData.variant, label: resonanceChipData.status } : null}
+              subLabel="Locked from Concept"
+              whatItMeans="Resonance measures whether your choices are commercially timed — does the market appetite exist for this spec combination right now?"
+              howCalculated="Material trend alignment + silhouette saturation score, weighted against your direction's velocity data."
+              isPending={false}
+              isExpanded={pulseExpandedRow === "resonance"}
+              onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === "resonance" ? null : "resonance")}
+            />
+            <PulseScoreRow
+              dimensionKey="execution"
+              label="Execution"
+              icon={<IconExecution size={14} />}
+              displayScore={!insight ? "—" : `$${insight.cogs}`}
+              numericPercent={!insight ? 0 : Math.min((insight.cogs / insight.ceiling) * 100, 100)}
+              scoreColor={executionColor}
+              pill={executionChipData ? { variant: executionChipData.variant, label: executionChipData.status } : null}
+              subLabel={executionChipData?.consequence ?? null}
+              whatItMeans="Execution measures cost feasibility — whether your build is viable at the target margin. COGS is calculated from material cost × yardage + complexity multiplier."
+              howCalculated="COGS vs margin ceiling: green if under, amber within 5%, red if over. Lead time scored separately against season deadline."
+              isPending={!insight}
+              isExpanded={pulseExpandedRow === "execution"}
+              onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === "execution" ? null : "execution")}
+            />
           </div>
 
           {/* Muko Insight */}
-          <div style={{ marginBottom: 28 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 12 }}>
-              Muko Insight
-            </div>
-            <h3 style={{ margin: "0 0 14px", fontFamily: sohne, fontWeight: 500, fontSize: 17, color: OLIVE, lineHeight: 1.3, letterSpacing: "-0.01em" }}>
-              {specInsightContent.headline}
-            </h3>
-            <p style={{ margin: "0 0 10px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.82)", lineHeight: 1.62 }}>
-              {specInsightContent.p1}
-            </p>
-            <p style={{ margin: "0 0 10px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.66)", lineHeight: 1.62 }}>
-              {specInsightContent.p2}
-            </p>
-            <p style={{ margin: "0 0 20px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.52)", lineHeight: 1.62 }}>
-              {specInsightContent.p3}
-            </p>
-            {specInsightContent.opportunity.length > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: BRAND.chartreuse, fontFamily: sohne, marginBottom: 4 }}>
-                  The Opportunity
-                </div>
-                <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 8 }}>
-                  What&apos;s working in your favor right now
-                </div>
-                <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
-                  {specInsightContent.opportunity.map((item, i) => (
-                    <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                      <span style={{ color: BRAND.chartreuse, fontSize: 11, lineHeight: "1.55", flexShrink: 0, marginTop: 1 }}>—</span>
-                      <span style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.72)", lineHeight: 1.55 }}>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {specInsightContent.editItems.length > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: CAMEL_COL, fontFamily: sohne, marginBottom: 4 }}>
-                  The Edit
-                </div>
-                <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 10 }}>
-                  Inputs worth revisiting before you commit
-                </div>
-                <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
-                  {specInsightContent.editItems.map((item, i) => (
-                    <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                      <span style={{ color: CAMEL_COL, fontSize: 11, lineHeight: "1.55", flexShrink: 0, marginTop: 1 }}>—</span>
-                      <span style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.72)", lineHeight: 1.55 }}>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {specInsightContent.sharpenItems.length > 0 && (
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: BRAND.steelBlue, fontFamily: sohne, marginBottom: 4 }}>
-                  Sharpen Your Spec
-                </div>
-                <p style={{ margin: "0 0 10px", fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", lineHeight: 1.5 }}>
-                  Small additions that improve execution clarity
-                </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {specInsightContent.sharpenItems.map((item, i) => {
-                    const isAdded = addedSharpenItems.has(item);
-                    return (
-                      <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 10px", borderRadius: 8, background: isAdded ? "rgba(125,150,172,0.05)" : "rgba(67,67,43,0.02)", border: isAdded ? "1px solid rgba(125,150,172,0.22)" : "1px solid rgba(67,67,43,0.07)", transition: "all 200ms ease" }}>
-                        <span style={{ fontFamily: inter, fontSize: 12, color: isAdded ? STEEL : "rgba(67,67,43,0.72)", lineHeight: 1.5, flex: 1 }}>{item}</span>
-                        {isAdded ? (
-                          <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, fontFamily: sohne, color: STEEL, letterSpacing: "0.02em" }}>✓ Added</span>
-                        ) : (
-                          <button
-                            onClick={() => addSharpenChip(item)}
-                            style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, fontFamily: sohne, color: STEEL, background: "rgba(125,150,172,0.07)", border: `1px solid rgba(125,150,172,0.22)`, borderRadius: 6, padding: "4px 8px", cursor: "pointer", letterSpacing: "0.02em" }}
-                          >
-                            ADD
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+          <MukoInsightSection
+            headline={specInsightContent.headline}
+            paragraphs={[specInsightContent.p1, specInsightContent.p2, specInsightContent.p3]}
+            opportunity={{ items: specInsightContent.opportunity }}
+            edit={{ items: specInsightContent.editItems }}
+            nextMove={{
+              mode: "spec",
+              suggestions: mukoSynthesis?.suggestions ?? [],
+              subtitle: "Adjustments that improve feasibility without changing your direction.",
+              appliedIds: appliedSuggestions,
+              onApply: (id) => applySuggestion(id, mukoSynthesis?.suggestions ?? []),
+              onUndo: undoSuggestion,
+            }}
+          />
 
           {/* Ask Muko */}
           <AskMuko
@@ -2783,12 +2058,17 @@ export default function SpecStudioPage() {
               identityScore: conceptContext.identityScore,
               resonanceScore: conceptContext.resonanceScore,
               material: selectedMaterial?.name,
-              silhouette: selectedSilhouette?.name,
+              silhouette: conceptSilhouette ? conceptSilhouette.charAt(0).toUpperCase() + conceptSilhouette.slice(1) : undefined,
               category: categoryId,
             }}
           />
 
-          {/* Run Muko Analysis */}
+          {/* Spacer for sticky footer */}
+          <div style={{ height: 72 }} />
+        </div>
+
+        {/* Sticky CTA */}
+        <div style={{ position: "sticky", bottom: 0, padding: "0 36px 24px", background: "linear-gradient(to bottom, rgba(250,249,246,0) 0%, rgba(250,249,246,0.92) 16%, rgba(250,249,246,1) 100%)", paddingTop: 20, zIndex: 10 }}>
           <button
             disabled={!isComplete}
             onClick={() => {
@@ -2797,18 +2077,22 @@ export default function SpecStudioPage() {
               setCategory(cat?.name ?? categoryId);
               setTargetMsrp(targetMSRP);
               setMaterial(materialId);
-              const sil = cat?.silhouettes.find(s => s.id === silhouetteId);
-              setSilhouette(sil?.name ?? silhouetteId);
+              setSilhouette(conceptSilhouette ? conceptSilhouette.charAt(0).toUpperCase() + conceptSilhouette.slice(1) : '');
               setStoreTier(constructionTier!);
-              const palette = paletteOptions[selectedPaletteIdx];
-              if (palette) {
-                setColorPalette(palette.palette.map((c: PaletteColor) => c.hex), palette.name);
+              // Palette from concept or spec selection
+              if (conceptPalette) {
+                const entry = (aestheticsData as unknown as Array<{ id: string; palette_options?: Array<{ id: string; name: string; swatches: string[] }> }>).find(
+                  (a) => a.id === conceptContext.aestheticMatchedId
+                );
+                const palOption = entry?.palette_options?.find((p) => p.id === conceptPalette);
+                if (palOption) {
+                  setColorPalette(palOption.swatches, palOption.name);
+                }
               }
               setCurrentStep(4);
               router.push("/report");
             }}
             style={{
-              marginTop: 16,
               width: "100%",
               padding: "14px 16px",
               borderRadius: 10,
@@ -2835,8 +2119,9 @@ export default function SpecStudioPage() {
             </svg>
           </button>
         </div>
-      </div>
+        </>
+        }
+      />
     </div>
-  </div>
   );
 }

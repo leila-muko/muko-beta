@@ -1,0 +1,52 @@
+{
+  "outerwear": [
+    { "id": "trench", "name": "Trench", "base_yardage": 3.2, "complexity_affinity": "high" },
+    { "id": "bomber", "name": "Bomber", "base_yardage": 2.0, "complexity_affinity": "moderate" },
+    { "id": "trucker", "name": "Trucker Jacket", "base_yardage": 2.2, "complexity_affinity": "moderate" },
+    { "id": "puffer", "name": "Puffer", "base_yardage": 2.8, "complexity_affinity": "high" },
+    { "id": "blazer", "name": "Blazer", "base_yardage": 2.5, "complexity_affinity": "high" },
+    { "id": "anorak", "name": "Anorak", "base_yardage": 2.4, "complexity_affinity": "moderate" },
+    { "id": "moto", "name": "Moto Jacket", "base_yardage": 2.3, "complexity_affinity": "high" },
+    { "id": "overcoat", "name": "Overcoat", "base_yardage": 3.5, "complexity_affinity": "high" }
+  ],
+  "tops": [
+    { "id": "tshirt", "name": "T-Shirt", "base_yardage": 1.2, "complexity_affinity": "low" },
+    { "id": "tank", "name": "Tank", "base_yardage": 0.8, "complexity_affinity": "low" },
+    { "id": "blouse", "name": "Blouse", "base_yardage": 1.8, "complexity_affinity": "moderate" },
+    { "id": "shirt", "name": "Button-Down Shirt", "base_yardage": 2.0, "complexity_affinity": "moderate" },
+    { "id": "bodysuit", "name": "Bodysuit", "base_yardage": 1.3, "complexity_affinity": "moderate" },
+    { "id": "crop_top", "name": "Crop Top", "base_yardage": 0.7, "complexity_affinity": "low" },
+    { "id": "polo", "name": "Polo", "base_yardage": 1.4, "complexity_affinity": "low" },
+    { "id": "tunic", "name": "Tunic", "base_yardage": 2.0, "complexity_affinity": "moderate" }
+  ],
+  "bottoms": [
+    { "id": "trouser", "name": "Trouser", "base_yardage": 1.8, "complexity_affinity": "moderate" },
+    { "id": "wide_leg", "name": "Wide-Leg Pant", "base_yardage": 2.2, "complexity_affinity": "moderate" },
+    { "id": "skirt_mini", "name": "Mini Skirt", "base_yardage": 0.8, "complexity_affinity": "low" },
+    { "id": "skirt_midi", "name": "Midi Skirt", "base_yardage": 1.5, "complexity_affinity": "low" },
+    { "id": "shorts", "name": "Shorts", "base_yardage": 1.0, "complexity_affinity": "low" },
+    { "id": "cargo", "name": "Cargo Pant", "base_yardage": 2.0, "complexity_affinity": "high" },
+    { "id": "jogger", "name": "Jogger", "base_yardage": 1.6, "complexity_affinity": "low" },
+    { "id": "skirt_maxi", "name": "Maxi Skirt", "base_yardage": 2.4, "complexity_affinity": "low" }
+  ],
+  "dresses": [
+    { "id": "mini_dress", "name": "Mini Dress", "base_yardage": 1.8, "complexity_affinity": "moderate" },
+    { "id": "midi_dress", "name": "Midi Dress", "base_yardage": 2.5, "complexity_affinity": "moderate" },
+    { "id": "maxi_dress", "name": "Maxi Dress", "base_yardage": 3.2, "complexity_affinity": "moderate" },
+    { "id": "shirt_dress", "name": "Shirt Dress", "base_yardage": 2.8, "complexity_affinity": "moderate" },
+    { "id": "slip_dress", "name": "Slip Dress", "base_yardage": 2.0, "complexity_affinity": "low" },
+    { "id": "wrap_dress", "name": "Wrap Dress", "base_yardage": 2.6, "complexity_affinity": "moderate" },
+    { "id": "blazer_dress", "name": "Blazer Dress", "base_yardage": 2.4, "complexity_affinity": "high" },
+    { "id": "halter_dress", "name": "Halter Dress", "base_yardage": 2.0, "complexity_affinity": "moderate" }
+  ],
+  "knitwear": [
+    { "id": "sweater", "name": "Sweater", "base_yardage": 1.8, "complexity_affinity": "moderate" },
+    { "id": "cardigan", "name": "Cardigan", "base_yardage": 2.2, "complexity_affinity": "moderate" },
+    { "id": "knit_vest", "name": "Knit Vest", "base_yardage": 1.2, "complexity_affinity": "low" },
+    { "id": "turtleneck", "name": "Turtleneck", "base_yardage": 1.6, "complexity_affinity": "moderate" },
+    { "id": "hoodie", "name": "Hoodie", "base_yardage": 2.0, "complexity_affinity": "moderate" },
+    { "id": "pullover", "name": "Pullover", "base_yardage": 1.8, "complexity_affinity": "low" },
+    { "id": "knit_polo", "name": "Knit Polo", "base_yardage": 1.4, "complexity_affinity": "low" },
+    { "id": "cape", "name": "Cape", "base_yardage": 2.8, "complexity_affinity": "high" }
+  ]
+}

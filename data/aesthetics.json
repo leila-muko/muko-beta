@@ -36,6 +36,14 @@
       "Gorpcore fatigue if utility references feel too literal or costume-like"
     ],
     "moodboard_images": [],
+    "silhouette_affinity": ["straight", "structured"],
+    "palette_affinity": ["earth_tones", "tonal_darks"],
+    "palette_options": [
+      { "id": "earth_tones", "name": "Earth Tones", "swatches": ["#8B7355", "#A0522D", "#D2B48C", "#556B2F", "#F5F0E8", "#2F4F4F"], "descriptor": "Terrain-rooted naturals with grounded warmth" },
+      { "id": "tonal_darks", "name": "Tonal Darks", "swatches": ["#2C2C2C", "#3D3D2E", "#4A4A3A", "#5B5B4A", "#6B6B5A", "#1A1A14"], "descriptor": "Deep tonal layering that signals protection" },
+      { "id": "warm_neutrals", "name": "Warm Neutrals", "swatches": ["#C4B5A0", "#E8DFD0", "#8B7D6B", "#F5EDE3", "#6B5E4E", "#D4C8B8"], "descriptor": "Grounded warmth across delivery windows" },
+      { "id": "cool_mineral", "name": "Cool Mineral", "swatches": ["#9BA8B4", "#F0EFED", "#6B7B8A", "#D8D6D2", "#3D4A54", "#B8BFC6"], "descriptor": "Restrained utility with architectural restraint" }
+    ],
     "chips": [
       {
         "label": "waxed cotton",
@@ -160,6 +168,14 @@
       "Brands at lower contemporary price points may struggle to convey value in simple silhouettes"
     ],
     "moodboard_images": [],
+    "silhouette_affinity": ["straight", "structured"],
+    "palette_affinity": ["cool_mineral", "warm_neutrals"],
+    "palette_options": [
+      { "id": "cool_mineral", "name": "Cool Mineral", "swatches": ["#9BA8B4", "#F0EFED", "#6B7B8A", "#D8D6D2", "#3D4A54", "#B8BFC6"], "descriptor": "Restrained and architectural — reads expensive" },
+      { "id": "warm_neutrals", "name": "Warm Neutrals", "swatches": ["#C4B5A0", "#E8DFD0", "#8B7D6B", "#F5EDE3", "#6B5E4E", "#D4C8B8"], "descriptor": "Grounded warmth that works across skin tones" },
+      { "id": "tonal_darks", "name": "Tonal Darks", "swatches": ["#2C2C2C", "#3D3D2E", "#4A4A3A", "#5B5B4A", "#6B6B5A", "#1A1A14"], "descriptor": "Depth through tonal discipline" },
+      { "id": "muted_pastels", "name": "Muted Pastels", "swatches": ["#D4C5D0", "#C5D1CA", "#D6CFC0", "#BCC8D4", "#E0D5C8", "#C8BDB4"], "descriptor": "Softened palette that reads considered" }
+    ],
     "chips": [
       {
         "label": "column silhouettes",
@@ -278,6 +294,14 @@
       "Limited SS26 relevance may reduce year-round utility for brands"
     ],
     "moodboard_images": [],
+    "silhouette_affinity": ["relaxed", "oversized"],
+    "palette_affinity": ["warm_neutrals", "muted_pastels"],
+    "palette_options": [
+      { "id": "warm_neutrals", "name": "Warm Neutrals", "swatches": ["#C4B5A0", "#E8DFD0", "#8B7D6B", "#F5EDE3", "#6B5E4E", "#D4C8B8"], "descriptor": "Vintage warmth with earned patina" },
+      { "id": "muted_pastels", "name": "Muted Pastels", "swatches": ["#D4C5D0", "#C5D1CA", "#D6CFC0", "#BCC8D4", "#E0D5C8", "#C8BDB4"], "descriptor": "Softened nostalgia in quiet tones" },
+      { "id": "earth_tones", "name": "Earth Tones", "swatches": ["#8B7355", "#A0522D", "#D2B48C", "#556B2F", "#F5F0E8", "#2F4F4F"], "descriptor": "Grounded heritage with honest warmth" },
+      { "id": "tonal_darks", "name": "Tonal Darks", "swatches": ["#2C2C2C", "#3D3D2E", "#4A4A3A", "#5B5B4A", "#6B6B5A", "#1A1A14"], "descriptor": "Dark academia depth" }
+    ],
     "chips": [
       {
         "label": "vintage knitwear",
@@ -402,6 +426,14 @@
       "Handcraft details may read as costumey if not paired with clean, modern silhouettes"
     ],
     "moodboard_images": [],
+    "silhouette_affinity": ["relaxed", "straight"],
+    "palette_affinity": ["earth_tones", "warm_neutrals"],
+    "palette_options": [
+      { "id": "earth_tones", "name": "Earth Tones", "swatches": ["#8B7355", "#A0522D", "#D2B48C", "#556B2F", "#F5F0E8", "#2F4F4F"], "descriptor": "Natural provenance made visible" },
+      { "id": "warm_neutrals", "name": "Warm Neutrals", "swatches": ["#C4B5A0", "#E8DFD0", "#8B7D6B", "#F5EDE3", "#6B5E4E", "#D4C8B8"], "descriptor": "Artisan warmth with craft integrity" },
+      { "id": "muted_pastels", "name": "Muted Pastels", "swatches": ["#D4C5D0", "#C5D1CA", "#D6CFC0", "#BCC8D4", "#E0D5C8", "#C8BDB4"], "descriptor": "Soft natural dye references" },
+      { "id": "tonal_darks", "name": "Tonal Darks", "swatches": ["#2C2C2C", "#3D3D2E", "#4A4A3A", "#5B5B4A", "#6B6B5A", "#1A1A14"], "descriptor": "Indigo and raw depth" }
+    ],
     "chips": [
       {
         "label": "hand-woven texture",
@@ -526,6 +558,14 @@
       "Early-stage trend with limited commercial proof at contemporary price points"
     ],
     "moodboard_images": [],
+    "silhouette_affinity": ["relaxed", "oversized"],
+    "palette_affinity": ["tonal_darks", "high_contrast"],
+    "palette_options": [
+      { "id": "tonal_darks", "name": "Tonal Darks", "swatches": ["#2C2C2C", "#3D3D2E", "#4A4A3A", "#5B5B4A", "#6B6B5A", "#1A1A14"], "descriptor": "Raw, anti-polish depth" },
+      { "id": "high_contrast", "name": "High Contrast", "swatches": ["#1A1A1A", "#F5F0E8", "#8A3A3A", "#C4B5A0", "#2C2C2C", "#D4C8B8"], "descriptor": "Stark tension between light and dark" },
+      { "id": "cool_mineral", "name": "Cool Mineral", "swatches": ["#9BA8B4", "#F0EFED", "#6B7B8A", "#D8D6D2", "#3D4A54", "#B8BFC6"], "descriptor": "Urban restraint with moody edge" },
+      { "id": "earth_tones", "name": "Earth Tones", "swatches": ["#8B7355", "#A0522D", "#D2B48C", "#556B2F", "#F5F0E8", "#2F4F4F"], "descriptor": "Grunge-meets-vintage groundedness" }
+    ],
     "chips": [
       {
         "label": "distressed leather",
@@ -650,6 +690,14 @@
       "Limited FW26 relevance may reduce commercial viability for fall collections"
     ],
     "moodboard_images": [],
+    "silhouette_affinity": ["oversized", "relaxed"],
+    "palette_affinity": ["muted_pastels", "high_contrast"],
+    "palette_options": [
+      { "id": "muted_pastels", "name": "Muted Pastels", "swatches": ["#D4C5D0", "#C5D1CA", "#D6CFC0", "#BCC8D4", "#E0D5C8", "#C8BDB4"], "descriptor": "Sweetened softness with sensory calm" },
+      { "id": "high_contrast", "name": "High Contrast", "swatches": ["#1A1A1A", "#F5F0E8", "#8A3A3A", "#C4B5A0", "#2C2C2C", "#D4C8B8"], "descriptor": "Digital brights against deep neutrals" },
+      { "id": "warm_neutrals", "name": "Warm Neutrals", "swatches": ["#C4B5A0", "#E8DFD0", "#8B7D6B", "#F5EDE3", "#6B5E4E", "#D4C8B8"], "descriptor": "Grounded tactility with approachable warmth" },
+      { "id": "cool_mineral", "name": "Cool Mineral", "swatches": ["#9BA8B4", "#F0EFED", "#6B7B8A", "#D8D6D2", "#3D4A54", "#B8BFC6"], "descriptor": "Clean, matte surface reference" }
+    ],
     "chips": [
       {
         "label": "rubberized finishes",
@@ -780,6 +828,14 @@
       "Risk of pieces being perceived as single-use rather than investment staples"
     ],
     "moodboard_images": [],
+    "silhouette_affinity": ["structured", "straight"],
+    "palette_affinity": ["high_contrast", "tonal_darks"],
+    "palette_options": [
+      { "id": "high_contrast", "name": "High Contrast", "swatches": ["#1A1A1A", "#F5F0E8", "#8A3A3A", "#C4B5A0", "#2C2C2C", "#D4C8B8"], "descriptor": "Maximum impact through stark contrast" },
+      { "id": "tonal_darks", "name": "Tonal Darks", "swatches": ["#2C2C2C", "#3D3D2E", "#4A4A3A", "#5B5B4A", "#6B6B5A", "#1A1A14"], "descriptor": "Depth that makes metallics pop" },
+      { "id": "warm_neutrals", "name": "Warm Neutrals", "swatches": ["#C4B5A0", "#E8DFD0", "#8B7D6B", "#F5EDE3", "#6B5E4E", "#D4C8B8"], "descriptor": "Grounded base for statement pieces" },
+      { "id": "cool_mineral", "name": "Cool Mineral", "swatches": ["#9BA8B4", "#F0EFED", "#6B7B8A", "#D8D6D2", "#3D4A54", "#B8BFC6"], "descriptor": "Silver-toned cool against warm metallics" }
+    ],
     "chips": [
       {
         "label": "metallic knits",
@@ -904,6 +960,14 @@
       "Novelty pieces may be perceived as low cost-per-wear at contemporary price points"
     ],
     "moodboard_images": [],
+    "silhouette_affinity": ["oversized", "relaxed"],
+    "palette_affinity": ["muted_pastels", "high_contrast"],
+    "palette_options": [
+      { "id": "muted_pastels", "name": "Muted Pastels", "swatches": ["#D4C5D0", "#C5D1CA", "#D6CFC0", "#BCC8D4", "#E0D5C8", "#C8BDB4"], "descriptor": "Sweetened nostalgia in candy tones" },
+      { "id": "high_contrast", "name": "High Contrast", "swatches": ["#1A1A1A", "#F5F0E8", "#8A3A3A", "#C4B5A0", "#2C2C2C", "#D4C8B8"], "descriptor": "Bold scale play through color tension" },
+      { "id": "warm_neutrals", "name": "Warm Neutrals", "swatches": ["#C4B5A0", "#E8DFD0", "#8B7D6B", "#F5EDE3", "#6B5E4E", "#D4C8B8"], "descriptor": "Grown-up base for playful details" },
+      { "id": "earth_tones", "name": "Earth Tones", "swatches": ["#8B7355", "#A0522D", "#D2B48C", "#556B2F", "#F5F0E8", "#2F4F4F"], "descriptor": "Grounded whimsy with natural charm" }
+    ],
     "chips": [
       {
         "label": "charm-loaded accessories",

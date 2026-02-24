@@ -9,6 +9,64 @@ export const SMART_DEFAULTS: Record<string, ConstructionTier> = {
   knitwear: 'moderate',
 };
 
+// Silhouette + category overrides for smart complexity defaults
+const SILHOUETTE_CATEGORY_OVERRIDES: Record<string, Record<string, ConstructionTier>> = {
+  outerwear: {
+    structured: 'high',
+    relaxed: 'moderate',
+    oversized: 'high',
+    straight: 'moderate',
+  },
+  tops: {
+    structured: 'moderate',
+    oversized: 'low',
+  },
+  dresses: {
+    structured: 'high',
+    oversized: 'moderate',
+  },
+};
+
+export interface SubcategoryEntry {
+  id: string;
+  name: string;
+  base_yardage: number;
+  complexity_affinity: 'low' | 'moderate' | 'high';
+}
+
+/**
+ * Get smart default complexity using subcategory complexity_affinity as base,
+ * with silhouette as a modifier. Silhouette can push complexity up but not down.
+ */
+export function getSmartDefault(
+  categoryId: string,
+  conceptSilhouette?: string,
+  subcategoryAffinity?: 'low' | 'moderate' | 'high'
+): ConstructionTier {
+  // Use subcategory affinity as base if available, otherwise fall back to category default
+  const base: ConstructionTier = subcategoryAffinity ?? SMART_DEFAULTS[categoryId] ?? 'moderate';
+
+  if (!conceptSilhouette) return base;
+
+  // Silhouette can push complexity up but not down
+  if (conceptSilhouette === 'structured' && base !== 'high') {
+    return 'high'; // structured always demands more construction
+  }
+  if (conceptSilhouette === 'oversized' && base === 'low') {
+    return 'moderate'; // oversized on simple garments adds some complexity
+  }
+
+  // Also check category-specific overrides as a fallback
+  const override = SILHOUETTE_CATEGORY_OVERRIDES[categoryId]?.[conceptSilhouette];
+  if (override) {
+    // Only apply override if it's higher than the base
+    const tierRank: Record<ConstructionTier, number> = { low: 0, moderate: 1, high: 2 };
+    if (tierRank[override] > tierRank[base]) return override;
+  }
+
+  return base;
+}
+
 // Descriptions shown in tooltips
 export const CONSTRUCTION_INFO: Record<ConstructionTier, {
   label: string;

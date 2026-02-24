@@ -34,9 +34,12 @@ interface SessionState {
   colorPalette: string[];
   colorPaletteName: string; // e.g., 'Earth Tones'
   chipSelection: ChipSelection | null;
+  conceptSilhouette: string; // required before lock — 'straight' | 'relaxed' | 'structured' | 'oversized'
+  conceptPalette: string | null; // optional palette id from aesthetic's palette_options
 
   // Step 3: Spec Studio
   category: string;
+  subcategory: string; // garment type within category (e.g., 'trench', 'bomber')
   targetMsrp: number | null;
   materialId: string;
   silhouette: string;
@@ -62,7 +65,10 @@ interface SessionState {
   setAestheticInput: (input: string) => void;
   setColorPalette: (colors: string[], name: string) => void;
   setChipSelection: (selection: ChipSelection | null) => void;
+  setConceptSilhouette: (s: string) => void;
+  setConceptPalette: (p: string | null) => void;
   setCategory: (category: string) => void;
+  setSubcategory: (subcategory: string) => void;
   setTargetMsrp: (msrp: number) => void;
   setMaterial: (id: string) => void;
   setSilhouette: (silhouette: string) => void;
@@ -93,7 +99,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   colorPalette: [],
   colorPaletteName: '',
   chipSelection: null,
+  conceptSilhouette: '',
+  conceptPalette: null,
   category: '',
+  subcategory: '',
   targetMsrp: null,
   materialId: '',
   silhouette: '',
@@ -114,7 +123,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   setColorPalette: (colorPalette, colorPaletteName) =>
     set({ colorPalette, colorPaletteName }),
   setChipSelection: (chipSelection) => set({ chipSelection }),
-  setCategory: (category) => set({ category }),
+  setConceptSilhouette: (conceptSilhouette) => set({ conceptSilhouette }),
+  setConceptPalette: (conceptPalette) => set({ conceptPalette }),
+  setCategory: (category) => set({ category, subcategory: '' }),
+  setSubcategory: (subcategory) => set({ subcategory }),
   setTargetMsrp: (targetMsrp) => set({ targetMsrp }),
   setMaterial: (materialId) => set({ materialId }),
   setSilhouette: (silhouette) => set({ silhouette }),
@@ -142,7 +154,10 @@ export const useSessionStore = create<SessionState>((set) => ({
     colorPalette: [],
     colorPaletteName: '',
     chipSelection: null,
+    conceptSilhouette: '',
+    conceptPalette: null,
     category: '',
+    subcategory: '',
     targetMsrp: null,
     materialId: '',
     silhouette: '',
