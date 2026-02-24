@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useSessionStore } from "@/lib/store/sessionStore";
@@ -20,6 +20,13 @@ import aestheticsData from "@/data/aesthetics.json";
 import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
 import { PulseScoreRow } from "@/components/ui/PulseScoreRow";
 import { MukoInsightSection } from "@/components/ui/MukoInsightSection";
+import { debounce } from "@/lib/utils/debounce";
+import {
+  checkMarketSaturation,
+  getResonanceScore,
+  getProxyMessage,
+  type Aesthetic as ResearcherAesthetic,
+} from "@/lib/agents/researcher";
 
 /* ─── Pulse icons ─────────────────────────────────────────────────────────── */
 function IconIdentity({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
@@ -200,13 +207,13 @@ function getIdentityStatus(score: number | undefined): { label: string; color: s
   if (score >= 70) return { label: "Moderate", color: PULSE_YELLOW, sublabel: "Some tension with core values" };
   return { label: "Tension", color: PULSE_RED, sublabel: "Significant brand tension" };
 }
-function getResonanceStatus(score: number | undefined, velocity?: string): { label: string; color: string; sublabel: string } {
-  if (score === undefined) return { label: "—", color: "rgba(67,67,43,0.35)", sublabel: "Select a direction to score" };
-  if (velocity === "emerging") return { label: "Ascending", color: PULSE_GREEN, sublabel: "Early momentum building" };
-  if (velocity === "declining") return { label: "Declining", color: PULSE_RED, sublabel: "Window closing" };
-  if (score >= 80) return { label: "Growing", color: PULSE_GREEN, sublabel: "Strong market pull" };
-  if (score >= 65) return { label: "Growing", color: PULSE_YELLOW, sublabel: "Early momentum building" };
-  return { label: "Saturated", color: PULSE_RED, sublabel: "Market is crowded" };
+function getResonanceStatus(pulse: { status: string; score: number; message: string } | null, saturationScore?: number, collectionsCount?: number): { label: string; color: string; sublabel: string } {
+  if (!pulse) return { label: "—", color: "rgba(67,67,43,0.35)", sublabel: "Select a direction to score" };
+  const color = pulse.status === "green" ? PULSE_GREEN : pulse.status === "yellow" ? PULSE_YELLOW : PULSE_RED;
+  const satSuffix = saturationScore != null ? ` · ${saturationScore}% saturation` : "";
+  const label = `${pulse.message}${satSuffix}`;
+  const sublabel = collectionsCount != null ? `Seen in ${collectionsCount} collections analyzed` : "";
+  return { label, color, sublabel };
 }
 
 /* ─── Aesthetic chip button (hover + selected states) ─────────────────────── */
@@ -351,6 +358,9 @@ export default function ConceptStudioPage() {
     setConceptSilhouette,
     conceptPalette,
     setConceptPalette,
+    chipSelection: storeChipSelection,
+    customChips: storeCustomChips,
+    setCustomChips: setStoreCustomChips,
   } = useSessionStore();
 
   const [headerCollectionName, setHeaderCollectionName] = useState<string>("Collection");
@@ -390,9 +400,25 @@ export default function ConceptStudioPage() {
     setHoveredImages(loadMoodboardImages(hoveredCard));
   }, [hoveredCard]);
 
+  // Resonance Pulse states: WAITING (no input), LOADING (LLM in flight), RESOLVED
+  const [resonanceLoading, setResonanceLoading] = useState(false);
+  const [resonanceProxyMessage, setResonanceProxyMessage] = useState<string | null>(null);
+  const [resonanceSaturationScore, setResonanceSaturationScore] = useState<number | null>(null);
+  const [resonanceCollectionsCount, setResonanceCollectionsCount] = useState<number | null>(null);
+
   const [pulseExpandedRow, setPulseExpandedRow] = useState<string | null>(null);
-  const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set());
-  const [customChips, setCustomChips] = useState<Record<string, AestheticChip[]>>({});
+  const [selectedElements, setSelectedElements] = useState<Set<string>>(() => {
+    // Restore from store on mount
+    const cs = useSessionStore.getState().chipSelection;
+    const ai = useSessionStore.getState().aestheticInput;
+    if (cs && cs.activatedChips.length > 0 && ai) {
+      return new Set(cs.activatedChips.map((chip) => `${ai}::${chip.label}`));
+    }
+    return new Set();
+  });
+  const [customChips, setCustomChips] = useState<Record<string, AestheticChip[]>>(() => {
+    return useSessionStore.getState().customChips ?? {};
+  });
   const toggleElement = (key: string) => {
     setSelectedElements((prev) => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
   };
@@ -415,6 +441,51 @@ export default function ConceptStudioPage() {
     });
     return rawLabels;
   }, [selectedAesthetic, selectedElements]);
+
+  // ─── Resonance scoring helper ────────────────────────────────────────────
+  const computeAndSetResonance = useCallback((aestheticName: string) => {
+    const entry = (aestheticsData as unknown as ResearcherAesthetic[]).find(
+      (a) => a.name === aestheticName || a.id === aestheticName.toLowerCase().replace(/\s+/g, "-")
+    );
+    if (!entry) return;
+    const saturation = checkMarketSaturation(entry);
+    const score = getResonanceScore(entry);
+    setResonanceSaturationScore(saturation.saturation_score);
+    setResonanceCollectionsCount(saturation.collections_count);
+    setResonanceLoading(false);
+    setResonanceProxyMessage(null);
+    useSessionStore.setState({
+      resonancePulse: {
+        score,
+        status: saturation.status,
+        message: saturation.message,
+      },
+    });
+  }, []);
+
+  // Sync customChips to store whenever they change
+  useEffect(() => {
+    setStoreCustomChips(customChips as Record<string, import("@/lib/store/sessionStore").ActivatedChip[]>);
+  }, [customChips, setStoreCustomChips]);
+
+  // Sync chip selection to store whenever selectedElements change
+  useEffect(() => {
+    if (!selectedAesthetic) return;
+    const activeKeys = Array.from(selectedElements).filter((k) => k.startsWith(`${selectedAesthetic}::`));
+    const libraryChips = getAestheticChips(selectedAesthetic);
+    const customChipsForDir = customChips[selectedAesthetic] ?? [];
+    const activatedChips = activeKeys.map((k) => {
+      const label = k.replace(`${selectedAesthetic}::`, "");
+      const lib = libraryChips.find((c) => c.label === label);
+      if (lib) return { ...lib, isCustom: false as const };
+      const custom = customChipsForDir.find((c) => c.label === label);
+      if (custom) return { ...custom, isCustom: true as const };
+      return { label, type: "mood" as const, material: null, silhouette: null, complexity_mod: 0, palette: null, isCustom: false as const };
+    });
+    useSessionStore.setState({
+      chipSelection: { directionId: selectedAesthetic.toLowerCase().replace(/\s+/g, "-"), activatedChips },
+    });
+  }, [selectedElements, selectedAesthetic, customChips]);
 
   const yourConceptRef = useRef<HTMLDivElement>(null);
   const [freeFormDraft, setFreeFormDraft] = useState("");
@@ -448,57 +519,47 @@ export default function ConceptStudioPage() {
     if (!aestheticInput && recommendedAesthetic && !identityPulse) {
       const base = AESTHETIC_CONTENT[recommendedAesthetic];
       const identity = base?.identityScore ?? 80;
-      const resonance = base?.resonanceScore ?? 75;
       useSessionStore.setState({
         identityPulse: { score: identity, status: identity >= 80 ? "green" : identity >= 60 ? "yellow" : "red", message: "Based on Muko's Pick" },
-        resonancePulse: { score: resonance, status: resonance >= 80 ? "green" : resonance >= 60 ? "yellow" : "red", message: "Based on Muko's Pick" },
       });
+      computeAndSetResonance(recommendedAesthetic);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── Recalculate pulse when silhouette/palette changes ───────────────────
+  // ─── Recalculate identity pulse when silhouette/palette changes ──────────
+  // Resonance is purely from getResonanceScore() — silhouette/palette don't affect it.
   useEffect(() => {
     if (!selectedAesthetic || !identityPulse) return;
     const base = AESTHETIC_CONTENT[selectedAesthetic];
     const baseIdentity = base?.identityScore ?? 80;
-    const baseResonance = base?.resonanceScore ?? 75;
     const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
       (a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-")
     );
     const silAffinity = entry?.silhouette_affinity ?? [];
     const palAffinity = entry?.palette_affinity ?? [];
-    const keywords = entry?.keywords?.map((k) => k.toLowerCase()) ?? [];
 
     let idMod = 0;
-    let resMod = 0;
 
     // Silhouette scoring
     if (conceptSilhouette) {
-      const silKeywords = SILHOUETTE_KEYWORD_MAP[conceptSilhouette] ?? [];
-      const silOverlap = silKeywords.filter((k) => keywords.includes(k)).length;
       if (silAffinity.includes(conceptSilhouette)) {
         idMod += 5;
       } else {
         idMod -= 3;
       }
-      resMod += silOverlap >= 2 ? 3 : silOverlap >= 1 ? 1 : -1;
     }
 
     // Palette scoring
     if (conceptPalette) {
-      const palKeywords = PALETTE_KEYWORD_MAP[conceptPalette] ?? [];
-      const palOverlap = palKeywords.filter((k) => keywords.includes(k)).length;
       if (palAffinity.includes(conceptPalette)) {
         idMod += 5;
       } else {
         idMod -= 3;
       }
-      resMod += palOverlap >= 2 ? 3 : palOverlap >= 1 ? 1 : -1;
     }
 
     const newIdentity = Math.max(0, Math.min(100, baseIdentity + idMod));
-    const newResonance = Math.max(0, Math.min(100, baseResonance + resMod));
 
     useSessionStore.setState({
       identityPulse: {
@@ -506,13 +567,74 @@ export default function ConceptStudioPage() {
         status: newIdentity >= 80 ? "green" : newIdentity >= 60 ? "yellow" : "red",
         message: newIdentity >= 80 ? "Strong alignment" : newIdentity >= 60 ? "Moderate alignment" : "Weak alignment",
       },
-      resonancePulse: {
-        score: newResonance,
-        status: newResonance >= 80 ? "green" : newResonance >= 60 ? "yellow" : "red",
-        message: newResonance >= 80 ? "Strong opportunity" : newResonance >= 60 ? "Moderate opportunity" : "Saturated market",
-      },
     });
+    // Resonance stays as computed by checkMarketSaturation / getResonanceScore
   }, [conceptSilhouette, conceptPalette, selectedAesthetic, identityPulse?.score !== undefined]);
+
+  // ─── Critic Agent: Brand Alignment Scoring ────────────────────────────────
+  // When a brand_profile_id is available (future: from Supabase auth/settings),
+  // calls the Critic Agent API to compute the Identity Pulse from real brand data.
+  // Falls back to the existing static scoring above when no brand profile exists.
+
+  const brandProfileId = useRef<string | null>(null); // TODO: wire from user's saved brand profile //null
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const runCriticAnalysis = useCallback(
+    debounce(async (aestheticKeywords: string[], aestheticName: string) => {
+      if (!aestheticKeywords.length || !brandProfileId.current) return;
+
+      // Set loading state via store
+      useSessionStore.setState({
+        identityPulse: { score: identityPulse?.score ?? 0, status: identityPulse?.status ?? "yellow", message: "Analyzing..." },
+      });
+
+      try {
+        const res = await fetch("/api/agents/critic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            aesthetic_keywords: aestheticKeywords,
+            aesthetic_name: aestheticName,
+            brand_profile_id: brandProfileId.current,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Critic agent request failed (${res.status})`);
+        }
+        const data = await res.json();
+        useSessionStore.setState({
+          identityPulse: {
+            status: data.pulse.status,
+            score: data.pulse.score,
+            message: data.pulse.message,
+          },
+        });
+      } catch (error) {
+        console.error("Identity pulse update failed:", error);
+        useSessionStore.setState({
+          identityPulse: {
+            status: "yellow",
+            score: 50,
+            message: "Analysis unavailable",
+          },
+        });
+      }
+    }, 400),
+    []
+  );
+
+  // Fire critic when aesthetic changes and brand profile is available
+  useEffect(() => {
+    if (!selectedAesthetic || !brandProfileId.current) return;
+    const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
+      (a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-")
+    );
+    if (entry?.keywords) {
+      runCriticAnalysis(entry.keywords, selectedAesthetic);
+    }
+  }, [selectedAesthetic, runCriticAnalysis]);
 
   const identityScore = identityPulse?.score;
   const resonanceScore = resonancePulse?.score;
@@ -523,7 +645,7 @@ export default function ConceptStudioPage() {
     ? (aestheticsData as unknown as AestheticDataEntry[]).find((a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-"))
     : null;
   const idStatus = getIdentityStatus(identityScore);
-  const resStatus = getResonanceStatus(resonanceScore, selectedAestheticEntry?.trend_velocity);
+  const resStatus = getResonanceStatus(resonancePulse, resonanceSaturationScore ?? undefined, resonanceCollectionsCount ?? undefined);
   const scoreColor = (score: number) => score >= 80 ? CHARTREUSE : score >= 65 ? BRAND.camel : BRAND.rose;
 
   /* ─── Select handler ──────────────────────────────────────────────────────── */
@@ -535,18 +657,17 @@ export default function ConceptStudioPage() {
     setConceptPalette(null);
     setAestheticInput(aesthetic);
 
-    // If pulse is already pre-populated (e.g. Muko's Pick on first load), just lock — don't recalculate
+    // If pulse is already pre-populated (e.g. Muko's Pick on first load), just lock — don't recalculate identity
     if (!identityPulse) {
       const base = AESTHETIC_CONTENT[aesthetic];
       const mockIdentity = base?.identityScore ?? Math.floor(Math.random() * 30) + 70;
-      const mockResonance = base?.resonanceScore ?? Math.floor(Math.random() * 30) + 65;
       const identityStatus = mockIdentity >= 80 ? "green" : mockIdentity >= 60 ? "yellow" : "red";
-      const resonanceStatus = mockResonance >= 80 ? "green" : mockResonance >= 60 ? "yellow" : "red";
       useSessionStore.setState({
         identityPulse: { score: mockIdentity, status: identityStatus, message: identityStatus === "green" ? "Strong alignment" : identityStatus === "yellow" ? "Moderate alignment" : "Weak alignment" },
-        resonancePulse: { score: mockResonance, status: resonanceStatus, message: resonanceStatus === "green" ? "Strong opportunity" : resonanceStatus === "yellow" ? "Moderate opportunity" : "Saturated market" },
       });
     }
+    // Always recompute resonance from real saturation data
+    computeAndSetResonance(aesthetic);
     useSessionStore.setState({ conceptLocked: true });
     try { lockConcept?.(); } catch {}
     setTimeout(() => { yourConceptRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
@@ -687,7 +808,7 @@ export default function ConceptStudioPage() {
   /* ─── Pulse rows ──────────────────────────────────────────────────────────── */
   const pulseRows = [
     { key: "identity", label: "Identity", icon: (c: string) => <IconIdentity size={14} color={c} />, score: identityScore != null ? `${identityScore}` : "—", scoreNum: identityScore ?? 0, color: identityScore != null ? scoreColor(identityScore) : "rgba(67,67,43,0.35)", chip: identityScore != null ? { variant: idStatus.color === PULSE_GREEN ? "green" as const : idStatus.color === PULSE_YELLOW ? "amber" as const : idStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: idStatus.label } : null, subLabel: idStatus.sublabel, what: `Identity measures how well this direction aligns with your brand DNA — keywords, aesthetic positioning, and customer profile. A high score means this direction reinforces who you already are. A low score signals tension that requires intentional navigation.`, how: `Keyword overlap between your brand profile and this direction's signals, weighted by conflict detection. Intentional tensions acknowledged in onboarding are factored in.`, pending: false },
-    { key: "resonance", label: "Resonance", icon: (c: string) => <IconResonance size={14} color={c} />, score: resonanceScore != null ? `${resonanceScore}` : "—", scoreNum: resonanceScore ?? 0, color: resonanceScore != null ? scoreColor(resonanceScore) : "rgba(67,67,43,0.35)", chip: resonanceScore != null ? { variant: resStatus.color === PULSE_GREEN ? "green" as const : resStatus.color === PULSE_YELLOW ? "amber" as const : resStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: resStatus.label } : null, subLabel: resStatus.sublabel, what: `Resonance measures market timing — how much consumer interest exists for this direction right now, and whether you're entering at the right moment. High resonance with ascending velocity means the window is open. Peak saturation means you're late.`, how: `Saturation score from our curated aesthetics library, weighted by trend velocity (emerging / ascending / peak / declining). Updated manually every Monday from WGSN and market data.`, pending: false },
+    { key: "resonance", label: "Resonance", icon: (c: string) => <IconResonance size={14} color={c} />, score: resonanceLoading ? "—" : resonanceScore != null ? `${resonanceScore}` : "—", scoreNum: resonanceLoading ? 0 : resonanceScore ?? 0, color: resonanceLoading ? "rgba(67,67,43,0.35)" : resonanceScore != null ? scoreColor(resonanceScore) : "rgba(67,67,43,0.35)", chip: resonanceLoading ? { variant: "gray" as const, status: "Matching direction..." } : resonanceScore != null ? { variant: resStatus.color === PULSE_GREEN ? "green" as const : resStatus.color === PULSE_YELLOW ? "amber" as const : resStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: resStatus.label } : null, subLabel: resonanceLoading ? "\u00A0" : resStatus.sublabel || "\u00A0", what: `Resonance measures market timing — how much consumer interest exists for this direction right now, and whether you're entering at the right moment. High resonance with ascending velocity means the window is open. Peak saturation means you're late.`, how: `Based on checkMarketSaturation(): saturation score from our curated aesthetics library, weighted by trend velocity. Resonance = 100 − saturation, with a 15-point penalty for declining velocity.`, pending: false },
     { key: "execution", label: "Execution", icon: (c: string) => <IconExecution size={14} color={c} />, score: "—", scoreNum: 0, color: "rgba(67,67,43,0.35)", chip: null, subLabel: "Unlocks in Spec Studio", what: `Execution measures whether the physical product you're building is feasible given your timeline, materials, and construction complexity. It unlocks in Spec Studio once you define your product inputs.`, how: `Timeline buffer score based on material lead times and construction complexity relative to your season deadline. Negative buffer scores red. Margin gate applied as a 30% score penalty if COGS exceeds target.`, pending: true },
   ];
 
@@ -1037,18 +1158,7 @@ export default function ConceptStudioPage() {
             <button
               onClick={() => {
                 if (!canContinue) return;
-                const activeKeys = Array.from(selectedElements).filter((k) => k.startsWith(`${selectedAesthetic}::`));
-                const libraryChips = getAestheticChips(selectedAesthetic!);
-                const customChipsForDir = customChips[selectedAesthetic!] ?? [];
-                const activatedChips = activeKeys.map((k) => {
-                  const label = k.replace(`${selectedAesthetic}::`, "");
-                  const lib = libraryChips.find((c) => c.label === label);
-                  if (lib) return { ...lib, isCustom: false as const };
-                  const custom = customChipsForDir.find((c) => c.label === label);
-                  if (custom) return { ...custom, isCustom: true as const };
-                  return { label, type: "mood" as const, material: null, silhouette: null, complexity_mod: 0, palette: null, isCustom: false as const };
-                });
-                useSessionStore.setState({ aestheticMatchedId: selectedAesthetic, refinementModifiers: interpretation?.modifiers ?? [], moodboardImages: topMoodboardImages, chipSelection: { directionId: selectedAesthetic!.toLowerCase().replace(/\s+/g, "-"), activatedChips }, conceptSilhouette, conceptPalette });
+                useSessionStore.setState({ aestheticMatchedId: selectedAesthetic, refinementModifiers: interpretation?.modifiers ?? [], moodboardImages: topMoodboardImages, conceptSilhouette, conceptPalette });
                 setCurrentStep(3);
                 router.push("/spec");
               }}
@@ -1069,22 +1179,29 @@ export default function ConceptStudioPage() {
             <div style={{ marginBottom: 0 }}>
               <div style={{ fontFamily: sohne, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>Pulse</div>
               {pulseRows.map((row) => (
-                <PulseScoreRow
-                  key={row.key}
-                  dimensionKey={row.key}
-                  label={row.label}
-                  icon={row.icon(row.color)}
-                  displayScore={row.score}
-                  numericPercent={row.scoreNum}
-                  scoreColor={row.color}
-                  pill={row.chip ? { variant: row.chip.variant, label: row.chip.status } : null}
-                  subLabel={row.subLabel}
-                  whatItMeans={row.what}
-                  howCalculated={row.how}
-                  isPending={row.pending}
-                  isExpanded={pulseExpandedRow === row.key}
-                  onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === row.key ? null : row.key)}
-                />
+                <React.Fragment key={row.key}>
+                  {/* Proxy message — shown above Resonance when LLM matched a different aesthetic */}
+                  {row.key === "resonance" && resonanceProxyMessage && !resonanceLoading && (
+                    <div style={{ fontSize: 11, color: "rgba(67,67,43,0.50)", fontFamily: inter, marginBottom: 8, lineHeight: 1.5 }}>
+                      {resonanceProxyMessage}
+                    </div>
+                  )}
+                  <PulseScoreRow
+                    dimensionKey={row.key}
+                    label={row.label}
+                    icon={row.icon(row.color)}
+                    displayScore={row.score}
+                    numericPercent={row.scoreNum}
+                    scoreColor={row.color}
+                    pill={row.chip ? { variant: row.chip.variant, label: row.chip.status } : null}
+                    subLabel={row.subLabel}
+                    whatItMeans={row.what}
+                    howCalculated={row.how}
+                    isPending={row.pending}
+                    isExpanded={pulseExpandedRow === row.key}
+                    onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === row.key ? null : row.key)}
+                  />
+                </React.Fragment>
               ))}
             </div>
 

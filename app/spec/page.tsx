@@ -11,7 +11,7 @@ import type {
   ConceptContext as ConceptContextType,
 } from "@/lib/types/spec-studio";
 import { calculateCOGS, generateInsight } from "@/lib/spec-studio/calculator";
-import { findAlternativeMaterial } from "@/lib/spec-studio/material-matcher";
+import { findAlternativeMaterial, findUpgradeMaterial } from "@/lib/spec-studio/material-matcher";
 import {
   CONSTRUCTION_INFO,
   getOverrideWarning,
@@ -460,11 +460,30 @@ export default function SpecStudioPage() {
   const materials: Material[] = materialsData as unknown as Material[];
   const allSubcategories = subcategoriesData as Record<string, SubcategoryEntry[]>;
 
-  const [categoryId, setCategoryId] = useState(categories[0].id);
-  const [subcategoryId, setSubcategoryId] = useState("");
-  const [targetMSRP, setTargetMSRP] = useState(450);
-  const [materialId, setMaterialId] = useState("");
-  const [constructionTier, setConstructionTier] = useState<ConstructionTier | null>(null);
+  // Restore local state from store so navigation back preserves selections
+  const [categoryId, setCategoryId] = useState(() => {
+    const storeCat = useSessionStore.getState().category;
+    if (storeCat) {
+      const match = categories.find((c) => c.name === storeCat);
+      if (match) return match.id;
+    }
+    return categories[0].id;
+  });
+  const [subcategoryId, setSubcategoryId] = useState(() => {
+    return useSessionStore.getState().subcategory || "";
+  });
+  const [targetMSRP, setTargetMSRP] = useState(() => {
+    return useSessionStore.getState().targetMsrp ?? 450;
+  });
+  const [materialId, setMaterialId] = useState(() => {
+    return useSessionStore.getState().materialId || "";
+  });
+  const [constructionTier, setConstructionTier] = useState<ConstructionTier | null>(() => {
+    const stored = useSessionStore.getState().constructionTier;
+    // Only restore if something was previously saved (not the default 'moderate' with no category set)
+    if (useSessionStore.getState().category) return stored;
+    return null;
+  });
   const [overrideWarning, setOverrideWarning] = useState<string | null>(null);
   const [pulseUpdated, setPulseUpdated] = useState(false);
 
@@ -641,6 +660,17 @@ export default function SpecStudioPage() {
     alternativeMaterial,
   ]);
 
+  const upgradeMaterial = useMemo(() => {
+    if (!selectedMaterial || !insight) return null;
+    return findUpgradeMaterial(
+      selectedMaterial,
+      materials,
+      conceptYardage,
+      insight.cogs,
+      insight.ceiling
+    );
+  }, [selectedMaterial, materials, conceptYardage, insight]);
+
   useEffect(() => {
     if (insight) {
       setPulseUpdated(true);
@@ -767,6 +797,24 @@ export default function SpecStudioPage() {
       setHasInitialized(true);
     }
   }, [hasInitialized, recommendedMaterialId]);
+
+  // Sync local spec selections to Zustand store so they persist across navigation
+  useEffect(() => {
+    const cat = categories.find(c => c.id === categoryId);
+    setCategory(cat?.name ?? categoryId);
+  }, [categoryId, categories, setCategory]);
+
+  useEffect(() => {
+    setTargetMsrp(targetMSRP);
+  }, [targetMSRP, setTargetMsrp]);
+
+  useEffect(() => {
+    if (materialId) setMaterial(materialId);
+  }, [materialId, setMaterial]);
+
+  useEffect(() => {
+    if (constructionTier) setStoreTier(constructionTier);
+  }, [constructionTier, setStoreTier]);
 
   function getBaselineMaterialCost() {
     if (!baselineMaterial) {
@@ -1059,6 +1107,69 @@ export default function SpecStudioPage() {
       // Silhouette is locked from Concept Studio — no silhouette suggestions
     }
 
+    // ── Under-budget: suggest upgrades to invest remaining headroom ──
+    if (overBy <= 0) {
+      const buffer = -overBy;
+
+      // Suggest upgrading complexity if not already at high
+      if (constructionTier !== "high") {
+        const nextTier: ConstructionTier = constructionTier === "low" ? "moderate" : "high";
+        const projected = projCOGS(selectedMaterial, conceptYardage, nextTier);
+        if (projected <= ceiling) {
+          const extraCost = projected - currentCogs;
+          suggestions.push({
+            id: `upgrade-complexity-${nextTier}`,
+            label: `Push complexity to ${nextTier.charAt(0).toUpperCase() + nextTier.slice(1)}`,
+            kind: "upgrade-complexity",
+            action: () => handleComplexityChange(nextTier),
+            undoAction: () => handleComplexityChange(currentTier),
+            sub: `+$${Math.round(extraCost)} COGS — adds detail and finishing quality while staying within ceiling`,
+            before: { label: currentTier.charAt(0).toUpperCase() + currentTier.slice(1), cogs: Math.round(currentCogs) },
+            after: { label: nextTier.charAt(0).toUpperCase() + nextTier.slice(1), projectedCogs: Math.round(projected), saving: -Math.round(extraCost) },
+          });
+        }
+      }
+
+      // Suggest upgrading to a premium material that fits within headroom
+      if (upgradeMaterial) {
+        const projected = projCOGS(upgradeMaterial, conceptYardage, constructionTier!);
+        const extraCost = projected - currentCogs;
+        const upgradeDeltas = scoreMaterialDeltas(upgradeMaterial);
+        const currentDeltas = scoreMaterialDeltas(selectedMaterial);
+        const identityGain = upgradeDeltas.identity - currentDeltas.identity;
+        const qualityNote = identityGain > 0
+          ? "stronger brand alignment"
+          : "elevated hand-feel";
+        suggestions.push({
+          id: `upgrade-material-${upgradeMaterial.id}`,
+          label: `Upgrade to ${upgradeMaterial.name}`,
+          kind: "upgrade-material",
+          action: () => {
+            const mat = materials.find((m) => m.id === upgradeMaterial.id);
+            if (mat) { setMaterialId(mat.id); setUserManuallySelected(true); }
+          },
+          undoAction: () => { setMaterialId(currentMatId); if (!currentMatId) setUserManuallySelected(false); },
+          sub: `+$${Math.round(extraCost)} COGS at $${upgradeMaterial.cost_per_yard}/yd — ${qualityNote}`,
+          before: { label: selectedMaterial.name, cogs: Math.round(currentCogs) },
+          after: { label: upgradeMaterial.name, projectedCogs: Math.round(projected), saving: -Math.round(extraCost) },
+        });
+      }
+
+      // If nothing else, suggest they're in a strong position
+      if (suggestions.length === 0 && buffer > 15) {
+        suggestions.push({
+          id: "invest-finishing",
+          label: "Invest in finishing details",
+          kind: "upgrade-complexity",
+          action: () => {},
+          undoAction: () => {},
+          sub: `$${Math.round(buffer)} buffer available — consider custom trims, branded hardware, or specialty finishing`,
+          before: { label: "Current", cogs: Math.round(currentCogs) },
+          after: { label: "Enhanced", projectedCogs: Math.round(currentCogs), saving: 0 },
+        });
+      }
+    }
+
     // Palette is locked from Concept Studio — no palette suggestions
 
     const headline =
@@ -1069,7 +1180,7 @@ export default function SpecStudioPage() {
     const detail =
       overBy > 0
         ? `Your biggest cost driver is ${selectedMaterial.name} at $${selectedMaterial.cost_per_yard}/yd. Pull cost back through complexity or material first.`
-        : `You’re in a safe zone. If you want to push the piece into more “statement” territory, you have room to invest in finishing details without breaking margin.`;
+        : `You're in a safe zone. If you want to push the piece into more "statement" territory, you have room to invest in finishing details without breaking margin.`;
 
     return { headline, overall, detail, suggestions };
   }, [
@@ -1078,6 +1189,7 @@ export default function SpecStudioPage() {
     selectedImpact,
     constructionTier,
     alternativeMaterial,
+    upgradeMaterial,
     materials,
     materialId,
     recommendedMaterialId,
@@ -2041,7 +2153,9 @@ export default function SpecStudioPage() {
             nextMove={{
               mode: "spec",
               suggestions: mukoSynthesis?.suggestions ?? [],
-              subtitle: "Adjustments that improve feasibility without changing your direction.",
+              subtitle: insight && insight.cogs > insight.ceiling
+                ? "Adjustments that improve feasibility without changing your direction."
+                : "Ways to invest your margin headroom and elevate the piece.",
               appliedIds: appliedSuggestions,
               onApply: (id) => applySuggestion(id, mukoSynthesis?.suggestions ?? []),
               onUndo: undoSuggestion,

@@ -17,17 +17,27 @@ export default function EntryScreen() {
 
   const allSeasons = useMemo(
     () => [
-      { id: 'spring26', label: 'Spring 2026' },
-      { id: 'resort26', label: 'Resort 26' },
-      { id: 'summer26', label: 'Summer 26' },
-      { id: 'fall26', label: 'Fall 26' },
-      { id: 'winter26', label: 'Winter 26' },
+      { id: 'fw26', label: 'FW 2026' },
+      { id: 'ss27', label: 'SS 2027' },
     ],
     []
   );
 
-  const [collectionName, setCollectionName] = useState('Spring Requiem');
-  const [selectedSeason, setSelectedSeason] = useState<string | null>('spring26');
+  const [collectionName, setCollectionName] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem('muko_collectionName');
+      if (saved) return saved;
+    } catch {}
+    return useSessionStore.getState().collectionName || 'Spring Requiem';
+  });
+  const [selectedSeason, setSelectedSeason] = useState<string | null>(() => {
+    const storeSeason = useSessionStore.getState().season;
+    if (storeSeason) {
+      const match = allSeasons.find((s) => s.label === storeSeason);
+      if (match) return match.id;
+    }
+    return 'fw26';
+  });
   const [touchedName, setTouchedName] = useState(false);
   const [touchedSeason, setTouchedSeason] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);

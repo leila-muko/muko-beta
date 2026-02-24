@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "conflict_pairs": [
+    {
+      "id": "min_max",
+      "keyword_a": "Minimalist",
+      "keyword_b": "Maximalist",
+      "tension_type": "aesthetic_opposition",
+      "severity": "hard",
+      "description": "Fundamental aesthetic contradiction — clean restraint vs. abundant decoration"
+    },
+    {
+      "id": "luxe_access",
+      "keyword_a": "Luxe",
+      "keyword_b": "Accessible",
+      "tension_type": "price_positioning",
+      "severity": "hard",
+      "description": "Price positioning conflict — premium exclusivity vs. mass accessibility"
+    },
+    {
+      "id": "timeless_trendy",
+      "keyword_a": "Timeless",
+      "keyword_b": "Trendy",
+      "tension_type": "longevity",
+      "severity": "soft",
+      "description": "Design longevity tension — enduring classics vs. moment-driven fashion"
+    },
+    {
+      "id": "formal_casual",
+      "keyword_a": "Formal",
+      "keyword_b": "Casual",
+      "tension_type": "occasion",
+      "severity": "soft",
+      "description": "Occasion dressing tension — structured occasion wear vs. relaxed everyday"
+    },
+    {
+      "id": "edgy_classic",
+      "keyword_a": "Edgy",
+      "keyword_b": "Classic",
+      "tension_type": "aesthetic_tone",
+      "severity": "soft",
+      "description": "Tonal tension — subversive disruption vs. established convention"
+    },
+    {
+      "id": "sustainable_fast",
+      "keyword_a": "Sustainable",
+      "keyword_b": "Fast Fashion",
+      "tension_type": "values",
+      "severity": "hard",
+      "description": "Values conflict — ethical production vs. rapid throughput model"
+    },
+    {
+      "id": "artisanal_technical",
+      "keyword_a": "Artisanal",
+      "keyword_b": "Technical",
+      "tension_type": "craft_approach",
+      "severity": "soft",
+      "description": "Production philosophy tension — handcrafted tradition vs. engineered performance"
+    }
+  ],
+  "tension_contexts": {
+    "trend-aware-classics": "Brand uses timeless silhouettes with current-season colors/details. Trendy aesthetics are acceptable IF the silhouette is structured and enduring.",
+    "fast-moving-capsules": "Brand releases frequent short-run capsules. Trendy aesthetics are core to the strategy, not a liability.",
+    "intentionally-hybrid": "Brand deliberately spans categories (e.g., luxury streetwear, formal-casual). Score based on execution quality, not category purity.",
+    "accessible-luxe": "Brand offers elevated quality at accessible price points. Price conflicts should be scored as 'yellow' tension, not hard fails."
+  }
+}

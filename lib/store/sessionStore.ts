@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface PulseState {
   status: 'green' | 'yellow' | 'red';
@@ -34,6 +35,7 @@ interface SessionState {
   colorPalette: string[];
   colorPaletteName: string; // e.g., 'Earth Tones'
   chipSelection: ChipSelection | null;
+  customChips: Record<string, ActivatedChip[]>; // keyed by aesthetic name
   conceptSilhouette: string; // required before lock — 'straight' | 'relaxed' | 'structured' | 'oversized'
   conceptPalette: string | null; // optional palette id from aesthetic's palette_options
 
@@ -65,6 +67,7 @@ interface SessionState {
   setAestheticInput: (input: string) => void;
   setColorPalette: (colors: string[], name: string) => void;
   setChipSelection: (selection: ChipSelection | null) => void;
+  setCustomChips: (chips: Record<string, ActivatedChip[]>) => void;
   setConceptSilhouette: (s: string) => void;
   setConceptPalette: (p: string | null) => void;
   setCategory: (category: string) => void;
@@ -88,87 +91,102 @@ interface SessionState {
   resetSession: () => void;
 }
 
-export const useSessionStore = create<SessionState>((set) => ({
-  // Initial state
-  season: '',
-  collectionName: '',
-  aestheticInput: '',
-  aestheticMatchedId: null,
-  refinementModifiers: [],
-  moodboardImages: [],
-  colorPalette: [],
-  colorPaletteName: '',
-  chipSelection: null,
-  conceptSilhouette: '',
-  conceptPalette: null,
-  category: '',
-  subcategory: '',
-  targetMsrp: null,
-  materialId: '',
-  silhouette: '',
-  constructionTier: 'moderate',
-  constructionTierOverride: false,
-  identityPulse: null,
-  resonancePulse: null,
-  executionPulse: null,
-  currentStep: 1,
-  conceptLocked: false,
-  intentGoals: [],
-  intentTradeoff: '',
+export const useSessionStore = create<SessionState>()(
+  persist(
+    (set) => ({
+      // Initial state
+      season: '',
+      collectionName: '',
+      aestheticInput: '',
+      aestheticMatchedId: null,
+      refinementModifiers: [],
+      moodboardImages: [],
+      colorPalette: [],
+      colorPaletteName: '',
+      chipSelection: null,
+      customChips: {},
+      conceptSilhouette: '',
+      conceptPalette: null,
+      category: '',
+      subcategory: '',
+      targetMsrp: null,
+      materialId: '',
+      silhouette: '',
+      constructionTier: 'moderate',
+      constructionTierOverride: false,
+      identityPulse: null,
+      resonancePulse: null,
+      executionPulse: null,
+      currentStep: 1,
+      conceptLocked: false,
+      intentGoals: [],
+      intentTradeoff: '',
 
-  // Actions
-  setSeason: (season) => set({ season }),
-  setCollectionName: (collectionName) => set({ collectionName }),
-  setAestheticInput: (aestheticInput) => set({ aestheticInput }),
-  setColorPalette: (colorPalette, colorPaletteName) =>
-    set({ colorPalette, colorPaletteName }),
-  setChipSelection: (chipSelection) => set({ chipSelection }),
-  setConceptSilhouette: (conceptSilhouette) => set({ conceptSilhouette }),
-  setConceptPalette: (conceptPalette) => set({ conceptPalette }),
-  setCategory: (category) => set({ category, subcategory: '' }),
-  setSubcategory: (subcategory) => set({ subcategory }),
-  setTargetMsrp: (targetMsrp) => set({ targetMsrp }),
-  setMaterial: (materialId) => set({ materialId }),
-  setSilhouette: (silhouette) => set({ silhouette }),
-  setConstructionTier: (tier, override = false) =>
-    set({ constructionTier: tier, constructionTierOverride: override }),
+      // Actions
+      setSeason: (season) => set({ season }),
+      setCollectionName: (collectionName) => set({ collectionName }),
+      setAestheticInput: (aestheticInput) => set({ aestheticInput }),
+      setColorPalette: (colorPalette, colorPaletteName) =>
+        set({ colorPalette, colorPaletteName }),
+      setChipSelection: (chipSelection) => set({ chipSelection }),
+      setCustomChips: (customChips) => set({ customChips }),
+      setConceptSilhouette: (conceptSilhouette) => set({ conceptSilhouette }),
+      setConceptPalette: (conceptPalette) => set({ conceptPalette }),
+      setCategory: (category) => set({ category, subcategory: '' }),
+      setSubcategory: (subcategory) => set({ subcategory }),
+      setTargetMsrp: (targetMsrp) => set({ targetMsrp }),
+      setMaterial: (materialId) => set({ materialId }),
+      setSilhouette: (silhouette) => set({ silhouette }),
+      setConstructionTier: (tier, override = false) =>
+        set({ constructionTier: tier, constructionTierOverride: override }),
 
-  updateIdentityPulse: (pulse) => set({ identityPulse: pulse }),
-  updateResonancePulse: (pulse) => set({ resonancePulse: pulse }),
-  updateExecutionPulse: (pulse) => set({ executionPulse: pulse }),
+      updateIdentityPulse: (pulse) => set({ identityPulse: pulse }),
+      updateResonancePulse: (pulse) => set({ resonancePulse: pulse }),
+      updateExecutionPulse: (pulse) => set({ executionPulse: pulse }),
 
-  setIntentGoals: (intentGoals) => set({ intentGoals }),
-  setIntentTradeoff: (intentTradeoff) => set({ intentTradeoff }),
+      setIntentGoals: (intentGoals) => set({ intentGoals }),
+      setIntentTradeoff: (intentTradeoff) => set({ intentTradeoff }),
 
-  lockConcept: () => set({ conceptLocked: true }),
-  unlockConcept: () => set({ conceptLocked: false }),
-  setCurrentStep: (step) => set({ currentStep: step }),
+      lockConcept: () => set({ conceptLocked: true }),
+      unlockConcept: () => set({ conceptLocked: false }),
+      setCurrentStep: (step) => set({ currentStep: step }),
 
-  resetSession: () => set({
-    season: '',
-    collectionName: '',
-    aestheticInput: '',
-    aestheticMatchedId: null,
-    refinementModifiers: [],
-    moodboardImages: [],
-    colorPalette: [],
-    colorPaletteName: '',
-    chipSelection: null,
-    conceptSilhouette: '',
-    conceptPalette: null,
-    category: '',
-    subcategory: '',
-    targetMsrp: null,
-    materialId: '',
-    silhouette: '',
-    constructionTier: 'moderate',
-    constructionTierOverride: false,
-    identityPulse: null,
-    resonancePulse: null,
-    executionPulse: null,
-    currentStep: 1,
-    conceptLocked: false,
-    intentGoals: [],
-    intentTradeoff: '',
-  }),
-}));
+      resetSession: () => set({
+        season: '',
+        collectionName: '',
+        aestheticInput: '',
+        aestheticMatchedId: null,
+        refinementModifiers: [],
+        moodboardImages: [],
+        colorPalette: [],
+        colorPaletteName: '',
+        chipSelection: null,
+        customChips: {},
+        conceptSilhouette: '',
+        conceptPalette: null,
+        category: '',
+        subcategory: '',
+        targetMsrp: null,
+        materialId: '',
+        silhouette: '',
+        constructionTier: 'moderate',
+        constructionTierOverride: false,
+        identityPulse: null,
+        resonancePulse: null,
+        executionPulse: null,
+        currentStep: 1,
+        conceptLocked: false,
+        intentGoals: [],
+        intentTradeoff: '',
+      }),
+    }),
+    {
+      name: 'muko-session',
+      partialize: (state) => {
+        // Persist everything except actions
+        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
+        return rest;
+      },
+    }
+  )
+);

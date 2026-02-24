@@ -75,6 +75,40 @@ export function findAlternativeMaterial(
 }
 
 /**
+ * Finds the best *more expensive* upgrade material that shares properties
+ * with the selected material and stays within the given COGS ceiling.
+ * Returns null if no viable upgrade exists.
+ */
+export function findUpgradeMaterial(
+  selectedMaterial: Material,
+  allMaterials: Material[],
+  yardage: number,
+  currentCOGS: number,
+  ceiling: number,
+  minSharedProperties: number = 1
+): Material | null {
+  const sel = selectedMaterial as Material & Record<string, unknown>;
+  const headroom = ceiling - currentCOGS;
+  if (headroom <= 0) return null;
+
+  const upgrades = allMaterials
+    .filter(m => {
+      if (m.id === sel.id) return false;
+      if (m.cost_per_yard <= sel.cost_per_yard) return false;
+      // Must fit within remaining headroom
+      const extraCost = (m.cost_per_yard - sel.cost_per_yard) * yardage;
+      if (extraCost > headroom) return false;
+      return isCompatible(sel, m as Material & Record<string, unknown>, minSharedProperties);
+    })
+    .sort((a, b) => {
+      // Prefer the most premium option that still fits
+      return b.cost_per_yard - a.cost_per_yard;
+    });
+
+  return upgrades.length > 0 ? upgrades[0] : null;
+}
+
+/**
  * Gets all cheaper alternatives with shared properties, sorted by relevance
  */
 export function findAllAlternatives(

@@ -128,15 +128,58 @@ export default function IntentCalibrationPage() {
 
   const maxSuccess = 3;
 
-  const [success, setSuccess] = useState<SuccessId[]>([]);
-  const [tradeoff, setTradeoff] = useState<TradeoffId | null>(null);
+  // Restore intent state from localStorage on mount
+  const [success, setSuccess] = useState<SuccessId[]>(() => {
+    try {
+      const saved = window.localStorage.getItem("muko_intent");
+      if (saved) { const p = JSON.parse(saved); return p.success ?? []; }
+    } catch {}
+    return [];
+  });
+  const [tradeoff, setTradeoff] = useState<TradeoffId | null>(() => {
+    try {
+      const saved = window.localStorage.getItem("muko_intent");
+      if (saved) { const p = JSON.parse(saved); return p.tradeoff ?? null; }
+    } catch {}
+    return null;
+  });
 
-  const [tTrend, setTTrend] = useState<TensionValue>("center");
-  const [tCreative, setTCreative] = useState<TensionValue>("center");
-  const [tElevated, setTElevated] = useState<TensionValue>("center");
-  const [tNovelty, setTNovelty] = useState<TensionValue>("center");
+  const [tTrend, setTTrend] = useState<TensionValue>(() => {
+    try {
+      const saved = window.localStorage.getItem("muko_intent");
+      if (saved) { const p = JSON.parse(saved); return p.tensions?.trendForward_vs_timeless ?? "center"; }
+    } catch {}
+    return "center";
+  });
+  const [tCreative, setTCreative] = useState<TensionValue>(() => {
+    try {
+      const saved = window.localStorage.getItem("muko_intent");
+      if (saved) { const p = JSON.parse(saved); return p.tensions?.creative_vs_commercial ?? "center"; }
+    } catch {}
+    return "center";
+  });
+  const [tElevated, setTElevated] = useState<TensionValue>(() => {
+    try {
+      const saved = window.localStorage.getItem("muko_intent");
+      if (saved) { const p = JSON.parse(saved); return p.tensions?.elevated_vs_accessible ?? "center"; }
+    } catch {}
+    return "center";
+  });
+  const [tNovelty, setTNovelty] = useState<TensionValue>(() => {
+    try {
+      const saved = window.localStorage.getItem("muko_intent");
+      if (saved) { const p = JSON.parse(saved); return p.tensions?.novelty_vs_continuity ?? "center"; }
+    } catch {}
+    return "center";
+  });
 
-  const [miss, setMiss] = useState("");
+  const [miss, setMiss] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem("muko_intent");
+      if (saved) { const p = JSON.parse(saved); return p.miss ?? ""; }
+    } catch {}
+    return "";
+  });
   const [touched, setTouched] = useState({ success: false, tradeoff: false });
 
   const canContinue = success.length > 0 && !!tradeoff;

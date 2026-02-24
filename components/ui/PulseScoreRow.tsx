@@ -5,11 +5,12 @@ import React from "react";
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
 
-// Brand-aligned pill colors: chartreuse, camel, rose
+// Brand-aligned pill colors: chartreuse, camel, rose, gray (loading)
 const PILL_COLORS = {
   green: { bg: "rgba(168,180,117,0.14)", color: "#A8B475", border: "rgba(168,180,117,0.30)" },
   amber: { bg: "rgba(184,135,107,0.14)", color: "#B8876B", border: "rgba(184,135,107,0.30)" },
   red: { bg: "rgba(169,123,143,0.14)", color: "#A97B8F", border: "rgba(169,123,143,0.30)" },
+  gray: { bg: "rgba(67,67,43,0.06)", color: "rgba(67,67,43,0.45)", border: "rgba(67,67,43,0.12)" },
 } as const;
 
 function LockIcon({ size = 21, color = "rgba(67,67,43,0.72)" }: { size?: number; color?: string }) {
@@ -28,7 +29,7 @@ export interface PulseScoreRowProps {
   displayScore: string;
   numericPercent: number;
   scoreColor: string;
-  pill: { variant: "green" | "amber" | "red"; label: string } | null;
+  pill: { variant: "green" | "amber" | "red" | "gray"; label: string } | null;
   subLabel?: string | null;
   whatItMeans: string;
   howCalculated: string;
