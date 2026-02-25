@@ -1,0 +1,129 @@
+{
+  "_meta": {
+    "description": "Maps piece types to chip labels that create construction or aesthetic tension. Hard = physical impossibility. Soft = creative tension. Neither blocks selection.",
+    "tension_levels": {
+      "hard": "Clear material or construction conflict — physically incompatible with the piece type.",
+      "soft": "Aesthetic tension — pushes against the piece's natural direction but is not impossible."
+    }
+  },
+  "parka": {
+    "hard": ["sheer layers", "lace detailing", "translucent layers", "jewel encrusting"],
+    "soft": ["metallic fabrics", "sequin saturation", "saturated pastel", "gel forms"]
+  },
+  "jacket": {
+    "hard": ["sheer layers", "lace detailing", "translucent layers"],
+    "soft": ["jewel encrusting", "saturated pastel", "gel forms"]
+  },
+  "coat": {
+    "hard": ["sheer layers", "translucent layers"],
+    "soft": ["gel forms", "saturated pastel", "rubberized finishes"]
+  },
+  "cape": {
+    "hard": ["cargo detailing", "utility hardware", "rubberized finishes"],
+    "soft": ["distressed leather", "raw print", "anti-fit tailoring"]
+  },
+  "trench": {
+    "hard": ["sheer layers", "translucent layers", "gel forms"],
+    "soft": ["saturated pastel", "jewel encrusting"]
+  },
+  "raincoat": {
+    "hard": ["sheer layers", "lace detailing", "hand-woven texture", "artisan patchwork"],
+    "soft": ["jewel encrusting", "statement jewelry", "sequin saturation"]
+  },
+  "puffer": {
+    "hard": ["sheer layers", "lace detailing", "translucent layers", "matte fabrics"],
+    "soft": ["sequin saturation", "distressed leather", "artisan patchwork"]
+  },
+  "trouser": {
+    "hard": ["lace detailing", "sheer layers"],
+    "soft": ["sequin saturation", "jewel encrusting", "charm-loaded accessories"]
+  },
+  "straight-pant": {
+    "hard": ["lace detailing", "sheer layers"],
+    "soft": ["sequin saturation", "inflated forms"]
+  },
+  "skirt": {
+    "hard": ["cargo detailing", "utility hardware", "rubberized finishes"],
+    "soft": ["distressed leather", "anti-fit tailoring", "raw print", "fringe"]
+  },
+  "mini-skirt": {
+    "hard": ["cargo detailing", "utility hardware"],
+    "soft": ["artisan patchwork", "hand-woven texture", "architectural draping"]
+  },
+  "slip-dress": {
+    "hard": ["cargo detailing", "utility hardware", "waxed cotton", "rubberized finishes"],
+    "soft": ["anti-fit tailoring", "distressed leather"]
+  },
+  "maxi-dress": {
+    "hard": ["cargo detailing", "utility hardware"],
+    "soft": ["rubberized finishes", "bold shoulders"]
+  },
+  "midi-dress": {
+    "hard": ["utility hardware", "rubberized finishes"],
+    "soft": ["cargo detailing", "anti-fit tailoring"]
+  },
+  "column-dress": {
+    "hard": ["cargo detailing", "utility hardware", "fringe detailing", "inflated forms"],
+    "soft": ["distressed leather", "raw print", "anti-fit tailoring"]
+  },
+  "shirt-dress": {
+    "hard": ["rubberized finishes", "translucent layers", "gel forms"],
+    "soft": ["sequin saturation", "metallic knits", "jewel encrusting"]
+  },
+  "babydoll-dress": {
+    "hard": ["cargo detailing", "utility hardware", "waxed cotton", "rubberized finishes"],
+    "soft": ["distressed leather", "anti-fit tailoring", "architectural draping"]
+  },
+  "sundress": {
+    "hard": ["cargo detailing", "utility hardware", "waxed cotton"],
+    "soft": ["rubberized finishes", "architectural draping", "bold shoulders"]
+  },
+  "knit-sweater": {
+    "hard": ["waxed cotton", "rubberized finishes", "translucent layers", "gel forms"],
+    "soft": ["utility hardware", "cargo detailing", "distressed leather"]
+  },
+  "cardigan": {
+    "hard": ["rubberized finishes", "translucent layers", "gel forms", "waxed cotton"],
+    "soft": ["utility hardware", "cargo detailing", "sequin saturation"]
+  },
+  "blazer": {
+    "hard": ["sheer layers", "translucent layers", "gel forms"],
+    "soft": ["inflated forms", "saturated pastel", "charm-loaded accessories"]
+  },
+  "shell": {
+    "hard": ["cargo detailing", "utility hardware", "rubberized finishes"],
+    "soft": ["distressed leather", "fringe detailing", "artisan patchwork"]
+  },
+  "blouse": {
+    "hard": ["utility hardware", "rubberized finishes", "waxed cotton"],
+    "soft": ["distressed leather", "cargo detailing", "anti-fit tailoring"]
+  },
+  "top": {
+    "hard": [],
+    "soft": ["architectural draping", "column silhouettes"]
+  },
+  "tank": {
+    "hard": ["utility hardware", "cargo detailing", "waxed cotton"],
+    "soft": ["architectural draping", "column silhouettes", "soft suiting"]
+  },
+  "tunic": {
+    "hard": ["sequin saturation", "rubberized finishes", "gel forms"],
+    "soft": ["cargo detailing", "utility hardware", "bold shoulders"]
+  },
+  "corset-top": {
+    "hard": ["cargo detailing", "utility hardware", "rubberized finishes"],
+    "soft": ["weather-ready knits", "waxed cotton"]
+  },
+  "boilersuit": {
+    "hard": ["lace detailing", "sheer layers", "jewel encrusting", "sequin saturation"],
+    "soft": ["metallic fabrics", "gel forms", "charm-loaded accessories"]
+  },
+  "mid-layer": {
+    "hard": ["lace detailing", "sheer layers", "metallic fabrics", "sequin saturation"],
+    "soft": ["architectural draping", "column silhouettes", "jewel encrusting"]
+  },
+  "vest": {
+    "hard": ["lace detailing", "sheer layers"],
+    "soft": ["sequin saturation", "jewel encrusting", "charm-loaded accessories"]
+  }
+}

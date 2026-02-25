@@ -1,0 +1,491 @@
+{
+    "_meta": {
+      "version": "1.0.0",
+      "description": "Maps aesthetic chip + category to specific construction detail suggestions with cost and margin context. All suggestions are grounded in standard garment construction practice and industry-benchmark labor/cost data.",
+      "cost_basis": "Labor cost estimates based on CMT (Cut, Make, Trim) at contemporary brand production volumes (300\u2013500 units/style), mid-market factory efficiency (~65%). Raw edge vs turned hem differential based on SMV (Standard Minute Value) comparisons: raw/serged edge = ~1\u20132 min SMV vs turned-under blind hem = ~4\u20136 min SMV at $0.04\u20130.08/min factory labor rate.",
+      "sources": [
+        "ISO 4916 Seam Classification",
+        "ASTM D6193 Standard Practice for Stitches and Seams",
+        "Coats Group Seam Type Reference",
+        "Industry SMV benchmarks for contemporary RTW production"
+      ]
+    },
+    "terrain-luxe": {
+      "waxed-cotton": {
+        "outerwear": {
+          "detail": "Use a flat-felled seam (Class 2.04) on all outer seams \u2014 it eliminates lining requirements on utilitarian pieces while adding structural integrity. Specify 401 chainstitch for main seams on denim-weight waxed canvas; it's stronger under tension than lockstitch and easier to unpick for repairs.",
+          "cost_note": "Flat-felled seams add ~3\u20134 min SMV vs a plain serged seam but eliminate the need for Hong Kong binding or lining on interior edges \u2014 net neutral on labor, saves $1.50\u20133/unit in lining fabric.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not add a full body lining \u2014 it fights the wax-coat breathability story and adds unnecessary cost."
+        },
+        "bottoms": {
+          "detail": "Bar-tack all pocket openings and belt loops \u2014 this is standard on workwear heritage pieces and the detail that signals quality to your customer. Specify 6\u20138 bar tacks per garment. Use a bar-tack machine (automated), not hand tacking.",
+          "cost_note": "Bar tacks add ~0.5 min SMV per tack at industrial speed. For 8 tacks: ~4 min additional SMV, approximately $0.20\u20130.30/unit. High perceived quality relative to cost.",
+          "complexity_flag": "low",
+          "avoid": "Avoid decorative rivets \u2014 they add $0.15\u20130.40/unit in hardware and create issues with dry cleaning of waxed canvas."
+        }
+      },
+      "cargo-detailing": {
+        "bottoms": {
+          "detail": "Use bellows pockets (box-pleated patch pockets) rather than inseam cargo pockets \u2014 they're faster to construct (no separate bag fabric), lie flatter unloaded, and read more contemporary. Specify zipper closure with YKK #5 coil; avoid snaps on outer pockets as they add SMV and fail under heavy use.",
+          "cost_note": "Bellows pocket with YKK zipper: ~8\u201310 min SMV per pocket vs welt/inseam cargo at 12\u201315 min SMV. Saves $0.40\u20130.80/unit in labor on a two-pocket style.",
+          "complexity_flag": "moderate",
+          "avoid": "Avoid more than 4 functional pockets \u2014 each adds ~8\u201312 min SMV and risks pushing the style into High complexity tier."
+        },
+        "outerwear": {
+          "detail": "Specify chest patch pockets with a single magnetic closure rather than button or zipper \u2014 faster to operate, adds 0 SMV per use for the end consumer, and reads as elevated utility rather than workwear surplus. Source neodymium magnets, not ferrite \u2014 stronger hold at smaller diameter.",
+          "cost_note": "Magnetic closure hardware: $0.30\u20130.60/unit. Eliminates buttonhole operation (~3 min SMV) and button attachment (~1 min SMV). Net SMV savings offset hardware cost.",
+          "complexity_flag": "moderate",
+          "avoid": "Avoid velcro on outer surfaces \u2014 it collects debris and reads as fast-fashion at the contemporary price point."
+        }
+      },
+      "utility-hardware": {
+        "outerwear": {
+          "detail": "Specify D-rings and webbing tabs in matte gunmetal, not polished silver \u2014 it reads as functional rather than decorative and avoids the 'costume' risk. Use a single bar-tack reinforcement at all webbing attachment points; this is standard on technical outerwear and directly communicates durability to the consumer.",
+          "cost_note": "Matte hardware commands no premium over polished (same base material, different finish treatment at mill). Bar-tack reinforcement on 4 attachment points: ~2 min SMV, approximately $0.10/unit.",
+          "complexity_flag": "low",
+          "avoid": "Avoid brass or gold-tone hardware \u2014 it conflicts with the terrain-utility positioning and reads as fashion-first."
+        }
+      },
+      "weather-ready-knits": {
+        "tops": {
+          "detail": "Specify a coverstitched hem (Class 400, Type 406) for all knitwear hemlines \u2014 it provides the 2-parallel-line finish that reads as elevated sportswear, allows stretch without breaking, and is the standard for any knit piece above $100 retail. Do not use a single-needle lockstitch hem on knit pieces.",
+          "cost_note": "Coverstitch hem vs single-needle: adds ~1 min SMV but eliminates hem-breaking on stretch knits. Returns cost through quality \u2014 single-needle breaks under wear and generates returns/replacement.",
+          "complexity_flag": "low",
+          "avoid": "Avoid hand-turned or blind-stitch hems on technical knits \u2014 they restrict stretch and add unnecessary SMV at this aesthetic."
+        }
+      },
+      "earthy-neutrals": {
+        "outerwear": {
+          "detail": "Specify tonal thread throughout \u2014 no contrast stitching. Use a 40-weight polyester core-spun thread in a shade 1\u20132 values darker than the base fabric; it reads as considered on garment, disappears at retail distance, and doesn't compromise the material-forward narrative.",
+          "cost_note": "Thread selection is zero additional cost \u2014 same SMV regardless of thread color. Source thread with fabric to ensure dye-lot consistency.",
+          "complexity_flag": "low",
+          "avoid": "Avoid contrast white stitching \u2014 it reads as fashion detail on what should be a utilitarian piece, undermining the category positioning."
+        }
+      },
+      "shearling-trim": {
+        "outerwear": {
+          "detail": "Shearling trim is a material choice, not a construction technique \u2014 attach it as a separate component using a flatlock stitch or a welt seam at the join point. Specify that shearling panels should be glued (contact cement) before stitching to prevent the pile from being drawn into the seam. Use a size 90\u2013100 leather needle and reduce presser foot pressure to avoid crushing the pile.",
+          "cost_note": "Shearling adds \u201312/unit in material depending on panel size (genuine vs faux). Genuine shearling trim on sleeves or collar: typical panel cost \u201310/unit. Faux shearling (teddy fabric): .50\u20133/unit. Both require leather needle and may require clapper pressing \u2014 no iron contact on pile side.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not attempt to press shearling pile with an iron \u2014 it permanently crushes the pile. Specify steam from a distance only, pile side up, for any shaping requirements."
+        }
+      }
+    },
+    "quiet-structure": {
+      "column-silhouettes": {
+        "dresses": {
+          "detail": "Use a Hong Kong seam finish (bias-bound interior seams) rather than serging on all internal seams \u2014 it adds a couture-adjacent interior quality signal that Design Directors will notice during sampling. Specify a 1cm self-fabric bias strip in a coordinating silk organza for interior seam binding.",
+          "cost_note": "Hong Kong finish adds ~2\u20133 min SMV per seam vs serged finish. On a column dress with 6 seams: ~15 min additional SMV, approximately $0.75\u20131.20/unit. Worth it at the $280+ contemporary price point \u2014 it's what separates the garment from fast-fashion at retail.",
+          "complexity_flag": "high",
+          "avoid": "Do not use exposed serged seams on the interior \u2014 on a minimalist piece with no lining, the inside is always seen, and a bare overlock edge reads as mass-market."
+        },
+        "bottoms": {
+          "detail": "Specify a blind hem (Type 103 chainstitch, invisible hemming machine) for all trouser and skirt hemlines \u2014 it's the expected finish for tailored bottoms at the contemporary price point and is nearly invisible from the outside. Allow 1.5in hem allowance for future alterations; this is a quality signal in-store.",
+          "cost_note": "Blind hem: ~3\u20134 min SMV. Turned-under double-fold hem: ~2\u20133 min SMV. Differential is ~1 min SMV (~$0.05/unit). For the tailored category, this is non-negotiable \u2014 the alternative is a visible topstitched hem that reads as casualwear.",
+          "complexity_flag": "low",
+          "avoid": "Avoid topstitched hems on tailored bottoms \u2014 the visual contrast line breaks the column silhouette and telegraphs lower construction tier."
+        }
+      },
+      "soft-suiting": {
+        "tops": {
+          "detail": "Specify a French front (fusible interfacing on front placket only, no full canvas) rather than full canvasing for suiting pieces at the contemporary price point \u2014 full canvas is appropriate for $600+ tailoring but adds 45\u201360 min SMV per jacket. A well-fused French front with chest piece gives 80% of the structure at 25% of the labor.",
+          "cost_note": "Full canvas chest: 45\u201360 min additional SMV vs French front: 8\u201312 min SMV. Labor savings of ~35\u201348 min SMV = $1.75\u20133.80/unit at factory rates. Apply savings to better shell fabric instead.",
+          "complexity_flag": "moderate",
+          "avoid": "Avoid fully unstructured (no interfacing) suiting at this aesthetic \u2014 the column shape requires some chest structure to hold the architectural silhouette."
+        },
+        "outerwear": {
+          "detail": "For unlined coats, specify a Hong Kong finish on all interior seams with self-fabric bias. For lined coats, use a clean-finish lining attachment (lining slip-stitched to hem by hand or blind-stitch machine) \u2014 not a topstitched lining hem, which reads as budget construction at the contemporary coat price point.",
+          "cost_note": "Hand slip-stitch lining hem: ~4\u20136 min SMV vs topstitched: ~1 min SMV. Additional ~4 min SMV = ~$0.20/unit. The topstitched alternative is the single most visible marker of quality tier difference to a trained buyer.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not specify a topstitched lining hem on any coat over $350 retail \u2014 buyers and press will flag it immediately."
+        }
+      },
+      "matte-fabrics": {
+        "dresses": {
+          "detail": "For matte crepe and Mikado, specify a rolled hem (narrow rolled hem foot, ~3mm) at sleeve edges and secondary hems \u2014 the narrow finish maintains the clean silhouette without adding bulk. Reserve the blind hem machine for main hemlines only. Note: matte crepe frays aggressively \u2014 add 20% to your seam allowance spec and communicate this to your factory's cutting team.",
+          "cost_note": "Rolled hem: ~2\u20133 min SMV \u2014 faster than blind hem for secondary edges. Specifying extra seam allowance adds no labor cost but prevents costly re-cutting if edges fray during sewing.",
+          "complexity_flag": "low",
+          "avoid": "Avoid serged edges on matte crepe \u2014 the overlock creates a visible ridge through the fabric on fitted silhouettes."
+        }
+      },
+      "architectural-draping": {
+        "outerwear": {
+          "detail": "For cape and sculptural outerwear, weight the hem internally rather than adding interfacing to the shell \u2014 use a thin lead or chain-weight tape sewn into the hem channel. This maintains the architectural drape without stiffening the fabric. Specify 1/4in chain weight tape, sourced from theatrical supply; it's standard on couture capes and high-end outerwear.",
+          "cost_note": "Chain weight tape: $0.80\u20131.50/unit in materials. Eliminates the need for heavy interfacing (~$0.40\u20130.60/unit) and the SMV to apply it. Net additional cost: ~$0.40\u20130.90/unit for dramatically better drape retention.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not use heavy fusible interfacing on sculptural silhouettes \u2014 it creates a stiff, unmoving hem that collapses the architectural intent under its own weight."
+        }
+      },
+      "bone-and-ivory": {
+        "dresses": {
+          "detail": "Bone and ivory are the highest-risk colorways for dye consistency \u2014 specify a single-dye-lot production run and include a color standard chip with your approved shade plus an acceptable-range chip (1\u20132 shades lighter and darker). Ivory in particular varies significantly between fabric types; specify the approved shade against both woven and knit base fabrics if your collection mixes them.",
+          "cost_note": "No construction cost impact. However: white and ivory goods require separate storage from dark fabrics in the factory \u2014 specify this in your QC sheet. Contact transfer (dye migration from dark fabrics to ivory) is a leading cause of claims on neutral-palette goods.",
+          "complexity_flag": "low",
+          "avoid": "Never ship bone/ivory goods in the same poly bag as dark-colored items \u2014 dye transfer in transit is irreversible. Specify individual poly-bag packaging per unit in your packing list."
+        }
+      },
+      "tonal-layering": {
+        "outerwear": {
+          "detail": "Tonal layering is a styling concept, not a construction detail \u2014 the production implication is fabric weight management. Ensure that your tonal pieces span a range of fabric weights (8 oz, 12 oz, 16 oz) so they layer physically without bulk. Specify that all tonal pieces in the same collection are dyed from the same dye lot number \u2014 even a 3% shade variation between pieces is visible when worn together.",
+          "cost_note": "Same-dye-lot specification may require minimum order quantities to be met within one production run. If ordering 200 units of three tonal pieces, confirm the factory can dye all from one bath \u2014 smaller runs may require separate dye batches with color deviation.",
+          "complexity_flag": "low",
+          "avoid": "Do not mix woven and knit fabrics in the same tonal colorway without a separate dye test \u2014 the same dye formula produces visibly different shades on woven vs knit due to fiber structure and dye uptake differences."
+        }
+      }
+    },
+    "romantic-analog": {
+      "vintage-knitwear": {
+        "tops": {
+          "detail": "For brushed and boucl\u00e9 knits, specify a full-fashioned construction approach where possible \u2014 meaning shaping is achieved by increasing/decreasing stitches in the knitting process rather than cut-and-sew. If your factory is cut-and-sew only, use a mock fully-fashioned finish: single-needle seam on the 2nd stitch in from the edge, leaving the first stitch row visible as a decorative detail.",
+          "cost_note": "True full-fashioned knitwear requires knitting factories rather than CMT \u2014 adds 20\u201335% to garment cost but eliminates all seaming labor. Mock fully-fashioned at cut-and-sew: adds ~2 min SMV per seam but creates a visible quality signal that justifies the $180\u2013280 contemporary knitwear price point.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not overlock-and-cover the seams on textured knits \u2014 the bulk shows through on loose-gauge knits and creates visible ridges at side seams."
+        }
+      },
+      "lace-detailing": {
+        "dresses": {
+          "detail": "Attach lace as a self-finishing trim rather than applying it over a hemline \u2014 bring the garment body up to the lace header and use a narrow zigzag (Type 304) to join them invisibly. This eliminates a separate hem operation and creates the impression that the lace is structural rather than applied decoration.",
+          "cost_note": "Self-finishing lace attachment: ~4\u20135 min SMV. Lace-over-hem approach: ~6\u20138 min SMV (requires separate hem + lace application). Saves ~2\u20133 min SMV = ~$0.10\u20130.20/unit while looking more considered.",
+          "complexity_flag": "moderate",
+          "avoid": "Avoid applying lace trim over a topstitched hem \u2014 the double layer of finishing creates visible bulk at the hemline edge, especially under a slip silhouette."
+        },
+        "tops": {
+          "detail": "For lace inserts and panels, use a motif-joining seam (Class 5 ornamental) \u2014 match the lace pattern at the join point, then topstitch along the pattern outline and trim the excess. The seam disappears into the design. This is standard practice in RTW lace construction and avoids the visible seam line that breaks the lace field.",
+          "cost_note": "Motif-joining requires ~6\u20138 min SMV for pattern matching and precision topstitching. Budget for 15\u201320% fabric waste on lace if pattern-matching is required. Factor into your material consumption spec.",
+          "complexity_flag": "high",
+          "avoid": "Do not join lace panels with a plain serged seam \u2014 the overlock thread destroys the lace ground and creates a stiff, visible join."
+        }
+      },
+      "oversized-blazers": {
+        "tops": {
+          "detail": "For oversized corduroy and textured-tweed blazers, specify a padstitched chest piece rather than fusible interfacing \u2014 the hand-padstitching gives the chest the slight roll and softness that distinguishes vintage tailoring from contemporary fused construction. If padstitch is outside factory capability, specify a sew-in (non-fusible) wigan canvas chest piece as the minimum.",
+          "cost_note": "Padstitch chest: ~20\u201330 min additional SMV per jacket \u2014 significant. Sew-in canvas chest: ~8\u201312 min SMV over fused. At the $320\u2013450 price point, the additional $1.50\u20132.50/unit in labor is recoverable. Evaluate based on your margin position.",
+          "complexity_flag": "high",
+          "avoid": "Do not use foam-backed fusible interfacing on wools and corduroys \u2014 heat and pressure from fusing can permanently flatten the pile and create a stiff, board-like chest that reads as mass-market."
+        }
+      },
+      "sheer-layers": {
+        "dresses": {
+          "detail": "For chiffon and silk-blend sheers, specify a French seam (Class 1.06) \u2014 two-pass construction that fully encloses raw edges within the seam allowance, leaving no visible finishing on the inside. This is the technically correct seam for unlined sheer garments and eliminates any visible fraying through the fabric.",
+          "cost_note": "French seam: ~4\u20135 min SMV vs plain serged: ~2 min SMV. Additional ~2\u20133 min SMV = ~$0.10\u20130.20/unit. On a sheer garment with 4\u20136 seams, adds ~$0.50\u20131.00/unit total. Non-negotiable at the contemporary price point \u2014 a serged seam shows through sheer fabric.",
+          "complexity_flag": "moderate",
+          "avoid": "Never serge sheer fabrics \u2014 the overlock thread is fully visible through the fabric and immediately communicates low production quality."
+        }
+      },
+      "prairie-references": {
+        "tops": {
+          "detail": "Use a flat-felled seam at yoke joins to reference the authentic Western shirt construction \u2014 the double row of visible topstitching at the yoke seam is a historically accurate detail that reads as considered vintage rather than costume. Specify 40-weight topstitching thread in a tonal shade, 3mm stitch length.",
+          "cost_note": "Flat-felled seam at yoke: ~5\u20136 min SMV vs plain seam: ~2 min SMV. Additional ~3\u20134 min SMV = ~$0.15\u20130.25/unit. The topstitching row is both structural (strongest seam type) and the visible authenticity marker that customers in this category specifically notice.",
+          "complexity_flag": "low",
+          "avoid": "Avoid applying the flat-fell across the full garment \u2014 limit it to the yoke seam only. Full-garment flat-felling pushes SMV significantly and creates an overly literal workwear reference."
+        }
+      },
+      "warm-yellow": {
+        "tops": {
+          "detail": "Warm yellow is a high-risk colorway on natural fibers \u2014 specify a colorfastness test to light (ISO 105-B02) before approving production. Butter yellow on linen and organic cotton fades faster than most colorways due to the dye chemistry of yellow pigments on cellulosic fibers. Specify a grade 4 minimum for light fastness (scale 1\u20135).",
+          "cost_note": "Colorfastness testing: lab cost of 0\u201380/test, adds 3\u20135 days. Non-optional at the contemporary price point \u2014 a fading butter-yellow linen top within the first season generates returns and brand damage disproportionate to the test cost.",
+          "complexity_flag": "low",
+          "avoid": "Avoid warm yellow on silk without reactive dye specification \u2014 acid dyes on silk produce a warm yellow that photographs beautifully but fades to greenish-white within 10 wash cycles. Specify reactive dye and a UV-protective finishing treatment."
+        }
+      }
+    },
+    "heritage-hand": {
+      "hand-woven-texture": {
+        "tops": {
+          "detail": "On hand-woven linen and organic cotton wovens, leave a 1cm raw fringe at hemlines rather than turning under \u2014 secure the warp threads with a single row of lockstitch 1cm from the edge to prevent further unraveling while allowing the fringe to read as intentional. This is the key finishing detail that makes Heritage Hand feel genuinely artisanal rather than mass-produced.",
+          "cost_note": "Raw fringe finish: ~1\u20132 min SMV vs turned-under blind hem: ~4\u20136 min SMV. Saves ~3\u20134 min SMV = ~$0.15\u20130.25/unit while visually communicating higher craft value. One of the rare cases where the cost-saving technique is also the aesthetically superior choice.",
+          "complexity_flag": "low",
+          "avoid": "Do not apply a turned-under double-fold hem on hand-woven fabrics \u2014 it conceals the woven selvedge quality that justifies the material premium."
+        },
+        "dresses": {
+          "detail": "For longer hand-woven pieces, use a pick-stitch hem (hand stitch visible as a single thread dot on the outside, invisible on the inside) \u2014 it's the correct technique for medium-to-heavy wovens where a blind hem machine would create pulling, and adds genuine hand-finishing credibility.",
+          "cost_note": "Pick-stitch hem is hand labor: ~8\u201312 min per hemline at skilled worker rate. Adds $0.50\u20131.00/unit over machine hem. At Heritage Hand price points ($280\u2013480 dresses), this is recoverable and adds authentic craft narrative.",
+          "complexity_flag": "high",
+          "avoid": "Avoid coverstitch hems on woven fabrics \u2014 the parallel stitch lines read as knitwear finishing and undermine the woven-goods authenticity."
+        }
+      },
+      "artisan-patchwork": {
+        "outerwear": {
+          "detail": "Concentrate patchwork at the yoke and upper sleeve only \u2014 this is the Bode-reference approach that maximizes visual impact while minimizing fabric waste and SMV. Each additional patchwork panel adds ~6\u201310 min SMV; a full-garment patchwork at 20+ panels can add 2\u20133 hours to the make time. Budget for 3\u20135 panels maximum at the contemporary price tier.",
+          "cost_note": "Each patchwork panel: ~6\u201310 min SMV for cutting, placement, joining, and pressing. 5 panels: ~35\u201350 min additional SMV = $1.75\u20134.00/unit over a plain shell. Full Bode-style patchwork at 20 panels would add $14\u201324/unit in labor alone \u2014 that's a $120\u2013180+ COGS impact.",
+          "complexity_flag": "high",
+          "avoid": "Do not attempt full-garment patchwork in your first production run with a new factory \u2014 patchwork matching requires an established relationship and significant sampling iterations. Budget 3\u20134 sample rounds."
+        },
+        "tops": {
+          "detail": "For patchwork tops, use a visible whip stitch in a contrasting 12-weight hand-sewing thread to join panels \u2014 it's the authentic hand-stitch reference that reads as craft rather than construction, and it's faster than topstitching panels on a machine while looking more deliberate.",
+          "cost_note": "Hand whip-stitch joining: ~4\u20136 min per panel join. On a 4-panel top with 3 joins: ~15\u201318 min SMV. Machine topstitching equivalent: ~6\u20138 min SMV. Additional ~8\u201310 min = $0.40\u20130.80/unit \u2014 the hand-finish premium is modest relative to the authenticity signal.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not join patchwork panels with a plain machine seam and press to one side \u2014 the flat, hidden join makes the patchwork read as print rather than construction."
+        }
+      },
+      "natural-dyes": {
+        "tops": {
+          "detail": "On natural-dyed organic cotton and linen, specify stone-wash or enzyme-wash as a final finishing step to even out the hand-dye variation \u2014 natural dyes are inherently uneven, and a light enzyme wash in production softens the hand while creating a consistent-enough appearance for retail without destroying the organic color story.",
+          "cost_note": "Enzyme wash: adds $1.50\u20133.00/unit in wet processing cost and 3\u20135 days to the production timeline. Factor into your calendar. Alert your factory: natural dyes can crack or fade unpredictably in enzyme wash \u2014 spec a small pre-production test batch of 5\u201310 units before full run.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not skip a pre-production wash test on natural-dyed goods \u2014 uneven dye settling looks like a QC defect at retail even when it is intentional. Document the 'acceptable variation' range in your QC spec sheet."
+        }
+      },
+      "raw-edge-finishing": {
+        "bottoms": {
+          "detail": "On raw selvedge denim, specify a chain-stitch inseam (401 chainstitch) at the inseam and outseam \u2014 this is the authentic selvedge denim construction standard (used by Levi's vintage, Japan Blue, Oni Denim) and creates the signature 'roping' fade pattern that selvedge enthusiasts specifically seek. Do not use lockstitch on selvedge denim seams.",
+          "cost_note": "401 chainstitch vs lockstitch: identical SMV, no cost difference. The distinction is machine availability \u2014 confirm your factory has a chainstitch machine before committing. If not, the lockstitch alternative will not damage the garment but will eliminate the fade roping that validates the selvedge premium.",
+          "complexity_flag": "low",
+          "avoid": "Never serge the inseam on selvedge denim \u2014 the overlock destroys the selvedge integrity. Specify 'no overlocking on selvedge panels' explicitly in your tech pack."
+        },
+        "tops": {
+          "detail": "For organic cotton and linen tops, specify a raw hem (single lockstitch 1cm from cut edge, fringe allowed) rather than any folded finish \u2014 the fray creates the 'visible time passing' quality that is the emotional core of Heritage Hand. Note fabric-specific fraying behavior in your tech pack: linen frays aggressively (specify 1.5cm lockstitch placement), organic cotton frays moderately (1cm placement).",
+          "cost_note": "Raw hem: ~1\u20132 min SMV vs turned-under blind hem: ~4\u20136 min SMV. Saves ~3 min SMV = ~$0.15/unit. Specify the exact fray allowance in your BOM \u2014 it affects how much fabric is 'lost' to fringe and must be factored into your consumption calculation. Add 3\u20134cm to pattern hemline for fraying allowance.",
+          "complexity_flag": "low",
+          "avoid": "Do not apply a turned-under hem on Heritage Hand tops \u2014 it is the single construction choice that most undermines the aesthetic positioning."
+        }
+      },
+      "fringe-detailing": {
+        "tops": {
+          "detail": "For woven fringe on linen and natural-fiber tops, specify cut-and-pulled fringe rather than sewn-on trim fringe \u2014 remove weft threads from the hem area to create a natural fringe from the warp threads of the fabric itself. This is structurally integrated (cannot fall off) and reads as genuinely artisanal rather than applied decoration.",
+          "cost_note": "Cut-and-pull fringe: ~8\u201312 min SMV for thread removal and securing the top edge of the fringe zone with a lockstitch. Sewn-on trim fringe: ~4\u20136 min SMV but adds $1.50\u20134/unit in trim cost. Cut-and-pull is slower but cheaper in materials and more authentic \u2014 preferred at Heritage Hand.",
+          "complexity_flag": "moderate",
+          "avoid": "Avoid using polyester fringe trim \u2014 regardless of the base fabric, synthetic trim on a natural-fiber garment creates a brand credibility problem, especially for a sustainability-positioned aesthetic."
+        }
+      },
+      "shibori": {
+        "tops": {
+          "detail": "For shibori-dyed garments, finish all pieces after dyeing rather than before \u2014 construct the garment first, then dye as a complete unit. This ensures the shibori resist pattern wraps naturally around the garment geometry (seams, curves) rather than looking like flat fabric assembled into a garment. Note: dyeing after construction requires pre-shrinking all threads and interfacings, or you will have puckering at seams after the dye bath.",
+          "cost_note": "Garment dyeing vs fabric dyeing: garment dyeing adds ~\u20134/unit in wet processing and requires color yield testing (garment construction absorbs dye differently than flat fabric). Pre-shrink all components (threads, zippers, interfacing) before construction or they will shrink differently in the dye bath.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not attempt shibori dyeing on garments with metal hardware (zippers, snaps, rivets) unless the hardware is masked during dyeing \u2014 indigo and fiber-reactive dyes stain metal permanently and cannot be removed without damaging the hardware finish."
+        }
+      }
+    },
+    "undone-glam": {
+      "distressed-leather": {
+        "outerwear": {
+          "detail": "On genuine leather, leave all interior seams unfinished (no binding, no serging) \u2014 leather does not fray and the bare interior seam edge is both correct construction practice and an authenticity signal. Specify edge paint (water-based leather edge paint in a tonal shade) on all exterior cut edges: armholes, hems, pocket edges. This protects the leather without adding visual finish.",
+          "cost_note": "Edge painting: ~0.5\u20131 min SMV per edge + $0.30\u20130.60/unit in edge paint material. On a jacket with 8 exterior edges: ~6\u20138 min SMV + $0.50/unit. Eliminates the need for any binding or facing at edges \u2014 saves ~$1\u20132/unit in lining/facing fabric.",
+          "complexity_flag": "moderate",
+          "avoid": "Never serge leather \u2014 an overlock machine needle perforates leather and creates irreparable stitch holes. All leather seams must be sewn once; there are no do-overs."
+        },
+        "bottoms": {
+          "detail": "For distressed leather trousers, specify a lapped seam (Class 2.01) at the side seams with the outer panel overlapping the inner \u2014 the visible seam line on the outside of the leg is a deliberate deconstructed reference and eliminates the need for seam allowance pressing. Topstitch with a 40-weight waxed thread, 4mm stitch length for a vintage saddlery reference.",
+          "cost_note": "Lapped seam on leather: ~3\u20134 min SMV vs plain seam: ~2 min SMV. The lapped construction eliminates the need for interior seam binding and is structurally stronger on leather \u2014 the overlapping layer distributes stress. Net construction cost is minimal.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not try to press leather seams open \u2014 leather cannot be pressed and a plain seam on leather creates a rounded, bulky ridge at the seam line."
+        }
+      },
+      "anti-fit-tailoring": {
+        "outerwear": {
+          "detail": "For deconstructed coats, specify a deliberately exposed seam on the shoulder and sleeve cap \u2014 reverse the garment so seam allowances fall on the outside. Finish the raw edges with a 3-thread overlock (not a 4-thread \u2014 you want visible thread coverage, not maximum edge enclosure). This is the technical basis of the Margiela-descended deconstruction language that defines this aesthetic.",
+          "cost_note": "Reversed/exposed seams: identical SMV to standard seam construction \u2014 it's just a direction reversal in the sewing instruction. Zero additional cost. Specify 'RS facing out' on exterior seams in your tech pack; this must be explicit or factories will default to standard construction.",
+          "complexity_flag": "low",
+          "avoid": "Do not accidentally expose seams on structural seams (armhole, shoulder seam) without reinforcing the seam allowance \u2014 exposed seam allowances under stress (armhole) must be double-stitched to prevent tearing under wear."
+        },
+        "tops": {
+          "detail": "For anti-fit blazers and suiting, specify a sew-in (non-fusible) canvas chest piece but leave the collar and lapel with no interfacing \u2014 the resulting 'soft front, collapsed collar' silhouette is the technical expression of anti-structure tailoring. The collar should roll rather than stand; the lapel should break naturally rather than hold a pressed crease.",
+          "cost_note": "Sew-in canvas (no fusible): similar SMV to fusible, different materials. Canvas: $1.50\u20132.50/unit vs fusible: $0.80\u20131.50/unit. The additional $0.70\u20131.00/unit in material cost delivers the intentionally unfinished structure that is central to the price-point justification.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not use foam interfacing anywhere in anti-fit suiting \u2014 it creates bounce-back structure that fights the intended drape and collapses the deconstructed silhouette."
+        }
+      },
+      "raw-print": {
+        "tops": {
+          "detail": "On raw-printed organic cotton, use an intentionally imprecise placement \u2014 specify 'approximately centered, \u00b12cm acceptable variation' in your tech pack. This communicates artistic intent to the factory and prevents them from rejecting off-center units as defects. Pre-wash printed goods before final hemming; screen print inks shrink differently from the base fabric on first wash.",
+          "cost_note": "Pre-wash before hemming adds 1\u20132 days to production and ~$0.40\u20130.80/unit in wet processing. Non-negotiable for screen prints \u2014 without pre-washing, hem lengths shift unpredictably after consumer's first wash.",
+          "complexity_flag": "low",
+          "avoid": "Do not set a tight placement tolerance on raw prints \u2014 a QC reject for off-center placement on a deliberately imperfect piece is the definition of missing the aesthetic intent."
+        }
+      },
+      "metallic-fabrics": {
+        "dresses": {
+          "detail": "On metallic-lam\u00e9 and foil-coated fabrics, use a rolled hem (2\u20133mm, narrow rolled hem foot on lockstitch machine) rather than any turned-under finish \u2014 the metallic coating cracks at fold lines under repeated wear. A rolled hem minimizes the fold depth and prevents visible cracking at the hemline edge.",
+          "cost_note": "Rolled hem on metallics: ~3\u20134 min SMV. Requires a narrow hemmer foot attachment \u2014 confirm factory has this or budget $50\u2013100 for the attachment. Alternative: Hong Kong bound hem with a contrast silk organza tape, which adds material cost (~$0.60/unit) but protects the metallic edge from folding entirely.",
+          "complexity_flag": "moderate",
+          "avoid": "Never specify a double-fold hem on metallic or foil-coated fabrics \u2014 the fold crease becomes a permanent visible crack line after the first wear."
+        }
+      },
+      "fringe": {
+        "tops": {
+          "detail": "For deconstructed fringe on wovens, cut fringe by slashing the hem allowance vertically to the lockstitch line rather than cutting separate fringe strips and applying them \u2014 self-fringe is more durable (attached at a structural stitch line), faster to produce, and reads as more intentionally deconstructed. Specify slash width of 8\u201312mm for a dense fringe; 15\u201320mm for a more graphic, open fringe.",
+          "cost_note": "Self-fringe (slash and secure): ~4\u20136 min SMV including the securing lockstitch. Applied fringe trim: ~4\u20136 min SMV in application labor + $1.50\u20134/unit in trim material. Self-fringe is cost-equivalent in labor and eliminates the trim cost entirely.",
+          "complexity_flag": "low",
+          "avoid": "Do not slash fringe on knit fabrics \u2014 knit fringe curls, rolls, and distorts under tension. Self-fringe only works on woven fabrics with stable warp threads."
+        }
+      },
+      "layered-chains": {
+        "tops": {
+          "detail": "Attached chain trim requires bar-tack reinforcement at every attachment point \u2014 chains exert linear tension along their length that tears through unprotected fabric rapidly. Specify a 4\u00d76mm bar tack at each end attachment point and at any mid-garment attachment point. Use a stainless steel split ring (not jump ring) as the intermediary between the chain and the fabric attachment; this distributes the tension across the ring diameter rather than concentrating it at a single thread.",
+          "cost_note": "Bar tacks at chain attachment: ~0.5 min SMV per tack. Split rings: /bin/sh.05\u20130.10/ring. On a 3-chain layered detail with 6 attachment points: ~3 min SMV + /bin/sh.30 hardware = ~/bin/sh.50/unit. Prevents the primary failure mode (chain tearing through fabric) that generates disproportionate customer service cost.",
+          "complexity_flag": "low",
+          "avoid": "Do not attach chains directly to fabric using only a single thread bar tack \u2014 chain weight creates a lever action that will tear a single-width bar tack within 5\u201310 wears. The split ring intermediary is non-negotiable on any hanging chain attachment."
+        }
+      }
+    },
+    "haptic-play": {
+      "rubberized-finishes": {
+        "outerwear": {
+          "detail": "On rubberized and coated nylons, specify a seam-sealing tape on all outer seams as a finish step \u2014 this is the technical differentiator between a fashion raincoat and a technical one. Use a 20mm single-sided seam tape (Bemis tape is industry standard), applied with a heat-sealing iron. It adds weatherproofing, eliminates internal seam finishing requirements, and is a legitimate functional claim for swing tags.",
+          "cost_note": "Seam tape application: ~2\u20133 min SMV per seam + $0.80\u20131.50/unit in Bemis tape material. On a 6-seam shell: ~15 min additional SMV + $1.20/unit material = $1.80\u20132.40/unit total. Creates a functional story that directly supports the $350\u2013500 technical outerwear price point.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not serge coated fabrics \u2014 the overlock needle perforates the coating and destroys the weatherproofing. All stitching on rubberized fabrics must be planned as permanent."
+        }
+      },
+      "inflated-forms": {
+        "outerwear": {
+          "detail": "For quilted and puffer silhouettes, specify box-baffle construction rather than sewn-through quilting \u2014 box baffles (separate inner and outer panels joined only at edges) eliminate the cold-spot channels created by sewn-through quilting and allow for maximum loft. The visual result is a cleaner, more sculptural surface without the depressed stitch lines that flatten inflated forms.",
+          "cost_note": "Box-baffle construction: ~25\u201335% more expensive in construction than sewn-through quilting due to the additional inner-baffle fabric and the joining operation. On a $280 puffer, this differential is ~$8\u201312/unit in added CMT. Evaluate against your margin position \u2014 box-baffle is the standard at $400+ outerwear.",
+          "complexity_flag": "high",
+          "avoid": "Avoid sewn-through quilting on oversized/sculptural puffers \u2014 the stitch lines flatten the inflated volume and visually undermine the silhouette you're trying to achieve."
+        },
+        "bottoms": {
+          "detail": "For inflated-volume trousers, achieve the volume through generous ease (20\u201330cm of ease at the thigh) rather than padding or batting \u2014 the volume comes from fabric, not fill. Use a wide-leg block with a dropped crotch point and specify a soft cotton or viscose lining to prevent the shell from clinging and collapsing the volume in wear.",
+          "cost_note": "Additional lining adds ~$2\u20134/unit in material + ~8\u201310 min SMV for attachment. The lining is functionally necessary for volume retention \u2014 without it, the shell clings to the leg and the visual volume collapses within an hour of wear.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not attempt inflated volume in structured fabrics (canvas, denim) \u2014 the fabric weight collapses the ease and the garment reads as just 'wide leg' rather than inflated."
+        }
+      },
+      "translucent-layers": {
+        "tops": {
+          "detail": "For silicone-panel and PVC insert tops, join the technical panel to the base fabric using a flat-felled seam with a Teflon presser foot \u2014 standard presser feet stick to PVC and silicone surfaces, causing uneven feeding. Specify Teflon or roller foot in your tech pack; most technical factories have these but must be instructed to use them.",
+          "cost_note": "Teflon foot: no additional SMV, factory equipment. If factory doesn't have it, Teflon foot cost is ~$15\u201330 \u2014 negligible amortized over a production run. Without it, uneven feeding creates visible stitch puckering on translucent panels that cannot be concealed.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not press PVC or silicone panels with a steam iron \u2014 heat permanently distorts or melts the material. All pressing must be done on the reverse side on the base fabric layer only."
+        }
+      },
+      "gel-forms": {
+        "bottoms": {
+          "detail": "For bonded and coated skirts, use an adhesive hem (double-sided fusible webbing strip) rather than a sewn hem \u2014 stitching on bonded fabrics creates perforation lines that become tear points under wear. Specify Bondaweb or equivalent 12mm fusible web strip; press at 140\u00b0C for 10 seconds per section. This is standard practice for bonded outerwear and leather hems.",
+          "cost_note": "Adhesive hem: ~2\u20133 min SMV + $0.20\u20130.40/unit in fusible web material. Sewn hem equivalent: ~3\u20134 min SMV with risk of tearing at stitch perforations. Adhesive is faster, cheaper, and the technically correct approach for bonded/coated fabrics.",
+          "complexity_flag": "low",
+          "avoid": "Do not specify sewn hems on bonded fabrics without specifying a Teflon foot and ball-point needle \u2014 standard sharp needles perforate the bonding layer and create a pre-stressed tear line at the hemline."
+        }
+      },
+      "saturated-pastel": {
+        "tops": {
+          "detail": "On pastel recycled polyester and technical fabrics, specify a dye-sublimation color test before production \u2014 pastel shades are the most sensitive to variation in polyester dyeing, and a 5\u201310% shade difference between batches is visible at retail. Specify an A/B color standard (acceptable range) rather than a single color standard, and include both ends of the range in your QC spec.",
+          "cost_note": "Color testing adds 2\u20133 days pre-production with no significant cost. Color rejection after production is catastrophic \u2014 a full re-dye on polyester is rarely possible; most rejected lots become write-offs. The test is free insurance.",
+          "complexity_flag": "low",
+          "avoid": "Do not rely on digital color standards (Pantone codes) alone for pastel polyester \u2014 the same Pantone can produce visibly different results depending on the dye bath temperature and the specific polyester fiber weight. Physical standards are mandatory."
+        }
+      },
+      "molded-details": {
+        "outerwear": {
+          "detail": "Molded structural details require a separate mold-making step before production \u2014 confirm your factory has injection molding or heat-press forming capability before committing to this specification. For heat-press formed details, specify a 3\u20134mm EVA foam base layer for the molded panel, thermoformed at 140\u2013160\u00b0C, then bonded to the shell with contact cement. The EVA base holds the form; the shell fabric is then stretched and glued over it.",
+          "cost_note": "Mold tooling cost: 00\u2013800 per mold for small-scale production runs. Amortized over 300 units: /bin/sh.65\u20132.70/unit tooling cost plus \u20132/unit in forming labor. Total molded-detail premium: \u20135/unit over standard construction. Confirm factory capability before spec \u2014 few CMT factories have forming capability.",
+          "complexity_flag": "high",
+          "avoid": "Do not attempt heat-press forming on coated fabrics (PVC, rubberized nylon) without a fabric heat-tolerance test first \u2014 most coatings delaminate or distort at the temperatures required for EVA thermoforming."
+        }
+      }
+    },
+    "high-voltage": {
+      "metallic-knits": {
+        "tops": {
+          "detail": "For metallic-thread knitwear, use a coverstitch hem (406) rather than a turned-under blind hem \u2014 the metallic yarns are too slippery and stiff to hold a blind hem reliably, and the yarn itself will break under the needle tension of a blind-hem machine. The visible parallel stitch lines of a coverstitch read as deliberate on metallic knitwear and are the standard finish on luxury metallic jersey.",
+          "cost_note": "Coverstitch: ~2\u20133 min SMV. Blind hem on metallic: ~5\u20137 min SMV with high risk of needle breakage and re-work (potentially 2\u20133\u00d7 the stated SMV in practice). Coverstitch is faster, more reliable, and technically correct for this fabric.",
+          "complexity_flag": "low",
+          "avoid": "Avoid hand-turned hems on metallic yarns \u2014 the metallic thread is sharp and will cut through hand-stitching thread over time, causing hem failure in consumer wear."
+        }
+      },
+      "sequin-saturation": {
+        "tops": {
+          "detail": "For micro-sequin fabrics, clear a 1.5cm channel at all seam lines before sewing \u2014 use a seam ripper or heat tool to remove sequins from the seam allowance only. This allows the seam to lie flat without sequin bulk and prevents needle breakage (sequin studs will break a size 70 needle on impact). Specify size 90 denim needle for all sequin-adjacent sewing.",
+          "cost_note": "Sequin clearing: ~3\u20135 min SMV per seam, adds ~$0.50\u20131.00/unit on a 4-seam style. Non-negotiable \u2014 sequin bulk at seam lines creates raised ridges visible from the outside and is a standard QC reject reason for sequined garments.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not try to sew through sequins at seam lines \u2014 even micro-sequins will deflect the needle, creating crooked seam lines, broken needles, and potentially damaging the machine feed dogs."
+        },
+        "dresses": {
+          "detail": "Line all sequin dresses with a 100% silk or silk-blend lining \u2014 sequin fabric is abrasive against the skin, and an unlined sequin dress at the contemporary price point ($320+) will generate significant customer complaints and returns. Attach the lining with a 'float lining' method: attach only at zipper and neckline, leave hem free to allow movement without pulling the shell.",
+          "cost_note": "Silk lining: $3\u20136/unit in material + ~12\u201315 min SMV for attachment. Total: ~$4.50\u20138.00/unit. At the sequin dress price point this is expected and non-negotiable. A nylon lining alternative saves $1.50\u20132/unit but creates static cling that lifts the sequin fabric unpredictably in wear.",
+          "complexity_flag": "high",
+          "avoid": "Never leave a sequin dress fully unlined \u2014 sequins abrade skin, cause snagging on undergarments, and generate customer service costs that far exceed the lining savings."
+        }
+      },
+      "bold-shoulders": {
+        "tops": {
+          "detail": "For statement-shoulder coats and blazers, specify a foam-free shoulder pad (compressed felt or horsehair canvas shoulder pad) rather than foam \u2014 foam shoulder pads degrade, compress permanently, and lose shape within 12\u201318 months of wear. Felt/canvas pads maintain their profile indefinitely and can be dry-cleaned without deformation.",
+          "cost_note": "Felt/canvas shoulder pad: $0.80\u20131.50/unit vs foam pad: $0.20\u20130.50/unit. Additional $0.60\u20131.00/unit in hardware delivers a garment that holds its shoulder profile for the product lifecycle \u2014 directly relevant to the cost-per-wear story of a High Voltage investment piece.",
+          "complexity_flag": "low",
+          "avoid": "Do not specify foam shoulder pads on any garment at the $350+ contemporary price point \u2014 the pad failure timeline is predictable and will reach consumers within the return-intent window."
+        }
+      },
+      "high-shine-fabrication": {
+        "bottoms": {
+          "detail": "For metallic-coated denim, specify a chainstitch inseam (401) identical to standard denim construction \u2014 the metallic coating is surface only and the underlying denim construction rules apply. Do not attempt to press metallic denim with a standard iron; specify a clapper board press only, 0 steam, at reduced temperature (120\u00b0C max). Steam will permanently stain metallic coatings.",
+          "cost_note": "Chainstitch vs lockstitch: no SMV differential \u2014 factory machine availability is the constraint, not the stitch itself. Clapper pressing vs steam pressing: factory should have appropriate equipment; if not, a press cloth with 0 steam is an acceptable workaround. No additional cost.",
+          "complexity_flag": "low",
+          "avoid": "Never steam-press metallic-coated fabrics \u2014 steam causes irreversible water-spot staining that appears as a dull patch through the metallic coating. Specify 'DRY PRESS ONLY' explicitly in your tech pack and QC checklist."
+        }
+      },
+      "statement-jewelry": {
+        "tops": {
+          "detail": "For tops and dresses with heavy embellishment attachment points, reinforce the interior at all attachment points with a 4\u00d74cm interfacing patch before attaching hardware \u2014 statement jewelry and heavy embellishment creates point-load stress that tears through the base fabric over time without reinforcement. Use a woven sew-in interfacing, not fusible, on stretch or delicate base fabrics.",
+          "cost_note": "Interfacing patches: ~$0.10/unit in material + ~0.5\u20131 min SMV per patch. On a 6-attachment piece: ~$0.10/unit material + ~4 min SMV = ~$0.30/unit total. Prevents a category of consumer complaint (hardware tearing through fabric) that generates disproportionate customer service cost.",
+          "complexity_flag": "low",
+          "avoid": "Do not attach heavy hardware directly to unlined chiffon, silk, or metallic jersey without interior reinforcement \u2014 the fabric will fail at the attachment point within 5\u201310 wears."
+        }
+      },
+      "statement-red": {
+        "tops": {
+          "detail": "Red is the highest-bleed-risk colorway in garment production \u2014 specify a colorfastness wash test (ISO 105-C06) and a rubbing test (ISO 105-X12) before approving production. Red dye molecules are larger than most other colorways and transfer more readily under heat, moisture, and friction. Specify a grade 4 minimum for both tests. On red silk specifically, require a fixative treatment after dyeing.",
+          "cost_note": "Colorfastness testing: 0\u201380/test. Fixative treatment on silk: adds /bin/sh.30\u20130.60/unit in wet processing. Non-negotiable \u2014 a red silk top that bleeds onto a cream blouse at the first wear is a brand-level incident at the contemporary price point.",
+          "complexity_flag": "low",
+          "avoid": "Do not include red and white pieces in the same photo shoot or retail display without colorfastness confirmation \u2014 contact transfer between red and white garments in transit or on a hanger is the most common and most visible quality failure in this colorway combination."
+        }
+      }
+    },
+    "sweet-subversion": {
+      "charm-loaded-accessories": {
+        "tops": {
+          "detail": "For removable charm attachment, specify stainless steel split rings (not lobster clasps or jump rings) as the hardware standard \u2014 split rings require two hands to open, preventing accidental charm loss in wear, and are the correct hardware for fashion charm attachment. Source in 12mm diameter minimum; smaller rings allow charms to spin off in wear.",
+          "cost_note": "Split rings: $0.05\u20130.10/ring + $0.10\u20130.20/unit in attachment labor. On a 4-charm piece: ~$0.40\u20130.60/unit total in hardware and attachment. Lobster clasp alternative: $0.15\u20130.30/clasp but opens accidentally under light tension \u2014 generates returns. Split ring is the correct specification.",
+          "complexity_flag": "low",
+          "avoid": "Do not specify open jump rings for charm attachment \u2014 they deform and open under minimal stress, and detached charms on childrenswear adjacent pieces create regulatory issues in some markets."
+        }
+      },
+      "bold-color-blocking": {
+        "tops": {
+          "detail": "On bold color-blocked pieces in recycled polyester, specify a pre-production wash test for color bleeding between panels \u2014 high-contrast color blocks (especially red/white, navy/white) are high-risk for dye migration on synthetic fabrics. Specify a 40\u00b0C wash test on the sample before approving production. If bleeding occurs, add a 3mm seam allowance buffer of the darker color cut away before joining to the light panel.",
+          "cost_note": "Pre-production wash test: 2\u20133 days, no significant cost. Color bleed remediation after production: typically a full re-make \u2014 potentially $15\u201325/unit. The test is cost-free insurance against a catastrophic production outcome.",
+          "complexity_flag": "low",
+          "avoid": "Do not assume that recycled polyester from different dye lots is colorfastness-compatible \u2014 even the same color specification from different production runs can have different levels of fixation."
+        },
+        "dresses": {
+          "detail": "For multi-panel color-block dresses in woven fabrics, specify that all panels are cut on the same grain line \u2014 off-grain color blocks twist in wear and create a spiral effect that reads as a construction defect rather than a design choice. Mark grain lines explicitly on each panel in your tech pack with a directional arrow.",
+          "cost_note": "Grain line specification adds no SMV \u2014 it's a cutting instruction, not a sewing operation. Off-grain cutting on color-blocked pieces typically results in a 20\u201330% reject rate at QC, which is an avoidable cost. Marker efficiency may decrease slightly due to grain constraints; factor 5\u20138% additional fabric consumption.",
+          "complexity_flag": "low",
+          "avoid": "Do not leave grain line unspecified on multi-panel color-block pieces \u2014 factories default to efficiency-maximizing marker layouts that may cut off-grain to fit more pieces per yard."
+        }
+      },
+      "micro-scale": {
+        "tops": {
+          "detail": "For micro-scale print placements and miniature repeat patterns, specify a 'pattern alignment' tolerance of \u00b13mm in your tech pack \u2014 this is tight enough to maintain visual consistency but achievable at production scale. Any tighter and your reject rate becomes economically unviable. Any looser and the scale-play visual precision that defines this aesthetic is lost in production.",
+          "cost_note": "Tight pattern alignment increases cutting time and reduces marker efficiency by ~5\u201310% (more fabric waste to align pattern). Factor into your consumption calculation \u2014 add 8\u201312% to standard fabric yield for tightly-aligned miniature prints.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not attempt micro-scale print alignment on fabrics with significant stretch or bias \u2014 the pattern shift in wear will exceed your alignment tolerance within the first hour, and there is no production fix for this."
+        }
+      },
+      "novelty-prints": {
+        "dresses": {
+          "detail": "For gingham and structured repeat prints, specify a horizontal stripe-match at all side seams and a pattern-match at the front bodice center \u2014 these are the two visible alignment points that consumers and buyers check first on patterned pieces. A pattern mismatch at the side seam signals mass-market production; alignment signals craft and attention.",
+          "cost_note": "Pattern matching at side seams and center front: adds 10\u201315% to fabric consumption (more yield wasted in alignment) + ~4\u20136 min SMV for matching operations. On a 2-yard dress in $7.50/yd fabric: ~$2.25 additional fabric + ~$0.30 labor = ~$2.55/unit. Worth it on gingham at $220+ price point; evaluate at lower price tiers.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not specify pattern matching across the shoulder seam \u2014 the curved seam prevents perfect alignment and a 'close enough' match at the shoulder reads worse than no matching at all."
+        }
+      },
+      "exaggerated-scale": {
+        "outerwear": {
+          "detail": "For oversized-scale outerwear (exaggerated lapels, statement collars), interface the collar and lapel with a sew-in wigan canvas rather than fusible \u2014 oversized collar/lapel pieces are more prone to fusible delamination (the bubbling that occurs when the adhesive fails after dry cleaning or heat exposure) because of their large surface area and repeated folding stress.",
+          "cost_note": "Sew-in canvas (wigan): $1.20\u20132.00/unit in material vs fusible interfacing: $0.60\u20131.20/unit. Additional ~$0.60\u20130.80/unit in material for construction that doesn't delaminate. On a $480 statement coat, this is non-negotiable \u2014 delamination is a visible, irreparable defect.",
+          "complexity_flag": "moderate",
+          "avoid": "Do not use foam-backed fusible interfacing on large collar or lapel pieces \u2014 the foam creates a rubbery stiffness that prevents the natural 'break' of a collar roll and reads as costume-quality construction."
+        }
+      },
+      "jewel-encrusting": {
+        "dresses": {
+          "detail": "For crystal and bead embellishment on dresses, specify a backing fabric (organza or tulle) glued or baste-stitched to the interior of the embellishment area before hand-sewing embellishments \u2014 the backing distributes the weight of beading across a wider area, prevents the base fabric from pulling and puckering under the bead weight, and allows the embellishment to be removed from the base fabric for cleaning if needed.",
+          "cost_note": "Backing fabric + application: ~$0.30\u20130.50/unit in material + ~5\u20138 min SMV for basting. On a fully embellished bodice, hand-beading itself adds $8\u201325/unit in labor depending on density \u2014 the backing cost is negligible relative to the embellishment investment it protects.",
+          "complexity_flag": "high",
+          "avoid": "Do not hand-sew heavy embellishment directly to silk or chiffon base fabrics without backing \u2014 the bead weight causes irreversible pulling and puckering that cannot be pressed out, destroying the garment."
+        }
+      }
+    }
+  }

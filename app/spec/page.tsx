@@ -23,6 +23,7 @@ import categoriesData from "@/data/categories.json";
 import materialsData from "@/data/materials.json";
 import subcategoriesData from "@/data/subcategories.json";
 import aestheticsData from "@/data/aesthetics.json";
+import designLanguageData from "@/data/design-language.json";
 import AskMuko from "@/components/AskMuko";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
 import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
@@ -453,6 +454,40 @@ function getSpecInsightData(
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+/* ─── Design Language helpers ─── */
+function chipToKey(label: string): string {
+  return label.toLowerCase().replace(/\s+/g, "-").replace(/[\/&]/g, "-");
+}
+
+interface DesignLanguageSuggestion {
+  chip: string;
+  detail: string;
+  cost_note: string;
+  complexity_flag: string;
+  avoid: string;
+}
+
+function getDesignLanguageSuggestions(
+  aestheticId: string,
+  selectedChips: string[],
+  category: string
+): DesignLanguageSuggestion[] {
+  const data = designLanguageData as unknown as Record<string, Record<string, Record<string, { detail: string; cost_note: string; complexity_flag: string; avoid: string }>>>;
+  const entry = data[aestheticId];
+  if (!entry) return [];
+  return selectedChips
+    .map((label) => {
+      const key = chipToKey(label);
+      const chipEntry = entry[key];
+      if (!chipEntry) return null;
+      const suggestion = chipEntry[category] || chipEntry[Object.keys(chipEntry)[0]];
+      if (!suggestion) return null;
+      return { chip: label, ...suggestion } as DesignLanguageSuggestion;
+    })
+    .filter((s): s is DesignLanguageSuggestion => s !== null)
+    .slice(0, 3);
+}
+
 export default function SpecStudioPage() {
   const router = useRouter();
   const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection } = useSessionStore();
@@ -497,6 +532,7 @@ export default function SpecStudioPage() {
 
   const storeAesthetic = useSessionStore((s) => s.aestheticMatchedId);
   const storeModifiers = useSessionStore((s) => s.refinementModifiers);
+  const selectedKeyPiece = useSessionStore((s) => s.selectedKeyPiece);
   const storeMoodboard = useSessionStore((s) => s.moodboardImages);
   const chipSelection = useSessionStore((s) => s.chipSelection);
   const conceptSilhouette = useSessionStore((s) => s.conceptSilhouette);
@@ -578,6 +614,10 @@ export default function SpecStudioPage() {
     AESTHETIC_KEYWORDS.default;
 
   const recommendedMaterialId = useMemo(() => {
+    // If a key piece specifies a recommended material, prefer it
+    if (selectedKeyPiece?.recommended_material_id && materials.find((m) => m.id === selectedKeyPiece.recommended_material_id)) {
+      return selectedKeyPiece.recommended_material_id;
+    }
     // If a chip specifies a material, prefer it (first chip with a material wins)
     const chipMaterial = chipSelection?.activatedChips.find((c) => c.material != null)?.material;
     if (chipMaterial && materials.find((m) => m.id === chipMaterial)) {
@@ -816,6 +856,28 @@ export default function SpecStudioPage() {
     if (constructionTier) setStoreTier(constructionTier);
   }, [constructionTier, setStoreTier]);
 
+  // Auto-populate from selected key piece when it changes
+  useEffect(() => {
+    if (selectedKeyPiece && !selectedKeyPiece.custom) {
+      if (selectedKeyPiece.category) {
+        const matchedCat = categories.find(
+          (c) => c.id === selectedKeyPiece.category ||
+            c.name.toLowerCase() === selectedKeyPiece.category?.toLowerCase()
+        );
+        if (matchedCat) handleCategoryChange(matchedCat.id);
+      }
+      if (selectedKeyPiece.type) {
+        setSubcategoryId(selectedKeyPiece.type);
+        setStoreSubcategory(selectedKeyPiece.type);
+      }
+      if (selectedKeyPiece.recommended_material_id) {
+        setMaterialId(selectedKeyPiece.recommended_material_id);
+      }
+    }
+  // Only run when selectedKeyPiece changes (not on every render)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKeyPiece]);
+
   function getBaselineMaterialCost() {
     if (!baselineMaterial) {
       const recMat = materials.find((m) => m.id === recommendedMaterialId);
@@ -881,9 +943,13 @@ export default function SpecStudioPage() {
     const baseScore = conceptContext.identityScore;
     const materialDelta = selectedMaterial ? scoreMaterialDeltas(selectedMaterial).identity : 0;
     const complexityDelta = constructionTier ? scoreComplexityDeltas(constructionTier).identity : 0;
+    // Key piece: building the exact category the direction calls for reinforces identity
+    const keyPieceDelta = (selectedKeyPiece && !selectedKeyPiece.custom && selectedKeyPiece.category && categoryId &&
+      (selectedKeyPiece.category === categoryId || selectedKeyPiece.category.toLowerCase() === categoryId.toLowerCase()))
+      ? 3 : 0;
 
     return clamp(
-      baseScore + materialDelta + complexityDelta,
+      baseScore + materialDelta + complexityDelta + keyPieceDelta,
       0,
       100
     );
@@ -897,6 +963,7 @@ export default function SpecStudioPage() {
     categoryId,
     materials,
     aestheticKws,
+    selectedKeyPiece,
   ]);
 
   const dynamicResonanceScore = useMemo(() => {
@@ -905,9 +972,16 @@ export default function SpecStudioPage() {
     const baseScore = conceptContext.resonanceScore;
     const materialDelta = selectedMaterial ? scoreMaterialDeltas(selectedMaterial).resonance : 0;
     const complexityDelta = constructionTier ? scoreComplexityDeltas(constructionTier).resonance : 0;
+    // Key piece signal reflects market momentum for this piece type
+    const keyPieceDelta = selectedKeyPiece && !selectedKeyPiece.custom
+      ? selectedKeyPiece.signal === 'ascending' ? 6
+        : selectedKeyPiece.signal === 'high-volume' ? 4
+        : selectedKeyPiece.signal === 'emerging' ? 2
+        : 0
+      : 0;
 
     return clamp(
-      baseScore + materialDelta + complexityDelta,
+      baseScore + materialDelta + complexityDelta + keyPieceDelta,
       0,
       100
     );
@@ -921,6 +995,7 @@ export default function SpecStudioPage() {
     categoryId,
     materials,
     aestheticKws,
+    selectedKeyPiece,
   ]);
 
   const identityColor =
@@ -1392,13 +1467,44 @@ export default function SpecStudioPage() {
           <>
 
           {/* Title */}
-          <div style={{ padding: "36px 44px 24px" }}>
-            <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 28, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1 }}>
-              Spec Studio
-            </h1>
-            <p style={{ margin: "10px 0 0", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.52)", lineHeight: 1.55, maxWidth: 460 }}>
-              We translated your concept into a recommended spec. Select your garment type, explore materials and construction — Muko scores every combination in real time.
-            </p>
+          <div style={{ padding: "36px 44px 24px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
+            <div>
+              <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 28, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1 }}>
+                Spec Studio
+              </h1>
+              <p style={{ margin: "10px 0 0", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.52)", lineHeight: 1.55, maxWidth: 460 }}>
+                We translated your concept into a recommended spec. Select your garment type, explore materials and construction — Muko scores every combination in real time.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setMaterialId(recommendedMaterialId);
+                setConstructionTier(baselineComplexity);
+                setUserManuallySelected(true);
+              }}
+              style={{
+                flexShrink: 0,
+                marginTop: 4,
+                padding: "8px 18px",
+                borderRadius: 999,
+                border: "1.5px solid #CDAAB3",
+                background: "transparent",
+                fontFamily: inter,
+                fontSize: 13,
+                fontWeight: 550,
+                color: "#CDAAB3",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                transition: "background 200ms ease",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(205,170,179,0.10)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+            >
+              Muko&apos;s Pick&nbsp;
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden style={{ display: "inline", verticalAlign: "middle", marginBottom: 1 }}>
+                <path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l7.1-1.01L12 2z"/>
+              </svg>
+            </button>
           </div>
 
           <div style={{ padding: "0 44px 48px" }}>
@@ -1418,14 +1524,22 @@ export default function SpecStudioPage() {
               flexWrap: "wrap" as const,
             }}
           >
-            {/* Direction name + silhouette + palette */}
+            {/* Direction name + key piece + silhouette + palette */}
             <span style={{ fontFamily: sohne, fontSize: 13.5, fontWeight: 500, color: OLIVE, letterSpacing: "-0.01em", flexShrink: 0 }}>
               {refinement.base}
             </span>
+            {selectedKeyPiece && (
+              <>
+                <span style={{ color: "rgba(67,67,43,0.65)", fontSize: 18, fontWeight: 700, lineHeight: 1, letterSpacing: 0 }}>&middot;</span>
+                <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 400, color: "rgba(67,67,43,0.52)" }}>
+                  {selectedKeyPiece.item}
+                </span>
+              </>
+            )}
             {conceptSilhouette && (
               <>
-                <span style={{ color: "rgba(67,67,43,0.30)", fontSize: 11 }}>&middot;</span>
-                <span style={{ fontFamily: inter, fontSize: 12, fontWeight: 400, color: "rgba(67,67,43,0.60)" }}>
+                <span style={{ color: "rgba(67,67,43,0.65)", fontSize: 18, fontWeight: 700, lineHeight: 1, letterSpacing: 0 }}>&middot;</span>
+                <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 400, color: "rgba(67,67,43,0.52)" }}>
                   {conceptSilhouette.charAt(0).toUpperCase() + conceptSilhouette.slice(1)}
                 </span>
               </>
@@ -1437,23 +1551,13 @@ export default function SpecStudioPage() {
               const palName = entry?.palette_options?.find((p) => p.id === conceptPalette)?.name ?? conceptPalette;
               return (
                 <>
-                  <span style={{ color: "rgba(67,67,43,0.30)", fontSize: 11 }}>&middot;</span>
-                  <span style={{ fontFamily: inter, fontSize: 12, fontWeight: 400, color: "rgba(67,67,43,0.60)" }}>
+                  <span style={{ color: "rgba(67,67,43,0.65)", fontSize: 18, fontWeight: 700, lineHeight: 1, letterSpacing: 0 }}>&middot;</span>
+                  <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 400, color: "rgba(67,67,43,0.52)" }}>
                     {palName}
                   </span>
                 </>
               );
             })()}
-
-            {/* Scores inline — identity + resonance only */}
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 2, fontFamily: inter, fontSize: 10, fontWeight: 650, color: identityColor }}>
-                <IconIdentity size={10} color={identityColor} />{dynamicIdentityScore}
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 2, fontFamily: inter, fontSize: 10, fontWeight: 650, color: resonanceColor }}>
-                <IconResonance size={10} color={resonanceColor} />{dynamicResonanceScore}
-              </span>
-            </div>
 
             {/* Chips — unified style */}
             {chipSelection && chipSelection.activatedChips.length > 0 && (
@@ -1491,55 +1595,24 @@ export default function SpecStudioPage() {
               overflow: "visible",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={microLabel}>Category</span>
-              <select
-                value={categoryId}
-                onChange={(e) => handleCategoryChange(e.target.value)}
-                style={{
-                  padding: "8px 28px 8px 12px",
-                  borderRadius: 12,
-                  width: 130,
-                  border: "1px solid rgba(67, 67, 43, 0.12)",
-                  background: "rgba(255,255,255,0.78)",
-                  fontFamily: "var(--font-inter), system-ui, sans-serif",
-                  fontSize: 14,
-                  fontWeight: 500,
-                  color: BRAND.oliveInk,
-                  cursor: "pointer",
-                  outline: "none",
-                  boxShadow: "0 10px 26px rgba(67, 67, 43, 0.06)",
-                  appearance: "none" as const,
-                  backgroundImage:
-                    `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2343432B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.4'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: "no-repeat",
-                  backgroundPosition: "right 14px center",
-                }}
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {categorySubcategories.length > 0 && (
+            {/* State 1: Non-custom key piece — no dropdowns needed, context bar above carries it */}
+            {selectedKeyPiece && !selectedKeyPiece.custom ? null : selectedKeyPiece && selectedKeyPiece.custom ? (
+              /* State 2: Custom piece — Category dropdown only */
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={microLabel}>Type</span>
+                <span style={microLabel}>Category</span>
                 <select
-                  value={subcategoryId}
-                  onChange={(e) => handleSubcategoryChange(e.target.value)}
+                  value={categoryId}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
                   style={{
                     padding: "8px 28px 8px 12px",
                     borderRadius: 12,
-                    width: 170,
+                    width: 130,
                     border: "1px solid rgba(67, 67, 43, 0.12)",
                     background: "rgba(255,255,255,0.78)",
-                    fontFamily: "var(--font-inter), system-ui, sans-serif",
+                    fontFamily: inter,
                     fontSize: 14,
                     fontWeight: 500,
-                    color: subcategoryId ? BRAND.oliveInk : "rgba(67, 67, 43, 0.40)",
+                    color: BRAND.oliveInk,
                     cursor: "pointer",
                     outline: "none",
                     boxShadow: "0 10px 26px rgba(67, 67, 43, 0.06)",
@@ -1550,14 +1623,83 @@ export default function SpecStudioPage() {
                     backgroundPosition: "right 14px center",
                   }}
                 >
-                  <option value="" disabled>Select type...</option>
-                  {categorySubcategories.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </div>
+            ) : (
+              /* State 3: No key piece — original dropdowns */
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={microLabel}>Category</span>
+                  <select
+                    value={categoryId}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
+                    style={{
+                      padding: "8px 28px 8px 12px",
+                      borderRadius: 12,
+                      width: 130,
+                      border: "1px solid rgba(67, 67, 43, 0.12)",
+                      background: "rgba(255,255,255,0.78)",
+                      fontFamily: "var(--font-inter), system-ui, sans-serif",
+                      fontSize: 14,
+                      fontWeight: 500,
+                      color: BRAND.oliveInk,
+                      cursor: "pointer",
+                      outline: "none",
+                      boxShadow: "0 10px 26px rgba(67, 67, 43, 0.06)",
+                      appearance: "none" as const,
+                      backgroundImage:
+                        `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2343432B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.4'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "right 14px center",
+                    }}
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {categorySubcategories.length > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={microLabel}>Type</span>
+                    <select
+                      value={subcategoryId}
+                      onChange={(e) => handleSubcategoryChange(e.target.value)}
+                      style={{
+                        padding: "8px 28px 8px 12px",
+                        borderRadius: 12,
+                        width: 170,
+                        border: "1px solid rgba(67, 67, 43, 0.12)",
+                        background: "rgba(255,255,255,0.78)",
+                        fontFamily: "var(--font-inter), system-ui, sans-serif",
+                        fontSize: 14,
+                        fontWeight: 500,
+                        color: subcategoryId ? BRAND.oliveInk : "rgba(67, 67, 43, 0.40)",
+                        cursor: "pointer",
+                        outline: "none",
+                        boxShadow: "0 10px 26px rgba(67, 67, 43, 0.06)",
+                        appearance: "none" as const,
+                        backgroundImage:
+                          `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2343432B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.4'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "right 14px center",
+                      }}
+                    >
+                      <option value="" disabled>Select type...</option>
+                      {categorySubcategories.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </>
             )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1605,140 +1747,7 @@ export default function SpecStudioPage() {
               </span>
             </div>
 
-            {insight && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={microLabel}>Est. COGS</span>
-                <span
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 700,
-                    fontVariantNumeric: "tabular-nums" as const,
-                    color:
-                      insight.type === "warning"
-                        ? BRAND.camel
-                        : insight.type === "strong"
-                          ? CHARTREUSE
-                          : STEEL,
-                    fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                    transition: "color 300ms ease",
-                  }}
-                >
-                  ${insight.cogs}
-                </span>
-              </div>
-            )}
           </div>
-
-          {/* ─── Hero Card: Muko's Pick / Selected ─── */}
-          {(() => {
-            const cellStyle = { borderRadius: 10, background: "rgba(67,67,43,0.03)", border: "1px solid rgba(67,67,43,0.08)", padding: "10px 12px" };
-            const cellLabelColor = hasUserSelection ? "rgba(67,67,43,0.50)" : ROSE;
-            const cellLabelStyle = { fontSize: 9, fontWeight: 800 as const, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: cellLabelColor, fontFamily: sohne, marginBottom: 5 };
-            const cellValueStyle = { fontFamily: sohne, fontSize: 13, fontWeight: 650 as const, color: OLIVE, marginBottom: 3 };
-            const cellDetailStyle = { fontFamily: inter, fontSize: 10, color: "rgba(67,67,43,0.45)" };
-
-            // Muko's Pick: show Material + Complexity cells
-            // Silhouette & Palette are already visible in the locked concept direction bar above
-            const mukoMatChips = baselineMaterial ? (chipsByMaterial[baselineMaterial.id] || []) : [];
-            const mukoComplexChips = baselineComplexity === "high" ? chipsForHighComplexity : [];
-            const mukoCells = [
-              { key: "material", label: "Material", name: baselineMaterial?.name ?? "—", detail: baselineMaterial ? `$${baselineMaterial.cost_per_yard}/yd · ${baselineMaterial.lead_time_weeks}wk` : "—", locked: false, chips: mukoMatChips },
-              { key: "complexity", label: "Complexity", name: COMPLEXITY_CONTEXT[baselineComplexity].label, detail: COMPLEXITY_CONTEXT[baselineComplexity].description, locked: false, chips: mukoComplexChips },
-            ];
-
-            const selMatChips = selectedMaterial ? (chipsByMaterial[selectedMaterial.id] || []) : [];
-            const selComplexChips = constructionTier === "high" ? chipsForHighComplexity : [];
-            const selectedCells = [
-              ...(materialId ? [{ key: "material", label: "Material", name: selectedMaterial?.name ?? "—", detail: selectedMaterial ? `$${selectedMaterial.cost_per_yard}/yd · ${selectedMaterial.lead_time_weeks}wk` : "—", locked: false, chips: selMatChips }] : []),
-              ...(constructionTier ? [{ key: "complexity", label: "Complexity", name: COMPLEXITY_CONTEXT[constructionTier].label, detail: COMPLEXITY_CONTEXT[constructionTier].description, locked: false, chips: selComplexChips }] : []),
-            ];
-
-            const cells = hasUserSelection ? selectedCells : mukoCells;
-            const gridCols = cells.length <= 1 ? "1fr" : cells.length === 2 ? "repeat(2, 1fr)" : cells.length === 3 ? "repeat(3, 1fr)" : "repeat(4, 1fr)";
-
-            return (
-              <div style={{ marginBottom: 28 }}>
-                {/* Section label */}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                  <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: hasUserSelection ? CHARTREUSE : ROSE, fontFamily: sohne }}>
-                    {hasUserSelection ? "Your Spec" : "Muko\u2019s Pick"}
-                  </span>
-                  <div style={{ flex: 1, height: 1, background: hasUserSelection ? "rgba(168,180,117,0.25)" : "rgba(169,123,143,0.20)" }} />
-                </div>
-
-                {/* Card */}
-                <div style={{
-                  borderRadius: 16,
-                  border: hasUserSelection ? `1.5px solid ${CHARTREUSE}` : "1.5px solid rgba(169,123,143,0.30)",
-                  background: "rgba(255,255,255,0.72)",
-                  boxShadow: hasUserSelection
-                    ? "0 4px 16px rgba(168,180,117,0.18), 0 1px 4px rgba(0,0,0,0.06)"
-                    : "0 18px 50px rgba(169,123,143,0.12), 0 2px 8px rgba(67,67,43,0.04), inset 0 1px 0 rgba(255,255,255,0.70)",
-                  padding: "18px 20px 16px",
-                }}>
-                  {/* Mini-cells */}
-                  <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 8, marginBottom: 14 }}>
-                    {cells.map((cell) => {
-                      const isLocked = (cell as any).locked === true;
-                      return (
-                        <div key={cell.key} style={{ ...cellStyle, position: "relative" as const, opacity: isLocked ? 0.7 : 1 }}>
-                          {isLocked ? (
-                            <div style={{ position: "absolute", top: 6, right: 6, width: 18, height: 18, borderRadius: "50%", background: "rgba(67,67,43,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }} title="Set in Concept Studio — go back to change">
-                              <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><rect x="3" y="6" width="8" height="6" rx="1.5" stroke="rgba(67,67,43,0.40)" strokeWidth="1.2" /><path d="M5 6V4.5a2 2 0 0 1 4 0V6" stroke="rgba(67,67,43,0.40)" strokeWidth="1.2" strokeLinecap="round" /></svg>
-                            </div>
-                          ) : hasUserSelection ? (
-                            <div style={{ position: "absolute", top: 6, right: 6, width: 18, height: 18, borderRadius: "50%", background: CHARTREUSE, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                            </div>
-                          ) : null}
-                          <div style={cellLabelStyle}>{cell.label}</div>
-                          <div style={cellValueStyle}>{cell.name}</div>
-                          {cell.detail && <div style={cellDetailStyle}>{cell.detail}</div>}
-                          {(cell as any).chips && (cell as any).chips.length > 0 && (
-                            <div style={{ marginTop: 5, display: "flex", flexWrap: "wrap", gap: 3 }}>
-                              {((cell as any).chips as ActivatedChip[]).map((chip) => (
-                                <span
-                                  key={chip.label}
-                                  style={{
-                                    padding: "2px 7px",
-                                    borderRadius: 999,
-                                    fontSize: 9,
-                                    fontWeight: 550,
-                                    color: STEEL,
-                                    background: "rgba(125,150,172,0.10)",
-                                    border: "1px solid rgba(125,150,172,0.28)",
-                                    fontFamily: inter,
-                                  }}
-                                >
-                                  {chip.label}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {(cell as any).swatches && (
-                            <div style={{ display: "flex", gap: 3, marginTop: 2 }}>
-                              {((cell as any).swatches as Array<{ hex: string }>).slice(0, 5).map((c, ci) => (
-                                <div key={ci} style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: c.hex, border: "1px solid rgba(0,0,0,0.06)" }} />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Footer */}
-                  <div style={{ borderTop: "1px solid rgba(67,67,43,0.07)", paddingTop: 10 }}>
-                    <p style={{ margin: 0, fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.40)", lineHeight: 1.5 }}>
-                      {hasUserSelection
-                        ? "Muko recalculates as you refine — change any input below."
-                        : "Select any material, silhouette, or construction below to override — Muko will recalculate in real time."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
               {/* Material */}
@@ -1767,6 +1776,7 @@ export default function SpecStudioPage() {
                   {materials.map((mat) => {
                     const isSel = materialId === mat.id;
                     const isRec = mat.id === recommendedMaterialId;
+                    const isRedirectMat = selectedKeyPiece?.redirect_material_id === mat.id && insight?.type === 'warning';
                     const isHover = hoveredMaterialId === mat.id;
                     const deltas = scoreMaterialDeltas(mat);
                     const matchingChips = chipsByMaterial[mat.id] || [];
@@ -1797,13 +1807,6 @@ export default function SpecStudioPage() {
                           position: "relative",
                         }}
                       >
-                        {isRec && !isSel && (
-                          <div style={{ position: "absolute", top: 8, right: 8 }}>
-                            <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(169,123,143,0.10)", border: "1px solid rgba(169,123,143,0.30)", color: ROSE, fontFamily: inter, whiteSpace: "nowrap" }}>
-                              Muko&apos;s Pick
-                            </span>
-                          </div>
-                        )}
                         <div
                           style={{
                             display: "flex",
@@ -1870,6 +1873,14 @@ export default function SpecStudioPage() {
                                 {chip.label}
                               </span>
                             ))}
+                          </div>
+                        )}
+
+                        {isRedirectMat && (
+                          <div style={{ marginTop: 8 }}>
+                            <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(67,67,43,0.06)", color: "rgba(67,67,43,0.45)", fontFamily: inter }}>
+                              COST ALTERNATIVE
+                            </span>
                           </div>
                         )}
 
@@ -1967,11 +1978,6 @@ export default function SpecStudioPage() {
                             >
                               {info.label}
                             </div>
-                            {isRec && !isSel && (
-                              <span style={{ display: "inline-block", marginTop: 3, padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(169,123,143,0.10)", border: "1px solid rgba(169,123,143,0.30)", color: ROSE, fontFamily: inter }}>
-                                Muko&apos;s Pick
-                              </span>
-                            )}
                             <div
                               style={{
                                 fontSize: 11,
@@ -2081,6 +2087,7 @@ export default function SpecStudioPage() {
                   </div>
                 )}
               </div>
+
           </div>{/* end sections */}
 
           <style>{`
@@ -2145,22 +2152,51 @@ export default function SpecStudioPage() {
           </div>
 
           {/* Muko Insight */}
-          <MukoInsightSection
-            headline={specInsightContent.headline}
-            paragraphs={[specInsightContent.p1, specInsightContent.p2, specInsightContent.p3]}
-            opportunity={{ items: specInsightContent.opportunity }}
-            edit={{ items: specInsightContent.editItems }}
-            nextMove={{
-              mode: "spec",
-              suggestions: mukoSynthesis?.suggestions ?? [],
-              subtitle: insight && insight.cogs > insight.ceiling
-                ? "Adjustments that improve feasibility without changing your direction."
-                : "Ways to invest your margin headroom and elevate the piece.",
-              appliedIds: appliedSuggestions,
-              onApply: (id) => applySuggestion(id, mukoSynthesis?.suggestions ?? []),
-              onUndo: undoSuggestion,
-            }}
-          />
+          {!userManuallySelected ? (
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ height: 1, background: "rgba(67,67,43,0.12)", margin: "24px 0" }} />
+              <div
+                style={{
+                  fontFamily: inter,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: "rgba(67,67,43,0.38)",
+                  marginBottom: 16,
+                }}
+              >
+                MUKO INSIGHT
+              </div>
+              <p style={{ margin: 0, fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.35)", fontStyle: "italic" }}>
+                Select a material to see Muko&apos;s insight
+              </p>
+            </div>
+          ) : (
+            <MukoInsightSection
+              headline={specInsightContent.headline}
+              paragraphs={[specInsightContent.p1, specInsightContent.p2, specInsightContent.p3]}
+              opportunity={{ items: specInsightContent.opportunity }}
+              edit={{ items: specInsightContent.editItems }}
+              nextMove={{
+                mode: "spec",
+                suggestions: mukoSynthesis?.suggestions ?? [],
+                subtitle: insight && insight.cogs > insight.ceiling
+                  ? "Adjustments that improve feasibility without changing your direction."
+                  : "Ways to invest your margin headroom and elevate the piece.",
+                appliedIds: appliedSuggestions,
+                onApply: (id) => applySuggestion(id, mukoSynthesis?.suggestions ?? []),
+                onUndo: undoSuggestion,
+              }}
+              constructionImplications={(() => {
+                const activeChips = chipSelection?.activatedChips.map((c) => c.label) ?? [];
+                if (activeChips.length === 0 || !storeAesthetic) return undefined;
+                const aestheticId = storeAesthetic.toLowerCase().replace(/\s+/g, "-");
+                const suggestions = getDesignLanguageSuggestions(aestheticId, activeChips, categoryId);
+                return suggestions.length > 0 ? suggestions : undefined;
+              })()}
+            />
+          )}
 
           {/* Ask Muko */}
           <AskMuko

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useSessionStore } from "@/lib/store/sessionStore";
+import type { KeyPiece } from "@/lib/store/sessionStore";
 import {
   BRAND,
   AESTHETICS,
@@ -17,6 +18,7 @@ import {
 } from "../../lib/concept-studio/utils";
 import AskMuko from "@/components/AskMuko";
 import aestheticsData from "@/data/aesthetics.json";
+import chipTensionsData from "@/data/chip_tensions.json";
 import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
 import { PulseScoreRow } from "@/components/ui/PulseScoreRow";
 import { MukoInsightSection } from "@/components/ui/MukoInsightSection";
@@ -125,6 +127,32 @@ const SILHOUETTE_ICONS: Record<string, React.ReactNode> = {
   ),
 };
 
+/* ─── Key piece category icons ──────────────────────────────────────────── */
+const KEY_PIECE_CATEGORY_ICONS: Record<string, React.ReactNode> = {
+  tops: (
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none">
+      <path d="M1 6l4-5h10l4 5-3 3v14H4V9L1 6z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  dresses: (
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none">
+      <path d="M7 1h6l2 8H5L7 1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+      <path d="M5 9l-3 14h16L15 9H5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  bottoms: (
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none">
+      <path d="M3 1h14v8l-4 14H7L3 9V1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+      <line x1="10" y1="9" x2="10" y2="23" stroke="currentColor" strokeWidth="1.2"/>
+    </svg>
+  ),
+  outerwear: (
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none">
+      <path d="M1 5l4-4h2l3 4 3-4h2l4 4-3 4v14H4V9L1 5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+    </svg>
+  ),
+};
+
 /* ─── Silhouette keyword map for scoring ─────────────────────────────────── */
 const SILHOUETTE_KEYWORD_MAP: Record<string, string[]> = {
   straight: ["minimalist", "clean", "structured", "timeless", "architectural", "restrained"],
@@ -154,6 +182,24 @@ interface AestheticDataEntry {
   palette_affinity?: string[];
   palette_options?: Array<{ id: string; name: string; swatches: string[]; descriptor: string }>;
   chips: AestheticChip[];
+  key_pieces?: Record<string, Array<KeyPiece & { implied_chips?: string[] }>>;
+}
+
+/* ─── Chip metadata for source tracking ─────────────────────────────────── */
+interface ChipMeta {
+  source: 'manual' | 'key-piece';
+  userConfirmed: boolean;
+}
+
+type TensionState = 'none' | 'soft' | 'hard';
+
+function getChipTensionState(chipLabel: string, selectedKeyPiece: KeyPiece | null): TensionState {
+  if (!selectedKeyPiece || selectedKeyPiece.custom) return 'none';
+  const tensions = (chipTensionsData as unknown as Record<string, { hard: string[]; soft: string[] }>)[selectedKeyPiece.type ?? ''];
+  if (!tensions) return 'none';
+  if (tensions.hard.includes(chipLabel)) return 'hard';
+  if (tensions.soft.includes(chipLabel)) return 'soft';
+  return 'none';
 }
 
 /* ─── Free-form aesthetic matcher ─────────────────────────────────────────── */
@@ -216,15 +262,50 @@ function getResonanceStatus(pulse: { status: string; score: number; message: str
   return { label, color, sublabel };
 }
 
-/* ─── Aesthetic chip button (hover + selected states) ─────────────────────── */
-function AestheticChipButton({ label, isActive, isClickable, onClick }: { label: string; isActive: boolean; isClickable: boolean; onClick: () => void }) {
+/* ─── Aesthetic chip button (hover + selected + auto-selected + tension states) ── */
+function AestheticChipButton({
+  label,
+  isActive,
+  isClickable,
+  onClick,
+  isAutoSelected,
+  tension,
+}: {
+  label: string;
+  isActive: boolean;
+  isClickable: boolean;
+  onClick: () => void;
+  isAutoSelected?: boolean;
+  tension?: TensionState;
+}) {
   const [hovered, setHovered] = useState(false);
   const inter = "var(--font-inter), system-ui, sans-serif";
+
+  const tensionSuffix = tension === 'hard' ? ' ✕' : tension === 'soft' ? ' ~' : '';
+  const borderColor = isActive
+    ? tension === 'hard'
+      ? 'rgba(169,95,95,0.70)'
+      : tension === 'soft'
+        ? 'rgba(184,135,59,0.60)'
+        : 'rgba(125,150,172,0.55)'
+    : hovered && isClickable
+      ? 'rgba(125,150,172,0.35)'
+      : 'rgba(67,67,43,0.18)';
+
+  const tooltip = isAutoSelected
+    ? 'Pre-selected based on your key piece. Tap to deselect.'
+    : tension === 'hard'
+      ? `Construction conflict with this piece type — this combination will affect your score.`
+      : tension === 'soft'
+        ? 'Tension with your key piece — Muko will note this in the analysis.'
+        : undefined;
+
   return (
     <span
       onClick={isClickable ? onClick : undefined}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      title={tooltip}
       style={{
         padding: "4px 10px",
         borderRadius: 999,
@@ -232,25 +313,34 @@ function AestheticChipButton({ label, isActive, isClickable, onClick }: { label:
         fontWeight: 500,
         fontFamily: inter,
         cursor: isClickable ? "pointer" : "default",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
         background: isActive
           ? "rgba(125,150,172,0.08)"
           : hovered && isClickable
             ? "rgba(125,150,172,0.05)"
             : "transparent",
-        border: isActive
-          ? "1px solid rgba(125,150,172,0.55)"
-          : hovered && isClickable
-            ? "1px solid rgba(125,150,172,0.35)"
-            : "1px solid rgba(67,67,43,0.18)",
+        border: `1px solid ${borderColor}`,
         color: isActive
-          ? "#7D96AC"
+          ? tension === 'hard'
+            ? 'rgba(169,95,95,0.90)'
+            : tension === 'soft'
+              ? 'rgba(184,135,59,0.90)'
+              : "#7D96AC"
           : hovered && isClickable
             ? "rgba(125,150,172,0.80)"
             : "rgba(67,67,43,0.52)",
         transition: "all 150ms ease",
       }}
     >
+      {isActive && isAutoSelected && (
+        <span style={{ fontSize: 8, lineHeight: 1, color: "inherit", marginRight: 1 }}>●</span>
+      )}
       {label}
+      {isActive && tension !== 'none' && tension && (
+        <span style={{ fontSize: 9, lineHeight: 1, color: "inherit", marginLeft: 1 }}>{tension === 'hard' ? '✕' : '~'}</span>
+      )}
     </span>
   );
 }
@@ -361,6 +451,7 @@ export default function ConceptStudioPage() {
     chipSelection: storeChipSelection,
     customChips: storeCustomChips,
     setCustomChips: setStoreCustomChips,
+    setSelectedKeyPiece,
   } = useSessionStore();
 
   const [headerCollectionName, setHeaderCollectionName] = useState<string>("Collection");
@@ -416,11 +507,25 @@ export default function ConceptStudioPage() {
     }
     return new Set();
   });
+
+  // Track chip source + confirmation state (key-piece auto-selected vs manual)
+  const [chipMeta, setChipMeta] = useState<Map<string, ChipMeta>>(new Map());
   const [customChips, setCustomChips] = useState<Record<string, AestheticChip[]>>(() => {
     return useSessionStore.getState().customChips ?? {};
   });
   const toggleElement = (key: string) => {
     setSelectedElements((prev) => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
+    // Mark as user-confirmed (once clicked, the user owns it regardless of source)
+    setChipMeta((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(key);
+      if (existing) {
+        next.set(key, { ...existing, userConfirmed: true });
+      } else {
+        next.set(key, { source: 'manual', userConfirmed: true });
+      }
+      return next;
+    });
   };
 
   const removeElement = (chip: string) => {
@@ -514,62 +619,8 @@ export default function ConceptStudioPage() {
     setInterpretation({ base: selectedAesthetic, modifiers: [], note: `Interpreting this as: ${selectedAesthetic}`, confidence: "high", unsupportedHits: [] });
   }, [selectedAesthetic]);
 
-  // Pre-populate pulse rail with Muko's Pick data on first visit
-  useEffect(() => {
-    if (!aestheticInput && recommendedAesthetic && !identityPulse) {
-      const base = AESTHETIC_CONTENT[recommendedAesthetic];
-      const identity = base?.identityScore ?? 80;
-      useSessionStore.setState({
-        identityPulse: { score: identity, status: identity >= 80 ? "green" : identity >= 60 ? "yellow" : "red", message: "Based on Muko's Pick" },
-      });
-      computeAndSetResonance(recommendedAesthetic);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Pulse scores are only populated after the user selects a direction
 
-  // ─── Recalculate identity pulse when silhouette/palette changes ──────────
-  // Resonance is purely from getResonanceScore() — silhouette/palette don't affect it.
-  useEffect(() => {
-    if (!selectedAesthetic || !identityPulse) return;
-    const base = AESTHETIC_CONTENT[selectedAesthetic];
-    const baseIdentity = base?.identityScore ?? 80;
-    const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
-      (a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-")
-    );
-    const silAffinity = entry?.silhouette_affinity ?? [];
-    const palAffinity = entry?.palette_affinity ?? [];
-
-    let idMod = 0;
-
-    // Silhouette scoring
-    if (conceptSilhouette) {
-      if (silAffinity.includes(conceptSilhouette)) {
-        idMod += 5;
-      } else {
-        idMod -= 3;
-      }
-    }
-
-    // Palette scoring
-    if (conceptPalette) {
-      if (palAffinity.includes(conceptPalette)) {
-        idMod += 5;
-      } else {
-        idMod -= 3;
-      }
-    }
-
-    const newIdentity = Math.max(0, Math.min(100, baseIdentity + idMod));
-
-    useSessionStore.setState({
-      identityPulse: {
-        score: newIdentity,
-        status: newIdentity >= 80 ? "green" : newIdentity >= 60 ? "yellow" : "red",
-        message: newIdentity >= 80 ? "Strong alignment" : newIdentity >= 60 ? "Moderate alignment" : "Weak alignment",
-      },
-    });
-    // Resonance stays as computed by checkMarketSaturation / getResonanceScore
-  }, [conceptSilhouette, conceptPalette, selectedAesthetic, identityPulse?.score !== undefined]);
 
   // ─── Critic Agent: Brand Alignment Scoring ────────────────────────────────
   // When a brand_profile_id is available (future: from Supabase auth/settings),
@@ -644,6 +695,170 @@ export default function ConceptStudioPage() {
   const selectedAestheticData = selectedAesthetic
     ? (aestheticsData as unknown as AestheticDataEntry[]).find((a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-"))
     : null;
+
+  // KEY PIECES — derived from aesthetic + season
+  const keyPieces = useMemo((): KeyPiece[] => {
+    if (!selectedAesthetic) return [];
+    const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
+      (a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-")
+    );
+    if (!entry?.key_pieces) return [];
+    const seasonKey = (season.includes("FW") || season.includes("Fall") || season.includes("fall")) ? "fw26" : "ss27";
+    return entry.key_pieces[seasonKey] ?? entry.key_pieces["fw26"] ?? Object.values(entry.key_pieces)[0] ?? [];
+  }, [selectedAesthetic, season]);
+
+  const [selectedKeyPieceLocal, setSelectedKeyPieceLocal] = useState<KeyPiece | null>(null);
+  const [customKeyPieceText, setCustomKeyPieceText] = useState("");
+  const [customKeyPieceConfirmed, setCustomKeyPieceConfirmed] = useState(false);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+
+  // Auto-select implied chips when key piece changes
+  useEffect(() => {
+    if (!selectedAesthetic || !selectedKeyPieceLocal || selectedKeyPieceLocal.custom) {
+      // Key piece deselected or is custom: remove unconfirmed key-piece chips
+      setSelectedElements((prev) => {
+        const next = new Set(prev);
+        chipMeta.forEach((meta, key) => {
+          if (meta.source === 'key-piece' && !meta.userConfirmed) {
+            next.delete(key);
+          }
+        });
+        return next;
+      });
+      return;
+    }
+
+    const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
+      (a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, '-')
+    );
+    if (!entry) return;
+
+    const seasonKey = (useSessionStore.getState().season?.includes('FW') || useSessionStore.getState().season?.includes('Fall')) ? 'fw26' : 'ss27';
+    const allPieces = [
+      ...(entry.key_pieces?.[seasonKey] ?? []),
+      ...(entry.key_pieces?.['fw26'] ?? []),
+      ...(entry.key_pieces?.['ss27'] ?? []),
+    ];
+    const matchedPiece = allPieces.find((p) => p.item === selectedKeyPieceLocal.item);
+    const impliedChips: string[] = (matchedPiece as (typeof matchedPiece & { implied_chips?: string[] }) | undefined)?.implied_chips ?? [];
+
+    if (impliedChips.length === 0) return;
+
+    const availableChipLabels = new Set(entry.chips.map((c) => c.label));
+
+    setSelectedElements((prev) => {
+      const next = new Set(prev);
+      impliedChips.forEach((label) => {
+        if (availableChipLabels.has(label)) {
+          const key = `${selectedAesthetic}::${label}`;
+          if (!next.has(key)) {
+            next.add(key);
+          }
+        }
+      });
+      return next;
+    });
+
+    setChipMeta((prev) => {
+      const next = new Map(prev);
+      impliedChips.forEach((label) => {
+        if (availableChipLabels.has(label)) {
+          const key = `${selectedAesthetic}::${label}`;
+          if (!next.has(key)) {
+            next.set(key, { source: 'key-piece', userConfirmed: false });
+          }
+          // If already exists as manual, leave it alone
+        }
+      });
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKeyPieceLocal, selectedAesthetic]);
+
+  // ─── Recalculate identity + resonance pulses when silhouette/palette/key piece changes ──────────
+  useEffect(() => {
+    if (!selectedAesthetic || !identityPulse) return;
+    const base = AESTHETIC_CONTENT[selectedAesthetic];
+    const baseIdentity = base?.identityScore ?? 80;
+    const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
+      (a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-")
+    );
+    const silAffinity = entry?.silhouette_affinity ?? [];
+    const palAffinity = entry?.palette_affinity ?? [];
+
+    let idMod = 0;
+
+    if (conceptSilhouette) {
+      if (silAffinity.includes(conceptSilhouette)) {
+        idMod += 5;
+      } else {
+        idMod -= 3;
+      }
+    }
+
+    if (conceptPalette) {
+      if (palAffinity.includes(conceptPalette)) {
+        idMod += 5;
+      } else {
+        idMod -= 3;
+      }
+    }
+
+    // Key piece: committing to a specific market piece sharpens direction → identity boost
+    if (selectedKeyPieceLocal && !selectedKeyPieceLocal.custom) {
+      idMod += 3;
+    }
+
+    // Chip tension penalty: manually selected chips that conflict with the key piece type
+    if (selectedKeyPieceLocal && !selectedKeyPieceLocal.custom && selectedKeyPieceLocal.type) {
+      const tensions = (chipTensionsData as unknown as Record<string, { hard: string[]; soft: string[] }>)[selectedKeyPieceLocal.type];
+      if (tensions) {
+        let tensionMod = 0;
+        const prefix = `${selectedAesthetic}::`;
+        selectedElements.forEach((key) => {
+          if (!key.startsWith(prefix)) return;
+          const label = key.replace(prefix, '');
+          const meta = chipMeta.get(key);
+          // Implied chips never self-penalize
+          if (meta?.source === 'key-piece') return;
+          if (tensions.hard.includes(label)) tensionMod -= 8;
+          else if (tensions.soft.includes(label)) tensionMod -= 3;
+        });
+        tensionMod = Math.max(tensionMod, -20);
+        idMod += tensionMod;
+      }
+    }
+
+    const newIdentity = Math.max(0, Math.min(100, baseIdentity + idMod));
+    useSessionStore.setState({
+      identityPulse: {
+        score: newIdentity,
+        status: newIdentity >= 80 ? "green" : newIdentity >= 60 ? "yellow" : "red",
+        message: newIdentity >= 80 ? "Strong alignment" : newIdentity >= 60 ? "Moderate alignment" : "Weak alignment",
+      },
+    });
+
+    // Key piece signal reflects market momentum → update resonance (always recompute to handle deselect)
+    if (entry) {
+      const baseResonance = getResonanceScore(entry as ResearcherAesthetic);
+      const resDelta = (selectedKeyPieceLocal && !selectedKeyPieceLocal.custom)
+        ? selectedKeyPieceLocal.signal === 'ascending' ? 6
+          : selectedKeyPieceLocal.signal === 'high-volume' ? 4
+          : selectedKeyPieceLocal.signal === 'emerging' ? 2
+          : 0
+        : 0;
+      const newResonance = Math.max(0, Math.min(100, baseResonance + resDelta));
+      const saturation = checkMarketSaturation(entry as ResearcherAesthetic);
+      useSessionStore.setState({
+        resonancePulse: {
+          score: newResonance,
+          status: newResonance >= 80 ? "green" : newResonance >= 60 ? "yellow" : "red",
+          message: saturation.message,
+        },
+      });
+    }
+  }, [conceptSilhouette, conceptPalette, selectedAesthetic, selectedKeyPieceLocal, selectedElements, chipMeta, identityPulse?.score !== undefined]);
+
   const idStatus = getIdentityStatus(identityScore);
   const resStatus = getResonanceStatus(resonancePulse, resonanceSaturationScore ?? undefined, resonanceCollectionsCount ?? undefined);
   const scoreColor = (score: number) => score >= 80 ? CHARTREUSE : score >= 65 ? BRAND.camel : BRAND.rose;
@@ -652,6 +867,7 @@ export default function ConceptStudioPage() {
   const handleSelectAesthetic = (aesthetic: string) => {
     setSelectedElements(new Set());
     setCustomChips({});
+    setChipMeta(new Map());
     // Clear silhouette/palette when aesthetic changes (affinity recommendations change)
     setConceptSilhouette('');
     setConceptPalette(null);
@@ -856,93 +1072,91 @@ export default function ConceptStudioPage() {
         leftContent={
           <>
           {/* Title */}
-          <div style={{ padding: "36px 44px 24px" }}>
-            <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 28, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1 }}>Concept Studio</h1>
-            <p style={{ margin: "10px 0 0", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.52)", lineHeight: 1.55, maxWidth: 460 }}>
-              We analyzed your brand DNA against live market data to find your strongest direction. Start with our pick or explore all eight below.
-            </p>
+          <div style={{ padding: "36px 44px 24px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
+            <div>
+              <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 28, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1 }}>Concept Studio</h1>
+              <p style={{ margin: "10px 0 0", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.52)", lineHeight: 1.55, maxWidth: 460 }}>
+                We analyzed your brand DNA against live market data to find your strongest direction. Start with our pick or explore all eight below.
+              </p>
+            </div>
+            <button
+              onClick={() => handleSelectAesthetic(recommendedAesthetic)}
+              style={{
+                flexShrink: 0,
+                marginTop: 4,
+                padding: "8px 18px",
+                borderRadius: 999,
+                border: "1.5px solid #CDAAB3",
+                background: "transparent",
+                fontFamily: inter,
+                fontSize: 13,
+                fontWeight: 550,
+                color: "#CDAAB3",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                transition: "background 200ms ease",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(205,170,179,0.10)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+            >
+              Muko&apos;s Pick&nbsp;
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden style={{ display: "inline", verticalAlign: "middle", marginBottom: 1 }}>
+                <path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l7.1-1.01L12 2z"/>
+              </svg>
+            </button>
           </div>
 
           <div style={{ padding: "0 44px 48px" }}>
 
-            {/* ── TOP SLOT ── selected card always here ──────────────────────────── */}
-
-            {/* Section label — switches from "Muko's Pick" to "Your Concept" on any selection */}
-            <div ref={yourConceptRef} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: selectedAesthetic ? CHARTREUSE : BRAND.rose, whiteSpace: "nowrap" }}>
-                {selectedAesthetic ? "Your Concept" : "MUKO\u2019S PICK"}
-              </span>
-              <div style={{ flex: 1, height: 1, background: selectedAesthetic ? "rgba(168,180,117,0.25)" : "rgba(169,123,143,0.25)" }} />
-            </div>
-
-            {/* Top card */}
-            <div
-              style={{
-                position: "relative",
-                width: "100%",
-                textAlign: "left",
-                padding: "18px 20px",
-                borderRadius: 10,
-                background: "transparent",
-                border: selectedAesthetic ? `1px solid ${CHARTREUSE}` : "1px solid rgba(67,67,43,0.14)",
-                boxShadow: selectedAesthetic ? "0 4px 16px rgba(168,180,117,0.18), 0 1px 4px rgba(0,0,0,0.06)" : "0 2px 8px rgba(0,0,0,0.04)",
-                marginBottom: 28,
-                overflow: "hidden",
-                boxSizing: "border-box",
-              }}
-            >
-              {/* Check icon — top-right corner */}
-              {selectedAesthetic && (
-                <div style={{ position: "absolute", top: 10, right: 10, width: 22, height: 22, borderRadius: "50%", background: CHARTREUSE, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            {/* ── YOUR CONCEPT (shown after selection) ────────────────────────────── */}
+            {selectedAesthetic && (
+              <>
+                <div ref={yourConceptRef} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                  <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: CHARTREUSE, whiteSpace: "nowrap" }}>
+                    Your Concept
+                  </span>
+                  <div style={{ flex: 1, height: 1, background: "rgba(168,180,117,0.25)" }} />
                 </div>
-              )}
-              {/* Name row */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
-                <span style={{ fontFamily: sohne, fontWeight: 500, fontSize: 20, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.15 }}>
-                  {topAesthetic}
-                </span>
-                {!selectedAesthetic && (
-                  <button onClick={() => handleSelectAesthetic(topAesthetic)} style={{ flexShrink: 0, padding: "5px 13px", borderRadius: 999, background: "transparent", border: `1px solid ${CHARTREUSE}`, fontFamily: inter, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.05em", color: CHARTREUSE, cursor: "pointer" }}>
-                    Select
-                  </button>
-                )}
-              </div>
 
-              {/* Description */}
-              {topContent?.description && (
-                <p style={{ margin: "0 0 12px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.58)", lineHeight: 1.55 }}>
-                  {topContent.description}
-                </p>
-              )}
-
-              {/* Chips — unselected: show directly under description */}
-              {!selectedAesthetic && topDisplayChips.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {topDisplayChips.map((chip) => (
-                    <AestheticChipButton
-                      key={chip.label}
-                      label={chip.label}
-                      isActive={false}
-                      isClickable={false}
-                      onClick={() => {}}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Moodboard — always visible when selected */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 14 }}>
-                {topMoodboardImages.map((src, i) => (
-                  <div key={`top-mb-${i}`} style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", animation: `fadeIn 220ms ease ${i * 20}ms both` }}>
-                    <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} loading="lazy" />
+                <div
+                  style={{
+                    position: "relative",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "18px 20px",
+                    borderRadius: 10,
+                    background: "transparent",
+                    border: `1px solid ${CHARTREUSE}`,
+                    boxShadow: "0 4px 16px rgba(168,180,117,0.18), 0 1px 4px rgba(0,0,0,0.06)",
+                    marginBottom: 28,
+                    overflow: "hidden",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <div style={{ position: "absolute", top: 10, right: 10, width: 22, height: 22, borderRadius: "50%", background: CHARTREUSE, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </div>
-                ))}
-              </div>
 
-              {/* ── SHAPE YOUR DIRECTION (inside card) ── */}
-              {selectedAesthetic && (
-                <>
+                  <span style={{ fontFamily: sohne, fontWeight: 500, fontSize: 20, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.15, display: "block", marginBottom: 8 }}>
+                    {topAesthetic}
+                  </span>
+
+                  {topContent?.description && (
+                    <p style={{ margin: "0 0 12px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.58)", lineHeight: 1.55 }}>
+                      {topContent.description}
+                    </p>
+                  )}
+
+                  <div style={{ padding: "0 18px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 14 }}>
+                      {topMoodboardImages.map((src, i) => (
+                        <div key={`top-mb-${i}`} style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", animation: `fadeIn 220ms ease ${i * 20}ms both` }}>
+                          <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} loading="lazy" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div style={{ height: 1, background: "rgba(67,67,43,0.10)", margin: "18px 0 16px" }} />
                   <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(67,67,43,0.50)", marginBottom: 6 }}>
                     SHAPE YOUR DIRECTION
@@ -950,6 +1164,138 @@ export default function ConceptStudioPage() {
                   <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 16 }}>
                     Complete your creative vision before moving to production specs.
                   </div>
+
+                  {/* KEY PIECES */}
+                  {keyPieces.length > 0 && (
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.40)", marginBottom: 4 }}>
+                        Key Pieces
+                      </div>
+                      <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 12 }}>
+                        What the market is moving toward for {selectedAesthetic} this season.
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10 }}>
+                        {keyPieces.map((piece, i) => {
+                          const isSelected = selectedKeyPieceLocal?.item === piece.item && !selectedKeyPieceLocal?.custom;
+                          const signalStyle = piece.signal === "high-volume"
+                            ? { bg: "rgba(169,123,143,0.15)", color: "#6B3D52", label: "HIGH VOLUME" }
+                            : piece.signal === "ascending"
+                            ? { bg: "rgba(168,180,117,0.15)", color: "#5B6A38", label: "ASCENDING ↑" }
+                            : { bg: "rgba(125,150,172,0.15)", color: "#3D5A72", label: "EMERGING" };
+                          const icon = KEY_PIECE_CATEGORY_ICONS[piece.category ?? ""] ?? null;
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedKeyPieceLocal(null);
+                                  setSelectedKeyPiece(null);
+                                } else {
+                                  setSelectedKeyPieceLocal(piece);
+                                  setSelectedKeyPiece(piece);
+                                }
+                              }}
+                              style={{
+                                textAlign: "left",
+                                borderRadius: 14,
+                                padding: "14px 14px 12px",
+                                background: isSelected ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
+                                border: isSelected ? `1.5px solid ${CHARTREUSE}` : "1px solid rgba(67,67,43,0.10)",
+                                boxShadow: isSelected ? "0 14px 40px rgba(67,67,43,0.10)" : "0 8px 24px rgba(67,67,43,0.05)",
+                                cursor: "pointer",
+                                outline: "none",
+                                transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+                                transform: isSelected ? "translateY(-1px)" : "translateY(0)",
+                                position: "relative",
+                              }}
+                            >
+                              {isSelected && (
+                                <div style={{ position: "absolute", top: 8, right: 8, width: 18, height: 18, borderRadius: "50%", background: CHARTREUSE, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                </div>
+                              )}
+                              <div style={{ fontSize: 13, marginBottom: 6, color: "rgba(67,67,43,0.35)" }}>
+                                {icon}
+                              </div>
+                              <div style={{ fontSize: 14, fontWeight: 650, color: OLIVE, fontFamily: sohne, marginBottom: 4 }}>
+                                {piece.item}
+                              </div>
+                              {piece.signal && (
+                                <div style={{ marginBottom: 6 }}>
+                                  <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: signalStyle.bg, color: signalStyle.color, fontFamily: inter }}>
+                                    {signalStyle.label}
+                                  </span>
+                                </div>
+                              )}
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                                {piece.category && (
+                                  <span style={{ padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, border: "1px solid rgba(67,67,43,0.14)", color: "rgba(67,67,43,0.52)" }}>
+                                    {piece.category}
+                                  </span>
+                                )}
+                                {piece.type && (
+                                  <span style={{ padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, border: "1px solid rgba(67,67,43,0.14)", color: "rgba(67,67,43,0.52)" }}>
+                                    {piece.type}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                        {/* Custom entry */}
+                        {!showCustomInput ? (
+                          <button
+                            onClick={() => setShowCustomInput(true)}
+                            style={{
+                              textAlign: "left",
+                              padding: "14px 14px 12px",
+                              borderRadius: 14,
+                              border: "1px dashed rgba(67,67,43,0.22)",
+                              background: "transparent",
+                              cursor: "pointer",
+                              fontFamily: inter,
+                              fontSize: 12,
+                              color: "rgba(67,67,43,0.50)",
+                              outline: "none",
+                            }}
+                          >
+                            + Add your own piece
+                          </button>
+                        ) : (
+                          <div style={{ padding: "14px 14px 12px", borderRadius: 14, border: "1px dashed rgba(67,67,43,0.22)", background: "rgba(255,255,255,0.60)" }}>
+                            <input
+                              autoFocus
+                              value={customKeyPieceText}
+                              onChange={(e) => setCustomKeyPieceText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && customKeyPieceText.trim()) {
+                                  const custom: KeyPiece = { item: customKeyPieceText.trim(), signal: null, category: null, type: null, recommended_material_id: null, redirect_material_id: null, custom: true };
+                                  setSelectedKeyPieceLocal(custom);
+                                  setSelectedKeyPiece(custom);
+                                  setCustomKeyPieceConfirmed(true);
+                                }
+                              }}
+                              onBlur={() => {
+                                if (customKeyPieceText.trim()) {
+                                  const custom: KeyPiece = { item: customKeyPieceText.trim(), signal: null, category: null, type: null, recommended_material_id: null, redirect_material_id: null, custom: true };
+                                  setSelectedKeyPieceLocal(custom);
+                                  setSelectedKeyPiece(custom);
+                                  setCustomKeyPieceConfirmed(true);
+                                }
+                              }}
+                              placeholder="e.g. Asymmetric Hem Midi Dress"
+                              style={{ width: "100%", boxSizing: "border-box", border: "none", background: "transparent", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.80)", outline: "none" }}
+                            />
+                            {customKeyPieceConfirmed && (
+                              <div style={{ marginTop: 6, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.44)", fontStyle: "italic" }}>
+                                Muko doesn&apos;t have market data on this piece yet — it won&apos;t affect your score but we&apos;ll track it.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Silhouette selector (required) */}
                   <div style={{ marginBottom: 18 }}>
@@ -1053,7 +1399,7 @@ export default function ConceptStudioPage() {
                     </div>
                   )}
 
-                  {/* LAYER THESE IN — selected: at bottom after palette */}
+                  {/* LAYER THESE IN */}
                   {topDisplayChips.length > 0 && (
                     <>
                       <div style={{ height: 1, background: "rgba(67,67,43,0.07)", margin: "16px 0 14px" }} />
@@ -1067,6 +1413,12 @@ export default function ConceptStudioPage() {
                         {topDisplayChips.map((chip) => {
                           const chipKey = `${topAesthetic}::${chip.label}`;
                           const isActive = selectedElements.has(chipKey);
+                          const meta = chipMeta.get(chipKey);
+                          const isAutoSelected = meta?.source === 'key-piece';
+                          // Only compute tension for manually selected chips (auto-selected chips never self-penalize)
+                          const tension: TensionState = isActive && !isAutoSelected
+                            ? getChipTensionState(chip.label, selectedKeyPieceLocal)
+                            : 'none';
                           return (
                             <AestheticChipButton
                               key={chip.label}
@@ -1074,6 +1426,8 @@ export default function ConceptStudioPage() {
                               isActive={isActive}
                               isClickable={true}
                               onClick={() => toggleElement(chipKey)}
+                              isAutoSelected={isAutoSelected}
+                              tension={tension}
                             />
                           );
                         })}
@@ -1081,9 +1435,10 @@ export default function ConceptStudioPage() {
                       </div>
                     </>
                   )}
-                </>
-              )}
-            </div>
+                </div>
+
+              </>
+            )}
 
             {/* ── EXPLORE OTHER DIRECTIONS ───────────────────────────────────────── */}
             <div style={{ marginBottom: 20 }}>
@@ -1117,7 +1472,6 @@ export default function ConceptStudioPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {orderedDirections.map((aesthetic) => {
                 const isHovered = hoveredCard === aesthetic;
-                const isMukosPick = aesthetic === recommendedAesthetic;
                 const content = AESTHETIC_CONTENT[aesthetic];
                 const chips = getAestheticChips(aesthetic).slice(0, 3);
                 const idCol = scoreColor(content?.identityScore ?? 0);
@@ -1130,7 +1484,6 @@ export default function ConceptStudioPage() {
                       aesthetic={aesthetic}
                       content={content}
                       chips={chips}
-                      isMukosPick={isMukosPick}
                       isHovered={isHovered}
                       moodboardImages={cardImages}
                       idColor={idCol}
@@ -1206,47 +1559,67 @@ export default function ConceptStudioPage() {
             </div>
 
             {/* MUKO INSIGHT */}
-            <MukoInsightSection
-              headline={insightContent.headline}
-              paragraphs={[insightContent.p1, insightContent.p2, insightContent.p3]}
-              opportunity={{ items: insightContent.opportunity }}
-              edit={{ items: insightContent.editItems }}
-              nextMove={{
-                mode: "concept",
-                items: nextMoveItems,
-                onAdd: (label) => {
-                  const item = nextMoveItems.find((i) => i.label === label);
-                  if (item?.type === 'silhouette_swap') {
-                    // Extract silhouette id from label like "Swap to Straight silhouette"
-                    const match = label.match(/(\w+) silhouette/);
-                    if (match) setConceptSilhouette(match[1].toLowerCase());
-                  } else if (item?.type === 'palette_swap') {
-                    const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
-                      (a) => a.name === selectedAesthetic || a.id === selectedAesthetic?.toLowerCase().replace(/\s+/g, "-")
-                    );
-                    const palAffinity = entry?.palette_affinity ?? [];
-                    if (palAffinity[0]) setConceptPalette(palAffinity[0]);
-                  } else if (selectedAesthetic) {
-                    // Strip the action prefix ("Layer in ", "Consider ", "Try ") to get the chip name
-                    const chipName = label.replace(/^(Layer in |Consider |Try )/, "");
-                    toggleElement(`${selectedAesthetic}::${chipName}`);
-                  }
-                },
-                onRemove: (label) => {
-                  const chipName = label.replace(/^(Layer in |Consider |Try |Swap to )/, "");
-                  removeElement(chipName);
-                },
-                addedItems: new Set(
-                  nextMoveItems
-                    .filter((i) => {
-                      if (i.type === 'silhouette_swap' || i.type === 'palette_swap') return false;
-                      const chipName = i.label.replace(/^(Layer in |Consider |Try )/, "");
-                      return addedChipLabels.has(chipName);
-                    })
-                    .map((i) => i.label)
-                ),
-              }}
-            />
+            {!selectedAesthetic ? (
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ height: 1, background: "rgba(67,67,43,0.12)", margin: "24px 0" }} />
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "rgba(67,67,43,0.38)",
+                    marginBottom: 16,
+                  }}
+                >
+                  MUKO INSIGHT
+                </div>
+                <p style={{ margin: 0, fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.35)", fontStyle: "italic" }}>
+                  Select a direction to see Muko&apos;s analysis
+                </p>
+              </div>
+            ) : (
+              <MukoInsightSection
+                headline={insightContent.headline}
+                paragraphs={[insightContent.p1, insightContent.p2, insightContent.p3]}
+                opportunity={{ items: insightContent.opportunity }}
+                edit={{ items: insightContent.editItems }}
+                nextMove={{
+                  mode: "concept",
+                  items: nextMoveItems,
+                  onAdd: (label) => {
+                    const item = nextMoveItems.find((i) => i.label === label);
+                    if (item?.type === 'silhouette_swap') {
+                      const match = label.match(/(\w+) silhouette/);
+                      if (match) setConceptSilhouette(match[1].toLowerCase());
+                    } else if (item?.type === 'palette_swap') {
+                      const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
+                        (a) => a.name === selectedAesthetic || a.id === selectedAesthetic?.toLowerCase().replace(/\s+/g, "-")
+                      );
+                      const palAffinity = entry?.palette_affinity ?? [];
+                      if (palAffinity[0]) setConceptPalette(palAffinity[0]);
+                    } else if (selectedAesthetic) {
+                      const chipName = label.replace(/^(Layer in |Consider |Try )/, "");
+                      toggleElement(`${selectedAesthetic}::${chipName}`);
+                    }
+                  },
+                  onRemove: (label) => {
+                    const chipName = label.replace(/^(Layer in |Consider |Try |Swap to )/, "");
+                    removeElement(chipName);
+                  },
+                  addedItems: new Set(
+                    nextMoveItems
+                      .filter((i) => {
+                        if (i.type === 'silhouette_swap' || i.type === 'palette_swap') return false;
+                        const chipName = i.label.replace(/^(Layer in |Consider |Try )/, "");
+                        return addedChipLabels.has(chipName);
+                      })
+                      .map((i) => i.label)
+                  ),
+                }}
+              />
+            )}
 
             {/* AskMuko */}
             <AskMuko step="concept" suggestedQuestions={["Why is Resonance at this level?", "How does this compare to other directions?", "What brands are doing this well?"]} context={{ aesthetic: selectedAesthetic, refineText, identityScore: identityPulse?.score, resonanceScore: resonancePulse?.score }} />
@@ -1267,14 +1640,13 @@ export default function ConceptStudioPage() {
 
 /* ─── Direction Card ──────────────────────────────────────────────────────── */
 function DirectionCard({
-  aesthetic, content, chips, isMukosPick, isHovered, moodboardImages,
+  aesthetic, content, chips, isHovered, moodboardImages,
   idColor, resColor, topIdScore, topResScore, onHoverEnter, onHoverLeave, onSelect,
   inter, sohne, steelBlue, chartreuse,
 }: {
   aesthetic: string;
   content: { description: string; identityScore: number; resonanceScore: number } | undefined;
   chips: AestheticChip[];
-  isMukosPick: boolean;
   isHovered: boolean;
   moodboardImages: string[];
   idColor: string;
@@ -1346,16 +1718,11 @@ function DirectionCard({
         {/* Right: select slides in, muko's pick stays anchored to the right */}
         <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
           {/* Select button — clips to 0 width when not hovered */}
-          <div style={{ overflow: "hidden", maxWidth: isHovered ? "80px" : "0px", opacity: isHovered ? 1 : 0, transition: "max-width 180ms ease, opacity 150ms ease", marginRight: isHovered && isMukosPick ? 6 : 0 }}>
+          <div style={{ overflow: "hidden", maxWidth: isHovered ? "80px" : "0px", opacity: isHovered ? 1 : 0, transition: "max-width 180ms ease, opacity 150ms ease" }}>
             <span style={{ display: "block", whiteSpace: "nowrap", padding: "4px 11px", borderRadius: 999, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em", border: `1px solid ${chartreuse}`, background: "transparent", color: chartreuse, fontFamily: inter, pointerEvents: "none" }}>
               Select
             </span>
           </div>
-          {isMukosPick && (
-            <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", background: "rgba(169,123,143,0.10)", border: `1px solid rgba(169,123,143,0.30)`, color: BRAND.rose, fontFamily: inter, whiteSpace: "nowrap" }}>
-              Muko&apos;s Pick
-            </span>
-          )}
         </div>
       </div>
 
@@ -1379,12 +1746,14 @@ function DirectionCard({
 
       {/* Moodboard — reveals on hover */}
       <div style={{ maxHeight: isHovered ? "1200px" : "0", overflow: "hidden", transition: "max-height 220ms ease" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 10 }}>
-          {moodboardImages.map((src, i) => (
-            <div key={`mb-${aesthetic}-${i}`} style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", opacity: isHovered ? 1 : 0, transition: `opacity 180ms ease ${i * 20}ms` }}>
-              <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} loading="lazy" />
-            </div>
-          ))}
+        <div style={{ padding: "0 18px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 10 }}>
+            {moodboardImages.map((src, i) => (
+              <div key={`mb-${aesthetic}-${i}`} style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", opacity: isHovered ? 1 : 0, transition: `opacity 180ms ease ${i * 20}ms` }}>
+                <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} loading="lazy" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

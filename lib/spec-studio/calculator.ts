@@ -69,6 +69,19 @@ export interface MukoInsight {
   } | null;
 }
 
+export function applyRoleModifiers(
+  baseScore: number,
+  role: string,
+  gatesPassed: { cost: boolean },
+  constructionTier: string
+): number {
+  let score = baseScore;
+  if (role === 'volume-driver' && !gatesPassed.cost) score *= 0.65;
+  if (role === 'hero' && !gatesPassed.cost) score *= 0.92;
+  if (role === 'volume-driver' && constructionTier === 'high') score *= 0.88;
+  return Math.round(score);
+}
+
 export function generateInsight(
   breakdown: COGSBreakdown,
   material: Material,

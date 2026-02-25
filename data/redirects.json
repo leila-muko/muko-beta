@@ -1,0 +1,433 @@
+{
+  "version": "1.0.0",
+  "brand_mismatch": {
+    "terrain-luxe": {
+      "Feminine": {
+        "suggestion": "romantic-analog",
+        "reason": "The consumer's desire for nature-connected softness doesn't require masculine coding — Romantic Analog channels the same earthiness through a feminine, tactile lens."
+      },
+      "Playful": {
+        "suggestion": "haptic-play",
+        "reason": "The appetite for sensory engagement translates directly — Haptic Play captures the same tactile curiosity without the utilitarian seriousness."
+      },
+      "Maximalist": {
+        "suggestion": "high-voltage",
+        "reason": "Terrain Luxe's restraint reads as underdressed to a maximalist consumer — High Voltage preserves the premium positioning while amplifying visual impact."
+      },
+      "Trendy": {
+        "suggestion": "haptic-play",
+        "reason": "Utility silhouettes signal stability, not newness — Haptic Play delivers the novelty-seeking consumer's need for innovation and trend currency."
+      },
+      "Romantic": {
+        "suggestion": "romantic-analog",
+        "reason": "The consumer craving warmth and narrative isn't looking for technical protection — Romantic Analog provides the same earthy groundedness through a romantic frame."
+      },
+      "Dramatic": {
+        "suggestion": "high-voltage",
+        "reason": "Terrain Luxe deliberately mutes drama in favor of function — High Voltage delivers the same premium foundation with the theatrical impact dramatic brands demand."
+      }
+    },
+    "quiet-structure": {
+      "Bohemian": {
+        "suggestion": "romantic-analog",
+        "reason": "The free-spirited consumer reads architectural minimalism as cold — Romantic Analog preserves the timelessness while adding the handmade warmth bohemian shoppers seek."
+      },
+      "Maximalist": {
+        "suggestion": "high-voltage",
+        "reason": "Quiet Structure's restraint creates cognitive dissonance for the maximalist eye — High Voltage retains the premium, sophisticated positioning at full volume."
+      },
+      "Grunge": {
+        "suggestion": "undone-glam",
+        "reason": "The grunge consumer wants visible friction, not invisible seams — Undone Glam channels structured rebellion without sacrificing the urban sensibility."
+      },
+      "Rebellious": {
+        "suggestion": "undone-glam",
+        "reason": "Quiet Structure reads as establishment — Undone Glam delivers the subversive attitude while keeping an urban, contemporary foundation."
+      },
+      "Romantic": {
+        "suggestion": "romantic-analog",
+        "reason": "Minimalism and romance are different emotional registers — Romantic Analog preserves the timeless quality while adding the sentiment and softness the romantic consumer needs."
+      },
+      "Dramatic": {
+        "suggestion": "high-voltage",
+        "reason": "Quiet Structure deliberately suppresses drama — High Voltage delivers the same sophisticated foundation with the visual impact dramatic brand identities demand."
+      },
+      "Vibrant": {
+        "suggestion": "haptic-play",
+        "reason": "Quiet Structure's muted restraint contradicts vibrant energy — Haptic Play preserves the contemporary, innovative quality while embracing the color and sensory boldness vibrant brands require."
+      }
+    },
+    "romantic-analog": {
+      "Technical": {
+        "suggestion": "terrain-luxe",
+        "reason": "The consumer seeking performance and innovation won't connect with vintage sentimentality — Terrain Luxe preserves the earthy, artisanal quality through a technical lens."
+      },
+      "Minimalist": {
+        "suggestion": "quiet-structure",
+        "reason": "Romantic Analog's layered nostalgia reads as clutter to a minimalist brand — Quiet Structure captures the timeless aspiration with the restraint minimalism demands."
+      },
+      "Urban": {
+        "suggestion": "undone-glam",
+        "reason": "Rural nostalgia doesn't resonate in urban contexts — Undone Glam maintains the moody, artisanal sensibility while grounding it in city culture."
+      },
+      "Innovative": {
+        "suggestion": "haptic-play",
+        "reason": "Romantic Analog is deliberately backward-looking — Haptic Play preserves the soft, tactile qualities while repositioning them as forward-looking and novel."
+      },
+      "Sporty": {
+        "suggestion": "terrain-luxe",
+        "reason": "Athletic functionality and vintage romanticism serve fundamentally different lifestyles — Terrain Luxe bridges the gap with durable, performance-coded pieces that still feel authentic."
+      },
+      "Edgy": {
+        "suggestion": "undone-glam",
+        "reason": "The romantic consumer and the edgy consumer are shopping for different emotions — Undone Glam keeps the moody depth while adding the rebellious tension edgy brands need."
+      }
+    },
+    "heritage-hand": {
+      "Technical": {
+        "suggestion": "terrain-luxe",
+        "reason": "Handcraft and high-tech are different trust systems — Terrain Luxe preserves the sustainability story and timeless quality while speaking to the performance-minded consumer."
+      },
+      "Urban": {
+        "suggestion": "undone-glam",
+        "reason": "Rural craft vocabulary alienates urban consumers — Undone Glam preserves the raw, authentic quality in a street-credible frame."
+      },
+      "Trendy": {
+        "suggestion": "sweet-subversion",
+        "reason": "Heritage Hand's timelessness is anti-trend by design — Sweet Subversion keeps the feminine, handmade quality while adding the cultural velocity trendy brands require."
+      },
+      "Edgy": {
+        "suggestion": "undone-glam",
+        "reason": "Heritage Hand's gentleness reads as passive to the edgy consumer — Undone Glam delivers raw authenticity with the confrontational energy edge demands."
+      },
+      "Bold": {
+        "suggestion": "high-voltage",
+        "reason": "Heritage Hand whispers — High Voltage channels the same premium, feminine positioning at the assertive register bold brands need."
+      },
+      "Innovative": {
+        "suggestion": "haptic-play",
+        "reason": "The artisanal consumer values proven technique; the innovation consumer values disruption — Haptic Play preserves the tactile, handmade quality while reframing it as experimentation."
+      }
+    },
+    "undone-glam": {
+      "Minimalist": {
+        "suggestion": "quiet-structure",
+        "reason": "Deconstructed excess and deliberate minimalism are opposite strategies — Quiet Structure preserves the urban sophistication without the visual chaos."
+      },
+      "Sophisticated": {
+        "suggestion": "high-voltage",
+        "reason": "Undone Glam's messy rebellion undercuts sophisticated brand codes — High Voltage delivers the same dramatic confidence with polish intact."
+      },
+      "Preppy": {
+        "suggestion": "quiet-structure",
+        "reason": "Grunge and prep are cultural opposites — Quiet Structure provides the clean, structured foundation preppy brands expect."
+      },
+      "Classic": {
+        "suggestion": "quiet-structure",
+        "reason": "Deconstruction inherently rejects classicism — Quiet Structure channels the timeless, premium quality that classic brand identities protect."
+      },
+      "Formal": {
+        "suggestion": "high-voltage",
+        "reason": "Undone Glam's disheveled energy undermines formal occasions — High Voltage preserves the bold, dramatic impact while respecting the formality the context demands."
+      },
+      "Serene": {
+        "suggestion": "romantic-analog",
+        "reason": "Undone Glam's tension and edge are the opposite of serenity — Romantic Analog preserves the moody depth while creating calm instead of confrontation."
+      },
+      "Timeless": {
+        "suggestion": "terrain-luxe",
+        "reason": "Deconstruction is inherently temporal — Terrain Luxe preserves the masculine, utilitarian edge in a form built to endure beyond seasonal cycles."
+      }
+    },
+    "haptic-play": {
+      "Timeless": {
+        "suggestion": "quiet-structure",
+        "reason": "Haptic Play is inherently of-the-moment — Quiet Structure delivers innovative restraint and premium quality that timeless brands can build a permanent collection around."
+      },
+      "Rustic": {
+        "suggestion": "heritage-hand",
+        "reason": "Synthetic tactility and rustic authenticity don't share a material language — Heritage Hand preserves the handmade, tactile appeal through natural fibers and honest craft."
+      },
+      "Minimalist": {
+        "suggestion": "quiet-structure",
+        "reason": "Haptic Play's sensory maximalism overwhelms minimalist brand codes — Quiet Structure captures the innovative, contemporary quality with appropriate restraint."
+      },
+      "Masculine": {
+        "suggestion": "terrain-luxe",
+        "reason": "Haptic Play's softness and playfulness don't speak to masculine positioning — Terrain Luxe preserves the technical, innovative quality in a masculine-coded frame."
+      },
+      "Classic": {
+        "suggestion": "quiet-structure",
+        "reason": "Inflated volumes and tactile novelty are deliberately anti-classical — Quiet Structure offers the clean, premium foundation classic brands need."
+      },
+      "Sophisticated": {
+        "suggestion": "high-voltage",
+        "reason": "Haptic Play's youthful exuberance undercuts sophisticated positioning — High Voltage preserves the bold, vibrant energy with the grown-up polish sophisticated brands require."
+      }
+    },
+    "high-voltage": {
+      "Minimalist": {
+        "suggestion": "quiet-structure",
+        "reason": "Maximum drama and minimal expression can't coexist — Quiet Structure preserves the premium, sophisticated positioning while respecting the restraint minimalism requires."
+      },
+      "Soft": {
+        "suggestion": "sweet-subversion",
+        "reason": "High Voltage's intensity overwhelms soft brand sensibilities — Sweet Subversion keeps the feminine, vibrant energy at a gentler register the soft consumer trusts."
+      },
+      "Rustic": {
+        "suggestion": "terrain-luxe",
+        "reason": "Red-carpet glamour and rural authenticity serve incompatible aspirations — Terrain Luxe preserves the premium quality through a grounded, natural vocabulary."
+      },
+      "Accessible": {
+        "suggestion": "haptic-play",
+        "reason": "High Voltage's luxury positioning creates price-ceiling tension with accessible brands — Haptic Play delivers similar bold, vibrant energy without the premium-only perception."
+      },
+      "Casual": {
+        "suggestion": "undone-glam",
+        "reason": "High Voltage's formality reads as overdressed in casual contexts — Undone Glam preserves the bold, dramatic quality in an effortless frame."
+      },
+      "Serene": {
+        "suggestion": "quiet-structure",
+        "reason": "High Voltage is engineered for maximum impact, not calm — Quiet Structure preserves the sophisticated, premium quality while creating the tranquility serene brands promise."
+      }
+    },
+    "sweet-subversion": {
+      "Minimalist": {
+        "suggestion": "quiet-structure",
+        "reason": "Whimsical maximalism and disciplined minimalism contradict each other — Quiet Structure delivers the contemporary, premium quality without the visual excess."
+      },
+      "Sophisticated": {
+        "suggestion": "high-voltage",
+        "reason": "Sweet Subversion's youthful playfulness undercuts sophisticated brand codes — High Voltage preserves the feminine, bold energy with grown-up glamour."
+      },
+      "Masculine": {
+        "suggestion": "haptic-play",
+        "reason": "Sweet Subversion's femininity is a core feature, not a modifier — Haptic Play preserves the innovative, sensory qualities in a gender-neutral frame."
+      },
+      "Technical": {
+        "suggestion": "haptic-play",
+        "reason": "Nostalgia-driven whimsy conflicts with performance-driven branding — Haptic Play delivers similar innovation and sensory novelty through a technical vocabulary."
+      },
+      "Timeless": {
+        "suggestion": "romantic-analog",
+        "reason": "Sweet Subversion's trend-driven playfulness has built-in expiration — Romantic Analog preserves the romantic, feminine quality in a timeless context that endures."
+      },
+      "Classic": {
+        "suggestion": "romantic-analog",
+        "reason": "Subversion and classicism are structurally opposed — Romantic Analog preserves the feminine warmth and sentimentality in a form the classic consumer recognizes."
+      }
+    }
+  },
+  "material_alternatives": {
+    "organic-cotton": [
+      {
+        "material_id": "conventional-cotton",
+        "reason": "Same hand and construction at half the COGS — use when sustainability certification isn't a purchase driver for the target consumer."
+      },
+      {
+        "material_id": "tencel",
+        "reason": "Better drape and a higher sustainability score with only a modest cost uplift — stronger story for eco-conscious positioning."
+      },
+      {
+        "material_id": "hemp",
+        "reason": "Superior durability and the highest sustainability score in the library, for brands where natural-fiber provenance is the selling point."
+      }
+    ],
+    "conventional-cotton": [
+      {
+        "material_id": "recycled-polyester",
+        "reason": "Comparable price point with a circular-economy narrative that strengthens marketing claims without meaningful cost impact."
+      },
+      {
+        "material_id": "virgin-polyester",
+        "reason": "Lowest COGS option with a two-week faster lead time — best for trend-driven capsules with short shelf life."
+      },
+      {
+        "material_id": "organic-cotton",
+        "reason": "Justifies a higher retail price through GOTS certification and the consumer trust premium that natural fibers carry."
+      }
+    ],
+    "tencel": [
+      {
+        "material_id": "rayon-viscose",
+        "reason": "Similar drape and hand at 35% lower COGS — the pragmatic swap when the sustainability narrative isn't the lead marketing message."
+      },
+      {
+        "material_id": "organic-cotton",
+        "reason": "Lower complexity tier with comparable lead time — easier to source and construct, with strong natural-fiber credentials."
+      },
+      {
+        "material_id": "linen",
+        "reason": "Natural fiber alternative with an equivalent sustainability score and strong seasonal appeal for spring/summer deliveries."
+      }
+    ],
+    "linen": [
+      {
+        "material_id": "organic-cotton",
+        "reason": "Simpler construction at a lower price point — avoids the wrinkle-management challenges that linen creates in retail presentation."
+      },
+      {
+        "material_id": "hemp",
+        "reason": "Similar natural-fiber hand with the highest sustainability score in the library — increasingly viable as production scales drive costs down."
+      },
+      {
+        "material_id": "tencel",
+        "reason": "Fluid drape without linen's textural stiffness, shorter lead time, and more versatile across silhouettes and seasons."
+      }
+    ],
+    "silk": [
+      {
+        "material_id": "tencel",
+        "reason": "Similar fluid drape at under half the COGS with a shorter lead time — the go-to silk substitute for bridge and contemporary collections."
+      },
+      {
+        "material_id": "rayon-viscose",
+        "reason": "Achieves comparable luminosity and drape at 70% lower cost — ideal for volume pieces where per-unit COGS drives the buy decision."
+      },
+      {
+        "material_id": "deadstock-fabric",
+        "reason": "Potential to source deadstock silk lots at a fraction of standard cost, with a two-week lead time that accelerates speed to market."
+      }
+    ],
+    "wool-merino": [
+      {
+        "material_id": "recycled-polyester",
+        "reason": "A fraction of the cost with four weeks shorter lead — viable for unstructured knits where natural fiber isn't the selling point."
+      },
+      {
+        "material_id": "organic-cotton",
+        "reason": "Lower cost, lower complexity, and easier consumer care — works for transitional-weight pieces in milder climates."
+      },
+      {
+        "material_id": "deadstock-fabric",
+        "reason": "Fourteen weeks faster to market with potential for premium deadstock wool lots — the speed play when the calendar is tight."
+      }
+    ],
+    "cashmere-blend": [
+      {
+        "material_id": "wool-merino",
+        "reason": "35% lower COGS with two weeks shorter lead and similar hand — the rational choice when cashmere is a luxury tax the margin can't absorb."
+      },
+      {
+        "material_id": "tencel",
+        "reason": "Fluid drape at under half the cost with a dramatically shorter lead time — a viable pivot when the design values softness over fiber prestige."
+      },
+      {
+        "material_id": "deadstock-fabric",
+        "reason": "Sixteen weeks faster to market and potential access to premium deadstock cashmere lots — eliminates the lead-time penalty entirely."
+      }
+    ],
+    "recycled-polyester": [
+      {
+        "material_id": "virgin-polyester",
+        "reason": "Nearly half the cost with a lower complexity tier and four weeks faster lead — the trade when the sustainability premium isn't justified by the retail price."
+      },
+      {
+        "material_id": "conventional-cotton",
+        "reason": "Natural fiber alternative at a lower complexity tier with a shorter lead time — avoids the microplastic narrative risk entirely."
+      },
+      {
+        "material_id": "deadstock-fabric",
+        "reason": "Ten weeks faster to market with a built-in waste-reduction story that rivals recycled polyester's sustainability positioning."
+      }
+    ],
+    "virgin-polyester": [
+      {
+        "material_id": "recycled-polyester",
+        "reason": "Modest cost premium buys a circular-economy narrative that insulates the brand from sustainability criticism — a defensive upgrade."
+      },
+      {
+        "material_id": "conventional-cotton",
+        "reason": "Natural fiber at comparable cost and complexity — eliminates the petrochemical and microplastic liability from the supply chain."
+      },
+      {
+        "material_id": "rayon-viscose",
+        "reason": "Better drape and biodegradability at a moderate cost uplift — the step up when the product needs to feel elevated beyond fast fashion."
+      }
+    ],
+    "nylon": [
+      {
+        "material_id": "recycled-polyester",
+        "reason": "Lower cost with a shorter lead time and a stronger sustainability story — the swap when structured performance isn't the primary requirement."
+      },
+      {
+        "material_id": "virgin-polyester",
+        "reason": "Half the cost with a lower complexity tier and five weeks faster lead — best for high-volume pieces where nylon's durability is overspec'd."
+      },
+      {
+        "material_id": "deadstock-fabric",
+        "reason": "Eleven weeks faster to market — deadstock nylon lots can match the structured hand at a fraction of the standard lead time."
+      }
+    ],
+    "leather": [
+      {
+        "material_id": "vegan-leather",
+        "reason": "60% lower cost with five weeks shorter lead time — the default swap when genuine leather's provenance story isn't a core brand pillar."
+      },
+      {
+        "material_id": "nylon",
+        "reason": "Lower cost and lower complexity tier for structured applications — avoids the ethical sourcing scrutiny that leather increasingly attracts."
+      },
+      {
+        "material_id": "deadstock-fabric",
+        "reason": "Thirteen weeks faster to market, with potential for premium deadstock leather lots that carry both cost and sustainability advantages."
+      }
+    ],
+    "vegan-leather": [
+      {
+        "material_id": "recycled-polyester",
+        "reason": "Lower cost and a lower complexity tier with a stronger circular-economy narrative — avoids the PU durability questions vegan leather faces."
+      },
+      {
+        "material_id": "nylon",
+        "reason": "Structured hand at lower cost with a moderate complexity tier — the pragmatic alternative when the vegan positioning isn't the marketing lead."
+      },
+      {
+        "material_id": "virgin-polyester",
+        "reason": "Dramatically lower COGS with a lower complexity tier and faster lead — the trade for trend-driven pieces where material prestige is secondary."
+      }
+    ],
+    "rayon-viscose": [
+      {
+        "material_id": "conventional-cotton",
+        "reason": "Lower cost, lower complexity, and a shorter lead time — avoids the deforestation-risk narrative that viscose supply chains carry."
+      },
+      {
+        "material_id": "organic-cotton",
+        "reason": "Lower complexity tier with a much stronger sustainability claim — the upgrade when the brand needs a cleaner supply-chain story."
+      },
+      {
+        "material_id": "tencel",
+        "reason": "Same lead time with a dramatically better sustainability score — the cleaner version of viscose for brands moving toward closed-loop sourcing."
+      }
+    ],
+    "deadstock-fabric": [
+      {
+        "material_id": "conventional-cotton",
+        "reason": "Consistent, repeatable supply at lower complexity — the fallback when lot-based deadstock sourcing creates reorder risk at scale."
+      },
+      {
+        "material_id": "recycled-polyester",
+        "reason": "Repeatable sustainable sourcing without lot dependency — the trade when production continuity matters more than lead-time speed."
+      },
+      {
+        "material_id": "organic-cotton",
+        "reason": "Fully traceable supply chain with GOTS certification — the swap when deadstock provenance uncertainty creates compliance risk."
+      }
+    ],
+    "hemp": [
+      {
+        "material_id": "linen",
+        "reason": "Similar natural-fiber hand at lower cost with a two-week shorter lead time — the established alternative while hemp production continues to scale."
+      },
+      {
+        "material_id": "organic-cotton",
+        "reason": "Lower cost, lower complexity, and three weeks faster to market — the pragmatic natural-fiber swap when hemp's premium isn't justified by the retail price."
+      },
+      {
+        "material_id": "deadstock-fabric",
+        "reason": "Thirteen weeks faster to market — the speed play when the calendar won't accommodate hemp's extended lead time."
+      }
+    ]
+  }
+}

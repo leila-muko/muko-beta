@@ -7,6 +7,17 @@ interface PulseState {
   message: string;
 }
 
+export interface KeyPiece {
+  item: string;
+  signal: 'high-volume' | 'ascending' | 'emerging' | null;
+  note?: string;
+  category: string | null;
+  type: string | null;
+  recommended_material_id: string | null;
+  redirect_material_id: string | null;
+  custom?: boolean;
+}
+
 export interface ActivatedChip {
   label: string;
   type: 'spec' | 'mood';
@@ -60,6 +71,8 @@ interface SessionState {
   // Intent
   intentGoals: string[];
   intentTradeoff: string;
+  collectionRole: 'hero' | 'directional' | 'core-evolution' | 'volume-driver' | null;
+  selectedKeyPiece: KeyPiece | null;
 
   // Actions
   setSeason: (season: string) => void;
@@ -83,6 +96,8 @@ interface SessionState {
 
   setIntentGoals: (goals: string[]) => void;
   setIntentTradeoff: (tradeoff: string) => void;
+  setCollectionRole: (role: 'hero' | 'directional' | 'core-evolution' | 'volume-driver') => void;
+  setSelectedKeyPiece: (piece: KeyPiece | null) => void;
 
   lockConcept: () => void;
   unlockConcept: () => void;
@@ -121,6 +136,8 @@ export const useSessionStore = create<SessionState>()(
       conceptLocked: false,
       intentGoals: [],
       intentTradeoff: '',
+      collectionRole: null,
+      selectedKeyPiece: null,
 
       // Actions
       setSeason: (season) => set({ season }),
@@ -146,6 +163,8 @@ export const useSessionStore = create<SessionState>()(
 
       setIntentGoals: (intentGoals) => set({ intentGoals }),
       setIntentTradeoff: (intentTradeoff) => set({ intentTradeoff }),
+      setCollectionRole: (collectionRole) => set({ collectionRole }),
+      setSelectedKeyPiece: (selectedKeyPiece) => set({ selectedKeyPiece }),
 
       lockConcept: () => set({ conceptLocked: true }),
       unlockConcept: () => set({ conceptLocked: false }),
@@ -178,13 +197,15 @@ export const useSessionStore = create<SessionState>()(
         conceptLocked: false,
         intentGoals: [],
         intentTradeoff: '',
+        collectionRole: null,
+        selectedKeyPiece: null,
       }),
     }),
     {
       name: 'muko-session',
       partialize: (state) => {
         // Persist everything except actions
-        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
+        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setCollectionRole, setSelectedKeyPiece, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
         return rest;
       },
     }

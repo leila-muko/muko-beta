@@ -33,12 +33,21 @@ type NextMoveProps = NextMoveConceptProps | NextMoveSpecProps;
 
 /* ─── Main component ────────────────────────────────────────────────────── */
 
+export interface ConstructionImplication {
+  chip: string;
+  detail: string;
+  cost_note: string;
+  complexity_flag: string;
+  avoid: string;
+}
+
 export interface MukoInsightSectionProps {
   headline: string;
   paragraphs: string[];
   opportunity: { items: string[]; subtitle?: string };
   edit: { items: string[]; subtitle?: string };
   nextMove: NextMoveProps;
+  constructionImplications?: ConstructionImplication[];
 }
 
 export function MukoInsightSection({
@@ -47,7 +56,25 @@ export function MukoInsightSection({
   opportunity,
   edit,
   nextMove,
+  constructionImplications,
 }: MukoInsightSectionProps) {
+  const [dlExpanded, setDlExpanded] = useState(true);
+  const [expandedChips, setExpandedChips] = useState<Set<string>>(new Set());
+  const implKey = constructionImplications?.map(s => s.chip).join('|') ?? '';
+  useEffect(() => {
+    setExpandedChips(new Set());
+  }, [implKey]);
+  function toggleChip(label: string) {
+    setExpandedChips(prev => {
+      const next = new Set(prev);
+      next.has(label) ? next.delete(label) : next.add(label);
+      return next;
+    });
+  }
+  function getFirstSentence(text: string): string {
+    const match = text.match(/^[^.!?]*[.!?]/);
+    return match ? match[0] : text;
+  }
   return (
     <div style={{ marginBottom: 28 }}>
       {/* Section divider */}
@@ -99,6 +126,112 @@ export function MukoInsightSection({
           {p}
         </p>
       ))}
+
+      {/* Construction Implications — collapsible */}
+      {constructionImplications && constructionImplications.length > 0 && (
+        <div style={{
+          marginBottom: 16,
+          borderRadius: 10,
+          border: "1px solid rgba(67,67,43,0.09)",
+          background: "transparent",
+          padding: "16px 20px",
+        }}>
+          <button
+            onClick={() => setDlExpanded(e => !e)}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              width: "100%", background: "none", border: "none", cursor: "pointer",
+              padding: 0, marginBottom: dlExpanded ? 6 : 0,
+            }}
+          >
+            <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)" }}>
+              construction implications ({constructionImplications.length})
+            </span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, transform: dlExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 180ms ease", color: "rgba(67,67,43,0.35)" }}>
+              <path d="M2 4.5L6 8L10 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          {dlExpanded && (
+            <>
+              <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.40)", marginBottom: 12 }}>
+                These signals influence complexity, cost, and production risk.
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {constructionImplications.map((s, i) => {
+                  const isExpanded = expandedChips.has(s.chip);
+                  const hasComplexity = s.complexity_flag === "high";
+                  const firstSentence = getFirstSentence(s.detail);
+                  return (
+                    <div key={i}>
+                      {/* Label row: chip pill + complexity flag + toggle — all on one line */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                        <span style={{
+                          padding: "3px 9px",
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 500,
+                          fontFamily: inter,
+                          background: "rgba(125,150,172,0.08)",
+                          border: "1px solid rgba(125,150,172,0.55)",
+                          color: "#7D96AC",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          flexShrink: 0,
+                        }}>
+                          {s.chip}
+                        </span>
+                        <div style={{ flex: 1 }} />
+                        {hasComplexity && (
+                          <span style={{ fontFamily: inter, fontSize: 10, fontStyle: "italic", color: "#B8876B", flexShrink: 0 }}>
+                            ↑ complexity
+                          </span>
+                        )}
+                        <button
+                          onClick={() => toggleChip(s.chip)}
+                          style={{
+                            fontFamily: inter,
+                            fontSize: 11,
+                            color: "rgba(67,67,43,0.38)",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: 0,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {isExpanded ? "[− less]" : "[+ more]"}
+                        </button>
+                      </div>
+                      {/* Detail — first sentence collapsed, full when expanded */}
+                      <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.64)", lineHeight: 1.65 }}>
+                        {isExpanded ? s.detail : firstSentence}
+                      </div>
+                      {/* Expanded: cost note + avoid */}
+                      {isExpanded && (
+                        <>
+                          {s.cost_note && (
+                            <div style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.45)", marginTop: 8, lineHeight: 1.6 }}>
+                              $ {s.cost_note}
+                            </div>
+                          )}
+                          {s.avoid && (
+                            <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(67,67,43,0.07)" }}>
+                              <div style={{ fontFamily: inter, fontSize: 11, color: "rgba(169,123,143,0.70)", lineHeight: 1.6 }}>
+                                <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "#A97B8F", marginRight: 4 }}>AVOID</span>
+                                {s.avoid}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* The Opportunity card — compact */}
       {opportunity.items.length > 0 && (

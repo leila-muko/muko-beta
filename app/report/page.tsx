@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AskMuko from "@/components/AskMuko";
 import { useSessionStore } from "@/lib/store/sessionStore";
+import type { KeyPiece } from "@/lib/store/sessionStore";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -406,6 +407,81 @@ const DIM_TAG: Record<string, { bg: string; text: string; border: string }> = {
   Resonance:  { bg: "rgba(168,180,117,0.08)", text: "#5B6A38",  border: `1px solid rgba(168,180,117,0.28)` },
 };
 
+/* ─── Collection Alignment helper ─── */
+type AlignmentStatus = 'pass' | 'advisory' | 'conflict';
+interface AlignmentSignal {
+  label: string;
+  text: string;
+  status: AlignmentStatus;
+}
+
+function getCollectionAlignment(
+  role: string,
+  costGatePassed: boolean,
+  constructionTier: string,
+  resonanceScore: number,
+  keyPiece: KeyPiece | null
+): AlignmentSignal[] {
+  const signals: AlignmentSignal[] = [];
+
+  // Signal 1: Margin vs Role
+  if (role === 'volume-driver') {
+    if (costGatePassed) {
+      signals.push({ label: "Margin vs Role", text: "Cost gate passed — fits a volume driver's margin requirements.", status: 'pass' });
+    } else {
+      signals.push({ label: "Margin vs Role", text: "Cost gate failed. Volume drivers need tight margins — current COGS exceeds ceiling.", status: 'conflict' });
+    }
+  } else if (role === 'hero') {
+    if (costGatePassed) {
+      signals.push({ label: "Margin vs Role", text: "Margin is healthy. For a hero piece, you have room to invest further in materials or construction.", status: 'pass' });
+    } else {
+      signals.push({ label: "Margin vs Role", text: "Over budget — acceptable for a hero piece if the creative direction justifies it. Flag for review.", status: 'advisory' });
+    }
+  } else if (role === 'directional') {
+    signals.push({ label: "Margin vs Role", text: costGatePassed ? "Margin holds — directional piece is commercially viable." : "Margin pressure on a directional piece — consider simplifying construction to restore headroom.", status: costGatePassed ? 'pass' : 'advisory' });
+  } else {
+    signals.push({ label: "Margin vs Role", text: costGatePassed ? "Core evolution holds on margin — on track." : "Core evolution piece is over budget. Tighten material or construction before committing.", status: costGatePassed ? 'pass' : 'conflict' });
+  }
+
+  // Signal 2: Complexity vs Role
+  const tierLower = constructionTier.toLowerCase();
+  if (role === 'volume-driver' && tierLower === 'high') {
+    signals.push({ label: "Complexity vs Role", text: "High construction complexity conflicts with volume driver requirements. Velocity and cost control will suffer.", status: 'conflict' });
+  } else if (role === 'hero' && tierLower === 'high') {
+    signals.push({ label: "Complexity vs Role", text: "High complexity is appropriate for a hero piece — construction is part of the identity.", status: 'pass' });
+  } else if (role === 'core-evolution' && tierLower === 'high') {
+    signals.push({ label: "Complexity vs Role", text: "High complexity on a core evolution piece adds risk. Moderate tier is recommended.", status: 'advisory' });
+  } else {
+    signals.push({ label: "Complexity vs Role", text: `${constructionTier} construction is well-matched to the ${role === 'directional' ? 'directional' : role} role.`, status: 'pass' });
+  }
+
+  // Signal 3: Market Signal vs Role
+  if (keyPiece && !keyPiece.custom) {
+    const signal = keyPiece.signal;
+    if (signal === 'high-volume' && (role === 'directional' || role === 'hero')) {
+      signals.push({ label: "Market Signal vs Role", text: `${keyPiece.item} is a high-volume market signal — may not deliver the freshness expected of a ${role} piece.`, status: 'advisory' });
+    } else if (signal === 'emerging' && role === 'volume-driver') {
+      signals.push({ label: "Market Signal vs Role", text: `${keyPiece.item} is an emerging trend — market volume may not be there yet for a volume driver.`, status: 'advisory' });
+    } else if (signal === 'ascending') {
+      signals.push({ label: "Market Signal vs Role", text: `${keyPiece.item} is in the ascending window — timing is strong for any collection role.`, status: 'pass' });
+    } else if (resonanceScore >= 75) {
+      signals.push({ label: "Market Signal vs Role", text: "Resonance is strong — market appetite aligns with this piece's role in the collection.", status: 'pass' });
+    } else {
+      signals.push({ label: "Market Signal vs Role", text: "Resonance score is moderate. Validate demand before committing production units.", status: 'advisory' });
+    }
+  } else {
+    if (resonanceScore >= 80) {
+      signals.push({ label: "Market Signal vs Role", text: "Strong resonance — market timing supports this role.", status: 'pass' });
+    } else if (resonanceScore >= 65) {
+      signals.push({ label: "Market Signal vs Role", text: "Moderate resonance. Consider the market timing relative to your collection role before finalizing.", status: 'advisory' });
+    } else {
+      signals.push({ label: "Market Signal vs Role", text: "Low resonance — reconsider the timing or direction before committing.", status: 'conflict' });
+    }
+  }
+
+  return signals;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════ */
@@ -421,6 +497,8 @@ export default function StandardReportPage() {
     silhouette: storeSilhouette,
     constructionTier: storeTier,
     chipSelection: storeChipSelection,
+    collectionRole,
+    selectedKeyPiece,
   } = useSessionStore();
 
   const aestheticScores = storeAesthetic ? AESTHETIC_CONTENT[storeAesthetic] : null;
@@ -908,6 +986,103 @@ export default function StandardReportPage() {
               ))}
             </div>
           </div>
+
+          {/* ═══ COLLECTION ALIGNMENT CHECK ═══ */}
+          {collectionRole && (() => {
+            const alignmentSignals = getCollectionAlignment(
+              collectionRole,
+              report.costGatePassed,
+              report.constructionTier,
+              report.resonance,
+              selectedKeyPiece ?? null
+            );
+            const roleLabels: Record<string, string> = {
+              hero: "Hero / Image piece",
+              directional: "Directional but scalable",
+              "core-evolution": "Core evolution",
+              "volume-driver": "Volume driver",
+            };
+            return (
+              <div
+                style={{
+                  ...card,
+                  padding: "24px 24px",
+                  marginBottom: 20,
+                  animation: "fadeIn 600ms ease-out 550ms both",
+                }}
+              >
+                <div style={microLabel}>COLLECTION ALIGNMENT</div>
+                <p style={{ ...bodyText, marginBottom: 16 }}>
+                  How this piece performs within its intended role.
+                </p>
+
+                {selectedKeyPiece && !selectedKeyPiece.custom && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(67,67,43,0.03)", border: "1px solid rgba(67,67,43,0.07)", marginBottom: 16 }}>
+                    <span style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.50)" }}>Analyzing as:</span>
+                    <span style={{ fontFamily: inter, fontSize: 11, fontWeight: 600, color: OLIVE }}>{selectedKeyPiece.item}</span>
+                    {selectedKeyPiece.signal && (
+                      <span style={{
+                        padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, fontFamily: inter,
+                        background: selectedKeyPiece.signal === "high-volume" ? "rgba(169,123,143,0.15)" : selectedKeyPiece.signal === "ascending" ? "rgba(168,180,117,0.15)" : "rgba(125,150,172,0.15)",
+                        color: selectedKeyPiece.signal === "high-volume" ? "#6B3D52" : selectedKeyPiece.signal === "ascending" ? "#5B6A38" : "#3D5A72",
+                      }}>
+                        {selectedKeyPiece.signal === "high-volume" ? "HIGH VOLUME" : selectedKeyPiece.signal === "ascending" ? "ASCENDING ↑" : "EMERGING"}
+                      </span>
+                    )}
+                    <span style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.40)" }}>
+                      {report.seasonLabel} play for {report.aestheticName}
+                    </span>
+                    <span style={{ marginLeft: "auto", fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.40)" }}>
+                      {roleLabels[collectionRole] || collectionRole}
+                    </span>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {alignmentSignals.map((signal, i) => {
+                    const isPass = signal.status === 'pass';
+                    const isConflict = signal.status === 'conflict';
+                    const iconColor = isPass ? CHARTREUSE : isConflict ? ROSE : CAMEL;
+                    const textColor = isPass ? "rgba(67,67,43,0.60)" : isConflict ? "rgba(67,67,43,0.75)" : "rgba(67,67,43,0.68)";
+                    const Icon = isPass
+                      ? () => (
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+                            <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke={iconColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )
+                      : isConflict
+                      ? () => (
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+                            <path d="M3 3L13 13M13 3L3 13" stroke={iconColor} strokeWidth="1.8" strokeLinecap="round" />
+                          </svg>
+                        )
+                      : () => (
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+                            <path d="M8 2L14 13H2L8 2Z" stroke={iconColor} strokeWidth="1.6" strokeLinejoin="round" />
+                            <path d="M8 7V10" stroke={iconColor} strokeWidth="1.6" strokeLinecap="round" />
+                            <circle cx="8" cy="12" r="0.8" fill={iconColor} />
+                          </svg>
+                        );
+                    return (
+                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                        <div style={{ flexShrink: 0, marginTop: 2, color: iconColor }}>
+                          <Icon />
+                        </div>
+                        <div>
+                          <span style={{ fontFamily: inter, fontSize: 11.5, fontWeight: 700, color: iconColor }}>
+                            {signal.label}
+                          </span>
+                          <span style={{ fontFamily: inter, fontSize: 11.5, color: textColor }}>
+                            {" — "}{signal.text}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ═══ BODY: Narrative + Radar ═══ */}
           <div

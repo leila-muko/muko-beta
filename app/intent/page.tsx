@@ -6,6 +6,8 @@ import { useSessionStore } from "@/lib/store/sessionStore";
 import { BRAND } from "../../lib/concept-studio/constants";
 
 /* ─── Types ─────────────────────────────────────────────────────────────────── */
+type CollectionRoleId = 'hero' | 'directional' | 'core-evolution' | 'volume-driver';
+
 type SuccessId =
   | "brand_statement"
   | "commercial_performance"
@@ -25,6 +27,7 @@ type TensionValue = "left" | "center" | "right";
 type IntentPayload = {
   success: SuccessId[];
   tradeoff: TradeoffId | null;
+  collectionRole: CollectionRoleId | null;
   tensions: {
     trendForward_vs_timeless: TensionValue;
     creative_vs_commercial: TensionValue;
@@ -59,7 +62,7 @@ const microLabel: React.CSSProperties = {
 /* ─── Main component ─────────────────────────────────────────────────────────── */
 export default function IntentCalibrationPage() {
   const router = useRouter();
-  const { season, setCurrentStep, setIntentGoals, setIntentTradeoff } = useSessionStore();
+  const { season, setCurrentStep, setIntentGoals, setIntentTradeoff, setCollectionRole: storeSetCollectionRole } = useSessionStore();
 
   const STEEL = (BRAND as any)?.steelBlue ?? (BRAND as any)?.steel ?? "#7D96AC";
 
@@ -144,6 +147,14 @@ export default function IntentCalibrationPage() {
     return null;
   });
 
+  const [collectionRole, setCollectionRole] = useState<CollectionRoleId | null>(() => {
+    try {
+      const saved = window.localStorage.getItem("muko_intent");
+      if (saved) { const p = JSON.parse(saved); return p.collectionRole ?? null; }
+    } catch {}
+    return null;
+  });
+
   const [tTrend, setTTrend] = useState<TensionValue>(() => {
     try {
       const saved = window.localStorage.getItem("muko_intent");
@@ -180,9 +191,9 @@ export default function IntentCalibrationPage() {
     } catch {}
     return "";
   });
-  const [touched, setTouched] = useState({ success: false, tradeoff: false });
+  const [touched, setTouched] = useState({ success: false, tradeoff: false, role: false });
 
-  const canContinue = success.length > 0 && !!tradeoff;
+  const canContinue = success.length > 0 && !!tradeoff && !!collectionRole;
 
   const toggleSuccess = (id: SuccessId) => {
     setTouched((t) => ({ ...t, success: true }));
@@ -197,6 +208,7 @@ export default function IntentCalibrationPage() {
     const payload: IntentPayload = {
       success,
       tradeoff,
+      collectionRole,
       tensions: {
         trendForward_vs_timeless: tTrend,
         creative_vs_commercial: tCreative,
@@ -221,12 +233,24 @@ export default function IntentCalibrationPage() {
     setIntentTradeoff(
       tradeoff ? (tradeoffOptions.find((o) => o.id === tradeoff)?.title ?? tradeoff) : ""
     );
+    if (collectionRole) storeSetCollectionRole(collectionRole);
   };
 
   const onContinue = () => {
-    setTouched({ success: true, tradeoff: true });
+    setTouched({ success: true, tradeoff: true, role: true });
     if (!canContinue) return;
     saveIntent();
+    // Reset concept-specific state so Muko's Pick renders fresh
+    useSessionStore.setState({
+      aestheticInput: '',
+      conceptLocked: false,
+      identityPulse: null,
+      resonancePulse: null,
+      conceptSilhouette: '',
+      conceptPalette: null,
+      chipSelection: null,
+      customChips: {},
+    });
     router.push("/concept");
   };
 
@@ -276,8 +300,19 @@ export default function IntentCalibrationPage() {
     if (tradeoff === "speed_over_perfection")
       parts.push("We'll bias toward 'good, shipped, and clear.'");
 
+    // Replace final sentence with role-based text when role is set
+    if (collectionRole === 'hero') {
+      parts.push("Conviction over caution. Muko will protect creative direction and flag commercial risk, not block it.");
+    } else if (collectionRole === 'directional') {
+      parts.push("Balanced push. Muko will flag when execution re commercial viability of your direction.");
+    } else if (collectionRole === 'core-evolution') {
+      parts.push("Optimizing a proven formula. Muko will tighten margin guardrails and flag saturation early.");
+    } else if (collectionRole === 'volume-driver') {
+      parts.push("Commercial first. Muko will apply tighter margin gates and flag complexity that threatens velocity.");
+    }
+
     return parts.join(" ");
-  }, [success, tradeoff, tTrend]);
+  }, [success, tradeoff, tTrend, collectionRole]);
 
   // Pulse on insight update
   const [insightPulse, setInsightPulse] = useState(false);
@@ -690,6 +725,96 @@ export default function IntentCalibrationPage() {
                 )}
               </div>
 
+              {/* Section 2.5 — Collection Role */}
+              <div>
+                <div
+                  style={{
+                    fontFamily: sohne,
+                    fontSize: 15,
+                    fontWeight: 500,
+                    color: OLIVE,
+                    marginBottom: 6,
+                  }}
+                >
+                  What role is this piece playing in your collection?
+                </div>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 12,
+                    fontStyle: "italic",
+                    color: "rgba(67,67,43,0.44)",
+                    marginBottom: 14,
+                  }}
+                >
+                  Pick one. This tells Muko how to weight tradeoffs.
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {(
+                    [
+                      { id: "hero" as CollectionRoleId, title: "Hero / Image piece", desc: "The statement. Margin pressure is acceptable if it's right." },
+                      { id: "directional" as CollectionRoleId, title: "Directional but scalable", desc: "Pushes the brand forward — needs to work commercially too." },
+                      { id: "core-evolution" as CollectionRoleId, title: "Core evolution", desc: "A proven category, refreshed for the season." },
+                      { id: "volume-driver" as CollectionRoleId, title: "Volume driver", desc: "This needs to sell. Margin and simplicity take priority." },
+                    ]
+                  ).map((opt) => {
+                    const active = collectionRole === opt.id;
+                    return (
+                      <IntentCard
+                        key={opt.id}
+                        active={active}
+                        disabled={false}
+                        onClick={() => {
+                          setTouched((t) => ({ ...t, role: true }));
+                          setCollectionRole(opt.id);
+                        }}
+                        chartreuse={CHARTREUSE}
+                        steel={STEEL}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              fontFamily: inter,
+                              fontSize: 13,
+                              fontWeight: 500,
+                              color: active ? OLIVE : "rgba(67,67,43,0.78)",
+                            }}
+                          >
+                            {opt.title}
+                          </div>
+                          <div
+                            style={{
+                              marginTop: 4,
+                              fontFamily: inter,
+                              fontSize: 12,
+                              color: "rgba(67,67,43,0.52)",
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {opt.desc}
+                          </div>
+                        </div>
+                      </IntentCard>
+                    );
+                  })}
+                </div>
+
+                {touched.role && !collectionRole && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: BRAND.rose,
+                      fontFamily: inter,
+                    }}
+                  >
+                    Choose a collection role to continue.
+                  </div>
+                )}
+              </div>
+
               {/* Section 3 — Tension sliders */}
               <div>
                 <div
@@ -828,6 +953,15 @@ export default function IntentCalibrationPage() {
                   label="TRADEOFF"
                   value={tradeoffText}
                   filled={!!tradeoff}
+                  chartreuse={CHARTREUSE}
+                />
+                <IntentPulseRow
+                  label="PIECE ROLE"
+                  value={collectionRole
+                    ? { hero: "Hero / Image piece", directional: "Directional but scalable", "core-evolution": "Core evolution", "volume-driver": "Volume driver" }[collectionRole]
+                    : "—"
+                  }
+                  filled={!!collectionRole}
                   chartreuse={CHARTREUSE}
                   isLast
                 />
