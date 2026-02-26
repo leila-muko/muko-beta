@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import AskMuko from "@/components/AskMuko";
+import FloatingMukoOrb from "@/components/FloatingMukoOrb";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import type { KeyPiece } from "@/lib/store/sessionStore";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
@@ -1445,26 +1445,6 @@ export default function StandardReportPage() {
             </div>
           </div>
 
-          {/* ═══ ASK MUKO ═══ */}
-          <AskMuko
-            step="report"
-            suggestedQuestions={[
-              "Why did Execution score 64?",
-              "Should I act on the silhouette redirect?",
-              "How confident is this score?",
-            ]}
-            context={{
-              score:     report.overallScore,
-              identity:  report.identity,
-              resonance: report.resonance,
-              execution: report.execution,
-              gates:     { costGatePassed: report.costGatePassed },
-              narrative: report.narrative,
-            }}
-          />
-
-          <div style={{ height: 24 }} />
-
           {/* ═══ BOTTOM CTA BAR ═══ */}
           <div
             style={{
@@ -1543,6 +1523,22 @@ export default function StandardReportPage() {
           </div>
         </div>
       </main>
+
+      {/* ═══ FLOATING MUKO ORB ═══ */}
+      <FloatingMukoOrb
+        step="report"
+        context={{
+          score:     report.overallScore,
+          identity:  report.identity,
+          resonance: report.resonance,
+          execution: report.execution,
+          gates:     { costGatePassed: report.costGatePassed },
+          narrative: report.narrative,
+        }}
+        conceptName={report.aestheticName}
+        identityScore={report.identity}
+        resonanceScore={report.resonance}
+      />
 
       {/* ═══ CSS ANIMATIONS ═══ */}
       <style>{`

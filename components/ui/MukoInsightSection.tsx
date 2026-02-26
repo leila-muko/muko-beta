@@ -79,6 +79,7 @@ export function MukoInsightSection({
     const sentences = text.match(/[^.!?]+[.!?]+/g);
     return sentences ? sentences[sentences.length - 1].trim() : text;
   }
+
   return (
     <div style={{ marginBottom: 28 }}>
       {/* Section divider */}
@@ -167,7 +168,7 @@ export function MukoInsightSection({
                   const firstSentence = getFirstSentence(s.detail);
                   return (
                     <div key={i}>
-                      {/* Label row: chip pill + complexity flag + toggle — all on one line */}
+                      {/* Label row */}
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
                         <span style={{
                           padding: "3px 9px",
@@ -206,7 +207,6 @@ export function MukoInsightSection({
                           {isExpanded ? "[− less]" : "[+ more]"}
                         </button>
                       </div>
-                      {/* Detail — first sentence collapsed, full when expanded */}
                       <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.64)", lineHeight: 1.65 }}>
                         {isExpanded ? s.detail : (
                           <>
@@ -217,7 +217,6 @@ export function MukoInsightSection({
                           </>
                         )}
                       </div>
-                      {/* Expanded: cost note + avoid */}
                       {isExpanded && (
                         <>
                           {s.cost_note && (
@@ -256,44 +255,15 @@ export function MukoInsightSection({
             marginBottom: 16,
           }}
         >
-          <div
-            style={{
-              fontFamily: inter,
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: "#A8B475",
-              marginBottom: 4,
-            }}
-          >
+          <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8B475", marginBottom: 4 }}>
             THE OPPORTUNITY
           </div>
-          <div
-            style={{
-              fontFamily: inter,
-              fontSize: 11,
-              fontStyle: "italic",
-              color: "rgba(67,67,43,0.45)",
-              marginBottom: 10,
-            }}
-          >
+          <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 10 }}>
             {opportunity.subtitle || "What\u2019s working in your favor right now"}
           </div>
           <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 7 }}>
             {opportunity.items.map((point, i) => (
-              <li
-                key={i}
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "flex-start",
-                  fontFamily: inter,
-                  fontSize: 12,
-                  color: "rgba(67,67,43,0.62)",
-                  lineHeight: 1.5,
-                }}
-              >
+              <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.62)", lineHeight: 1.5 }}>
                 <CheckIcon size={12} color="#A8B475" />
                 <span style={{ marginTop: -1 }}>{point}</span>
               </li>
@@ -314,44 +284,15 @@ export function MukoInsightSection({
             marginBottom: 16,
           }}
         >
-          <div
-            style={{
-              fontFamily: inter,
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: "#B8876B",
-              marginBottom: 4,
-            }}
-          >
+          <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#B8876B", marginBottom: 4 }}>
             THE EDIT
           </div>
-          <div
-            style={{
-              fontFamily: inter,
-              fontSize: 11,
-              fontStyle: "italic",
-              color: "rgba(67,67,43,0.45)",
-              marginBottom: 10,
-            }}
-          >
+          <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 10 }}>
             {edit.subtitle || "Inputs worth revisiting before you commit"}
           </div>
           <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 7 }}>
             {edit.items.map((item, i) => (
-              <li
-                key={i}
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "flex-start",
-                  fontFamily: inter,
-                  fontSize: 12,
-                  color: "rgba(67,67,43,0.62)",
-                  lineHeight: 1.5,
-                }}
-              >
+              <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.62)", lineHeight: 1.5 }}>
                 <PencilIcon size={12} color="#B8876B" />
                 <span style={{ marginTop: -1 }}>{item}</span>
               </li>
@@ -360,65 +301,127 @@ export function MukoInsightSection({
         </div>
       )}
 
-      {/* Next Move section */}
-      {nextMove.mode === "concept" && nextMove.items.length > 0 && (
-        <NextMoveContainer subtitle={nextMove.subtitle || "Suggested pivots and creative additions \u2014 apply a swap or layer in what resonates."}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {nextMove.items.map((item, i) => (
-              <React.Fragment key={item.label}>
-                {i > 0 && (
-                  <div style={{ height: 1, background: "rgba(125,150,172,0.10)", margin: "0 4px" }} />
-                )}
-                <ConceptNextMoveRow
-                  label={item.label}
-                  rationale={item.rationale}
-                  itemType={item.type}
-                  isAdded={nextMove.addedItems?.has(item.label) ?? false}
-                  onAdd={() => nextMove.onAdd(item.label)}
-                  onRemove={nextMove.onRemove ? () => nextMove.onRemove!(item.label) : undefined}
-                />
-              </React.Fragment>
-            ))}
-          </div>
-        </NextMoveContainer>
-      )}
+      {/* ── Next Move — Concept ──────────────────────────────────────────── */}
+      {nextMove.mode === "concept" && nextMove.items.length > 0 && (() => {
+        const addedCount = nextMove.addedItems?.size ?? 0;
+        return (
+          <NextMoveCard subtitle={nextMove.subtitle || "Suggested pivots and creative additions \u2014 apply a swap or layer in what resonates."}>
+            {nextMove.items.map((item, i) => {
+              const isSwap = item.type === 'silhouette_swap' || item.type === 'palette_swap';
+              const tagType: 'add' | 'swap' | 'redirect' = isSwap ? 'swap' : 'add';
+              const impact: 'HIGH' | 'MED' | 'LOW' = isSwap ? 'HIGH' : i === 0 ? 'MED' : 'LOW';
+              const isAdded = nextMove.addedItems?.has(item.label) ?? false;
+              return (
+                <React.Fragment key={item.label}>
+                  {i > 0 && <div style={{ height: 1, background: "rgba(125,150,172,0.10)", margin: "0 4px" }} />}
+                  <NextMoveRow
+                    index={i}
+                    action={item.label}
+                    rationale={item.rationale}
+                    tagType={tagType}
+                    impact={impact}
+                    isAdded={isAdded}
+                    applyLabel={isSwap ? "← Apply" : "+ Add"}
+                    onToggle={() => {
+                      if (isAdded) {
+                        nextMove.onRemove?.(item.label);
+                      } else {
+                        nextMove.onAdd(item.label);
+                      }
+                    }}
+                    onUndo={nextMove.onRemove ? () => nextMove.onRemove!(item.label) : undefined}
+                  />
+                </React.Fragment>
+              );
+            })}
+            <NextMoveFooter
+              total={nextMove.items.length}
+              added={addedCount}
+              onApplyAll={() => {
+                nextMove.items.forEach(item => {
+                  if (!(nextMove.addedItems?.has(item.label))) {
+                    nextMove.onAdd(item.label);
+                  }
+                });
+              }}
+            />
+          </NextMoveCard>
+        );
+      })()}
 
-      {nextMove.mode === "spec" && nextMove.suggestions.length > 0 && (
-        <NextMoveContainer subtitle={nextMove.subtitle || "Adjustments that improve feasibility without changing your direction."}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {nextMove.suggestions.slice(0, 3).map((suggestion, i) => (
-              <React.Fragment key={suggestion.id}>
-                {i > 0 && (
-                  <div style={{ height: 1, background: "rgba(125,150,172,0.10)", margin: "0 4px" }} />
-                )}
-                <SpecNextMoveRow
+      {/* ── Next Move — Spec ─────────────────────────────────────────────── */}
+      {nextMove.mode === "spec" && nextMove.suggestions.length > 0 && (() => {
+        const suggestions = nextMove.suggestions.slice(0, 3);
+        const addedCount = suggestions.filter(s => nextMove.appliedIds.has(s.id)).length;
+        return (
+          <NextMoveCard subtitle={nextMove.subtitle || "Adjustments that improve feasibility without changing your direction."}>
+            {suggestions.map((suggestion, i) => {
+              let tagType: 'add' | 'swap' | 'redirect' = 'swap';
+              if (suggestion.kind === 'material' || suggestion.kind === 'upgrade-material') {
+                tagType = 'redirect';
+              } else if (suggestion.id === 'invest-finishing') {
+                tagType = 'add';
+              }
+              const saving = Math.abs(suggestion.after.saving);
+              const impact: 'HIGH' | 'MED' | 'LOW' = saving > 20 ? 'HIGH' : saving > 10 ? 'MED' : 'LOW';
+              const isApplied = nextMove.appliedIds.has(suggestion.id);
+              return (
+                <React.Fragment key={suggestion.id}>
+                  {i > 0 && <div style={{ height: 1, background: "rgba(125,150,172,0.10)", margin: "0 4px" }} />}
+                  <SpecNextMoveRow
+                  index={i}
                   suggestion={suggestion}
-                  isApplied={nextMove.appliedIds.has(suggestion.id)}
+                  tagType={tagType}
+                  impact={impact}
+                  isApplied={isApplied}
                   onApply={() => nextMove.onApply(suggestion.id)}
                   onUndo={() => nextMove.onUndo(suggestion.id)}
                 />
-              </React.Fragment>
-            ))}
-          </div>
-        </NextMoveContainer>
-      )}
+                </React.Fragment>
+              );
+            })}
+            <NextMoveFooter
+              total={suggestions.length}
+              added={addedCount}
+              onApplyAll={() => {
+                suggestions.forEach(s => {
+                  if (!nextMove.appliedIds.has(s.id)) {
+                    nextMove.onApply(s.id);
+                  }
+                });
+              }}
+            />
+          </NextMoveCard>
+        );
+      })()}
     </div>
   );
 }
 
-/* ─── Next Move container ───────────────────────────────────────────────── */
+/* ─── Tag + impact helpers ──────────────────────────────────────────────── */
 
-function NextMoveContainer({ subtitle, children }: { subtitle: string; children: React.ReactNode }) {
+const TAG_STYLES = {
+  add:      { bg: "rgba(168,180,117,0.14)", border: "rgba(168,180,117,0.38)", text: "#7A8C3A" },
+  swap:     { bg: "rgba(184,135,107,0.12)", border: "rgba(184,135,107,0.35)", text: "#B8876B" },
+  redirect: { bg: "rgba(125,150,172,0.12)", border: "rgba(125,150,172,0.35)", text: "#7D96AC" },
+};
+const TAG_LABELS = { add: "Add", swap: "Swap", redirect: "Redirect" };
+const IMPACT_COLORS = { HIGH: "#A8B475", MED: "#B8876B", LOW: "#7D96AC" };
+
+/* ─── Next Move card shell ──────────────────────────────────────────────── */
+
+function NextMoveCard({ subtitle, children }: { subtitle: string; children: React.ReactNode }) {
   return (
     <div
       style={{
-        border: "1px solid rgba(125,150,172,0.18)",
-        borderLeft: "3px solid rgba(125,150,172,0.45)",
+        padding: "11px 16px",
         borderRadius: 10,
-        padding: "16px 18px",
-        background: "rgba(125,150,172,0.06)",
+        border: "1px solid rgba(125,150,172,0.22)",
+        borderLeft: "3px solid rgba(125,150,172,0.35)",
+        background: "transparent",
       }}
     >
+      {/* Micro-label — same pattern as THE OPPORTUNITY / THE EDIT */}
       <div
         style={{
           fontFamily: inter,
@@ -443,82 +446,181 @@ function NextMoveContainer({ subtitle, children }: { subtitle: string; children:
       >
         {subtitle}
       </div>
-      {children}
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {children}
+      </div>
     </div>
   );
 }
 
-/* ─── Concept mode row ──────────────────────────────────────────────────── */
+/* ─── Shared row chrome ─────────────────────────────────────────────────── */
 
-function ConceptNextMoveRow({
-  label,
-  rationale,
-  itemType,
+function RowShell({
+  index,
+  tagType,
+  impact,
   isAdded,
-  onAdd,
-  onRemove,
+  hovered,
+  onMouseEnter,
+  onMouseLeave,
+  children,
 }: {
-  label: string;
-  rationale: string;
-  itemType?: 'chip' | 'silhouette_swap' | 'palette_swap';
+  index: number;
+  tagType: 'add' | 'swap' | 'redirect';
+  impact: 'HIGH' | 'MED' | 'LOW';
   isAdded: boolean;
-  onAdd: () => void;
-  onRemove?: () => void;
+  hovered: boolean;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+  children: React.ReactNode;
 }) {
-  const [hovered, setHovered] = useState(false);
-  const isSwap = itemType === 'silhouette_swap' || itemType === 'palette_swap';
+  const tag = TAG_STYLES[tagType];
+  const numStr = String(index + 1).padStart(2, '0');
 
   return (
     <div
       style={{
         display: "flex",
         alignItems: "flex-start",
-        justifyContent: "space-between",
-        padding: "10px 4px",
-        gap: 10,
+        gap: 8,
+        padding: "9px 4px",
+        transition: "background 150ms ease",
+        background: isAdded ? "rgba(168,180,117,0.07)" : "transparent",
+        borderRadius: 6,
       }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      {/* Row number — Inter, muted, same weight as micro-labels */}
+      <div
+        style={{
+          fontFamily: inter,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: "0.06em",
+          color: isAdded ? "rgba(168,180,117,0.70)" : "rgba(67,67,43,0.22)",
+          flexShrink: 0,
+          marginTop: 2,
+          width: 18,
+        }}
+      >
+        {numStr}
+      </div>
+
+      {/* Content column */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Tag + impact row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+          <span
+            style={{
+              fontFamily: inter,
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+              color: tag.text,
+              background: tag.bg,
+              border: `1px solid ${tag.border}`,
+              borderRadius: 3,
+              padding: "1px 5px",
+              lineHeight: 1.4,
+            }}
+          >
+            {TAG_LABELS[tagType]}
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <div
+              style={{
+                width: 4,
+                height: 4,
+                borderRadius: "50%",
+                background: IMPACT_COLORS[impact],
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{
+                fontFamily: inter,
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "rgba(67,67,43,0.32)",
+              }}
+            >
+              {impact}
+            </span>
+          </div>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Concept mode row ──────────────────────────────────────────────────── */
+
+function NextMoveRow({
+  index,
+  action,
+  rationale,
+  tagType,
+  impact,
+  isAdded,
+  applyLabel,
+  onToggle,
+  onUndo,
+}: {
+  index: number;
+  action: string;
+  rationale: string;
+  tagType: 'add' | 'swap' | 'redirect';
+  impact: 'HIGH' | 'MED' | 'LOW';
+  isAdded: boolean;
+  applyLabel: string;
+  onToggle: () => void;
+  onUndo?: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <RowShell
+      index={index}
+      tagType={tagType}
+      impact={impact}
+      isAdded={isAdded}
+      hovered={hovered}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: "50%",
-            background: isAdded ? "#A8B475" : "#7D96AC",
-            flexShrink: 0,
-            marginTop: 5,
-          }}
-        />
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span
-            style={{
-              fontFamily: inter,
-              fontSize: 12.5,
-              fontWeight: 600,
-              color: isAdded ? "#A8B475" : "rgba(67,67,43,0.72)",
-              lineHeight: 1.4,
-            }}
-          >
-            {label}
-          </span>
-          <span
-            style={{
-              fontFamily: inter,
-              fontSize: 11,
-              fontStyle: "italic",
-              color: "rgba(67,67,43,0.40)",
-              lineHeight: 1.4,
-            }}
-          >
-            {rationale}
-          </span>
-        </div>
+      {/* Action label */}
+      <div
+        style={{
+          fontFamily: inter,
+          fontSize: 12.5,
+          fontWeight: 600,
+          color: isAdded ? "#A8B475" : "rgba(67,67,43,0.72)",
+          lineHeight: 1.4,
+        }}
+      >
+        {action}
       </div>
-
+      {/* Rationale */}
+      <div
+        style={{
+          fontFamily: inter,
+          fontSize: 11,
+          fontStyle: "italic",
+          color: "rgba(67,67,43,0.40)",
+          lineHeight: 1.4,
+          marginTop: 2,
+        }}
+      >
+        {rationale}
+      </div>
+      {/* Button */}
       {isAdded ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
           <span
             style={{
               fontFamily: inter,
@@ -528,11 +630,11 @@ function ConceptNextMoveRow({
               color: "#A8B475",
             }}
           >
-            {isSwap ? "Applied \u2713" : "Added \u2713"}
+            {applyLabel.startsWith("←") ? "Applied \u2713" : "Added \u2713"}
           </span>
-          {onRemove && (
+          {onUndo && (
             <button
-              onClick={(e) => { e.stopPropagation(); onRemove(); }}
+              onClick={(e) => { e.stopPropagation(); onUndo(); }}
               style={{
                 fontFamily: inter,
                 fontSize: 10,
@@ -544,13 +646,13 @@ function ConceptNextMoveRow({
                 padding: 0,
               }}
             >
-              {isSwap ? "Undo" : "Remove"}
+              {applyLabel.startsWith("←") ? "Undo" : "Remove"}
             </button>
           )}
         </div>
       ) : (
         <button
-          onClick={onAdd}
+          onClick={onToggle}
           style={{
             fontFamily: inter,
             fontSize: 10,
@@ -558,32 +660,38 @@ function ConceptNextMoveRow({
             letterSpacing: "0.08em",
             color: "#A8B475",
             background: "transparent",
-            border: `1px solid rgba(168,180,117,${hovered ? 0.5 : 0.35})`,
+            border: `1px solid rgba(168,180,117,${hovered ? 0.50 : 0.35})`,
             borderRadius: 999,
             padding: "4px 10px",
             cursor: "pointer",
             opacity: hovered ? 1 : 0.7,
             transition: "opacity 150ms ease, border-color 150ms ease",
             whiteSpace: "nowrap",
-            flexShrink: 0,
+            marginTop: 6,
           }}
         >
-          {isSwap ? "\u2190 Apply" : "+ Add"}
+          {applyLabel}
         </button>
       )}
-    </div>
+    </RowShell>
   );
 }
 
 /* ─── Spec mode row ─────────────────────────────────────────────────────── */
 
 function SpecNextMoveRow({
+  index,
   suggestion,
+  tagType,
+  impact,
   isApplied,
   onApply,
   onUndo,
 }: {
+  index: number;
   suggestion: SpecSuggestion;
+  tagType: 'add' | 'swap' | 'redirect';
+  impact: 'HIGH' | 'MED' | 'LOW';
   isApplied: boolean;
   onApply: () => void;
   onUndo: () => void;
@@ -604,87 +712,204 @@ function SpecNextMoveRow({
       style={{
         display: "flex",
         alignItems: "flex-start",
-        justifyContent: "space-between",
-        padding: "10px 4px",
         gap: 10,
-        transition: "background 300ms ease",
-        background: flashActive ? "rgba(168,180,117,0.10)" : "transparent",
-        borderRadius: 6,
+        padding: "11px 8px",
+        borderRadius: 8,
+        background: flashActive
+          ? "rgba(168,180,117,0.12)"
+          : isApplied
+          ? "rgba(168,180,117,0.07)"
+          : "transparent",
+        transition: "background 200ms ease",
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: "50%",
-            background: isApplied ? "#A8B475" : "#7D96AC",
-            flexShrink: 0,
-            marginTop: 5,
-          }}
-        />
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {/* Row number */}
+      <div
+        style={{
+          fontFamily: inter,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: "0.06em",
+          color: isApplied ? "rgba(168,180,117,0.70)" : "rgba(67,67,43,0.22)",
+          flexShrink: 0,
+          marginTop: 2,
+          width: 18,
+        }}
+      >
+        {String(index + 1).padStart(2, '0')}
+      </div>
+
+      {/* Content column */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Tag + impact */}
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
           <span
             style={{
               fontFamily: inter,
-              fontSize: 12.5,
-              fontWeight: 600,
-              color: isApplied ? "#A8B475" : "rgba(67,67,43,0.72)",
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+              color: TAG_STYLES[tagType].text,
+              background: TAG_STYLES[tagType].bg,
+              border: `1px solid ${TAG_STYLES[tagType].border}`,
+              borderRadius: 3,
+              padding: "1px 5px",
               lineHeight: 1.4,
             }}
           >
-            {suggestion.label}
+            {TAG_LABELS[tagType]}
           </span>
-          {suggestion.sub && (
+          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <div
+              style={{
+                width: 4,
+                height: 4,
+                borderRadius: "50%",
+                background: IMPACT_COLORS[impact],
+                flexShrink: 0,
+              }}
+            />
             <span
               style={{
                 fontFamily: inter,
-                fontSize: 11,
-                fontStyle: "italic",
-                color: "rgba(67,67,43,0.40)",
-                lineHeight: 1.4,
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "rgba(67,67,43,0.32)",
               }}
             >
-              {suggestion.sub}
+              {impact}
             </span>
-          )}
+          </div>
         </div>
-      </div>
 
-      {isApplied ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <span
+        {/* Label */}
+        <div
+          style={{
+            fontFamily: inter,
+            fontSize: 12.5,
+            fontWeight: 600,
+            color: isApplied ? "#A8B475" : "rgba(67,67,43,0.72)",
+            lineHeight: 1.4,
+          }}
+        >
+          {suggestion.label}
+        </div>
+
+        {/* Sub */}
+        {suggestion.sub && (
+          <div
+            style={{
+              fontFamily: inter,
+              fontSize: 11,
+              fontStyle: "italic",
+              color: "rgba(67,67,43,0.40)",
+              lineHeight: 1.4,
+              marginTop: 2,
+            }}
+          >
+            {suggestion.sub}
+          </div>
+        )}
+
+        {/* Button */}
+        {isApplied ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+            <span
+              style={{
+                fontFamily: inter,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                color: "#A8B475",
+              }}
+            >
+              Applied {"\u2713"}
+            </span>
+            <button
+              onClick={onUndo}
+              style={{
+                fontFamily: inter,
+                fontSize: 10,
+                color: "rgba(67,67,43,0.45)",
+                textDecoration: "underline",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              Undo
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onApply}
             style={{
               fontFamily: inter,
               fontSize: 10,
               fontWeight: 700,
               letterSpacing: "0.08em",
               color: "#A8B475",
-            }}
-          >
-            Applied {"\u2713"}
-          </span>
-          <button
-            onClick={onUndo}
-            style={{
-              fontFamily: inter,
-              fontSize: 10,
-              color: "rgba(67,67,43,0.45)",
-              textDecoration: "underline",
-              background: "none",
-              border: "none",
+              background: "transparent",
+              border: `1px solid rgba(168,180,117,${hovered ? 0.50 : 0.35})`,
+              borderRadius: 999,
+              padding: "4px 10px",
               cursor: "pointer",
-              padding: 0,
+              opacity: hovered ? 1 : 0.7,
+              transition: "opacity 150ms ease, border-color 150ms ease",
+              whiteSpace: "nowrap",
+              marginTop: 6,
             }}
           >
-            Undo
+            {"\u2190"} Apply
           </button>
-        </div>
-      ) : (
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Footer ────────────────────────────────────────────────────────────── */
+
+function NextMoveFooter({
+  total,
+  added,
+  onApplyAll,
+}: {
+  total: number;
+  added: number;
+  onApplyAll: () => void;
+}) {
+  const allAdded = added >= total;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginTop: 10,
+        paddingTop: 10,
+        borderTop: "1px solid rgba(125,150,172,0.12)",
+      }}
+    >
+      <span
+        style={{
+          fontFamily: inter,
+          fontSize: 10,
+          fontStyle: "italic",
+          color: "rgba(67,67,43,0.38)",
+        }}
+      >
+        {added} of {total} applied
+      </span>
+      {!allAdded && (
         <button
-          onClick={onApply}
+          onClick={onApplyAll}
           style={{
             fontFamily: inter,
             fontSize: 10,
@@ -692,17 +917,17 @@ function SpecNextMoveRow({
             letterSpacing: "0.08em",
             color: "#A8B475",
             background: "transparent",
-            border: `1px solid rgba(168,180,117,${hovered ? 0.5 : 0.35})`,
+            border: "1px solid rgba(168,180,117,0.35)",
             borderRadius: 999,
             padding: "4px 10px",
             cursor: "pointer",
-            opacity: hovered ? 1 : 0.7,
-            transition: "opacity 150ms ease, border-color 150ms ease",
-            whiteSpace: "nowrap",
-            flexShrink: 0,
+            opacity: 0.8,
+            transition: "opacity 150ms ease",
           }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
+          onMouseLeave={e => (e.currentTarget.style.opacity = "0.8")}
         >
-          {"\u2190"} Apply
+          Apply all →
         </button>
       )}
     </div>

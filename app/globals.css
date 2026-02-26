@@ -159,6 +159,20 @@
   }
 }
 
+/* Muko's Pick button — animated dot */
+@keyframes muko-dot-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(169, 123, 143, 0.45);
+  }
+  60% {
+    box-shadow: 0 0 0 4px rgba(169, 123, 143, 0);
+  }
+}
+
+.muko-pick-dot {
+  animation: muko-dot-pulse 2.2s ease-out infinite;
+}
+
 /* Drag-state utility for panel resizing */
 body.panel-resizing {
   user-select: none !important;

@@ -16,7 +16,7 @@ import {
   matchAestheticToFolder,
   interpretRefine,
 } from "../../lib/concept-studio/utils";
-import AskMuko from "@/components/AskMuko";
+import FloatingMukoOrb from "@/components/FloatingMukoOrb";
 import aestheticsData from "@/data/aesthetics.json";
 import chipTensionsData from "@/data/chip_tensions.json";
 import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
@@ -1084,25 +1084,32 @@ export default function ConceptStudioPage() {
               style={{
                 flexShrink: 0,
                 marginTop: 4,
-                padding: "8px 18px",
+                padding: "7px 16px 7px 12px",
                 borderRadius: 999,
-                border: "1.5px solid #CDAAB3",
-                background: "transparent",
-                fontFamily: inter,
-                fontSize: 13,
-                fontWeight: 550,
-                color: "#CDAAB3",
+                border: "1.5px solid rgba(169,123,143,0.30)",
+                background: "rgba(169,123,143,0.06)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
                 cursor: "pointer",
-                whiteSpace: "nowrap",
-                transition: "background 200ms ease",
+                transition: "background 200ms ease, border-color 200ms ease",
               }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(205,170,179,0.10)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(169,123,143,0.12)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(169,123,143,0.50)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(169,123,143,0.06)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(169,123,143,0.30)";
+              }}
             >
-              Muko&apos;s Pick&nbsp;
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden style={{ display: "inline", verticalAlign: "middle", marginBottom: 1 }}>
-                <path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l7.1-1.01L12 2z"/>
-              </svg>
+              <span
+                className="muko-pick-dot"
+                style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#A97B8F", flexShrink: 0 }}
+              />
+              <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 550, color: "#A97B8F", whiteSpace: "nowrap" }}>
+                Muko&apos;s Pick
+              </span>
             </button>
           </div>
 
@@ -1621,12 +1628,22 @@ export default function ConceptStudioPage() {
               />
             )}
 
-            {/* AskMuko */}
-            <AskMuko step="concept" suggestedQuestions={["Why is Resonance at this level?", "How does this compare to other directions?", "What brands are doing this well?"]} context={{ aesthetic: selectedAesthetic, refineText, identityScore: identityPulse?.score, resonanceScore: resonancePulse?.score }} />
-
           </div>
           </>
         }
+      />
+
+      {/* ═══ FLOATING MUKO ORB ═══ */}
+      <FloatingMukoOrb
+        step="concept"
+        context={{ aesthetic: selectedAesthetic, refineText, identityScore: identityPulse?.score, resonanceScore: resonancePulse?.score }}
+        conceptName={(() => {
+          if (!selectedAesthetic) return undefined;
+          const entry = (aestheticsData as Array<{ id: string; name: string }>).find(a => a.id === selectedAesthetic);
+          return entry?.name ?? selectedAesthetic;
+        })()}
+        identityScore={identityPulse?.score}
+        resonanceScore={resonancePulse?.score}
       />
 
       <style>{`

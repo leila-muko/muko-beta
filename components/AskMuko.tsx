@@ -13,6 +13,7 @@ export interface AskMukoProps {
   step: AskMukoStep;
   suggestedQuestions: string[];
   context?: Record<string, any>;
+  floating?: boolean;
   brand?: {
     oliveInk?: string;
     chartreuse?: string;
@@ -61,7 +62,7 @@ function getMockResponse(question: string): string {
   return "Great question. When fully wired, Muko will use your session context \u2014 brand DNA, scores, material choices, and market data \u2014 for a specific answer. Try one of the suggested questions to preview this.";
 }
 
-export default function AskMuko({ step, suggestedQuestions, context, brand: brandOverride }: AskMukoProps) {
+export default function AskMuko({ step, suggestedQuestions, context, floating = false, brand: brandOverride }: AskMukoProps) {
   const BRAND = { ...DEFAULT_BRAND, ...brandOverride };
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<AskMukoMessage[]>([]);
@@ -69,10 +70,31 @@ export default function AskMuko({ step, suggestedQuestions, context, brand: bran
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isTyping]);
   useEffect(() => { if (isExpanded && inputRef.current) setTimeout(() => inputRef.current?.focus(), 300); }, [isExpanded]);
   useEffect(() => { setMessages([]); setIsExpanded(false); setInputValue(""); }, [step]);
+
+  // Escape key collapses the floating bar
+  useEffect(() => {
+    if (!floating) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setIsExpanded(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [floating]);
+
+  // Click outside collapses the floating bar
+  useEffect(() => {
+    if (!floating || !isExpanded) return;
+    const onDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsExpanded(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [floating, isExpanded]);
 
   const handleSend = (text: string) => {
     if (!text.trim()) return;
@@ -96,16 +118,9 @@ export default function AskMuko({ step, suggestedQuestions, context, brand: bran
   const inter = "var(--font-inter), system-ui, sans-serif";
   const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 
-  return (
-    <div style={{
-      marginTop: 24,
-      borderRadius: 12,
-      border: "1px solid rgba(67,67,43,0.08)",
-      borderTop: `2px solid rgba(169,123,143,0.32)`,
-      background: "rgba(250,249,246,0.97)",
-      overflow: "hidden",
-    }}>
-
+  /* ─── Shared panel content (used in both floating and static renders) ─── */
+  const panelContent = (
+    <>
       {/* ─── Collapsed trigger ─── */}
       {!isExpanded && (
         <button
@@ -287,12 +302,70 @@ export default function AskMuko({ step, suggestedQuestions, context, brand: bran
           </div>
         </div>
       )}
+    </>
+  );
 
-      <style>{`
-        @keyframes askMukoFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes askMukoDotPulse { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.4); } }
-        @keyframes askMukoRadarPing { 0% { transform: scale(1); opacity: 0.5; } 60% { transform: scale(2.4); opacity: 0; } 100% { transform: scale(2.4); opacity: 0; } }
-      `}</style>
+  const styleTag = (
+    <style>{`
+      @keyframes askMukoFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes askMukoDotPulse { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.4); } }
+      @keyframes askMukoRadarPing { 0% { transform: scale(1); opacity: 0.5; } 60% { transform: scale(2.4); opacity: 0; } 100% { transform: scale(2.4); opacity: 0; } }
+      @keyframes floatingBarFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    `}</style>
+  );
+
+  /* ─── Floating render ─── */
+  if (floating) {
+    return (
+      <>
+        <div style={{
+          position: "fixed",
+          bottom: 24,
+          left: 0,
+          right: 0,
+          zIndex: 200,
+          display: "flex",
+          justifyContent: "center",
+          padding: "0 16px",
+          pointerEvents: "none",
+        }}>
+          <div
+            ref={containerRef}
+            style={{
+              width: "100%",
+              maxWidth: 720,
+              pointerEvents: "auto",
+              borderRadius: 12,
+              border: "1px solid rgba(67,67,43,0.08)",
+              borderTop: "2px solid rgba(169,123,143,0.32)",
+              background: "rgba(250,249,246,0.97)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              boxShadow: "0 -4px 32px rgba(0,0,0,0.09), 0 2px 8px rgba(0,0,0,0.04)",
+              overflow: "hidden",
+              animation: "floatingBarFadeUp 380ms ease-out both",
+            }}
+          >
+            {panelContent}
+          </div>
+        </div>
+        {styleTag}
+      </>
+    );
+  }
+
+  /* ─── Static (inline) render ─── */
+  return (
+    <div style={{
+      marginTop: 24,
+      borderRadius: 12,
+      border: "1px solid rgba(67,67,43,0.08)",
+      borderTop: "2px solid rgba(169,123,143,0.32)",
+      background: "rgba(250,249,246,0.97)",
+      overflow: "hidden",
+    }}>
+      {panelContent}
+      {styleTag}
     </div>
   );
 }

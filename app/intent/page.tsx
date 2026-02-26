@@ -184,13 +184,6 @@ export default function IntentCalibrationPage() {
     return "center";
   });
 
-  const [miss, setMiss] = useState(() => {
-    try {
-      const saved = window.localStorage.getItem("muko_intent");
-      if (saved) { const p = JSON.parse(saved); return p.miss ?? ""; }
-    } catch {}
-    return "";
-  });
   const [touched, setTouched] = useState({ success: false, tradeoff: false, role: false });
 
   const canContinue = success.length > 0 && !!tradeoff && !!collectionRole;
@@ -215,7 +208,7 @@ export default function IntentCalibrationPage() {
         elevated_vs_accessible: tElevated,
         novelty_vs_continuity: tNovelty,
       },
-      miss: (miss || "").trim(),
+      miss: "",
       meta: {
         seasonLabel: headerSeasonLabel,
         collectionName: headerCollectionName,
@@ -331,9 +324,6 @@ export default function IntentCalibrationPage() {
   useEffect(() => {
     prevInsightRef.current = mukoInsight;
   }, []);
-
-  /* ─── Focus ring for text input ──────────────────────────────────────────── */
-  const [inputFocused, setInputFocused] = useState(false);
 
   /* ─── RENDER ─────────────────────────────────────────────────────────────── */
   return (
@@ -876,54 +866,6 @@ export default function IntentCalibrationPage() {
                 </div>
               </div>
 
-              {/* Section 4 — Optional miss input */}
-              <div>
-                <div
-                  style={{
-                    fontFamily: sohne,
-                    fontSize: 15,
-                    fontWeight: 500,
-                    color: OLIVE,
-                    marginBottom: 6,
-                  }}
-                >
-                  What would make this collection feel like a miss? (Optional)
-                </div>
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 12,
-                    fontStyle: "italic",
-                    color: "rgba(67,67,43,0.44)",
-                    marginBottom: 14,
-                  }}
-                >
-                  One line is enough. This helps Muko avoid &ldquo;safe generic.&rdquo;
-                </div>
-
-                <input
-                  value={miss}
-                  onChange={(e) => setMiss(e.target.value)}
-                  onFocus={() => setInputFocused(true)}
-                  onBlur={() => setInputFocused(false)}
-                  placeholder="Feels generic or safe…"
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "12px 14px",
-                    fontSize: 13,
-                    borderRadius: 10,
-                    border: inputFocused
-                      ? `1px solid ${STEEL}`
-                      : "1px solid rgba(67,67,43,0.12)",
-                    background: "rgba(255,255,255,0.80)",
-                    color: OLIVE,
-                    fontFamily: inter,
-                    outline: "none",
-                    transition: "border-color 150ms ease",
-                  }}
-                />
-              </div>
             </div>
 
             {/* ── RIGHT RAIL column wrapper ────────────────────────────── */}
@@ -984,22 +926,6 @@ export default function IntentCalibrationPage() {
                 </div>
               </div>
 
-              {/* "A miss" block — conditional */}
-              {miss.trim() ? (
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ ...microLabel }}>&ldquo;A MISS&rdquo; LOOKS LIKE</div>
-                  <div
-                    style={{
-                      fontFamily: inter,
-                      fontSize: 12.5,
-                      lineHeight: 1.7,
-                      color: "rgba(67,67,43,0.64)",
-                    }}
-                  >
-                    {miss.trim()}
-                  </div>
-                </div>
-              ) : null}
             </div>
 
             {/* Continue button — standalone below the rail panel */}

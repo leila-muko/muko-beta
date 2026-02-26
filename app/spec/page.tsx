@@ -24,7 +24,7 @@ import materialsData from "@/data/materials.json";
 import subcategoriesData from "@/data/subcategories.json";
 import aestheticsData from "@/data/aesthetics.json";
 import designLanguageData from "@/data/design-language.json";
-import AskMuko from "@/components/AskMuko";
+import FloatingMukoOrb from "@/components/FloatingMukoOrb";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
 import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
 import { PulseScoreRow } from "@/components/ui/PulseScoreRow";
@@ -488,6 +488,57 @@ function getDesignLanguageSuggestions(
     .slice(0, 3);
 }
 
+function getFirstSentence(text: string): string {
+  const match = text.match(/^[^.!?]*[.!?]/);
+  return match ? match[0] : text;
+}
+
+function parseCostBadge(costNote: string): { label: string; variant: 'neutral' | 'added' } {
+  if (!costNote) return { label: "+ 0", variant: 'neutral' };
+  const lower = costNote.toLowerCase();
+  if (
+    lower.includes("identical") || lower.includes("zero additional") ||
+    lower.includes("no additional") || lower.includes("is minimal") ||
+    lower.includes("+0") || lower.includes("no cost") ||
+    lower.includes("just a direction") || lower.includes("net construction cost")
+  ) {
+    return { label: "+ 0", variant: 'neutral' };
+  }
+  return { label: "+ Cost", variant: 'added' };
+}
+
+function parseRiskLevel(complexityFlag: string): 'Low' | 'Med' | 'High' {
+  const f = (complexityFlag || "").toLowerCase();
+  if (f === 'high') return 'High';
+  if (f === 'medium' || f === 'moderate' || f === 'med') return 'Med';
+  return 'Low';
+}
+
+function RemoveSignalButton({ onClick }: { onClick: () => void }) {
+  const [hovered, setHovered] = React.useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        fontFamily: inter,
+        fontSize: 11,
+        color: hovered ? "#9a6845" : "#a09888",
+        background: "none",
+        border: hovered ? "1px solid rgba(184,135,107,0.5)" : "1px solid rgba(200,194,182,0.5)",
+        borderRadius: 6,
+        padding: "3px 8px",
+        cursor: "pointer",
+        flexShrink: 0,
+        transition: "color 150ms ease, border-color 150ms ease",
+      }}
+    >
+      ✕ Remove signal
+    </button>
+  );
+}
+
 export default function SpecStudioPage() {
   const router = useRouter();
   const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse } = useSessionStore();
@@ -534,6 +585,9 @@ export default function SpecStudioPage() {
   const [hoveredMaterialId, setHoveredMaterialId] = useState<string | null>(null);
   const [hoveredComplexity, setHoveredComplexity] = useState<ConstructionTier | null>(null);
   const [pulseExpandedRow, setPulseExpandedRow] = useState<string | null>(null);
+  const [dismissingChips, setDismissingChips] = useState<Set<string>>(new Set());
+  const [expandedSignal, setExpandedSignal] = useState<string | null>(null);
+  const [removedSignals, setRemovedSignals] = useState<import("@/lib/store/sessionStore").ActivatedChip[]>([]);
 
   const storeAesthetic = useSessionStore((s) => s.aestheticMatchedId);
   const storeModifiers = useSessionStore((s) => s.refinementModifiers);
@@ -792,6 +846,44 @@ export default function SpecStudioPage() {
         getSmartDefault(categoryId, conceptSilhouette || undefined)
       )
     );
+  };
+
+  const activeImplications = useMemo(() => {
+    const activeChips = chipSelection?.activatedChips.map((c) => c.label) ?? [];
+    if (activeChips.length === 0 || !storeAesthetic) return [];
+    const aestheticId = storeAesthetic.toLowerCase().replace(/\s+/g, "-");
+    return getDesignLanguageSuggestions(aestheticId, activeChips, categoryId);
+  }, [chipSelection, storeAesthetic, categoryId]);
+
+  const removeChipSignal = (chipLabel: string) => {
+    if (expandedSignal === chipLabel) setExpandedSignal(null);
+    setDismissingChips(prev => new Set(prev).add(chipLabel));
+    setTimeout(() => {
+      if (chipSelection) {
+        const removed = chipSelection.activatedChips.find(c => c.label === chipLabel);
+        if (removed) setRemovedSignals(prev => [...prev, removed]);
+        setChipSelection({
+          ...chipSelection,
+          activatedChips: chipSelection.activatedChips.filter(c => c.label !== chipLabel),
+        });
+      }
+      setDismissingChips(prev => {
+        const next = new Set(prev);
+        next.delete(chipLabel);
+        return next;
+      });
+    }, 250);
+  };
+
+  const restoreAllSignals = () => {
+    if (!chipSelection || removedSignals.length === 0) return;
+    const existing = new Set(chipSelection.activatedChips.map(c => c.label));
+    const toRestore = removedSignals.filter(c => !existing.has(c.label));
+    setChipSelection({
+      ...chipSelection,
+      activatedChips: [...chipSelection.activatedChips, ...toRestore],
+    });
+    setRemovedSignals([]);
   };
 
   const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
@@ -1549,25 +1641,32 @@ export default function SpecStudioPage() {
               style={{
                 flexShrink: 0,
                 marginTop: 4,
-                padding: "8px 18px",
+                padding: "7px 16px 7px 12px",
                 borderRadius: 999,
-                border: "1.5px solid #CDAAB3",
-                background: "transparent",
-                fontFamily: inter,
-                fontSize: 13,
-                fontWeight: 550,
-                color: "#CDAAB3",
+                border: "1.5px solid rgba(169,123,143,0.30)",
+                background: "rgba(169,123,143,0.06)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
                 cursor: "pointer",
-                whiteSpace: "nowrap",
-                transition: "background 200ms ease",
+                transition: "background 200ms ease, border-color 200ms ease",
               }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(205,170,179,0.10)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(169,123,143,0.12)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(169,123,143,0.50)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(169,123,143,0.06)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(169,123,143,0.30)";
+              }}
             >
-              Muko&apos;s Pick&nbsp;
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden style={{ display: "inline", verticalAlign: "middle", marginBottom: 1 }}>
-                <path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l7.1-1.01L12 2z"/>
-              </svg>
+              <span
+                className="muko-pick-dot"
+                style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#A97B8F", flexShrink: 0 }}
+              />
+              <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 550, color: "#A97B8F", whiteSpace: "nowrap" }}>
+                Muko&apos;s Pick
+              </span>
             </button>
           </div>
 
@@ -2197,6 +2296,281 @@ export default function SpecStudioPage() {
                 )}
               </div>
 
+              {/* Construction Implications — inline sub-section of Complexity */}
+              <div id="construction-section">
+                {/* Section heading */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                  <span style={{ ...sectionHeading, color: "rgba(67,67,43,0.35)", fontWeight: 500 }}>Complexity</span>
+                  <span style={{ ...sectionHeading, color: "rgba(67,67,43,0.22)", fontSize: 14, fontWeight: 400 }}>|</span>
+                  <span style={sectionHeading}>Construction Implications</span>
+                </div>
+                <div style={{
+                  fontFamily: inter,
+                  fontSize: 12,
+                  fontStyle: "italic",
+                  color: "rgba(67,67,43,0.42)",
+                  marginBottom: 16,
+                }}>
+                  Construction implications for your active signals. Click a row to expand.
+                </div>
+
+                {/* Strip container */}
+                <div style={{
+                  background: "rgba(255,255,255,0.55)",
+                  border: "1px solid rgba(67,67,43,0.08)",
+                  borderRadius: 12,
+                  backdropFilter: "blur(4px)",
+                  overflow: "hidden",
+                }}>
+                  {activeImplications.length === 0 ? (
+                    <div style={{
+                      padding: "28px 24px",
+                      textAlign: "center",
+                      fontFamily: inter,
+                      fontSize: 13,
+                      color: "#b0a898",
+                      fontStyle: "italic",
+                    }}>
+                      No active signals. Add aesthetic chips above to see construction implications.
+                    </div>
+                  ) : (
+                    activeImplications.map((s, i) => {
+                      const isDismissing = dismissingChips.has(s.chip);
+                      const isExpanded = expandedSignal === s.chip;
+                      const costBadge = parseCostBadge(s.cost_note);
+                      const risk = parseRiskLevel(s.complexity_flag);
+                      const instruction = getFirstSentence(s.detail);
+
+                      const riskStyle: React.CSSProperties =
+                        risk === 'High'
+                          ? { color: "#9a4a2a", background: "rgba(184,135,107,0.12)", border: "1px solid rgba(184,135,107,0.3)" }
+                          : risk === 'Med'
+                          ? { color: "#9a7820", background: "rgba(230,192,104,0.12)", border: "1px solid rgba(230,192,104,0.3)" }
+                          : { color: "#6b7a35", background: "rgba(168,180,117,0.12)", border: "1px solid rgba(168,180,117,0.3)" };
+
+                      const costStyle: React.CSSProperties =
+                        costBadge.variant === 'neutral'
+                          ? { color: "#8a8478", background: "rgba(180,172,160,0.1)", border: "1px solid rgba(180,172,160,0.2)" }
+                          : { color: "#9a6845", background: "rgba(184,135,107,0.1)", border: "1px solid rgba(184,135,107,0.25)" };
+
+                      return (
+                        <div
+                          key={s.chip}
+                          style={{
+                            opacity: isDismissing ? 0 : 1,
+                            transform: isDismissing ? "translateY(-4px)" : "translateY(0)",
+                            transition: "opacity 250ms ease, transform 250ms ease",
+                            borderTop: i > 0 ? "1px solid rgba(200,194,182,0.3)" : undefined,
+                          }}
+                        >
+                          {/* Collapsed row */}
+                          <div
+                            onClick={() => setExpandedSignal(isExpanded ? null : s.chip)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              padding: "14px 20px",
+                              cursor: "pointer",
+                              background: isExpanded ? "rgba(168,180,117,0.04)" : "transparent",
+                              transition: "background 150ms ease",
+                            }}
+                          >
+                            {/* Expand arrow */}
+                            <span style={{
+                              fontSize: 14,
+                              color: isExpanded ? CHARTREUSE : "rgba(200,192,182,0.8)",
+                              flexShrink: 0,
+                              transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                              transition: "transform 180ms ease, color 150ms ease",
+                              display: "inline-block",
+                              lineHeight: 1,
+                              fontWeight: 300,
+                            }}>
+                              ›
+                            </span>
+
+                            {/* Chip pill */}
+                            <span style={{
+                              padding: "3px 10px",
+                              borderRadius: 20,
+                              fontSize: 11,
+                              fontWeight: 500,
+                              fontFamily: inter,
+                              background: "rgba(125,150,172,0.1)",
+                              border: "1px solid rgba(125,150,172,0.2)",
+                              color: "#7D96AC",
+                              flexShrink: 0,
+                              whiteSpace: "nowrap" as const,
+                            }}>
+                              {s.chip}
+                            </span>
+
+                            {/* Instruction text */}
+                            <span style={{
+                              fontFamily: inter,
+                              fontSize: 13,
+                              color: "#3a3830",
+                              flex: 1,
+                              lineHeight: 1.4,
+                              minWidth: 0,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: isExpanded ? "normal" : "nowrap" as const,
+                            }}>
+                              {instruction}
+                            </span>
+
+                            {/* Cost badge */}
+                            <span style={{
+                              fontFamily: inter,
+                              fontSize: 11,
+                              fontWeight: 500,
+                              borderRadius: 4,
+                              padding: "2px 7px",
+                              flexShrink: 0,
+                              whiteSpace: "nowrap" as const,
+                              ...costStyle,
+                            }}>
+                              {costBadge.label}
+                            </span>
+
+                            {/* Risk badge */}
+                            <span style={{
+                              fontFamily: inter,
+                              fontSize: 11,
+                              fontWeight: 500,
+                              borderRadius: 4,
+                              padding: "2px 7px",
+                              flexShrink: 0,
+                              whiteSpace: "nowrap" as const,
+                              ...riskStyle,
+                            }}>
+                              {risk} risk
+                            </span>
+
+                            {/* Remove × */}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); removeChipSignal(s.chip); }}
+                              style={{
+                                fontSize: 12,
+                                color: "#c8c0b4",
+                                background: "transparent",
+                                border: "1px solid rgba(200,194,182,0.5)",
+                                borderRadius: "50%",
+                                cursor: "pointer",
+                                flexShrink: 0,
+                                width: 18,
+                                height: 18,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                lineHeight: "1",
+                                padding: "0 0 1px 0",
+                                transition: "color 150ms ease, border-color 150ms ease",
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.color = CAMEL_COL;
+                                e.currentTarget.style.borderColor = "rgba(184,135,107,0.5)";
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.color = "#c8c0b4";
+                                e.currentTarget.style.borderColor = "rgba(200,194,182,0.5)";
+                              }}
+                              aria-label={`Remove ${s.chip} signal`}
+                            >
+                              ×
+                            </button>
+                          </div>
+
+                          {/* Expanded detail */}
+                          {isExpanded && (
+                            <div style={{
+                              paddingLeft: 44,
+                              paddingRight: 24,
+                              paddingBottom: 18,
+                              paddingTop: 14,
+                              background: "rgba(168,180,117,0.03)",
+                              borderTop: "1px solid rgba(200,194,182,0.2)",
+                            }}>
+                              {/* Full spec paragraph */}
+                              <div style={{
+                                fontFamily: inter,
+                                fontSize: 13,
+                                color: "#5a5650",
+                                lineHeight: 1.7,
+                                marginBottom: 14,
+                              }}>
+                                {s.detail}
+                              </div>
+
+                              {(s.cost_note || s.avoid) && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                  {s.cost_note && (
+                                    <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
+                                      <span style={{
+                                        fontFamily: inter, fontSize: 9, fontWeight: 700,
+                                        letterSpacing: "0.10em", textTransform: "uppercase" as const,
+                                        color: CHARTREUSE, flexShrink: 0, lineHeight: 1.8,
+                                        width: 44,
+                                      }}>COST</span>
+                                      <span style={{ fontFamily: inter, fontSize: 12, color: "#8a8478", lineHeight: 1.7 }}>
+                                        {s.cost_note}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {s.avoid && (
+                                    <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
+                                      <span style={{
+                                        fontFamily: inter, fontSize: 9, fontWeight: 700,
+                                        letterSpacing: "0.10em", textTransform: "uppercase" as const,
+                                        color: CAMEL_COL, flexShrink: 0, lineHeight: 1.8,
+                                        width: 44,
+                                      }}>AVOID</span>
+                                      <span style={{ fontFamily: inter, fontSize: 12, color: "#8a8478", lineHeight: 1.7 }}>
+                                        {s.avoid}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Restore bar */}
+                {removedSignals.length > 0 && (
+                  <div style={{
+                    marginTop: 8,
+                    fontFamily: inter,
+                    fontSize: 11,
+                    color: "rgba(67,67,43,0.45)",
+                  }}>
+                    {removedSignals.length} signal{removedSignals.length !== 1 ? "s" : ""} removed
+                    {" · "}
+                    <button
+                      onClick={restoreAllSignals}
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 11,
+                        color: STEEL,
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                      }}
+                    >
+                      Restore all
+                    </button>
+                  </div>
+                )}
+              </div>
+
           </div>{/* end sections */}
 
           <style>{`
@@ -2258,6 +2632,31 @@ export default function SpecStudioPage() {
               isExpanded={pulseExpandedRow === "execution"}
               onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === "execution" ? null : "execution")}
             />
+            {activeImplications.length > 0 && (
+              <button
+                onClick={() => document.getElementById("construction-section")?.scrollIntoView({ behavior: "smooth" })}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  width: "100%",
+                  marginTop: 10,
+                  padding: "10px 14px",
+                  background: "rgba(184,135,107,0.08)",
+                  border: "1px solid rgba(184,135,107,0.25)",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+              >
+                <span style={{ fontFamily: inter, fontSize: 12, fontWeight: 500, color: "#9a6845" }}>
+                  ⚠ {activeImplications.length} construction signal{activeImplications.length !== 1 ? "s" : ""} flagged
+                </span>
+                <span style={{ fontFamily: inter, fontSize: 11, color: CAMEL_COL, flexShrink: 0 }}>
+                  See below ↓
+                </span>
+              </button>
+            )}
           </div>
 
           {/* Muko Insight */}
@@ -2297,30 +2696,8 @@ export default function SpecStudioPage() {
                 onApply: (id) => applySuggestion(id, mukoSynthesis?.suggestions ?? []),
                 onUndo: undoSuggestion,
               }}
-              constructionImplications={(() => {
-                const activeChips = chipSelection?.activatedChips.map((c) => c.label) ?? [];
-                if (activeChips.length === 0 || !storeAesthetic) return undefined;
-                const aestheticId = storeAesthetic.toLowerCase().replace(/\s+/g, "-");
-                const suggestions = getDesignLanguageSuggestions(aestheticId, activeChips, categoryId);
-                return suggestions.length > 0 ? suggestions : undefined;
-              })()}
             />
           )}
-
-          {/* Ask Muko */}
-          <AskMuko
-            step="spec"
-            suggestedQuestions={suggestedQuestions}
-            context={{
-              aesthetic: conceptContext.aestheticMatchedId,
-              refinement,
-              identityScore: conceptContext.identityScore,
-              resonanceScore: conceptContext.resonanceScore,
-              material: selectedMaterial?.name,
-              silhouette: conceptSilhouette ? conceptSilhouette.charAt(0).toUpperCase() + conceptSilhouette.slice(1) : undefined,
-              category: categoryId,
-            }}
-          />
 
           {/* Spacer for sticky footer */}
           <div style={{ height: 72 }} />
@@ -2380,6 +2757,23 @@ export default function SpecStudioPage() {
         </div>
         </>
         }
+      />
+
+      {/* ═══ FLOATING MUKO ORB ═══ */}
+      <FloatingMukoOrb
+        step="spec"
+        context={{
+          aesthetic: conceptContext.aestheticMatchedId,
+          refinement,
+          identityScore: conceptContext.identityScore,
+          resonanceScore: conceptContext.resonanceScore,
+          material: selectedMaterial?.name,
+          silhouette: conceptSilhouette ? conceptSilhouette.charAt(0).toUpperCase() + conceptSilhouette.slice(1) : undefined,
+          category: categoryId,
+        }}
+        conceptName={conceptContext.aestheticName || undefined}
+        identityScore={conceptContext.identityScore}
+        resonanceScore={conceptContext.resonanceScore}
       />
     </div>
   );
