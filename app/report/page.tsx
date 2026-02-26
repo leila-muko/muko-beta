@@ -499,6 +499,7 @@ export default function StandardReportPage() {
     chipSelection: storeChipSelection,
     collectionRole,
     selectedKeyPiece,
+    executionPulse: storeExecutionPulse,
   } = useSessionStore();
 
   const aestheticScores = storeAesthetic ? AESTHETIC_CONTENT[storeAesthetic] : null;
@@ -518,6 +519,7 @@ export default function StandardReportPage() {
     modifiers:        storeModifiers.length > 0 ? storeModifiers : (storeAesthetic ? [] : MOCK_REPORT.modifiers),
     identity:         derivedIdentity,
     resonance:        derivedResonance,
+    execution:        storeExecutionPulse?.score ?? MOCK_REPORT.execution,
   };
 
   const animatedScore     = useCountUp(report.overallScore, 1400, 500);
@@ -987,103 +989,6 @@ export default function StandardReportPage() {
             </div>
           </div>
 
-          {/* ═══ COLLECTION ALIGNMENT CHECK ═══ */}
-          {collectionRole && (() => {
-            const alignmentSignals = getCollectionAlignment(
-              collectionRole,
-              report.costGatePassed,
-              report.constructionTier,
-              report.resonance,
-              selectedKeyPiece ?? null
-            );
-            const roleLabels: Record<string, string> = {
-              hero: "Hero / Image piece",
-              directional: "Directional but scalable",
-              "core-evolution": "Core evolution",
-              "volume-driver": "Volume driver",
-            };
-            return (
-              <div
-                style={{
-                  ...card,
-                  padding: "24px 24px",
-                  marginBottom: 20,
-                  animation: "fadeIn 600ms ease-out 550ms both",
-                }}
-              >
-                <div style={microLabel}>COLLECTION ALIGNMENT</div>
-                <p style={{ ...bodyText, marginBottom: 16 }}>
-                  How this piece performs within its intended role.
-                </p>
-
-                {selectedKeyPiece && !selectedKeyPiece.custom && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(67,67,43,0.03)", border: "1px solid rgba(67,67,43,0.07)", marginBottom: 16 }}>
-                    <span style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.50)" }}>Analyzing as:</span>
-                    <span style={{ fontFamily: inter, fontSize: 11, fontWeight: 600, color: OLIVE }}>{selectedKeyPiece.item}</span>
-                    {selectedKeyPiece.signal && (
-                      <span style={{
-                        padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, fontFamily: inter,
-                        background: selectedKeyPiece.signal === "high-volume" ? "rgba(169,123,143,0.15)" : selectedKeyPiece.signal === "ascending" ? "rgba(168,180,117,0.15)" : "rgba(125,150,172,0.15)",
-                        color: selectedKeyPiece.signal === "high-volume" ? "#6B3D52" : selectedKeyPiece.signal === "ascending" ? "#5B6A38" : "#3D5A72",
-                      }}>
-                        {selectedKeyPiece.signal === "high-volume" ? "HIGH VOLUME" : selectedKeyPiece.signal === "ascending" ? "ASCENDING ↑" : "EMERGING"}
-                      </span>
-                    )}
-                    <span style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.40)" }}>
-                      {report.seasonLabel} play for {report.aestheticName}
-                    </span>
-                    <span style={{ marginLeft: "auto", fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.40)" }}>
-                      {roleLabels[collectionRole] || collectionRole}
-                    </span>
-                  </div>
-                )}
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {alignmentSignals.map((signal, i) => {
-                    const isPass = signal.status === 'pass';
-                    const isConflict = signal.status === 'conflict';
-                    const iconColor = isPass ? CHARTREUSE : isConflict ? ROSE : CAMEL;
-                    const textColor = isPass ? "rgba(67,67,43,0.60)" : isConflict ? "rgba(67,67,43,0.75)" : "rgba(67,67,43,0.68)";
-                    const Icon = isPass
-                      ? () => (
-                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-                            <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke={iconColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )
-                      : isConflict
-                      ? () => (
-                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-                            <path d="M3 3L13 13M13 3L3 13" stroke={iconColor} strokeWidth="1.8" strokeLinecap="round" />
-                          </svg>
-                        )
-                      : () => (
-                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-                            <path d="M8 2L14 13H2L8 2Z" stroke={iconColor} strokeWidth="1.6" strokeLinejoin="round" />
-                            <path d="M8 7V10" stroke={iconColor} strokeWidth="1.6" strokeLinecap="round" />
-                            <circle cx="8" cy="12" r="0.8" fill={iconColor} />
-                          </svg>
-                        );
-                    return (
-                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                        <div style={{ flexShrink: 0, marginTop: 2, color: iconColor }}>
-                          <Icon />
-                        </div>
-                        <div>
-                          <span style={{ fontFamily: inter, fontSize: 11.5, fontWeight: 700, color: iconColor }}>
-                            {signal.label}
-                          </span>
-                          <span style={{ fontFamily: inter, fontSize: 11.5, color: textColor }}>
-                            {" — "}{signal.text}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-
           {/* ═══ BODY: Narrative + Radar ═══ */}
           <div
             style={{
@@ -1119,61 +1024,60 @@ export default function StandardReportPage() {
                 thing to watch.
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {/* WHAT'S WORKING — chartreuse */}
-                <div>
-                  <div
-                    style={{
-                      fontFamily: inter,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase" as const,
-                      color: CHARTREUSE,
-                      marginBottom: 6,
-                    }}
-                  >
-                    What&apos;s Working
-                  </div>
-                  <p style={bodyText}>{report.narrative.working}</p>
-                </div>
+              {(() => {
+                const alignmentSignals = collectionRole
+                  ? getCollectionAlignment(collectionRole, report.costGatePassed, report.constructionTier, report.resonance, selectedKeyPiece ?? null)
+                  : [];
+                const passSignals     = alignmentSignals.filter(s => s.status === 'pass');
+                const advisorySignals = alignmentSignals.filter(s => s.status === 'advisory');
+                const conflictSignals = alignmentSignals.filter(s => s.status === 'conflict');
+                const watchSignals    = [...advisorySignals, ...conflictSignals];
 
-                {/* WHAT TO CONSIDER — steel blue */}
-                <div>
-                  <div
-                    style={{
-                      fontFamily: inter,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase" as const,
-                      color: STEEL,
-                      marginBottom: 6,
-                    }}
-                  >
-                    What to Consider
-                  </div>
-                  <p style={bodyText}>{report.narrative.consider}</p>
-                </div>
+                function AlignmentLine({ signal }: { signal: { label: string; text: string; status: string } }) {
+                  const isConflict = signal.status === 'conflict';
+                  const color = isConflict ? ROSE : signal.status === 'pass' ? CHARTREUSE : CAMEL;
+                  return (
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 7 }}>
+                      <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, color, flexShrink: 0, letterSpacing: "0.04em" }}>
+                        {signal.label.toUpperCase()}
+                      </span>
+                      <span style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.52)", lineHeight: 1.55 }}>
+                        — {signal.text}
+                      </span>
+                    </div>
+                  );
+                }
 
-                {/* RECOMMENDATION — rose */}
-                <div>
-                  <div
-                    style={{
-                      fontFamily: inter,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase" as const,
-                      color: ROSE,
-                      marginBottom: 6,
-                    }}
-                  >
-                    Recommendation
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    {/* WHAT'S WORKING — chartreuse */}
+                    <div>
+                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: CHARTREUSE, marginBottom: 6 }}>
+                        What&apos;s Working
+                      </div>
+                      <p style={bodyText}>{report.narrative.working}</p>
+                      {passSignals.map((s, i) => <AlignmentLine key={i} signal={s} />)}
+                    </div>
+
+                    {/* WHAT TO CONSIDER — steel blue */}
+                    <div>
+                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: STEEL, marginBottom: 6 }}>
+                        What to Consider
+                      </div>
+                      <p style={bodyText}>{report.narrative.consider}</p>
+                      {watchSignals.map((s, i) => <AlignmentLine key={i} signal={s} />)}
+                    </div>
+
+                    {/* RECOMMENDATION — rose */}
+                    <div>
+                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: ROSE, marginBottom: 6 }}>
+                        Recommendation
+                      </div>
+                      <p style={bodyText}>{report.narrative.recommendation}</p>
+                    </div>
                   </div>
-                  <p style={bodyText}>{report.narrative.recommendation}</p>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Key Redirect — matches SharpenRow / add-chip-row from Concept Studio */}
               <div

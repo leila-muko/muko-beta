@@ -10,7 +10,7 @@ import type {
   ConstructionTier,
   ConceptContext as ConceptContextType,
 } from "@/lib/types/spec-studio";
-import { calculateCOGS, generateInsight } from "@/lib/spec-studio/calculator";
+import { calculateCOGS, generateInsight, checkExecutionFeasibility } from "@/lib/spec-studio/calculator";
 import { findAlternativeMaterial, findUpgradeMaterial } from "@/lib/spec-studio/material-matcher";
 import {
   CONSTRUCTION_INFO,
@@ -490,7 +490,7 @@ function getDesignLanguageSuggestions(
 
 export default function SpecStudioPage() {
   const router = useRouter();
-  const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection } = useSessionStore();
+  const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse } = useSessionStore();
   const categories: Category[] = categoriesData.categories as unknown as Category[];
   const materials: Material[] = materialsData as unknown as Material[];
   const allSubcategories = subcategoriesData as Record<string, SubcategoryEntry[]>;
@@ -520,6 +520,11 @@ export default function SpecStudioPage() {
     return null;
   });
   const [overrideWarning, setOverrideWarning] = useState<string | null>(null);
+  const [timelineWeeks, setTimelineWeeks] = useState<number>(() => {
+    const season = useSessionStore.getState().season;
+    const isFW = season && (season.toLowerCase().includes('fw') || season.toLowerCase().includes('fall'));
+    return isFW ? 24 : 20;
+  });
   const [pulseUpdated, setPulseUpdated] = useState(false);
 
   const [hasInitialized, setHasInitialized] = useState(false);
@@ -719,13 +724,32 @@ export default function SpecStudioPage() {
     }
   }, [insight?.cogs, insight?.type]);
 
-  const executionStatus = !insight
+  // Cost gate signal
+  const costStatus: 'green' | 'yellow' | 'red' | null = !insight
     ? null
-    : insight.type === "warning"
-      ? "red"
-      : insight.type === "viable"
-        ? "yellow"
-        : "green";
+    : insight.type === "warning" ? "red"
+    : insight.type === "viable"  ? "yellow"
+    : "green";
+
+  // Timeline feasibility signal
+  const timelineFeasibility = constructionTier && selectedMaterial
+    ? checkExecutionFeasibility({
+        construction_tier: constructionTier,
+        material: selectedMaterial,
+        timeline_weeks: timelineWeeks,
+      })
+    : null;
+  const timelineStatus = timelineFeasibility?.status ?? null;
+
+  // Blended execution status — worst of the two signals wins
+  const executionStatus: 'green' | 'yellow' | 'red' | null = (() => {
+    if (!costStatus && !timelineStatus) return null;
+    if (!costStatus) return timelineStatus;
+    if (!timelineStatus) return costStatus;
+    if (costStatus === 'red' || timelineStatus === 'red') return 'red';
+    if (costStatus === 'yellow' || timelineStatus === 'yellow') return 'yellow';
+    return 'green';
+  })();
 
   const executionColor =
     executionStatus === "green"
@@ -1035,22 +1059,51 @@ export default function SpecStudioPage() {
           : { variant: "amber", status: "Ascending", consequence: "Differentiation window open" }
     : { variant: "amber", status: "Ascending", consequence: "Differentiation window open" };
 
-  const executionChipData: PulseChipProps | null = overrideWarning
-    ? { variant: "amber", status: "Complexity mismatch", consequence: overrideWarning.split(".")[0] }
-    : executionStatus === "green"
-      ? { variant: "green", status: "Feasible", consequence: "Good margin headroom" }
-      : executionStatus === "yellow"
-        ? { variant: "amber", status: "Tight margin", consequence: "Reduce complexity" }
-        : executionStatus === "red"
-          ? { variant: "red", status: "Not feasible", consequence: "Adjust specs to proceed" }
-          : null;
+  // Blended execution chip: lead with cost if both fail; show timeline message if only timeline fails
+  const executionChipData: PulseChipProps | null = (() => {
+    if (overrideWarning) {
+      return { variant: "amber", status: "Complexity mismatch", consequence: overrideWarning.split(".")[0] };
+    }
+    if (!executionStatus) return null;
+
+    const costFailed = costStatus === 'red';
+    const timelineFailed = timelineStatus === 'red';
+    const timelineTight  = timelineStatus === 'yellow';
+
+    if (costFailed && timelineFailed) {
+      return { variant: "red", status: "Not feasible", consequence: "Adjust cost and timeline to proceed" };
+    }
+    if (costFailed) {
+      return { variant: "red", status: "Not feasible", consequence: "Adjust specs to proceed" };
+    }
+    if (timelineFailed) {
+      return { variant: "red", status: "Timeline risk", consequence: timelineFeasibility?.message ?? "Significant timeline risk" };
+    }
+    if (timelineTight && costStatus === 'yellow') {
+      return { variant: "amber", status: "Tight margin + timeline", consequence: "Reduce complexity or extend deadline" };
+    }
+    if (timelineTight) {
+      return { variant: "amber", status: "Tight timeline", consequence: timelineFeasibility?.message ?? "Tight but possible" };
+    }
+    if (costStatus === 'yellow') {
+      return { variant: "amber", status: "Tight margin", consequence: "Reduce complexity" };
+    }
+    return { variant: "green", status: "Feasible", consequence: "Good margin headroom" };
+  })();
   // ─────────────────────────────────────────────────────────────────────────
 
-  const executionScore =
-    executionStatus === "green" ? 80
-    : executionStatus === "yellow" ? 55
-    : executionStatus === "red" ? 40
-    : 0;
+  // Blended execution score: both fail = 35, one fails = 50, yellow = 65, green = 80
+  const executionScore = (() => {
+    const costRed      = costStatus === 'red';
+    const timelineRed  = timelineStatus === 'red';
+    const timelineYellow = timelineStatus === 'yellow';
+    if (costRed && timelineRed) return 35;
+    if (costRed || timelineRed) return 50;
+    if (timelineYellow) return 65;
+    if (executionStatus === 'yellow') return 55;
+    if (executionStatus === 'green') return 80;
+    return 0;
+  })();
 
   const marginGatePassed = !insight || insight.type !== "warning";
 
@@ -1061,6 +1114,17 @@ export default function SpecStudioPage() {
     : 6;
 
   const specInsightData = getSpecInsightData(executionScore, marginGatePassed, timelineBuffer);
+
+  // ─── Fix #1: Write execution state to store so report page gets real data ──
+  useEffect(() => {
+    if (!executionStatus) return;
+    updateExecutionPulse({
+      status: executionStatus as 'green' | 'yellow' | 'red',
+      score: executionScore,
+      message: executionChipData?.consequence ?? '',
+    });
+  }, [executionStatus, executionScore, executionChipData?.consequence]);
+  // ──────────────────────────────────────────────────────────────────────────
 
   const selectedImpact: Deltas = useMemo(() => {
     if (!selectedMaterial) return { identity: 0, resonance: 0, execution: 0 };
@@ -1703,7 +1767,13 @@ export default function SpecStudioPage() {
             )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={microLabel}>MSRP</span>
+              {/* MSRP label + ceiling subtitle */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <span style={microLabel}>MSRP</span>
+                <span style={{ fontSize: 9, color: "rgba(67,67,43,0.32)", fontFamily: "var(--font-inter), system-ui, sans-serif", letterSpacing: "0.02em" }}>
+                  Ceiling: ${marginCeiling}
+                </span>
+              </div>
               <div style={{ position: "relative" }}>
                 <span
                   style={{
@@ -1736,15 +1806,54 @@ export default function SpecStudioPage() {
                   }}
                 />
               </div>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: "rgba(67, 67, 43, 0.35)",
-                  fontFamily: "var(--font-inter), system-ui, sans-serif",
-                }}
-              >
-                Ceiling: ${marginCeiling}
-              </span>
+
+              {/* Delivery label + required subtitle */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 1, marginLeft: 8 }}>
+                <span style={microLabel}>Delivery</span>
+                <span style={{ fontSize: 9, fontFamily: "var(--font-inter), system-ui, sans-serif", letterSpacing: "0.02em", color: timelineFeasibility ? (timelineStatus === 'red' ? '#8A3A3A' : timelineStatus === 'yellow' ? BRAND.camel : "rgba(67,67,43,0.32)") : "rgba(67,67,43,0.32)" }}>
+                  {timelineFeasibility ? `${timelineFeasibility.required_weeks}wk required` : "\u00a0"}
+                </span>
+              </div>
+              <div style={{ position: "relative" }}>
+                <input
+                  type="number"
+                  min={4}
+                  max={52}
+                  value={timelineWeeks}
+                  onChange={(e) => setTimelineWeeks(Math.max(4, Number(e.target.value)))}
+                  style={{
+                    padding: "8px 36px 8px 12px",
+                    borderRadius: 12,
+                    width: 88,
+                    border: `1px solid ${
+                      timelineStatus === 'red' ? 'rgba(138, 58, 58, 0.35)' :
+                      timelineStatus === 'yellow' ? 'rgba(184, 135, 107, 0.35)' :
+                      'rgba(67, 67, 43, 0.12)'
+                    }`,
+                    background: "rgba(255,255,255,0.78)",
+                    fontFamily: "var(--font-inter), system-ui, sans-serif",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: BRAND.oliveInk,
+                    outline: "none",
+                    boxShadow: "0 10px 26px rgba(67, 67, 43, 0.06)",
+                  }}
+                />
+                <span
+                  style={{
+                    position: "absolute",
+                    right: 12,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    fontSize: 11,
+                    color: "rgba(67, 67, 43, 0.4)",
+                    fontFamily: "var(--font-inter), system-ui, sans-serif",
+                    pointerEvents: "none",
+                  }}
+                >
+                  wks
+                </span>
+              </div>
             </div>
 
           </div>
@@ -1794,7 +1903,7 @@ export default function SpecStudioPage() {
                           background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
                           border: isSel
                             ? `1.5px solid ${CHARTREUSE}`
-                            : isRec && !isSel
+                            : isRec && !materialId
                               ? "1.5px solid rgba(169,123,143,0.35)"
                               : "1px solid rgba(67, 67, 43, 0.10)",
                           boxShadow: isSel
@@ -1993,12 +2102,12 @@ export default function SpecStudioPage() {
 
                           {isHover && !isSel ? (
                             compactDeltaCluster({
-                              deltas,
+                              deltas: { ...deltas, identity: 0 },
                               isHoverOrActive: true,
                               isRecommended: isRec,
                             })
                           ) : !isSel ? (
-                            aggregateDeltaDot({ deltas })
+                            aggregateDeltaDot({ deltas: { ...deltas, identity: 0 } })
                           ) : null}
                         </div>
 

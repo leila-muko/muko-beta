@@ -69,6 +69,43 @@ export interface MukoInsight {
   } | null;
 }
 
+export interface FeasibilityResult {
+  status: 'green' | 'yellow' | 'red';
+  message: string;
+  required_weeks: number;
+  timeline_gap: number;
+}
+
+export function checkExecutionFeasibility({
+  construction_tier,
+  material,
+  timeline_weeks,
+}: {
+  construction_tier: 'low' | 'moderate' | 'high';
+  material: { lead_time_weeks: number };
+  timeline_weeks: number;
+}): FeasibilityResult {
+  const complexity_weeks = { low: 6, moderate: 10, high: 16 };
+  const required_weeks = complexity_weeks[construction_tier] + material.lead_time_weeks;
+  const gap = timeline_weeks - required_weeks;
+
+  let status: 'green' | 'yellow' | 'red';
+  let message: string;
+
+  if (gap >= 4) {
+    status = 'green';
+    message = 'Feasible timeline';
+  } else if (gap > -4) {
+    status = 'yellow';
+    message = 'Tight but possible';
+  } else {
+    status = 'red';
+    message = 'Significant timeline risk';
+  }
+
+  return { status, message, required_weeks, timeline_gap: gap };
+}
+
 export function applyRoleModifiers(
   baseScore: number,
   role: string,

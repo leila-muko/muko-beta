@@ -75,6 +75,10 @@ export function MukoInsightSection({
     const match = text.match(/^[^.!?]*[.!?]/);
     return match ? match[0] : text;
   }
+  function getLastSentence(text: string): string {
+    const sentences = text.match(/[^.!?]+[.!?]+/g);
+    return sentences ? sentences[sentences.length - 1].trim() : text;
+  }
   return (
     <div style={{ marginBottom: 28 }}>
       {/* Section divider */}
@@ -204,7 +208,14 @@ export function MukoInsightSection({
                       </div>
                       {/* Detail — first sentence collapsed, full when expanded */}
                       <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.64)", lineHeight: 1.65 }}>
-                        {isExpanded ? s.detail : firstSentence}
+                        {isExpanded ? s.detail : (
+                          <>
+                            {firstSentence}
+                            {s.cost_note && (
+                              <span style={{ fontWeight: 600 }}>{" "}{getLastSentence(s.cost_note)}</span>
+                            )}
+                          </>
+                        )}
                       </div>
                       {/* Expanded: cost note + avoid */}
                       {isExpanded && (
