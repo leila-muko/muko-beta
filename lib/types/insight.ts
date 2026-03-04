@@ -7,10 +7,14 @@ export type InsightMode = ConceptInsightMode | SpecInsightMode;
 export interface InsightData {
   /** Always exactly 3 plain-prose statements. No headers. */
   statements: string[];
-  /** Always exactly 3 guardrail bullets rendered under the edit label. */
+  /** Always exactly 3 bullets rendered under the primary label (edit or opportunity). */
   edit: string[];
   /** 'THE EDIT' or 'THE OPPORTUNITY' — driven by mode. */
   editLabel: string;
+  /** Always exactly 3 bullets for the secondary section (opposite of primary). */
+  secondary?: string[];
+  /** 'THE EDIT' when primary is OPPORTUNITY, 'THE OPPORTUNITY' when primary is EDIT. */
+  secondaryLabel?: string;
   /** Optional chip labels (spec chips) to surface in the Sharpen row. */
   sharpenChips?: string[];
   /** Controls which placeholder content and visual mode is shown. */

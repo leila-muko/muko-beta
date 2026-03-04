@@ -22,6 +22,9 @@ import chipTensionsData from "@/data/chip_tensions.json";
 import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
 import { PulseScoreRow } from "@/components/ui/PulseScoreRow";
 import { MukoInsightSection } from "@/components/ui/MukoInsightSection";
+import { buildConceptBlackboard, toAestheticSlug } from "@/lib/synthesizer/assemble";
+import type { InsightData } from "@/lib/types/insight";
+import { createClient } from "@/lib/supabase/client";
 import { debounce } from "@/lib/utils/debounce";
 import {
   checkMarketSaturation,
@@ -403,23 +406,56 @@ function getDirectionInsight(
   };
 }
 
-/* ─── Compute recommended aesthetic (static, deterministic) ─────────────── */
-function computeRecommendedAesthetic(): string {
-  const getDiffBonus = (velocity: string, saturation: number) => {
-    if (velocity === "emerging") return saturation < 45 ? 100 : saturation < 60 ? 75 : 50;
-    if (velocity === "peak") return saturation < 50 ? 40 : 20;
-    return 0;
-  };
+/* ─── Compute recommended aesthetic (brand-aware) ───────────────────────── */
+//
+// Rankings use two signals combined at equal weight:
+//   1. Identity compatibility — static identity score penalised by tension hits
+//   2. Resonance opportunity  — (100 - saturation) + velocity bonus
+//
+// Brand filtering: aesthetics with 3+ brand DNA keywords appearing in their
+// tension_keywords[] are excluded entirely — they represent strong aesthetic
+// incompatibility (e.g. Undone Glam tensions with Minimalist/Timeless/Serene,
+// all core Reformation keywords).
+//
+// When brandKeywords is empty the filter is a no-op and we fall back to a
+// pure market-opportunity ranking — acceptable when no brand profile exists.
+function computeRecommendedAesthetic(brandKeywords: string[] = []): string {
+  const normalizedBrand = brandKeywords.map(k => k.toLowerCase().trim());
+
   const scored = AESTHETICS.map((aesthetic) => {
     const content = AESTHETIC_CONTENT[aesthetic];
-    const entry = (aestheticsData as Array<{ id: string; name: string; trend_velocity: string; saturation_score: number }>)
-      .find((a) => a.name === aesthetic || a.id === aesthetic.toLowerCase().replace(/\s+/g, "-"));
+    const entry = (aestheticsData as Array<{
+      id: string;
+      name: string;
+      trend_velocity: string;
+      saturation_score: number;
+      tension_keywords?: string[];
+    }>).find((a) => a.name === aesthetic || a.id === aesthetic.toLowerCase().replace(/\s+/g, "-"));
+
     const velocity = entry?.trend_velocity ?? "peak";
     const saturation = entry?.saturation_score ?? 50;
-    const bonus = getDiffBonus(velocity, saturation);
-    const heroScore = (content?.identityScore ?? 0) * 0.4 + (content?.resonanceScore ?? 0) * 0.4 + bonus * 0.2;
+    const tensionKws = (entry?.tension_keywords ?? []).map(k => k.toLowerCase().trim());
+
+    // Count brand keywords that appear in this aesthetic's tension list
+    const tensionHits = normalizedBrand.filter(k => tensionKws.includes(k)).length;
+
+    // Hard filter: 3+ brand keywords in tension_keywords = strong incompatibility
+    if (tensionHits >= 3) return { aesthetic, heroScore: -Infinity };
+
+    // Resonance opportunity: inverse of saturation + velocity signal
+    // "emerging" aesthetics get more opportunity credit than "ascending" or "peak"
+    const velocityBonus = velocity === "emerging" ? 20 : velocity === "ascending" ? 10 : 0;
+    const resonanceOpportunity = (100 - saturation) + velocityBonus;
+
+    // Identity compatibility penalised per tension hit (15% per hit)
+    // Prevents market-opportunity bonus from overriding brand fit
+    const tensionMultiplier = Math.max(0, 1 - tensionHits * 0.15);
+    const identityCompatibility = (content?.identityScore ?? 0) * tensionMultiplier;
+
+    const heroScore = identityCompatibility * 0.5 + resonanceOpportunity * 0.5;
     return { aesthetic, heroScore };
   });
+
   scored.sort((a, b) => b.heroScore - a.heroScore);
   return scored[0]?.aesthetic ?? TOP_SUGGESTED[0];
 }
@@ -437,6 +473,8 @@ export default function ConceptStudioPage() {
   const router = useRouter();
   const {
     season,
+    collectionName: storeCollectionName,
+    refinementModifiers,
     aestheticInput,
     setAestheticInput,
     identityPulse,
@@ -452,6 +490,9 @@ export default function ConceptStudioPage() {
     customChips: storeCustomChips,
     setCustomChips: setStoreCustomChips,
     setSelectedKeyPiece,
+    intentGoals,
+    intentTradeoff,
+    collectionRole: storeCollectionRole,
   } = useSessionStore();
 
   const [headerCollectionName, setHeaderCollectionName] = useState<string>("Collection");
@@ -468,7 +509,7 @@ export default function ConceptStudioPage() {
     } catch { setHeaderSeasonLabel(season || "—"); }
   }, [season]);
 
-  const recommendedAesthetic = useMemo(() => computeRecommendedAesthetic(), []);
+  const recommendedAesthetic = useMemo(() => computeRecommendedAesthetic(refinementModifiers), [refinementModifiers]);
   const selectedAesthetic = AESTHETICS.includes(aestheticInput as any) ? aestheticInput : null;
   const selectedIsAlternative = Boolean(selectedAesthetic && selectedAesthetic !== recommendedAesthetic);
 
@@ -593,6 +634,146 @@ export default function ConceptStudioPage() {
   }, [selectedElements, selectedAesthetic, customChips]);
 
   const yourConceptRef = useRef<HTMLDivElement>(null);
+
+  // ─── Synthesizer: reactive MUKO INSIGHT (streaming) ──────────────────────
+  const conceptAbortRef = useRef<AbortController | null>(null);
+  const [conceptInsightData, setConceptInsightData] = useState<InsightData | null>(null);
+  const [conceptInsightLoading, setConceptInsightLoading] = useState(false);
+  const [conceptStreamingText, setConceptStreamingText] = useState('');
+
+  const addedChipKey = useMemo(
+    () => Array.from(addedChipLabels).sort().join(','),
+    [addedChipLabels]
+  );
+
+  useEffect(() => {
+    if (!selectedAesthetic) {
+      setConceptInsightData(null);
+      setConceptStreamingText('');
+      return;
+    }
+    const slug = toAestheticSlug(selectedAesthetic);
+    const tensionToNum = (v: string) => v === 'left' ? 75 : v === 'right' ? 25 : 50;
+    let intentPayload: import('@/lib/synthesizer/blackboard').IntentCalibration | undefined;
+    try {
+      const raw = window.localStorage.getItem('muko_intent');
+      if (raw) {
+        const parsed = JSON.parse(raw) as { tensions?: Record<string, string> };
+        const t = parsed.tensions ?? {};
+        intentPayload = {
+          primary_goals: intentGoals,
+          tradeoff: intentTradeoff,
+          piece_role: storeCollectionRole ?? '',
+          tension_sliders: {
+            trend_forward: tensionToNum(t.trendForward_vs_timeless ?? 'center'),
+            creative_expression: tensionToNum(t.creative_vs_commercial ?? 'center'),
+            elevated_design: tensionToNum(t.elevated_vs_accessible ?? 'center'),
+            novelty: tensionToNum(t.novelty_vs_continuity ?? 'center'),
+          },
+        };
+      }
+    } catch { /* no intent stored — omit from payload */ }
+
+    const blackboard = buildConceptBlackboard({
+      aestheticInput: aestheticInput || selectedAesthetic,
+      aestheticSlug: slug,
+      brandKeywords: refinementModifiers,
+      identity_score: identityPulse?.score ?? 80,
+      resonance_score: resonancePulse?.score ?? 75,
+      season: season || 'SS27',
+      collectionName: storeCollectionName || headerCollectionName,
+      intent: intentPayload,
+    });
+    if (!blackboard) return;
+
+    conceptAbortRef.current?.abort();
+    const controller = new AbortController();
+    conceptAbortRef.current = controller;
+
+    const timer = window.setTimeout(async () => {
+      setConceptInsightLoading(true);
+      setConceptStreamingText('');
+      try {
+        const res = await fetch('/api/synthesizer/concept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(blackboard),
+          signal: controller.signal,
+        });
+        if (!res.ok || !res.body || controller.signal.aborted) return;
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let currentEvent = '';
+        let currentData = '';
+
+        const processMessage = (event: string, data: string) => {
+          if (event === 'chunk') {
+            try {
+              const parsed = JSON.parse(data) as { text: string };
+              const chunk = parsed.text ?? '';
+              setConceptStreamingText(prev => {
+                const accumulated = prev + chunk;
+                // Extract partial brand_alignment value for display
+                const match = accumulated.match(/"brand_alignment"\s*:\s*"([^"]*)/);
+                return match ? match[1] : prev;
+              });
+            } catch { /* ignore parse errors on partial chunks */ }
+          } else if (event === 'complete' || event === 'fallback') {
+            try {
+              const result = JSON.parse(data) as { data: InsightData; meta: { method: string } };
+              if (!controller.signal.aborted) {
+                setConceptInsightData(result.data);
+                setConceptStreamingText('');
+                // Fire-and-forget DB log
+                try {
+                  const supabase = createClient();
+                  supabase.from('analyses').insert({
+                    narrative: result.data.statements?.join(' ') ?? '',
+                    agent_versions: { synthesizer: result.meta?.method ?? 'unknown' },
+                  }).then(() => {});
+                } catch { /* fire-and-forget */ }
+              }
+            } catch { /* ignore */ }
+          }
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done || controller.signal.aborted) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              currentEvent = line.slice(7).trim();
+            } else if (line.startsWith('data: ')) {
+              currentData = line.slice(6);
+            } else if (line === '') {
+              if (currentEvent && currentData) processMessage(currentEvent, currentData);
+              currentEvent = '';
+              currentData = '';
+            }
+          }
+        }
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return;
+      } finally {
+        if (!controller.signal.aborted) {
+          setConceptInsightLoading(false);
+          setConceptStreamingText('');
+        }
+      }
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAesthetic, conceptSilhouette, conceptPalette, addedChipKey]);
+
   const [freeFormDraft, setFreeFormDraft] = useState("");
   const [freeFormMatch, setFreeFormMatch] = useState<string | null>(null);
   const [freeFormLoading, setFreeFormLoading] = useState(false);
@@ -890,31 +1071,25 @@ export default function ConceptStudioPage() {
   };
 
   /* ─── Sorted base list ────────────────────────────────────────────────────── */
+  const aestheticSorter = (rec: string) => (a: string, b: string) => {
+    if (a === rec) return -1;
+    if (b === rec) return 1;
+    const sa = ((AESTHETIC_CONTENT[a]?.identityScore ?? 0) * 0.5) + ((AESTHETIC_CONTENT[a]?.resonanceScore ?? 0) * 0.5);
+    const sb = ((AESTHETIC_CONTENT[b]?.identityScore ?? 0) * 0.5) + ((AESTHETIC_CONTENT[b]?.resonanceScore ?? 0) * 0.5);
+    return sb - sa;
+  };
+
   const sortedDirections = useMemo(() => {
-    return AESTHETICS
-      .filter((a) => a !== recommendedAesthetic)
-      .sort((a, b) => {
-        const sa = ((AESTHETIC_CONTENT[a]?.identityScore ?? 0) * 0.5) + ((AESTHETIC_CONTENT[a]?.resonanceScore ?? 0) * 0.5);
-        const sb = ((AESTHETIC_CONTENT[b]?.identityScore ?? 0) * 0.5) + ((AESTHETIC_CONTENT[b]?.resonanceScore ?? 0) * 0.5);
-        return sb - sa;
-      });
+    return [...AESTHETICS].sort(aestheticSorter(recommendedAesthetic));
   }, [recommendedAesthetic]);
 
-  // When alternative is selected: list = all aesthetics except the selected one, sorted by combinedScore
-  // (Muko's Pick is included in this list with a badge)
-  // When hero/nothing selected: list = sortedDirections (excludes hero)
+  // All aesthetics except the selected one, with Muko's Pick always at the top
   const orderedDirections = useMemo(() => {
-    if (selectedIsAlternative) {
-      return AESTHETICS
-        .filter((a) => a !== selectedAesthetic)
-        .sort((a, b) => {
-          const sa = ((AESTHETIC_CONTENT[a]?.identityScore ?? 0) * 0.5) + ((AESTHETIC_CONTENT[a]?.resonanceScore ?? 0) * 0.5);
-          const sb = ((AESTHETIC_CONTENT[b]?.identityScore ?? 0) * 0.5) + ((AESTHETIC_CONTENT[b]?.resonanceScore ?? 0) * 0.5);
-          return sb - sa;
-        });
-    }
-    return sortedDirections;
-  }, [sortedDirections, selectedAesthetic, selectedIsAlternative]);
+    const base = selectedIsAlternative
+      ? [...AESTHETICS].filter((a) => a !== selectedAesthetic)
+      : [...AESTHETICS];
+    return base.sort(aestheticSorter(recommendedAesthetic));
+  }, [sortedDirections, selectedAesthetic, selectedIsAlternative, recommendedAesthetic]);
 
   /* ─── Muko Insight ────────────────────────────────────────────────────────── */
   const insightContent = useMemo(() => {
@@ -1086,8 +1261,8 @@ export default function ConceptStudioPage() {
                 marginTop: 4,
                 padding: "7px 16px 7px 12px",
                 borderRadius: 999,
-                border: "1.5px solid rgba(169,123,143,0.30)",
-                background: "rgba(169,123,143,0.06)",
+                border: "1.5px solid rgba(77,48,47,0.35)",
+                background: "transparent",
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
@@ -1095,19 +1270,19 @@ export default function ConceptStudioPage() {
                 transition: "background 200ms ease, border-color 200ms ease",
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "rgba(169,123,143,0.12)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(169,123,143,0.50)";
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(77,48,47,0.06)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(77,48,47,0.55)";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "rgba(169,123,143,0.06)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(169,123,143,0.30)";
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(77,48,47,0.35)";
               }}
             >
               <span
                 className="muko-pick-dot"
-                style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#A97B8F", flexShrink: 0 }}
+                style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#A8B475", flexShrink: 0 }}
               />
-              <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 550, color: "#A97B8F", whiteSpace: "nowrap" }}>
+              <span style={{ fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "#4D302F", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
                 Muko&apos;s Pick
               </span>
             </button>
@@ -1504,6 +1679,7 @@ export default function ConceptStudioPage() {
                       sohne={sohne}
                       steelBlue={STEEL}
                       chartreuse={CHARTREUSE}
+                      isMukoPick={aesthetic === recommendedAesthetic}
                     />
                   </motion.div>
                 );
@@ -1586,12 +1762,32 @@ export default function ConceptStudioPage() {
                   Select a direction to see Muko&apos;s analysis
                 </p>
               </div>
+            ) : conceptInsightLoading && !conceptInsightData && !conceptStreamingText ? (
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ height: 1, background: "rgba(67,67,43,0.12)", margin: "24px 0" }} />
+                <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>
+                  MUKO INSIGHT
+                </div>
+                {/* Skeleton — shown only before first streaming chunk arrives */}
+                {[80, 60, 90, 55].map((w, i) => (
+                  <div key={i} style={{ height: i === 0 ? 18 : 12, borderRadius: 6, background: "rgba(67,67,43,0.07)", marginBottom: i === 0 ? 14 : 8, width: `${w}%`, animation: "pulse 1.4s ease-in-out infinite" }} />
+                ))}
+              </div>
             ) : (
               <MukoInsightSection
-                headline={insightContent.headline}
-                paragraphs={[insightContent.p1, insightContent.p2, insightContent.p3]}
-                opportunity={{ items: insightContent.opportunity }}
-                edit={{ items: insightContent.editItems }}
+                headline={conceptInsightData?.statements[0] ?? insightContent.headline}
+                paragraphs={
+                  conceptInsightData
+                    ? [conceptInsightData.statements[1] ?? '', conceptInsightData.statements[2] ?? ''].filter(Boolean)
+                    : [insightContent.p1, insightContent.p2, insightContent.p3]
+                }
+                bullets={{
+                  label: conceptInsightData?.editLabel ?? 'POSITIONING',
+                  items: conceptInsightData?.edit ?? insightContent.opportunity,
+                }}
+                mode={conceptInsightData?.mode}
+                isStreaming={conceptInsightLoading && !!conceptStreamingText}
+                streamingText={conceptStreamingText}
                 nextMove={{
                   mode: "concept",
                   items: nextMoveItems,
@@ -1649,6 +1845,7 @@ export default function ConceptStudioPage() {
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes expandDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
         /* ResizableSplitPanel handles mobile stacking */
       `}</style>
     </div>
@@ -1659,7 +1856,7 @@ export default function ConceptStudioPage() {
 function DirectionCard({
   aesthetic, content, chips, isHovered, moodboardImages,
   idColor, resColor, topIdScore, topResScore, onHoverEnter, onHoverLeave, onSelect,
-  inter, sohne, steelBlue, chartreuse,
+  inter, sohne, steelBlue, chartreuse, isMukoPick,
 }: {
   aesthetic: string;
   content: { description: string; identityScore: number; resonanceScore: number } | undefined;
@@ -1677,6 +1874,7 @@ function DirectionCard({
   sohne: string;
   steelBlue: string;
   chartreuse: string;
+  isMukoPick?: boolean;
 }) {
   const idScore = content?.identityScore ?? 0;
   const resScore = content?.resonanceScore ?? 0;
@@ -1732,8 +1930,14 @@ function DirectionCard({
           </div>
         </div>
 
-        {/* Right: select slides in, muko's pick stays anchored to the right */}
-        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+        {/* Right: muko's pick badge + select button */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          {isMukoPick && (
+            <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 999, background: "rgba(168,180,117,0.12)", border: "1px solid rgba(168,180,117,0.40)" }}>
+              <span style={{ display: "inline-block", width: 5, height: 5, borderRadius: "50%", background: "#A8B475", flexShrink: 0 }} />
+              <span style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "#6B7A3E", whiteSpace: "nowrap" }}>Muko&apos;s Pick</span>
+            </div>
+          )}
           {/* Select button — clips to 0 width when not hovered */}
           <div style={{ overflow: "hidden", maxWidth: isHovered ? "80px" : "0px", opacity: isHovered ? 1 : 0, transition: "max-width 180ms ease, opacity 150ms ease" }}>
             <span style={{ display: "block", whiteSpace: "nowrap", padding: "4px 11px", borderRadius: 999, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em", border: `1px solid ${chartreuse}`, background: "transparent", color: chartreuse, fontFamily: inter, pointerEvents: "none" }}>

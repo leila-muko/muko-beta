@@ -8,16 +8,18 @@ const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
 
 interface StepProps {
-  value: number;
-  onChange: (value: number) => void;
+  targetMargin: number;
+  onTargetMarginChange: (value: number) => void;
 }
 
-export default function Step5Margin({ value, onChange }: StepProps) {
-  const fillPercent = ((value - 40) / 35) * 100;
+export default function Step5AestheticExclusions({
+  targetMargin,
+  onTargetMarginChange,
+}: StepProps) {
+  const fillPercent = ((targetMargin - 40) / 35) * 100;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-      {/* Section header */}
       <div>
         <div
           style={{
@@ -42,7 +44,6 @@ export default function Step5Margin({ value, onChange }: StepProps) {
         </div>
       </div>
 
-      {/* Large display */}
       <div style={{ textAlign: 'center' }}>
         <div
           style={{
@@ -54,18 +55,17 @@ export default function Step5Margin({ value, onChange }: StepProps) {
             lineHeight: 1,
           }}
         >
-          {value}%
+          {targetMargin}%
         </div>
       </div>
 
-      {/* Slider */}
       <div style={{ padding: '0 8px' }}>
         <input
           type="range"
           min="40"
           max="75"
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
+          value={targetMargin}
+          onChange={(e) => onTargetMarginChange(Number(e.target.value))}
           style={{
             width: '100%',
             height: 3,
@@ -97,9 +97,7 @@ export default function Step5Margin({ value, onChange }: StepProps) {
           input[type='range']::-webkit-slider-thumb:hover {
             box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 0 3px rgba(125,150,172,0.20);
           }
-          input[type='range']::-webkit-slider-thumb:active {
-            cursor: grabbing;
-          }
+          input[type='range']::-webkit-slider-thumb:active { cursor: grabbing; }
           input[type='range']::-moz-range-thumb {
             width: 18px;
             height: 18px;
@@ -115,7 +113,6 @@ export default function Step5Margin({ value, onChange }: StepProps) {
           }
         `}</style>
 
-        {/* Range labels */}
         <div
           style={{
             display: 'flex',
@@ -132,7 +129,6 @@ export default function Step5Margin({ value, onChange }: StepProps) {
         </div>
       </div>
 
-      {/* Helper text */}
       <div
         style={{
           fontSize: 12.5,
@@ -141,7 +137,7 @@ export default function Step5Margin({ value, onChange }: StepProps) {
           lineHeight: 1.6,
         }}
       >
-        At {value}% margin, a ${100} MSRP means ${(100 * (1 - value / 100)).toFixed(2)} COGS
+        At {targetMargin}% margin, a $100 MSRP means ${(100 * (1 - targetMargin / 100)).toFixed(2)} COGS
       </div>
     </div>
   );

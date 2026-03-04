@@ -1,24 +1,38 @@
 {
-    "aesthetic": [
-      "Minimalist", "Maximalist", "Romantic", "Edgy", "Sporty",
-      "Bohemian", "Preppy", "Grunge", "Western", "Coastal",
-      "Urban", "Rustic", "Gothic", "Feminine", "Masculine",
-      "Formal", "Casual", "Classic"
-    ],
-    "values": [
-      "Sustainable", "Luxe", "Accessible", "Innovative",
-      "Timeless", "Trendy", "Artisanal", "Technical",
-      "Ethical", "Premium", "Playful", "Sophisticated"
-    ],
-    "mood": [
-      "Moody", "Serene", "Bold", "Rebellious",
-      "Soft", "Dramatic", "Vibrant"
-    ],
-    "conflicts": [
-      ["Minimalist", "Maximalist"],
-      ["Luxe", "Accessible"],
-      ["Timeless", "Trendy"],
-      ["Formal", "Casual"],
-      ["Edgy", "Classic"]
-    ]
-  }
+  "silhouette_form": [
+    "Minimalist", "Structured", "Fluid", "Relaxed", "Tailored",
+    "Romantic", "Maximalist", "Deconstructed", "Feminine"
+  ],
+  "mood_attitude": [
+    "Serene", "Edgy", "Playful", "Dramatic", "Soft", "Bold", "Rebellious", "Timeless"
+  ],
+  "surface_material": [
+    "Sustainable", "Technical", "Artisanal", "Luxe", "Premium",
+    "Natural", "Raw", "Refined", "Synthetic"
+  ],
+  "conflicts": [
+    ["Minimalist", "Maximalist"],
+    ["Luxe", "Accessible"],
+    ["Timeless", "Trendy"],
+    ["Formal", "Casual"],
+    ["Edgy", "Classic"],
+    ["Structured", "Fluid"],
+    ["Serene", "Dramatic"],
+    ["Bold", "Soft"]
+  ],
+  "aesthetic": [
+    "Minimalist", "Maximalist", "Romantic", "Edgy", "Sporty",
+    "Bohemian", "Preppy", "Grunge", "Western", "Coastal",
+    "Urban", "Rustic", "Gothic", "Feminine", "Masculine",
+    "Formal", "Casual", "Classic"
+  ],
+  "values": [
+    "Sustainable", "Luxe", "Accessible", "Innovative",
+    "Timeless", "Trendy", "Artisanal", "Technical",
+    "Ethical", "Premium", "Playful", "Sophisticated"
+  ],
+  "mood": [
+    "Moody", "Serene", "Bold", "Rebellious",
+    "Soft", "Dramatic", "Vibrant"
+  ]
+}

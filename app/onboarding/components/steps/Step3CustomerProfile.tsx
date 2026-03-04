@@ -18,7 +18,6 @@ export default function Step3CustomerProfile({ value, onChange }: StepProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Section header */}
       <div>
         <div
           style={{
@@ -29,7 +28,7 @@ export default function Step3CustomerProfile({ value, onChange }: StepProps) {
             marginBottom: 6,
           }}
         >
-          Who&apos;s your customer?
+          Describe your customer in one specific sentence.
         </div>
         <div
           style={{
@@ -40,16 +39,17 @@ export default function Step3CustomerProfile({ value, onChange }: StepProps) {
             marginBottom: 14,
           }}
         >
-          Describe your target customer in your own words.
+          Not demographics — who is she really?
         </div>
 
-        <textarea
+        <input
+          type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder="Describe your target customer..."
-          rows={5}
+          placeholder="She's 32, works in architecture, buys fewer pieces with more intention."
+          autoFocus
           style={{
             width: '100%',
             boxSizing: 'border-box',
@@ -63,7 +63,6 @@ export default function Step3CustomerProfile({ value, onChange }: StepProps) {
             outline: 'none',
             fontFamily: inter,
             lineHeight: 1.65,
-            resize: 'vertical',
             transition: 'all 200ms ease',
             boxShadow: focused
               ? '0 4px 20px rgba(125,150,172,0.10)'
@@ -72,7 +71,6 @@ export default function Step3CustomerProfile({ value, onChange }: StepProps) {
         />
       </div>
 
-      {/* Character count */}
       {value && (
         <div
           style={{

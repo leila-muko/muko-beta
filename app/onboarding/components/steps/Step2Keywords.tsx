@@ -10,20 +10,36 @@ const CHARTREUSE = '#A8B475';
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
 
+const MAX_KEYWORDS = 6;
+
+const CHIP_GROUPS = [
+  { key: 'silhouette_form', label: 'SILHOUETTE & FORM',  keywords: keywordsData.silhouette_form },
+  { key: 'mood_attitude',   label: 'MOOD & ATTITUDE',    keywords: keywordsData.mood_attitude },
+  { key: 'surface_material',label: 'SURFACE & MATERIAL', keywords: keywordsData.surface_material },
+];
+
 interface StepProps {
+  brandDescription: string;
+  onBrandDescriptionChange: (value: string) => void;
   value: string[];
   onChange: (value: string[]) => void;
   onTensionContextChange: (context: string | null) => void;
 }
 
-export default function Step2Keywords({ value, onChange, onTensionContextChange }: StepProps) {
+export default function Step2Keywords({
+  brandDescription,
+  onBrandDescriptionChange,
+  value,
+  onChange,
+  onTensionContextChange,
+}: StepProps) {
+  const [descFocused, setDescFocused] = useState(false);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [detectedConflict, setDetectedConflict] = useState<string[] | null>(null);
   const [resolvedConflicts, setResolvedConflicts] = useState<Set<string>>(new Set());
 
-  const getConflictKey = (word1: string, word2: string) => {
-    return [word1, word2].sort().join('|');
-  };
+  const getConflictKey = (word1: string, word2: string) =>
+    [word1, word2].sort().join('|');
 
   const checkForConflicts = (keyword: string, currentKeywords: string[]) => {
     const allKeywords = [...currentKeywords, keyword];
@@ -43,6 +59,7 @@ export default function Step2Keywords({ value, onChange, onTensionContextChange 
     if (value.includes(keyword)) {
       onChange(value.filter((k) => k !== keyword));
     } else {
+      if (value.length >= MAX_KEYWORDS) return; // cap at 6
       const conflict = checkForConflicts(keyword, value);
       if (conflict) {
         setDetectedConflict(conflict);
@@ -63,16 +80,13 @@ export default function Step2Keywords({ value, onChange, onTensionContextChange 
     setShowConflictModal(false);
   };
 
-  const categories = [
-    { name: 'Aesthetic', keywords: keywordsData.aesthetic },
-    { name: 'Values', keywords: keywordsData.values },
-    { name: 'Mood', keywords: keywordsData.mood },
-  ];
+  const descCharCount = brandDescription.length;
+  const approxSentences = (brandDescription.match(/[.!?]+/g) || []).length;
 
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-        {/* Section header */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
+        {/* ── Q3: Brand description ─────────────────────────────────────── */}
         <div>
           <div
             style={{
@@ -83,7 +97,7 @@ export default function Step2Keywords({ value, onChange, onTensionContextChange 
               marginBottom: 6,
             }}
           >
-            Select your brand DNA keywords
+            Describe your brand&apos;s aesthetic in 2–3 sentences.
           </div>
           <div
             style={{
@@ -91,62 +105,141 @@ export default function Step2Keywords({ value, onChange, onTensionContextChange 
               fontSize: 12,
               fontStyle: 'italic',
               color: 'rgba(67,67,43,0.44)',
+              marginBottom: 14,
             }}
           >
-            Choose 3-8 keywords that best describe your brand.
+            What does it look like, feel like, stand for?
           </div>
-        </div>
 
-        {/* Keywords by category */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-          {categories.map((category) => (
-            <div key={category.name}>
-              {/* Category label */}
-              <div
-                style={{
-                  fontFamily: inter,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  color: 'rgba(67,67,43,0.38)',
-                  marginBottom: 12,
-                }}
-              >
-                {category.name}
-              </div>
+          <textarea
+            value={brandDescription}
+            onChange={(e) => onBrandDescriptionChange(e.target.value)}
+            onFocus={() => setDescFocused(true)}
+            onBlur={() => setDescFocused(false)}
+            placeholder={`Clean, body-conscious silhouettes in sustainable fabrics. The woman who buys us cares about how she looks and where her clothes come from — in that order.`}
+            rows={4}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: '16px 18px',
+              fontSize: 14,
+              fontWeight: 400,
+              color: OLIVE,
+              backgroundColor: 'rgba(255,255,255,0.75)',
+              border: descFocused
+                ? `1.5px solid ${STEEL}`
+                : '1.5px solid rgba(67,67,43,0.10)',
+              borderRadius: 10,
+              outline: 'none',
+              fontFamily: inter,
+              lineHeight: 1.65,
+              resize: 'vertical',
+              transition: 'all 200ms ease',
+              boxShadow: descFocused
+                ? '0 4px 20px rgba(125,150,172,0.10)'
+                : '0 2px 8px rgba(0,0,0,0.04)',
+            }}
+          />
 
-              {/* Keyword chips */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {category.keywords.map((keyword) => (
-                  <KeywordChip
-                    key={keyword}
-                    label={keyword}
-                    selected={value.includes(keyword)}
-                    onClick={() => handleKeywordToggle(keyword)}
-                  />
-                ))}
-              </div>
+          {brandDescription && (
+            <div
+              style={{
+                marginTop: 8,
+                fontSize: 12,
+                color:
+                  approxSentences > 3
+                    ? 'rgba(169,123,143,0.80)'
+                    : 'rgba(67,67,43,0.42)',
+                fontFamily: inter,
+              }}
+            >
+              {descCharCount} chars
+              {approxSentences > 3 && ' · aim for 2–3 sentences'}
             </div>
-          ))}
+          )}
         </div>
 
-        {/* Selected count */}
-        {value.length > 0 && (
+        {/* ── Q4: Aesthetic keywords ────────────────────────────────────── */}
+        <div>
           <div
             style={{
-              fontSize: 12.5,
-              color: 'rgba(67,67,43,0.52)',
-              fontFamily: inter,
-              lineHeight: 1.6,
+              fontFamily: sohne,
+              fontSize: 15,
+              fontWeight: 500,
+              color: OLIVE,
+              marginBottom: 6,
             }}
           >
-            {value.length} keyword{value.length !== 1 ? 's' : ''} selected
+            Select up to 6 keywords that define your aesthetic.
           </div>
-        )}
+          <div
+            style={{
+              fontFamily: inter,
+              fontSize: 12,
+              fontStyle: 'italic',
+              color: 'rgba(67,67,43,0.44)',
+              marginBottom: 22,
+            }}
+          >
+            Choose across categories — not just one.
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+            {CHIP_GROUPS.map((group) => (
+              <div key={group.key}>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(67,67,43,0.38)',
+                    marginBottom: 12,
+                  }}
+                >
+                  {group.label}
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {group.keywords.map((keyword) => {
+                    const selected = value.includes(keyword);
+                    const disabled = !selected && value.length >= MAX_KEYWORDS;
+                    return (
+                      <KeywordChip
+                        key={keyword}
+                        label={keyword}
+                        selected={selected}
+                        disabled={disabled}
+                        onClick={() => handleKeywordToggle(keyword)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Running count */}
+          <div
+            style={{
+              marginTop: 20,
+              fontSize: 12.5,
+              color:
+                value.length >= MAX_KEYWORDS
+                  ? OLIVE
+                  : 'rgba(67,67,43,0.52)',
+              fontFamily: inter,
+              lineHeight: 1.6,
+              fontWeight: value.length >= MAX_KEYWORDS ? 600 : 400,
+            }}
+          >
+            {value.length} of {MAX_KEYWORDS} selected
+          </div>
+        </div>
       </div>
 
-      {/* Conflict Modal */}
+      {/* Conflict Modal — unchanged pattern */}
       {showConflictModal && detectedConflict && (
         <ConflictModal
           conflict={detectedConflict}
@@ -162,10 +255,12 @@ export default function Step2Keywords({ value, onChange, onTensionContextChange 
 function KeywordChip({
   label,
   selected,
+  disabled,
   onClick,
 }: {
   label: string;
   selected: boolean;
+  disabled: boolean;
   onClick: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -175,29 +270,39 @@ function KeywordChip({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      disabled={disabled}
       style={{
         padding: '9px 18px',
         fontSize: 13,
         fontWeight: selected ? 600 : 500,
-        color: selected ? OLIVE : hovered ? 'rgba(67,67,43,0.72)' : 'rgba(67,67,43,0.58)',
+        color: disabled
+          ? 'rgba(67,67,43,0.28)'
+          : selected
+          ? OLIVE
+          : hovered
+          ? 'rgba(67,67,43,0.72)'
+          : 'rgba(67,67,43,0.58)',
         backgroundColor: selected
           ? 'rgba(168,180,117,0.12)'
-          : hovered
+          : hovered && !disabled
           ? 'rgba(255,255,255,0.90)'
           : 'rgba(255,255,255,0.75)',
         border: selected
           ? `1.5px solid ${CHARTREUSE}`
-          : hovered
+          : hovered && !disabled
           ? '1.5px solid rgba(67,67,43,0.18)'
           : '1.5px solid rgba(67,67,43,0.10)',
         borderRadius: 999,
-        cursor: 'pointer',
+        cursor: disabled ? 'not-allowed' : 'pointer',
         fontFamily: sohne,
         letterSpacing: '0.01em',
         transition: 'all 200ms ease',
-        boxShadow: selected ? '0 2px 8px rgba(168,180,117,0.12)' : '0 2px 8px rgba(0,0,0,0.04)',
+        boxShadow: selected
+          ? '0 2px 8px rgba(168,180,117,0.12)'
+          : '0 2px 8px rgba(0,0,0,0.04)',
         transform: selected ? 'translateY(-1px)' : 'translateY(0)',
         outline: 'none',
+        opacity: disabled ? 0.45 : 1,
       }}
     >
       {label}
@@ -234,9 +339,7 @@ function ConflictModal({ conflict, onClose, onConfirm }: ConflictModalProps) {
   ];
 
   const handleConfirm = () => {
-    if (selected) {
-      onConfirm(selected);
-    }
+    if (selected) onConfirm(selected);
   };
 
   return (
@@ -267,7 +370,6 @@ function ConflictModal({ conflict, onClose, onConfirm }: ConflictModalProps) {
           border: '1px solid rgba(67,67,43,0.09)',
         }}
       >
-        {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <div
             style={{
@@ -311,23 +413,18 @@ function ConflictModal({ conflict, onClose, onConfirm }: ConflictModalProps) {
           </p>
         </div>
 
-        {/* Options */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
-          {resolutionOptions.map((option) => {
-            const active = selected === option.id;
-            return (
-              <ModalOption
-                key={option.id}
-                label={option.label}
-                description={option.description}
-                active={active}
-                onClick={() => setSelected(option.id)}
-              />
-            );
-          })}
+          {resolutionOptions.map((option) => (
+            <ModalOption
+              key={option.id}
+              label={option.label}
+              description={option.description}
+              active={selected === option.id}
+              onClick={() => setSelected(option.id)}
+            />
+          ))}
         </div>
 
-        {/* Actions */}
         <div style={{ display: 'flex', gap: 10 }}>
           <button
             onClick={onClose}
@@ -369,9 +466,7 @@ function ConflictModal({ conflict, onClose, onConfirm }: ConflictModalProps) {
               letterSpacing: '0.02em',
               color: selected ? STEEL : 'rgba(67,67,43,0.30)',
               background: selected ? 'rgba(125,150,172,0.07)' : 'rgba(255,255,255,0.46)',
-              border: selected
-                ? `1.5px solid ${STEEL}`
-                : '1.5px solid rgba(67,67,43,0.10)',
+              border: selected ? `1.5px solid ${STEEL}` : '1.5px solid rgba(67,67,43,0.10)',
               borderRadius: 10,
               cursor: selected ? 'pointer' : 'not-allowed',
               transition: 'all 280ms ease',
@@ -433,7 +528,6 @@ function ModalOption({
         gap: 10,
       }}
     >
-      {/* Radio dot */}
       <span
         style={{
           width: 13,

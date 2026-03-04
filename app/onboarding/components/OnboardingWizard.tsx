@@ -8,8 +8,8 @@ import ProgressIndicator from './ProgressIndicator';
 import Step1BrandName from './steps/Step1BrandName';
 import Step2Keywords from './steps/Step2Keywords';
 import Step3CustomerProfile from './steps/Step3CustomerProfile';
-import Step4PriceTier from './steps/Step4PriceTier';
-import Step5Margin from './steps/Step5Margin';
+import Step4BrandReferences from './steps/Step4PriceTier';
+import Step5AestheticExclusions from './steps/Step5Margin';
 import Step6Confirmation from './steps/Step6Confirmation';
 
 /* ─── Design tokens — match workspace pages ──────────────────────────────── */
@@ -20,9 +20,13 @@ const inter = 'var(--font-inter), system-ui, sans-serif';
 
 interface FormData {
   brandName: string;
+  priceTier: string;
+  brandDescription: string;
   keywords: string[];
   customerProfile: string;
-  priceTier: string;
+  referenceBrands: string[];
+  excludedBrands: string[];
+  excludedAesthetics: string[];
   targetMargin: number;
   tensionContext: string | null;
   acceptsConflicts: boolean;
@@ -37,9 +41,13 @@ export default function OnboardingWizard() {
 
   const [formData, setFormData] = useState<FormData>({
     brandName: '',
+    priceTier: '',
+    brandDescription: '',
     keywords: [],
     customerProfile: '',
-    priceTier: '',
+    referenceBrands: ['', '', ''],
+    excludedBrands: ['', '', ''],
+    excludedAesthetics: [],
     targetMargin: 60,
     tensionContext: null,
     acceptsConflicts: false,
@@ -86,12 +94,18 @@ export default function OnboardingWizard() {
       return;
     }
 
+    const referenceBrands = formData.referenceBrands.filter(Boolean);
+    const excludedBrands = formData.excludedBrands.filter(Boolean);
+
     console.log('Attempting to create profile with data:', {
       user_id: userId,
       brand_name: formData.brandName,
+      price_tier: formData.priceTier,
+      brand_description: formData.brandDescription,
       keywords: formData.keywords,
       customer_profile: formData.customerProfile,
-      price_tier: formData.priceTier,
+      reference_brands: referenceBrands,
+      excluded_brands: excludedBrands,
       target_margin: formData.targetMargin / 100,
       tension_context: formData.tensionContext,
       accepts_conflicts: formData.acceptsConflicts,
@@ -105,9 +119,12 @@ export default function OnboardingWizard() {
         .insert({
           user_id: userId,
           brand_name: formData.brandName,
+          price_tier: formData.priceTier,
+          brand_description: formData.brandDescription,
           keywords: formData.keywords,
           customer_profile: formData.customerProfile,
-          price_tier: formData.priceTier,
+          reference_brands: referenceBrands,
+          excluded_brands: excludedBrands,
           target_margin: formData.targetMargin / 100,
           tension_context: formData.tensionContext,
           accepts_conflicts: formData.acceptsConflicts,
@@ -121,7 +138,7 @@ export default function OnboardingWizard() {
       }
 
       console.log('Brand profile created successfully:', data);
-      router.push('/dashboard');
+      router.push('/entry');
     } catch (error: any) {
       console.error('Full error object:', error);
       alert(`Failed to create brand profile: ${error.message || 'Unknown error'}`);
@@ -136,15 +153,19 @@ export default function OnboardingWizard() {
         return (
           <Step1BrandName
             value={formData.brandName}
-            onChange={(val: string) => updateFormData('brandName', val)}
+            onChange={(val) => updateFormData('brandName', val)}
+            priceTier={formData.priceTier}
+            onPriceTierChange={(val) => updateFormData('priceTier', val)}
           />
         );
       case 2:
         return (
           <Step2Keywords
+            brandDescription={formData.brandDescription}
+            onBrandDescriptionChange={(val) => updateFormData('brandDescription', val)}
             value={formData.keywords}
-            onChange={(val: string[]) => updateFormData('keywords', val)}
-            onTensionContextChange={(context: string | null) => {
+            onChange={(val) => updateFormData('keywords', val)}
+            onTensionContextChange={(context) => {
               updateFormData('tensionContext', context);
               updateFormData('acceptsConflicts', context !== null);
             }}
@@ -154,21 +175,23 @@ export default function OnboardingWizard() {
         return (
           <Step3CustomerProfile
             value={formData.customerProfile}
-            onChange={(val: string) => updateFormData('customerProfile', val)}
+            onChange={(val) => updateFormData('customerProfile', val)}
           />
         );
       case 4:
         return (
-          <Step4PriceTier
-            value={formData.priceTier}
-            onChange={(val: string) => updateFormData('priceTier', val)}
+          <Step4BrandReferences
+            referenceBrands={formData.referenceBrands}
+            onReferenceBrandsChange={(val) => updateFormData('referenceBrands', val)}
+            excludedBrands={formData.excludedBrands}
+            onExcludedBrandsChange={(val) => updateFormData('excludedBrands', val)}
           />
         );
       case 5:
         return (
-          <Step5Margin
-            value={formData.targetMargin}
-            onChange={(val: number) => updateFormData('targetMargin', val)}
+          <Step5AestheticExclusions
+            targetMargin={formData.targetMargin}
+            onTargetMarginChange={(val) => updateFormData('targetMargin', val)}
           />
         );
       case 6:
@@ -208,7 +231,6 @@ export default function OnboardingWizard() {
           gap: 20,
         }}
       >
-        {/* Left: logo + context + progress */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           <span
             style={{
@@ -222,13 +244,7 @@ export default function OnboardingWizard() {
             muko
           </span>
 
-          <div
-            style={{
-              width: 1,
-              height: 24,
-              background: 'rgba(67,67,43,0.10)',
-            }}
-          />
+          <div style={{ width: 1, height: 24, background: 'rgba(67,67,43,0.10)' }} />
 
           <span
             style={{

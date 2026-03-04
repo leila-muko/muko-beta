@@ -17,6 +17,12 @@ const FALLBACK: InsightData = {
     'Push silhouette further than the category expects',
     'Find the unexpected material within the aesthetic',
   ],
+  secondary: [
+    'The consumer appetite for this direction is real and growing',
+    'Adjacent references give the brand a credible entry point',
+    'Timing into this window is workable before saturation sets in',
+  ],
+  secondaryLabel: 'THE OPPORTUNITY',
 };
 
 const DIVIDER = (
@@ -105,6 +111,56 @@ export function InsightPanel({ data = FALLBACK, onChipApply }: InsightPanelProps
           </div>
         ))}
       </div>
+
+      {/* ─── Secondary section (opposite of primary — always rendered if populated) ─── */}
+      {data.secondary && data.secondary.length > 0 && (
+        <>
+          {DIVIDER}
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: '0.10em',
+              textTransform: 'uppercase',
+              color: data.secondaryLabel === 'THE OPPORTUNITY' ? '#A8B475' : 'rgba(67,67,43,0.42)',
+              fontFamily: 'var(--font-sohne-breit), system-ui, sans-serif',
+              marginBottom: 10,
+            }}
+          >
+            {data.secondaryLabel}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {data.secondary.map((bullet, i) => (
+              <div
+                key={i}
+                style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: 'rgba(67,67,43,0.35)',
+                    flexShrink: 0,
+                    lineHeight: 1.58,
+                    fontFamily: 'var(--font-inter), system-ui, sans-serif',
+                  }}
+                >
+                  ·
+                </span>
+                <span
+                  style={{
+                    fontSize: 12.5,
+                    lineHeight: 1.5,
+                    color: 'rgba(67,67,43,0.72)',
+                    fontFamily: 'var(--font-inter), system-ui, sans-serif',
+                  }}
+                >
+                  {bullet}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ─── Sharpen row (optional) ─── */}
       {data.sharpenChips && data.sharpenChips.length > 0 && (

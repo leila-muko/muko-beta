@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { CheckIcon, PencilIcon } from "@/components/ui/icons/InsightIcons";
 import type { SpecSuggestion } from "@/lib/types/next-move";
+import type { InsightMode } from "@/lib/types/insight";
 
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
@@ -44,21 +45,28 @@ export interface ConstructionImplication {
 export interface MukoInsightSectionProps {
   headline: string;
   paragraphs: string[];
-  opportunity: { items: string[]; subtitle?: string };
-  edit: { items: string[]; subtitle?: string };
+  bullets: { label: string; items: string[]; subtitle?: string };
   nextMove: NextMoveProps;
   constructionImplications?: ConstructionImplication[];
+  mode?: InsightMode;
+  /** True while the LLM is streaming new text — activates streaming display state */
+  isStreaming?: boolean;
+  /** Partial `brand_alignment` / `margin_read` value extracted from the in-progress JSON */
+  streamingText?: string;
 }
 
 export function MukoInsightSection({
   headline,
   paragraphs,
-  opportunity,
-  edit,
+  bullets,
   nextMove,
   constructionImplications,
+  mode,
+  isStreaming = false,
+  streamingText = '',
 }: MukoInsightSectionProps) {
   const [dlExpanded, setDlExpanded] = useState(true);
+  const [bulletsExpanded, setBulletsExpanded] = useState(true);
   const [expandedChips, setExpandedChips] = useState<Set<string>>(new Set());
   const implKey = constructionImplications?.map(s => s.chip).join('|') ?? '';
   useEffect(() => {
@@ -100,7 +108,12 @@ export function MukoInsightSection({
         MUKO INSIGHT
       </div>
 
-      {/* Headline — pullquote style */}
+      {/* Streaming cursor keyframes — injected once per render */}
+      {isStreaming && (
+        <style>{`@keyframes mukoCursorBlink{0%,100%{opacity:1}50%{opacity:0}}@keyframes mukoCardPulse{0%,100%{opacity:0.5}50%{opacity:0.8}}`}</style>
+      )}
+
+      {/* Headline — pullquote style; shows streaming text while generating */}
       <div
         style={{
           fontFamily: sohne,
@@ -113,11 +126,33 @@ export function MukoInsightSection({
           paddingLeft: 16,
         }}
       >
-        {headline}
+        {isStreaming && streamingText ? (
+          <>
+            {streamingText}
+            <span
+              style={{
+                display: "inline-block",
+                width: 2,
+                height: "1em",
+                background: "#A8B475",
+                marginLeft: 2,
+                verticalAlign: "text-bottom",
+                animation: "mukoCursorBlink 0.9s step-start infinite",
+              }}
+            />
+          </>
+        ) : isStreaming ? (
+          /* streaming started but no extractable text yet — pulse the border */
+          <span style={{ opacity: 0.35, animation: "mukoCardPulse 1.2s ease-in-out infinite" }}>
+            {headline}
+          </span>
+        ) : (
+          headline
+        )}
       </div>
 
-      {/* Body paragraphs */}
-      {paragraphs.map((p, i) => (
+      {/* Body paragraphs — hidden while streaming; show prior content faded */}
+      {!isStreaming && paragraphs.map((p, i) => (
         <p
           key={i}
           style={{
@@ -243,63 +278,45 @@ export function MukoInsightSection({
         </div>
       )}
 
-      {/* The Opportunity card — compact */}
-      {opportunity.items.length > 0 && (
-        <div
+      {/* Single bullets card — camel, always renders; pulses while streaming */}
+      <div
+        style={{
+          padding: "11px 16px",
+          borderRadius: 10,
+          border: "1px solid rgba(184,135,107,0.22)",
+          borderLeft: "3px solid rgba(184,135,107,0.40)",
+          background: "transparent",
+          marginBottom: 16,
+          animation: isStreaming ? "mukoCardPulse 1.5s ease-in-out infinite" : undefined,
+        }}
+      >
+        <button
+          onClick={() => setBulletsExpanded(e => !e)}
+          disabled={isStreaming}
           style={{
-            padding: "11px 16px",
-            borderRadius: 10,
-            border: "1px solid rgba(168,180,117,0.22)",
-            borderLeft: "3px solid rgba(168,180,117,0.30)",
-            background: "transparent",
-            marginBottom: 16,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            width: "100%", background: "none", border: "none", cursor: isStreaming ? "default" : "pointer",
+            padding: 0, marginBottom: (!isStreaming && bulletsExpanded) ? 4 : 0,
           }}
         >
-          <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8B475", marginBottom: 4 }}>
-            THE OPPORTUNITY
-          </div>
-          <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 10 }}>
-            {opportunity.subtitle || "What\u2019s working in your favor right now"}
-          </div>
-          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 7 }}>
-            {opportunity.items.map((point, i) => (
-              <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.62)", lineHeight: 1.5 }}>
-                <CheckIcon size={12} color="#A8B475" />
-                <span style={{ marginTop: -1 }}>{point}</span>
+          <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#B8876B" }}>
+            {bullets.label}
+          </span>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, transform: (!isStreaming && bulletsExpanded) ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 180ms ease", color: "#B8876B" }}>
+            <path d="M2 4.5L6 8L10 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        {!isStreaming && bulletsExpanded && bullets.items.length > 0 && (
+          <ul style={{ margin: "8px 0 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 7 }}>
+            {bullets.items.map((item, i) => (
+              <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.66)", lineHeight: 1.55 }}>
+                <span style={{ color: "rgba(184,135,107,0.55)", flexShrink: 0, marginTop: 1, fontSize: 11 }}>·</span>
+                <span>{item}</span>
               </li>
             ))}
           </ul>
-        </div>
-      )}
-
-      {/* The Edit card — compact */}
-      {edit.items.length > 0 && (
-        <div
-          style={{
-            padding: "11px 16px",
-            borderRadius: 10,
-            border: "1px solid rgba(184,135,107,0.22)",
-            borderLeft: "3px solid rgba(184,135,107,0.30)",
-            background: "transparent",
-            marginBottom: 16,
-          }}
-        >
-          <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#B8876B", marginBottom: 4 }}>
-            THE EDIT
-          </div>
-          <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.45)", marginBottom: 10 }}>
-            {edit.subtitle || "Inputs worth revisiting before you commit"}
-          </div>
-          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 7 }}>
-            {edit.items.map((item, i) => (
-              <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.62)", lineHeight: 1.5 }}>
-                <PencilIcon size={12} color="#B8876B" />
-                <span style={{ marginTop: -1 }}>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ── Next Move — Concept ──────────────────────────────────────────── */}
       {nextMove.mode === "concept" && nextMove.items.length > 0 && (() => {

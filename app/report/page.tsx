@@ -1,11 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import FloatingMukoOrb from "@/components/FloatingMukoOrb";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import type { KeyPiece } from "@/lib/store/sessionStore";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
+import { buildReportBlackboard, toAestheticSlug } from "@/lib/synthesizer/assemble";
+import { calculateCOGS } from "@/lib/spec-studio/calculator";
+import { createClient } from "@/lib/supabase/client";
+import materialsData from "@/data/materials.json";
+import type { Material, ConstructionTier } from "@/lib/types/spec-studio";
+import type { InsightData } from "@/lib/types/insight";
+import type { ReportComputedData } from "@/lib/synthesizer/reportNarrative";
 
 /* ═══════════════════════════════════════════════════════════════
    Muko — The Standard Report (Step 4)
@@ -307,92 +313,8 @@ function RadarChart({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   MOCK DATA — Replace with real Orchestrator Blackboard output
-   ═══════════════════════════════════════════════════════════════ */
-const MOCK_REPORT = {
-  collectionName: "Desert Mirage",
-  seasonLabel: "SS26",
-  aestheticName: "Refined Clarity",
-  modifiers: ["Feminine", "Soft"],
-  category: "Outerwear",
-  material: "Cotton Twill",
-  materialCostPerYd: 20,
-  materialLeadWeeks: 3,
-  silhouette: "Cocoon",
-  yardage: 3.8,
-  constructionTier: "High" as const,
-  targetMSRP: 450,
-  targetMargin: 0.6,
-  overallScore: 78,
-  identity: 88,
-  resonance: 82,
-  execution: 64,
-  brandFit: 90,
-  demand: 82,
-  saturation: 78,
-  margin: 75,
-  cost: 72,
-  timeline: 58,
-  cogs: 142,
-  ceiling: 180,
-  projectedMargin: 68.4,
-  costGatePassed: true,
-  narrative: {
-    working:
-      "Your aesthetic direction aligns strongly with your brand DNA. Refined Clarity captures the clean, editorial sensibility your customer expects, and its resonance score of 82 signals healthy demand without the saturation risk of more trending directions. This is a confident choice.",
-    consider:
-      "Execution presents the main tension. Cotton Twill at $20/yd keeps you well within margin, but the high construction complexity paired with a 3-week lead time leaves limited buffer for your Resort timeline. The Cocoon silhouette adds yardage that compounds this pressure.",
-    recommendation:
-      "This direction works — don't abandon it. Consider simplifying construction from High to Moderate tier, or switching silhouette from Cocoon to Straight to reduce yardage by 0.8 yards/unit and gain 2 weeks of production buffer.",
-  },
-  redirect: {
-    label: "Switch Cocoon → Straight silhouette",
-    savings: "~$16/unit in material",
-    timeline: "recovers 2 weeks of buffer",
-    detail: "Maintains the aesthetic integrity of Refined Clarity without the execution risk.",
-  },
-  considerations: [
-    {
-      title: "Timeline pressure from Cocoon yardage",
-      detail:
-        "Cocoon requires ~3.8 yards vs. 3.0 for Straight. This extends cutting time and increases material waste risk at volume.",
-      dimension: "execution" as const,
-    },
-    {
-      title: "Cotton Twill sourcing window",
-      detail:
-        "3-week lead time is standard, but seasonal demand spikes in Q1 could extend this. Place orders early or identify backup supplier.",
-      dimension: "execution" as const,
-    },
-    {
-      title: "Refined Clarity is trending — watch saturation",
-      detail:
-        "Currently at 35% saturation (healthy), but velocity is accelerating. If competitors converge here for Resort, differentiation becomes critical.",
-      dimension: "resonance" as const,
-    },
-  ],
-  actions: [
-    {
-      title: "Simplify silhouette to Straight",
-      detail:
-        "Saves ~$16/unit in material and recovers 2 weeks of production buffer. Maintains aesthetic integrity.",
-      tags: ["Cost", "Timeline"],
-    },
-    {
-      title: "Lock material sourcing this week",
-      detail:
-        "Place a preliminary order for Cotton Twill to secure pricing and lead time before Q1 demand peaks.",
-      tags: ["Execution"],
-    },
-    {
-      title: "Try a Tencel version",
-      detail:
-        "Tencel at $22/yd offers similar hand feel with better drape. Swap the material and re-run to see the margin impact.",
-      tags: ["Identity", "Cost"],
-    },
-  ],
-};
+/* ─── Default target margin (used until brand profile is wired) ─── */
+const DEFAULT_TARGET_MARGIN = 0.60;
 
 /* ─── Dimension tag style by type ─── */
 const DIM_TAG: Record<string, { bg: string; text: string; border: string }> = {
@@ -503,24 +425,122 @@ export default function StandardReportPage() {
   } = useSessionStore();
 
   const aestheticScores = storeAesthetic ? AESTHETIC_CONTENT[storeAesthetic] : null;
-  const derivedIdentity  = aestheticScores?.identityScore  ?? MOCK_REPORT.identity;
-  const derivedResonance = aestheticScores?.resonanceScore ?? MOCK_REPORT.resonance;
+  const derivedIdentity  = aestheticScores?.identityScore  ?? 0;
+  const derivedResonance = aestheticScores?.resonanceScore ?? 0;
+  const derivedExecution = storeExecutionPulse?.score ?? 0;
+
+  // ─── reportComputed: populated by synthesizer API on mount ───────────────
+  const [reportComputed, setReportComputed] = useState<ReportComputedData | null>(null);
+
+  // Local pre-synthesizer fallbacks (computed from store, never from MOCK)
+  const localOverallScore = Math.round(
+    derivedIdentity * 0.35 + derivedResonance * 0.35 + derivedExecution * 0.30
+  );
 
   const report = {
-    ...MOCK_REPORT,
-    collectionName:   storeCollection || MOCK_REPORT.collectionName,
-    seasonLabel:      storeSeason     || MOCK_REPORT.seasonLabel,
-    aestheticName:    storeAesthetic  || MOCK_REPORT.aestheticName,
-    category:         storeCategory   || MOCK_REPORT.category,
-    material:         storeMaterial   || MOCK_REPORT.material,
-    silhouette:       storeSilhouette || MOCK_REPORT.silhouette,
-    targetMSRP:       storeTargetMsrp ?? MOCK_REPORT.targetMSRP,
-    constructionTier: (storeTier ? storeTier.charAt(0).toUpperCase() + storeTier.slice(1) : MOCK_REPORT.constructionTier) as "Low" | "Moderate" | "High",
-    modifiers:        storeModifiers.length > 0 ? storeModifiers : (storeAesthetic ? [] : MOCK_REPORT.modifiers),
-    identity:         derivedIdentity,
-    resonance:        derivedResonance,
-    execution:        storeExecutionPulse?.score ?? MOCK_REPORT.execution,
+    collectionName:   storeCollection || "—",
+    seasonLabel:      storeSeason     || "—",
+    aestheticName:    storeAesthetic  || "—",
+    category:         storeCategory   || "—",
+    material:         storeMaterial   || "—",
+    silhouette:       storeSilhouette || "—",
+    targetMSRP:       storeTargetMsrp ?? 0,
+    targetMargin:     reportComputed?.targetMargin ?? DEFAULT_TARGET_MARGIN,
+    constructionTier: (storeTier
+      ? storeTier.charAt(0).toUpperCase() + storeTier.slice(1)
+      : "Moderate") as "Low" | "Moderate" | "High",
+    modifiers: storeModifiers,
+    identity:  derivedIdentity,
+    resonance: derivedResonance,
+    execution: derivedExecution,
+    // Synthesizer-computed fields (fall back to 0/empty while loading)
+    overallScore:     reportComputed?.overallScore     ?? localOverallScore,
+    brandFit:         reportComputed?.brandFit         ?? derivedIdentity,
+    demand:           reportComputed?.demand           ?? derivedResonance,
+    saturation:       reportComputed?.saturation       ?? 0,
+    margin:           reportComputed?.margin           ?? 0,
+    cost:             reportComputed?.cost             ?? 0,
+    timeline:         reportComputed?.timeline         ?? 0,
+    cogs:             reportComputed?.cogs             ?? 0,
+    ceiling:          reportComputed?.ceiling          ?? 0,
+    projectedMargin:  reportComputed?.projectedMargin  ?? 0,
+    costGatePassed:   reportComputed?.costGatePassed   ?? true,
+    considerations:   reportComputed?.considerations   ?? [],
+    actions:          reportComputed?.actions          ?? [],
+    redirect:         reportComputed?.redirect         ?? null,
   };
+
+  // ─── Synthesizer: one-time report on mount ────────────────────────────────
+  const reportAbortRef = useRef<AbortController | null>(null);
+  const [reportNarrativeData, setReportNarrativeData] = useState<InsightData | null>(null);
+
+  useEffect(() => {
+    if (!storeAesthetic) return;
+    const slug = toAestheticSlug(storeAesthetic);
+    if (!slug || !storeMaterial) return;
+
+    const materials = materialsData as unknown as Material[];
+    const mat = materials.find((m) => m.id === storeMaterial);
+    const tier = (storeTier ?? 'moderate') as ConstructionTier;
+    const cogsResult = mat
+      ? calculateCOGS(mat, 2.5, tier, false, storeTargetMsrp ?? 0, DEFAULT_TARGET_MARGIN)
+      : null;
+    const cogsUsd = cogsResult?.totalCOGS ?? 0;
+    const marginPass = cogsResult ? !cogsResult.isOverBudget : true;
+    const overallScore = Math.round(derivedIdentity * 0.35 + derivedResonance * 0.35 + derivedExecution * 0.30);
+
+    const blackboard = buildReportBlackboard({
+      aestheticSlug: slug,
+      brandKeywords: storeModifiers,
+      identity_score: derivedIdentity,
+      resonance_score: derivedResonance,
+      execution_score: derivedExecution,
+      overall_score: overallScore,
+      materialId: storeMaterial,
+      cogs_usd: cogsUsd,
+      target_msrp: storeTargetMsrp ?? 0,
+      margin_pass: marginPass,
+      construction_tier: storeTier ?? 'moderate',
+      timeline_weeks: 14,
+      season: storeSeason || 'SS27',
+      collectionName: storeCollection || '',
+      collection_role: collectionRole,
+    });
+    if (!blackboard) return;
+
+    reportAbortRef.current?.abort();
+    const controller = new AbortController();
+    reportAbortRef.current = controller;
+
+    (async () => {
+      try {
+        const res = await fetch('/api/synthesizer/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(blackboard),
+          signal: controller.signal,
+        });
+        if (!res.ok || controller.signal.aborted) return;
+        const result = await res.json();
+        if (controller.signal.aborted) return;
+        setReportNarrativeData(result.data as InsightData);
+        setReportComputed(result.computed as ReportComputedData);
+        // Fire-and-forget DB log
+        try {
+          const supabase = createClient();
+          supabase.from('analyses').insert({
+            narrative: (result.data as InsightData).statements?.join(' ') ?? '',
+            agent_versions: { synthesizer: result.meta?.method ?? 'unknown' },
+          }).then(() => {});
+        } catch { /* fire-and-forget */ }
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return;
+      }
+    })();
+
+    return () => { controller.abort(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const animatedScore     = useCountUp(report.overallScore, 1400, 500);
   const animatedIdentity  = useCountUp(report.identity,     1000, 800);
@@ -532,8 +552,8 @@ export default function StandardReportPage() {
   const resonanceColor = getScoreColor(report.resonance);
   const executionColor = getScoreColor(report.execution);
 
-  const headerCollectionName = storeCollection || MOCK_REPORT.collectionName;
-  const headerSeasonLabel    = storeSeason     || MOCK_REPORT.seasonLabel;
+  const headerCollectionName = storeCollection || '—';
+  const headerSeasonLabel    = storeSeason     || '—';
 
   const radarData = [
     { label: "Brand Fit",  value: report.brandFit,   color: getScoreColor(report.brandFit) },
@@ -1055,7 +1075,7 @@ export default function StandardReportPage() {
                       <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: CHARTREUSE, marginBottom: 6 }}>
                         What&apos;s Working
                       </div>
-                      <p style={bodyText}>{report.narrative.working}</p>
+                      <p style={bodyText}>{reportNarrativeData?.statements[0] ?? ''}</p>
                       {passSignals.map((s, i) => <AlignmentLine key={i} signal={s} />)}
                     </div>
 
@@ -1064,7 +1084,7 @@ export default function StandardReportPage() {
                       <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: STEEL, marginBottom: 6 }}>
                         What to Consider
                       </div>
-                      <p style={bodyText}>{report.narrative.consider}</p>
+                      <p style={bodyText}>{reportNarrativeData?.statements[1] ?? ''}</p>
                       {watchSignals.map((s, i) => <AlignmentLine key={i} signal={s} />)}
                     </div>
 
@@ -1073,50 +1093,51 @@ export default function StandardReportPage() {
                       <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: ROSE, marginBottom: 6 }}>
                         Recommendation
                       </div>
-                      <p style={bodyText}>{report.narrative.recommendation}</p>
+                      <p style={bodyText}>{reportNarrativeData?.statements[2] ?? ''}</p>
                     </div>
                   </div>
                 );
               })()}
 
-              {/* Key Redirect — matches SharpenRow / add-chip-row from Concept Studio */}
-              <div
-                style={{
-                  marginTop: 18,
-                  padding: "10px 12px",
-                  borderRadius: 6,
-                  border: "1px dashed rgba(67,67,43,0.22)",
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 10,
-                }}
-              >
-                <span style={{ color: CHARTREUSE, fontSize: 16, flexShrink: 0, lineHeight: 1.4 }}>→</span>
-                <div>
-                  <div
-                    style={{
-                      fontFamily: inter,
-                      fontSize: 12,
-                      fontWeight: 650,
-                      color: "rgba(67,67,43,0.72)",
-                      marginBottom: 3,
-                    }}
-                  >
-                    Key Redirect: {report.redirect.label}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: inter,
-                      fontSize: 12,
-                      lineHeight: 1.55,
-                      color: "rgba(67,67,43,0.52)",
-                    }}
-                  >
-                    Saves {report.redirect.savings} and {report.redirect.timeline}.{" "}
-                    {report.redirect.detail}
+              {/* Key Redirect — rendered when synthesizer resolves a redirect */}
+              {report.redirect && (
+                <div
+                  style={{
+                    marginTop: 18,
+                    padding: "10px 12px",
+                    borderRadius: 6,
+                    border: "1px dashed rgba(67,67,43,0.22)",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                  }}
+                >
+                  <span style={{ color: CHARTREUSE, fontSize: 16, flexShrink: 0, lineHeight: 1.4 }}>→</span>
+                  <div>
+                    <div
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 12,
+                        fontWeight: 650,
+                        color: "rgba(67,67,43,0.72)",
+                        marginBottom: 3,
+                      }}
+                    >
+                      Key Redirect: {report.redirect.label}
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 12,
+                        lineHeight: 1.55,
+                        color: "rgba(67,67,43,0.52)",
+                      }}
+                    >
+                      {report.redirect.savings ? `${report.redirect.savings} — ` : ''}{report.redirect.detail}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* ── Dimension Map (Radar) ── */}
@@ -1185,13 +1206,13 @@ export default function StandardReportPage() {
                   name: "Cost Viability",
                   passed: report.costGatePassed,
                   metric: `$${report.cogs}`,
-                  detail: `Estimated COGS per unit. Target ceiling is $${report.ceiling} at ${Math.round(report.targetMargin * 100)}% margin on $${report.targetMSRP} MSRP. You have $${report.ceiling - report.cogs} of headroom.`,
+                  detail: `Estimated COGS per unit. Target ceiling is $${report.ceiling} at ${Math.round(report.targetMargin * 100)}% margin on $${report.targetMSRP} MSRP.${report.costGatePassed ? ` You have $${Math.round(report.ceiling - report.cogs)} of headroom.` : ` You are $${Math.round(report.cogs - report.ceiling)} over ceiling.`}`,
                 },
                 {
                   name: "Margin Health",
                   passed: report.projectedMargin >= report.targetMargin * 100,
                   metric: `${report.projectedMargin}%`,
-                  detail: `Projected margin exceeds your ${Math.round(report.targetMargin * 100)}% target. ${report.silhouette} silhouette adds ~$16 in material vs. Straight — still within range.`,
+                  detail: `Projected margin at ${report.projectedMargin}% vs. your ${Math.round(report.targetMargin * 100)}% target.${report.projectedMargin >= report.targetMargin * 100 ? ' Within range.' : ' Below target — consider a cost reduction.'}`,
                 },
                 {
                   name: "Sustainability",
@@ -1533,7 +1554,11 @@ export default function StandardReportPage() {
           resonance: report.resonance,
           execution: report.execution,
           gates:     { costGatePassed: report.costGatePassed },
-          narrative: report.narrative,
+          narrative: {
+            working:        reportNarrativeData?.statements[0] ?? '',
+            consider:       reportNarrativeData?.statements[1] ?? '',
+            recommendation: reportNarrativeData?.statements[2] ?? '',
+          },
         }}
         conceptName={report.aestheticName}
         identityScore={report.identity}

@@ -10,20 +10,38 @@ const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
 interface StepProps {
   formData: {
     brandName: string;
+    priceTier: string;
+    brandDescription: string;
     keywords: string[];
     customerProfile: string;
-    priceTier: string;
+    referenceBrands: string[];
+    excludedBrands: string[];
+    excludedAesthetics: string[];
     targetMargin: number;
   };
 }
 
+const AESTHETIC_LABELS: Record<string, string> = {
+  'terrain-luxe':    'Terrain Luxe',
+  'quiet-structure': 'Quiet Structure',
+  'romantic-analog': 'Romantic Analog',
+  'heritage-hand':   'Heritage Hand',
+  'undone-glam':     'Undone Glam',
+  'haptic-play':     'Haptic Play',
+  'high-voltage':    'High Voltage',
+  'sweet-subversion':'Sweet Subversion',
+};
+
+const PRICE_TIER_LABELS: Record<string, string> = {
+  Contemporary: 'Contemporary ($100–300)',
+  Bridge:       'Bridge ($300–600)',
+  Luxury:       'Luxury ($600+)',
+};
+
 export default function Step6Confirmation({ formData }: StepProps) {
-  const priceTierLabels: Record<string, string> = {
-    Accessible: 'Accessible ($50-100)',
-    Contemporary: 'Contemporary ($100-300)',
-    Bridge: 'Bridge ($300-600)',
-    Luxury: 'Luxury ($600+)',
-  };
+  const refBrands = formData.referenceBrands.filter(Boolean);
+  const exclBrands = formData.excludedBrands.filter(Boolean);
+  const exclAesthetics = formData.excludedAesthetics;
 
   const fields = [
     {
@@ -32,19 +50,44 @@ export default function Step6Confirmation({ formData }: StepProps) {
       filled: !!formData.brandName,
     },
     {
-      label: 'Brand DNA Keywords',
+      label: 'Market Tier',
+      value: formData.priceTier
+        ? PRICE_TIER_LABELS[formData.priceTier] ?? formData.priceTier
+        : 'Not selected',
+      filled: !!formData.priceTier,
+    },
+    {
+      label: 'Brand Description',
+      value: formData.brandDescription || 'Not provided',
+      filled: !!formData.brandDescription,
+    },
+    {
+      label: 'Aesthetic Keywords',
       value: formData.keywords.length > 0 ? formData.keywords.join(', ') : 'None selected',
       filled: formData.keywords.length > 0,
     },
     {
-      label: 'Customer Profile',
+      label: 'Customer',
       value: formData.customerProfile || 'Not provided',
       filled: !!formData.customerProfile,
     },
     {
-      label: 'Price Tier',
-      value: formData.priceTier ? priceTierLabels[formData.priceTier] : 'Not selected',
-      filled: !!formData.priceTier,
+      label: 'Reference Brands',
+      value: refBrands.length > 0 ? refBrands.join(', ') : 'None added',
+      filled: refBrands.length > 0,
+    },
+    {
+      label: 'Never-Be Brands',
+      value: exclBrands.length > 0 ? exclBrands.join(', ') : 'None added',
+      filled: exclBrands.length > 0,
+    },
+    {
+      label: 'Excluded Aesthetics',
+      value:
+        exclAesthetics.length > 0
+          ? exclAesthetics.map((id) => AESTHETIC_LABELS[id] ?? id).join(', ')
+          : 'None excluded',
+      filled: exclAesthetics.length > 0,
     },
     {
       label: 'Target Margin',
@@ -55,7 +98,6 @@ export default function Step6Confirmation({ formData }: StepProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Section header */}
       <div>
         <div
           style={{
@@ -80,7 +122,6 @@ export default function Step6Confirmation({ formData }: StepProps) {
         </div>
       </div>
 
-      {/* Summary card */}
       <div
         style={{
           borderRadius: 10,
@@ -103,7 +144,6 @@ export default function Step6Confirmation({ formData }: StepProps) {
                 gap: 10,
               }}
             >
-              {/* Status dot */}
               <span
                 style={{
                   width: 7,
@@ -138,6 +178,7 @@ export default function Step6Confirmation({ formData }: StepProps) {
                     color: field.filled ? OLIVE : 'rgba(67,67,43,0.42)',
                     fontFamily: inter,
                     lineHeight: 1.5,
+                    wordBreak: 'break-word',
                   }}
                 >
                   {field.value}
@@ -148,7 +189,6 @@ export default function Step6Confirmation({ formData }: StepProps) {
         </div>
       </div>
 
-      {/* Note */}
       <div
         style={{
           fontSize: 12,

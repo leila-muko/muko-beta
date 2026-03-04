@@ -34,6 +34,8 @@ import type { PulseChipProps } from "@/components/ui/PulseChip";
 import { InsightPanel } from "@/components/ui/InsightPanel";
 import { SuggestionCard } from "@/components/ui/SuggestionCard";
 import type { InsightData, SpecInsightMode } from "@/lib/types/insight";
+import { buildSpecBlackboard } from "@/lib/synthesizer/assemble";
+import { createClient } from "@/lib/supabase/client";
 import type { SpecSuggestion } from "@/lib/types/next-move";
 
 /* ─── Icons: matched to Concept Studio (star, users, cog) ─── */
@@ -541,7 +543,7 @@ function RemoveSignalButton({ onClick }: { onClick: () => void }) {
 
 export default function SpecStudioPage() {
   const router = useRouter();
-  const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse } = useSessionStore();
+  const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole } = useSessionStore();
   const categories: Category[] = categoriesData.categories as unknown as Category[];
   const materials: Material[] = materialsData as unknown as Material[];
   const allSubcategories = subcategoriesData as Record<string, SubcategoryEntry[]>;
@@ -618,6 +620,7 @@ export default function SpecStudioPage() {
 
   const storeCollectionName = useSessionStore((s) => s.collectionName);
   const storeSeason = useSessionStore((s) => s.season);
+  const refinementModifiers = useSessionStore((s) => s.refinementModifiers);
 
   const [headerCollectionName, setHeaderCollectionName] = useState("Desert Mirage");
   const [headerSeasonLabel, setHeaderSeasonLabel] = useState("SS26");
@@ -1207,6 +1210,142 @@ export default function SpecStudioPage() {
 
   const specInsightData = getSpecInsightData(executionScore, marginGatePassed, timelineBuffer);
 
+  // ─── Synthesizer: reactive MUKO INSIGHT (streaming) ──────────────────────
+  const specAbortRef = useRef<AbortController | null>(null);
+  const [specSynthInsightData, setSpecSynthInsightData] = useState<InsightData | null>(null);
+  const [specInsightLoading, setSpecInsightLoading] = useState(false);
+  const [specStreamingText, setSpecStreamingText] = useState('');
+
+  useEffect(() => {
+    if (!userManuallySelected || !materialId || !conceptContext.aestheticMatchedId) return;
+
+    const tensionToNum = (v: string) => v === 'left' ? 75 : v === 'right' ? 25 : 50;
+    let intentPayload: import('@/lib/synthesizer/blackboard').IntentCalibration | undefined;
+    try {
+      const raw = window.localStorage.getItem('muko_intent');
+      if (raw) {
+        const parsed = JSON.parse(raw) as { tensions?: Record<string, string> };
+        const t = parsed.tensions ?? {};
+        intentPayload = {
+          primary_goals: intentGoals,
+          tradeoff: intentTradeoff,
+          piece_role: storeCollectionRole ?? '',
+          tension_sliders: {
+            trend_forward: tensionToNum(t.trendForward_vs_timeless ?? 'center'),
+            creative_expression: tensionToNum(t.creative_vs_commercial ?? 'center'),
+            elevated_design: tensionToNum(t.elevated_vs_accessible ?? 'center'),
+            novelty: tensionToNum(t.novelty_vs_continuity ?? 'center'),
+          },
+        };
+      }
+    } catch { /* no intent stored — omit from payload */ }
+
+    const blackboard = buildSpecBlackboard({
+      aestheticSlug: conceptContext.aestheticMatchedId,
+      brandKeywords: refinementModifiers,
+      identity_score: dynamicIdentityScore,
+      resonance_score: dynamicResonanceScore,
+      execution_score: executionScore,
+      materialId,
+      cogs_usd: insight?.cogs ?? 0,
+      target_msrp: targetMSRP,
+      margin_pass: marginGatePassed,
+      construction_tier: constructionTier ?? 'moderate',
+      timeline_weeks: timelineWeeks,
+      season: storeSeason || 'SS27',
+      collectionName: storeCollectionName || headerCollectionName,
+      intent: intentPayload,
+    });
+    if (!blackboard) return;
+
+    specAbortRef.current?.abort();
+    const controller = new AbortController();
+    specAbortRef.current = controller;
+
+    const timer = window.setTimeout(async () => {
+      setSpecInsightLoading(true);
+      setSpecStreamingText('');
+      try {
+        const res = await fetch('/api/synthesizer/spec', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(blackboard),
+          signal: controller.signal,
+        });
+        if (!res.ok || !res.body || controller.signal.aborted) return;
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let currentEvent = '';
+        let currentData = '';
+
+        const processMessage = (event: string, data: string) => {
+          if (event === 'chunk') {
+            try {
+              const parsed = JSON.parse(data) as { text: string };
+              const chunk = parsed.text ?? '';
+              setSpecStreamingText(prev => {
+                const accumulated = prev + chunk;
+                // Extract partial margin_read value for display
+                const match = accumulated.match(/"margin_read"\s*:\s*"([^"]*)/);
+                return match ? match[1] : prev;
+              });
+            } catch { /* ignore parse errors on partial chunks */ }
+          } else if (event === 'complete' || event === 'fallback') {
+            try {
+              const result = JSON.parse(data) as { data: InsightData; meta: { method: string } };
+              if (!controller.signal.aborted) {
+                setSpecSynthInsightData(result.data);
+                setSpecStreamingText('');
+                // Fire-and-forget DB log
+                try {
+                  const supabase = createClient();
+                  supabase.from('analyses').insert({
+                    narrative: result.data.statements?.join(' ') ?? '',
+                    agent_versions: { synthesizer: result.meta?.method ?? 'unknown' },
+                  }).then(() => {});
+                } catch { /* fire-and-forget */ }
+              }
+            } catch { /* ignore */ }
+          }
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done || controller.signal.aborted) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              currentEvent = line.slice(7).trim();
+            } else if (line.startsWith('data: ')) {
+              currentData = line.slice(6);
+            } else if (line === '') {
+              if (currentEvent && currentData) processMessage(currentEvent, currentData);
+              currentEvent = '';
+              currentData = '';
+            }
+          }
+        }
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return;
+      } finally {
+        if (!controller.signal.aborted) {
+          setSpecInsightLoading(false);
+          setSpecStreamingText('');
+        }
+      }
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materialId, constructionTier, categoryId, targetMSRP]);
+
   // ─── Fix #1: Write execution state to store so report page gets real data ──
   useEffect(() => {
     if (!executionStatus) return;
@@ -1643,8 +1782,8 @@ export default function SpecStudioPage() {
                 marginTop: 4,
                 padding: "7px 16px 7px 12px",
                 borderRadius: 999,
-                border: "1.5px solid rgba(169,123,143,0.30)",
-                background: "rgba(169,123,143,0.06)",
+                border: "1.5px solid rgba(77,48,47,0.35)",
+                background: "transparent",
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
@@ -1652,19 +1791,19 @@ export default function SpecStudioPage() {
                 transition: "background 200ms ease, border-color 200ms ease",
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "rgba(169,123,143,0.12)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(169,123,143,0.50)";
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(77,48,47,0.06)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(77,48,47,0.55)";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "rgba(169,123,143,0.06)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(169,123,143,0.30)";
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(77,48,47,0.35)";
               }}
             >
               <span
                 className="muko-pick-dot"
-                style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#A97B8F", flexShrink: 0 }}
+                style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#A8B475", flexShrink: 0 }}
               />
-              <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 550, color: "#A97B8F", whiteSpace: "nowrap" }}>
+              <span style={{ fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "#4D302F", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
                 Muko&apos;s Pick
               </span>
             </button>
@@ -2576,6 +2715,7 @@ export default function SpecStudioPage() {
           <style>{`
             @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
             @keyframes continueReady { 0% { transform: translateY(4px); opacity: 0.6; } 100% { transform: translateY(0); opacity: 1; } }
+            @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
           `}</style>
 
         </div>{/* end left content padding */}
@@ -2680,12 +2820,32 @@ export default function SpecStudioPage() {
                 Select a material to see Muko&apos;s insight
               </p>
             </div>
+          ) : specInsightLoading && !specSynthInsightData && !specStreamingText ? (
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ height: 1, background: "rgba(67,67,43,0.12)", margin: "24px 0" }} />
+              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>
+                MUKO INSIGHT
+              </div>
+              {/* Skeleton — shown only before first streaming chunk arrives */}
+              {[80, 60, 90, 55].map((w, i) => (
+                <div key={i} style={{ height: i === 0 ? 18 : 12, borderRadius: 6, background: "rgba(67,67,43,0.07)", marginBottom: i === 0 ? 14 : 8, width: `${w}%`, animation: "pulse 1.4s ease-in-out infinite" }} />
+              ))}
+            </div>
           ) : (
             <MukoInsightSection
-              headline={specInsightContent.headline}
-              paragraphs={[specInsightContent.p1, specInsightContent.p2, specInsightContent.p3]}
-              opportunity={{ items: specInsightContent.opportunity }}
-              edit={{ items: specInsightContent.editItems }}
+              headline={specSynthInsightData?.statements[0] ?? specInsightContent.headline}
+              paragraphs={
+                specSynthInsightData
+                  ? [specSynthInsightData.statements[1] ?? '', specSynthInsightData.statements[2] ?? ''].filter(Boolean)
+                  : [specInsightContent.p1, specInsightContent.p2, specInsightContent.p3]
+              }
+              bullets={{
+                label: specSynthInsightData?.editLabel ?? 'BUILD REALITY',
+                items: specSynthInsightData?.edit ?? specInsightContent.opportunity,
+              }}
+              mode={specSynthInsightData?.mode}
+              isStreaming={specInsightLoading && !!specStreamingText}
+              streamingText={specStreamingText}
               nextMove={{
                 mode: "spec",
                 suggestions: mukoSynthesis?.suggestions ?? [],

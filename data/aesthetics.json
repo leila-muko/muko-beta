@@ -32,7 +32,7 @@
     "trend_velocity": "ascending",
     "score_source": "hardcoded_v1",
     "seasonal_relevance": {
-      "ss26": 4,
+      "ss27": 4,
       "fw26": 5
     },
     "collections_analyzed": 187,
@@ -396,7 +396,7 @@
     "trend_velocity": "peak",
     "score_source": "hardcoded_v1",
     "seasonal_relevance": {
-      "ss26": 5,
+      "ss27": 5,
       "fw26": 5
     },
     "collections_analyzed": 243,
@@ -767,7 +767,7 @@
     "trend_velocity": "ascending",
     "score_source": "hardcoded_v1",
     "seasonal_relevance": {
-      "ss26": 3,
+      "ss27": 3,
       "fw26": 5
     },
     "collections_analyzed": 156,
@@ -1128,7 +1128,7 @@
     "trend_velocity": "ascending",
     "score_source": "hardcoded_v1",
     "seasonal_relevance": {
-      "ss26": 5,
+      "ss27": 5,
       "fw26": 4
     },
     "collections_analyzed": 198,
@@ -1494,7 +1494,7 @@
     "trend_velocity": "emerging",
     "score_source": "hardcoded_v1",
     "seasonal_relevance": {
-      "ss26": 4,
+      "ss27": 4,
       "fw26": 5
     },
     "collections_analyzed": 134,
@@ -1867,7 +1867,7 @@
     "trend_velocity": "ascending",
     "score_source": "hardcoded_v1",
     "seasonal_relevance": {
-      "ss26": 5,
+      "ss27": 5,
       "fw26": 3
     },
     "collections_analyzed": 142,
@@ -2233,7 +2233,7 @@
     "trend_velocity": "ascending",
     "score_source": "hardcoded_v1",
     "seasonal_relevance": {
-      "ss26": 5,
+      "ss27": 5,
       "fw26": 5
     },
     "collections_analyzed": 176,
@@ -2609,7 +2609,7 @@
     "trend_velocity": "ascending",
     "score_source": "hardcoded_v1",
     "seasonal_relevance": {
-      "ss26": 5,
+      "ss27": 5,
       "fw26": 4
     },
     "collections_analyzed": 128,

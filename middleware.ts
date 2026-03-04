@@ -9,14 +9,15 @@ export async function middleware(request: NextRequest) {
     const protectedRoutes = ['/dashboard', '/analysis', '/settings']
     const authRoutes = ['/auth/signin', '/auth/signup']
     const pathname = request.nextUrl.pathname
-    
-    const isProtectedRoute = protectedRoutes.some(route => 
+
+    const isProtectedRoute = protectedRoutes.some(route =>
       pathname.startsWith(route)
     )
-    const isAuthRoute = authRoutes.some(route => 
+    const isAuthRoute = authRoutes.some(route =>
       pathname.startsWith(route)
     )
-    
+    const isRoot = pathname === '/'
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -30,15 +31,23 @@ export async function middleware(request: NextRequest) {
         },
       }
     )
-    
+
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     if (isProtectedRoute && !user) {
       return NextResponse.redirect(new URL('/auth/signin', request.url))
     }
-    
-    if (isAuthRoute && user) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+
+    // Logged-in user hitting auth pages or root — route by brand profile
+    if ((isAuthRoute || isRoot) && user) {
+      const { data: brandProfile } = await supabase
+        .from('brand_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single()
+
+      const destination = brandProfile ? '/entry' : '/onboarding'
+      return NextResponse.redirect(new URL(destination, request.url))
     }
     
     return response

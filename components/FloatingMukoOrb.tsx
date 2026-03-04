@@ -563,8 +563,8 @@ export default function FloatingMukoOrb({
         {/* ══ "Ask Muko" label — fades in on hover only ══ */}
         <div style={{
           marginTop: 7,
-          fontFamily: inter,
-          fontSize: 11,
+          fontFamily: sohne,
+          fontSize: 10,
           color: "#8a8478",
           letterSpacing: "0.03em",
           opacity: isHover ? 1 : 0,

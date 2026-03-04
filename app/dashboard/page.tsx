@@ -10,6 +10,16 @@ export default async function DashboardPage() {
     redirect('/auth/signin')
   }
 
+  const { data: brandProfile } = await supabase
+    .from('brand_profiles')
+    .select('id')
+    .eq('user_id', user!.id)
+    .single()
+
+  if (brandProfile) {
+    redirect('/entry')
+  }
+
   return (
     <div className="min-h-screen p-8">
       <div className="max-w-4xl mx-auto">
