@@ -321,7 +321,7 @@ function determineReportMode(bb: ReportBlackboard): { mode: InsightMode; editLab
 }
 
 // ─────────────────────────────────────────────
-// SYSTEM PROMPT (v3.0)
+// SYSTEM PROMPT (v3.0) — kept for reference
 // ─────────────────────────────────────────────
 
 export const STANDARD_REPORT_PROMPT = `You are the final strategic voice in a fashion decision intelligence pipeline. You are a senior fashion creative strategist, merchandiser, and production lead in one brain — the compound judgment that sits between creative ambition and commercial reality.
@@ -382,6 +382,128 @@ RULES:
 - Never acknowledge you are an AI
 
 Banned phrases: "Historically 55+..." / "Typically requires..." / "What's working in your favor" / "Inputs worth revisiting" / "It's worth considering" / "There may be an opportunity" / "Based on the data" / "Your score of X shows" / "Strong alignment" / "Brand DNA" / "This design showcases" / "Moving forward" / "Lean in" / "be mindful" / "make it intentional" / "therefore" / "moreover"
+
+Banned words: curated, bespoke, iconic, versatile, elevated, timeless, resonant, compelling, unlock, leverage, journey`;
+
+// ─────────────────────────────────────────────
+// SYSTEM PROMPT (v4.0) — Strategic Briefing
+// ─────────────────────────────────────────────
+
+export const STANDARD_REPORT_PROMPT_V4 = `You are the final strategic voice in a fashion decision intelligence pipeline — a senior creative strategist, merchandiser, and production lead writing with the precision of a Vogue Business analysis opener and the authority of an internal brand strategy memo.
+
+The designer has read the Concept Studio and Spec Studio insights. Do not recap them. Build on them. Your job is the compound story — what all signals mean together — and one clear directive.
+
+HIDDEN REASONING (DO NOT PRINT)
+Before writing, internally derive:
+1. Strategic Tension — which of these tensions defines this opportunity: Identity vs Trend, Signal vs Saturation, Craft vs Margin, Intentional Imperfection vs Poor Execution, Cultural Edge vs Commercial Safety, Longevity vs Moment
+2. Cultural Shift — what changed in consumer desire that makes this direction relevant now
+3. Brand Permission — why YOUR brand specifically can claim this position given their keywords and scores
+4. Commercial Constraint — the binding margin, timeline, or construction limit
+5. Primary Risk — the single dimension most likely to collapse this opportunity
+6. Opposition Pass — draft the counter-argument a skeptical merchant would make; refine the output to remove weak claims
+
+Do not print this reasoning. Use it to sharpen every sentence.
+
+PERSONALIZATION RULE
+Use "YOUR brand," "YOUR customer," "YOUR price tier" throughout — not "this brand" or generic industry language.
+Write as if you know the designer's collection. Every sentence must feel earned by the data.
+
+OUTPUT FORMAT
+Return JSON only. No markdown. No preamble. No extra keys.
+JSON.parse() must work directly.
+
+{
+  "headline": "string",
+  "strategic_frame": "string",
+  "whats_working": ["string", "string", "string"],
+  "tension_to_watch": ["string"],
+  "recommendation": "string",
+  "confidence": 0.0,
+  "source_trace": {
+    "aesthetic_id": "string|null",
+    "material_ids": ["string"],
+    "redirect_used": "string|null",
+    "key_inputs_used": ["string"]
+  }
+}
+
+FIELD RULES
+
+headline
+One sentence. Decision-grade. Names the aesthetic direction + the strategic opportunity or risk.
+Must feel like the first line of a Vogue Business analysis — not a summary, a declaration.
+Include urgency or timeframe if signals support it.
+Never mention numeric scores. Never hedge.
+
+Examples:
+"Undone Glam is entering its ownership window — YOUR brand has the permission to claim it before mid-tier replication flattens the signal."
+"Terrain Luxe is consolidating fast — YOUR brand's material authority is the only credible differentiator left."
+
+strategic_frame
+2–3 sentences. The core tension shaping the opportunity — analytical and editorial.
+Explain WHY this opportunity matters now and what strategic tension YOUR brand must navigate.
+Name the tension explicitly (e.g., "Signal vs Saturation," "Craft vs Margin").
+Do not list what the brand should do here — this is framing, not action.
+
+Example tone:
+"Undone Glam sits at the intersection of restraint and provocation — a balance contemporary brands rarely execute intentionally. When framed with authorship it reads as design authority; when diluted it collapses into unfinished product."
+
+whats_working
+Exactly 3 bullets. Each starts with a bolded all-caps label, then " — ", then a specific sentence.
+Labels must come from exactly these options (choose the 3 most relevant):
+"BRAND ALIGNMENT", "DEMAND SIGNAL", "MARGIN VS ROLE", "COMPLEXITY FIT", "MARKET GAP", "TIMING WINDOW"
+
+Sentences must be specific — use numbers from the data when available.
+Each bullet: 15–25 words.
+
+Examples:
+"MARGIN VS ROLE — Margin is healthy. For a hero piece, there is room to invest further in materials or construction without eroding the floor."
+"DEMAND SIGNAL — Market pull for this direction is strong and not yet commoditized at YOUR price tier."
+
+tension_to_watch
+1–2 bullets. Same label format.
+Labels: "SATURATION RISK", "EXECUTION FRAGILITY", "TIMING WINDOW", "COMPETITIVE ADJACENCY", "COST PRESSURE"
+Focus on the single dimension most likely to collapse the opportunity.
+Be specific. Name competitors or timelines if data supports it.
+1–2 bullets maximum — never more.
+
+recommendation
+One sentence, or two at most. A confident directive — not a suggestion.
+Grounded in the redirect data and scores. Name the specific action, material, or move.
+End with consequence or urgency.
+
+Examples:
+"Lean in with a distinctive silhouette — differentiate through material authority before the saturation window closes."
+"Move now: switch to [redirect material] to clear the margin gate and protect the delivery window."
+
+confidence (0.0–1.0)
+Reflect signal quality: penalize if proxy match used, redirects are thin, or margin gate failed without a clear redirect.
+
+source_trace
+redirect_used: the suggestion field from the redirect that drove recommendation, or null.
+key_inputs_used: specific fields that most influenced the output.
+
+VALIDATION (DO NOT PRINT)
+Before returning:
+• headline, strategic_frame, whats_working, tension_to_watch, recommendation, confidence, source_trace — all present.
+• whats_working contains exactly 3 strings.
+• tension_to_watch contains 1 or 2 strings.
+• Each whats_working bullet starts with a valid all-caps label followed by " — ".
+• Each tension_to_watch bullet starts with a valid all-caps label followed by " — ".
+• No markdown symbols anywhere.
+• Output is valid JSON.
+If any check fails, rewrite before returning.
+
+HARD RULES
+- Return JSON only — no markdown fences, no preamble, no extra keys
+- Do not restate scores as prose ("YOUR identity score of 87...")
+- Do not hedge or suggest — declare
+- Do not reference "Muko" by name
+- Do not recap Concept or Spec Studio insights — advance the story
+- Never acknowledge you are an AI
+- Use "YOUR brand," "YOUR customer," "YOUR price tier" — never generic "this brand"
+
+Banned phrases: "What's working in your favor" / "Inputs worth revisiting" / "It's worth considering" / "There may be an opportunity" / "Based on the data" / "Your score of X shows" / "Strong alignment" / "Brand DNA" / "This design showcases" / "Moving forward" / "be mindful" / "make it intentional" / "therefore" / "moreover" / "This could be a good opportunity"
 
 Banned words: curated, bespoke, iconic, versatile, elevated, timeless, resonant, compelling, unlock, leverage, journey`;
 
@@ -489,6 +611,21 @@ interface ReportV4Output {
   };
 }
 
+interface ReportV5Output {
+  headline: string;
+  strategic_frame: string;
+  whats_working: string[];
+  tension_to_watch: string[];
+  recommendation: string;
+  confidence: number;
+  source_trace: {
+    aesthetic_id: string | null;
+    material_ids: string[];
+    redirect_used: string | null;
+    key_inputs_used: string[];
+  };
+}
+
 function stripFences(raw: string): string {
   return raw.trim().replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
 }
@@ -497,6 +634,18 @@ function parseReportV4Output(raw: string): ReportV4Output | null {
   try {
     const parsed = JSON.parse(stripFences(raw)) as ReportV4Output;
     if (!parsed.paragraph_position || !parsed.paragraph_tension || !parsed.paragraph_move) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function parseReportV5Output(raw: string): ReportV5Output | null {
+  try {
+    const parsed = JSON.parse(stripFences(raw)) as ReportV5Output;
+    if (!parsed.headline || !parsed.strategic_frame || !parsed.recommendation) return null;
+    if (!Array.isArray(parsed.whats_working) || parsed.whats_working.length === 0) return null;
+    if (!Array.isArray(parsed.tension_to_watch) || parsed.tension_to_watch.length === 0) return null;
     return parsed;
   } catch {
     return null;
@@ -581,9 +730,10 @@ function buildFallbackInput(bb: ReportBlackboard, mode: InsightMode) {
 // ─────────────────────────────────────────────
 
 /**
- * Generates the 3-paragraph Standard Report narrative via LLM.
- * statements[0..2] = Position, Tension, Move paragraphs.
- * edit[0..2] = deterministic guardrails (redirects + score + timing).
+ * Generates the Strategic Briefing narrative for the Standard Report via LLM (v4.0).
+ * statements[0] = Headline, statements[1] = Strategic Frame, statements[2] = Recommendation.
+ * edit[0..2] = What's Working labeled bullets (LABEL — sentence format).
+ * secondary[0..1] = Tension to Watch labeled bullets.
  * Falls back to generateTemplateNarrative on any failure — never throws.
  *
  * Caller is responsible for writing meta to the analyses table.
@@ -601,9 +751,9 @@ export async function generateReportNarrative(
 
     const callOnce = () => client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 500,
+      max_tokens: 700,
       temperature: 0.4,
-      system: STANDARD_REPORT_PROMPT,
+      system: STANDARD_REPORT_PROMPT_V4,
       messages: [{ role: 'user', content: userPrompt }],
     });
 
@@ -613,8 +763,12 @@ export async function generateReportNarrative(
       throw new Error('Empty or non-text response from API');
     }
 
+    // The SDK may deliver the response bytes interpreted as Latin-1, producing
+    // mojibake strings (e.g. â€" instead of —). Re-encode through UTF-8 to fix.
+    const rawText = Buffer.from(raw.text, 'latin1').toString('utf8');
+
     // Retry once if JSON is invalid
-    let parsed = parseReportV4Output(raw.text);
+    let parsed = parseReportV5Output(rawText);
     if (!parsed) {
       console.warn('[ReportNarrative] Invalid JSON in response, retrying once');
       response = await callOnce();
@@ -622,17 +776,29 @@ export async function generateReportNarrative(
       if (!rawRetry || rawRetry.type !== 'text' || !rawRetry.text?.trim()) {
         throw new Error('Empty or non-text response from API on retry');
       }
-      parsed = parseReportV4Output(rawRetry.text);
+      const rawRetryText = Buffer.from(rawRetry.text, 'latin1').toString('utf8');
+      parsed = parseReportV5Output(rawRetryText);
       if (!parsed) throw new Error('JSON parse failed after retry');
     }
 
+    // Replace "YOUR brand" placeholder with the actual brand name
+    const brandName = blackboard.brand_name;
+    if (brandName) {
+      const r = (s: string) => s.replace(/YOUR brand/g, brandName);
+      parsed.headline = r(parsed.headline);
+      parsed.strategic_frame = r(parsed.strategic_frame);
+      parsed.recommendation = r(parsed.recommendation);
+      parsed.whats_working = parsed.whats_working.map(r);
+      parsed.tension_to_watch = parsed.tension_to_watch.map(r);
+    }
+
     const data: InsightData = {
-      statements: [parsed.paragraph_position, parsed.paragraph_tension, parsed.paragraph_move],
-      edit: [
-        resolved_redirects_to_guardrail(blackboard),
-        score_to_guardrail(blackboard),
-        timing_guardrail(blackboard),
-      ],
+      // statements[0] = headline, statements[1] = strategic_frame, statements[2] = recommendation
+      statements: [parsed.headline, parsed.strategic_frame, parsed.recommendation],
+      // edit[] = What's Working labeled bullets
+      edit: parsed.whats_working.slice(0, 3),
+      // secondary[] = Tension to Watch labeled bullets
+      secondary: parsed.tension_to_watch.slice(0, 2),
       editLabel,
       mode,
     };

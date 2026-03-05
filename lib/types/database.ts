@@ -8,6 +8,10 @@ export interface BrandProfile {
     target_margin: number;
     tension_context: string | null;
     accepts_conflicts: boolean;
+    brand_description?: string | null;
+    reference_brands?: string[];
+    excluded_brands?: string[];
+    excluded_aesthetics?: string[];
     created_at: string;
     updated_at: string;
   }

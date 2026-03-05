@@ -10,7 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { SpecBlackboard } from '@/lib/synthesizer/specInsight';
 import {
   buildSpecPrompt,
-  SPEC_STUDIO_PROMPT_V6_1,
+  SPEC_STUDIO_PROMPT_V6_2,
   determineSpecMode,
   buildSpecFallbackInput,
   parseSpecV5Output,
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
           model: 'claude-sonnet-4-6',
           max_tokens: 650,
           temperature: 0.35,
-          system: SPEC_STUDIO_PROMPT_V6_1,
+          system: SPEC_STUDIO_PROMPT_V6_2,
           messages: [{ role: 'user', content: userPrompt }],
         });
 
@@ -89,6 +89,15 @@ export async function POST(req: NextRequest) {
             return;
           }
 
+          // Replace "YOUR brand" placeholder with the actual brand/collection name
+          const brandName = blackboard.brand_name;
+          if (brandName) {
+            const r = (s: string) => s.replace(/YOUR brand/g, brandName);
+            parsed.insight_title = r(parsed.insight_title);
+            parsed.insight_description = r(parsed.insight_description);
+            parsed.build_reality = parsed.build_reality.map(r);
+          }
+
           const data: InsightData = {
             statements: [parsed.insight_title, parsed.insight_description],
             edit: parsed.build_reality.slice(0, 3),
@@ -111,7 +120,7 @@ export async function POST(req: NextRequest) {
 
   return new Response(stream, {
     headers: {
-      'Content-Type': 'text/event-stream',
+      'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
     },

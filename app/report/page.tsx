@@ -1029,40 +1029,54 @@ export default function StandardReportPage() {
               {/* Section label */}
               <div style={microLabel}>Muko Insight</div>
 
-              {/* Headline — Söhne Breit, same weight as Concept Studio insight headline */}
+              {/* Headline — LLM-generated or static fallback */}
               <div
                 style={{
                   fontFamily: sohne,
-                  fontWeight: 500,
+                  fontWeight: 700,
                   fontSize: 17,
                   color: OLIVE,
                   lineHeight: 1.3,
-                  marginBottom: 18,
+                  marginBottom: reportNarrativeData?.statements[1] ? 12 : 18,
                 }}
               >
-                {report.aestheticName} is a smart direction for {report.seasonLabel} — with one
-                thing to watch.
+                {reportNarrativeData?.statements[0] ||
+                  `${report.aestheticName} is a smart direction for ${report.seasonLabel} — with one thing to watch.`}
               </div>
 
-              {(() => {
-                const alignmentSignals = collectionRole
-                  ? getCollectionAlignment(collectionRole, report.costGatePassed, report.constructionTier, report.resonance, selectedKeyPiece ?? null)
-                  : [];
-                const passSignals     = alignmentSignals.filter(s => s.status === 'pass');
-                const advisorySignals = alignmentSignals.filter(s => s.status === 'advisory');
-                const conflictSignals = alignmentSignals.filter(s => s.status === 'conflict');
-                const watchSignals    = [...advisorySignals, ...conflictSignals];
+              {/* Strategic Frame — the core tension shaping the opportunity */}
+              {reportNarrativeData?.statements[1] && (
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 12.5,
+                    lineHeight: 1.65,
+                    color: "rgba(67,67,43,0.62)",
+                    borderLeft: `2px solid ${CAMEL}`,
+                    paddingLeft: 12,
+                    marginBottom: 18,
+                    fontStyle: "italic",
+                  }}
+                >
+                  {reportNarrativeData.statements[1]}
+                </div>
+              )}
 
-                function AlignmentLine({ signal }: { signal: { label: string; text: string; status: string } }) {
-                  const isConflict = signal.status === 'conflict';
-                  const color = isConflict ? ROSE : signal.status === 'pass' ? CHARTREUSE : CAMEL;
+              {(() => {
+                function NarrativeBullet({ bullet, labelColor }: { bullet: string; labelColor: string }) {
+                  const sepIdx = bullet.indexOf(' — ');
+                  if (sepIdx === -1) {
+                    return <p style={{ ...bodyText, marginTop: 6 }}>{bullet}</p>;
+                  }
+                  const label = bullet.slice(0, sepIdx);
+                  const text = bullet.slice(sepIdx + 3);
                   return (
                     <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 7 }}>
-                      <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, color, flexShrink: 0, letterSpacing: "0.04em" }}>
-                        {signal.label.toUpperCase()}
+                      <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, color: labelColor, flexShrink: 0, letterSpacing: "0.04em" }}>
+                        {label}
                       </span>
                       <span style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.52)", lineHeight: 1.55 }}>
-                        — {signal.text}
+                        — {text}
                       </span>
                     </div>
                   );
@@ -1072,25 +1086,27 @@ export default function StandardReportPage() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     {/* WHAT'S WORKING — chartreuse */}
                     <div>
-                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: CHARTREUSE, marginBottom: 6 }}>
+                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: CHARTREUSE, marginBottom: 6 }}>
                         What&apos;s Working
                       </div>
-                      <p style={bodyText}>{reportNarrativeData?.statements[0] ?? ''}</p>
-                      {passSignals.map((s, i) => <AlignmentLine key={i} signal={s} />)}
+                      {reportNarrativeData?.edit?.map((bullet, i) => (
+                        <NarrativeBullet key={i} bullet={bullet} labelColor={CHARTREUSE} />
+                      ))}
                     </div>
 
-                    {/* WHAT TO CONSIDER — steel blue */}
+                    {/* TENSION TO WATCH — steel blue */}
                     <div>
-                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: STEEL, marginBottom: 6 }}>
-                        What to Consider
+                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: STEEL, marginBottom: 6 }}>
+                        Tension to Watch
                       </div>
-                      <p style={bodyText}>{reportNarrativeData?.statements[1] ?? ''}</p>
-                      {watchSignals.map((s, i) => <AlignmentLine key={i} signal={s} />)}
+                      {reportNarrativeData?.secondary?.map((bullet, i) => (
+                        <NarrativeBullet key={i} bullet={bullet} labelColor={STEEL} />
+                      ))}
                     </div>
 
                     {/* RECOMMENDATION — rose */}
                     <div>
-                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: ROSE, marginBottom: 6 }}>
+                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: ROSE, marginBottom: 6 }}>
                         Recommendation
                       </div>
                       <p style={bodyText}>{reportNarrativeData?.statements[2] ?? ''}</p>
@@ -1555,8 +1571,8 @@ export default function StandardReportPage() {
           execution: report.execution,
           gates:     { costGatePassed: report.costGatePassed },
           narrative: {
-            working:        reportNarrativeData?.statements[0] ?? '',
-            consider:       reportNarrativeData?.statements[1] ?? '',
+            working:        reportNarrativeData?.edit?.join(' ') ?? '',
+            consider:       reportNarrativeData?.secondary?.join(' ') ?? '',
             recommendation: reportNarrativeData?.statements[2] ?? '',
           },
         }}

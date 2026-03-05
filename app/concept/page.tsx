@@ -509,7 +509,35 @@ export default function ConceptStudioPage() {
     } catch { setHeaderSeasonLabel(season || "—"); }
   }, [season]);
 
-  const recommendedAesthetic = useMemo(() => computeRecommendedAesthetic(refinementModifiers), [refinementModifiers]);
+  // Real Critic identity scores for all aesthetics, populated once brandProfileId resolves.
+  // Empty until the batch fetch completes — falls back to static scoring in the meantime.
+  const [allCriticScores, setAllCriticScores] = useState<Record<string, number>>({});
+
+  const { recommendedAesthetic, mukoPickLabel } = useMemo(() => {
+    // No real scores yet — fall back to static brand-agnostic ranking
+    if (Object.keys(allCriticScores).length === 0) {
+      return { recommendedAesthetic: computeRecommendedAesthetic(refinementModifiers), mukoPickLabel: "Muko's Pick" };
+    }
+
+    // Score each aesthetic using real Critic identity + static resonance
+    const scored = AESTHETICS.map((aesthetic) => {
+      const identityScore = allCriticScores[aesthetic] ?? 0;
+      const resonanceScore = AESTHETIC_CONTENT[aesthetic]?.resonanceScore ?? 0;
+      return { aesthetic, identityScore, heroScore: identityScore * 0.5 + resonanceScore * 0.5 };
+    });
+
+    // Filter: only aesthetics where Critic identity >= 50 are eligible for Pick
+    const eligible = scored.filter((s) => s.identityScore >= 50);
+
+    if (eligible.length > 0) {
+      eligible.sort((a, b) => b.heroScore - a.heroScore);
+      return { recommendedAesthetic: eligible[0].aesthetic, mukoPickLabel: "Muko's Pick" };
+    }
+
+    // No aesthetic clears the threshold — surface the closest-fit with a different label
+    scored.sort((a, b) => b.identityScore - a.identityScore);
+    return { recommendedAesthetic: scored[0]?.aesthetic ?? computeRecommendedAesthetic(refinementModifiers), mukoPickLabel: "Closest Match" };
+  }, [allCriticScores, refinementModifiers]);
   const selectedAesthetic = AESTHETICS.includes(aestheticInput as any) ? aestheticInput : null;
   const selectedIsAlternative = Boolean(selectedAesthetic && selectedAesthetic !== recommendedAesthetic);
 
@@ -808,7 +836,63 @@ export default function ConceptStudioPage() {
   // calls the Critic Agent API to compute the Identity Pulse from real brand data.
   // Falls back to the existing static scoring above when no brand profile exists.
 
-  const brandProfileId = useRef<string | null>(null); // TODO: wire from user's saved brand profile //null
+  const brandProfileId = useRef<string | null>(null);
+  const [noBrandProfile, setNoBrandProfile] = useState(false);
+
+  // On mount: resolve the current user's brand profile id from Supabase
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        setNoBrandProfile(true);
+        return;
+      }
+      supabase
+        .from('brand_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data?.id) {
+            brandProfileId.current = data.id;
+            setNoBrandProfile(false);
+
+            // Batch-score all aesthetics against the brand profile so Pick selection
+            // can use real Critic identity scores instead of static constants.
+            const profileId = data.id;
+            const allEntries = aestheticsData as unknown as AestheticDataEntry[];
+            Promise.allSettled(
+              AESTHETICS.map(async (aesthetic) => {
+                const entry = allEntries.find((a) => a.name === aesthetic);
+                if (!entry?.keywords?.length) return { aesthetic, score: 0 };
+                const res = await fetch("/api/agents/critic", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    aesthetic_keywords: entry.keywords,
+                    aesthetic_name: aesthetic,
+                    brand_profile_id: profileId,
+                  }),
+                });
+                if (!res.ok) return { aesthetic, score: 0 };
+                const json = await res.json();
+                return { aesthetic, score: json.pulse?.score ?? 0 };
+              })
+            ).then((results) => {
+              const scores: Record<string, number> = {};
+              for (const result of results) {
+                if (result.status === "fulfilled") {
+                  scores[result.value.aesthetic] = result.value.score;
+                }
+              }
+              setAllCriticScores(scores);
+            });
+          } else {
+            setNoBrandProfile(true);
+          }
+        });
+    });
+  }, []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const runCriticAnalysis = useCallback(
@@ -1198,7 +1282,7 @@ export default function ConceptStudioPage() {
 
   /* ─── Pulse rows ──────────────────────────────────────────────────────────── */
   const pulseRows = [
-    { key: "identity", label: "Identity", icon: (c: string) => <IconIdentity size={14} color={c} />, score: identityScore != null ? `${identityScore}` : "—", scoreNum: identityScore ?? 0, color: identityScore != null ? scoreColor(identityScore) : "rgba(67,67,43,0.35)", chip: identityScore != null ? { variant: idStatus.color === PULSE_GREEN ? "green" as const : idStatus.color === PULSE_YELLOW ? "amber" as const : idStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: idStatus.label } : null, subLabel: idStatus.sublabel, what: `Identity measures how well this direction aligns with your brand DNA — keywords, aesthetic positioning, and customer profile. A high score means this direction reinforces who you already are. A low score signals tension that requires intentional navigation.`, how: `Keyword overlap between your brand profile and this direction's signals, weighted by conflict detection. Intentional tensions acknowledged in onboarding are factored in.`, pending: false },
+    { key: "identity", label: "Identity", icon: (c: string) => <IconIdentity size={14} color={c} />, score: identityScore != null ? `${identityScore}` : "—", scoreNum: identityScore ?? 0, color: identityScore != null ? scoreColor(identityScore) : "rgba(67,67,43,0.35)", chip: identityScore != null ? { variant: idStatus.color === PULSE_GREEN ? "green" as const : idStatus.color === PULSE_YELLOW ? "amber" as const : idStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: idStatus.label } : null, subLabel: noBrandProfile ? "Complete Brand DNA setup to see identity scores" : idStatus.sublabel, what: `Identity measures how well this direction aligns with your brand DNA — keywords, aesthetic positioning, and customer profile. A high score means this direction reinforces who you already are. A low score signals tension that requires intentional navigation.`, how: `Keyword overlap between your brand profile and this direction's signals, weighted by conflict detection. Intentional tensions acknowledged in onboarding are factored in.`, pending: false },
     { key: "resonance", label: "Resonance", icon: (c: string) => <IconResonance size={14} color={c} />, score: resonanceLoading ? "—" : resonanceScore != null ? `${resonanceScore}` : "—", scoreNum: resonanceLoading ? 0 : resonanceScore ?? 0, color: resonanceLoading ? "rgba(67,67,43,0.35)" : resonanceScore != null ? scoreColor(resonanceScore) : "rgba(67,67,43,0.35)", chip: resonanceLoading ? { variant: "gray" as const, status: "Matching direction..." } : resonanceScore != null ? { variant: resStatus.color === PULSE_GREEN ? "green" as const : resStatus.color === PULSE_YELLOW ? "amber" as const : resStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: resStatus.label } : null, subLabel: resonanceLoading ? "\u00A0" : resStatus.sublabel || "\u00A0", what: `Resonance measures market timing — how much consumer interest exists for this direction right now, and whether you're entering at the right moment. High resonance with ascending velocity means the window is open. Peak saturation means you're late.`, how: `Based on checkMarketSaturation(): saturation score from our curated aesthetics library, weighted by trend velocity. Resonance = 100 − saturation, with a 15-point penalty for declining velocity.`, pending: false },
     { key: "execution", label: "Execution", icon: (c: string) => <IconExecution size={14} color={c} />, score: "—", scoreNum: 0, color: "rgba(67,67,43,0.35)", chip: null, subLabel: "Unlocks in Spec Studio", what: `Execution measures whether the physical product you're building is feasible given your timeline, materials, and construction complexity. It unlocks in Spec Studio once you define your product inputs.`, how: `Timeline buffer score based on material lead times and construction complexity relative to your season deadline. Negative buffer scores red. Margin gate applied as a 30% score penalty if COGS exceeds target.`, pending: true },
   ];
@@ -1283,7 +1367,7 @@ export default function ConceptStudioPage() {
                 style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#A8B475", flexShrink: 0 }}
               />
               <span style={{ fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "#4D302F", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
-                Muko&apos;s Pick
+                {mukoPickLabel}
               </span>
             </button>
           </div>
@@ -1680,6 +1764,7 @@ export default function ConceptStudioPage() {
                       steelBlue={STEEL}
                       chartreuse={CHARTREUSE}
                       isMukoPick={aesthetic === recommendedAesthetic}
+                      mukoPickLabel={mukoPickLabel}
                     />
                   </motion.div>
                 );
@@ -1856,7 +1941,7 @@ export default function ConceptStudioPage() {
 function DirectionCard({
   aesthetic, content, chips, isHovered, moodboardImages,
   idColor, resColor, topIdScore, topResScore, onHoverEnter, onHoverLeave, onSelect,
-  inter, sohne, steelBlue, chartreuse, isMukoPick,
+  inter, sohne, steelBlue, chartreuse, isMukoPick, mukoPickLabel = "Muko's Pick",
 }: {
   aesthetic: string;
   content: { description: string; identityScore: number; resonanceScore: number } | undefined;
@@ -1875,6 +1960,7 @@ function DirectionCard({
   steelBlue: string;
   chartreuse: string;
   isMukoPick?: boolean;
+  mukoPickLabel?: string;
 }) {
   const idScore = content?.identityScore ?? 0;
   const resScore = content?.resonanceScore ?? 0;
@@ -1935,7 +2021,7 @@ function DirectionCard({
           {isMukoPick && (
             <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 999, background: "rgba(168,180,117,0.12)", border: "1px solid rgba(168,180,117,0.40)" }}>
               <span style={{ display: "inline-block", width: 5, height: 5, borderRadius: "50%", background: "#A8B475", flexShrink: 0 }} />
-              <span style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "#6B7A3E", whiteSpace: "nowrap" }}>Muko&apos;s Pick</span>
+              <span style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "#6B7A3E", whiteSpace: "nowrap" }}>{mukoPickLabel}</span>
             </div>
           )}
           {/* Select button — clips to 0 width when not hovered */}

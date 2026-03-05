@@ -125,6 +125,7 @@ export default function OnboardingWizard() {
           customer_profile: formData.customerProfile,
           reference_brands: referenceBrands,
           excluded_brands: excludedBrands,
+          excluded_aesthetics: formData.excludedAesthetics,
           target_margin: formData.targetMargin / 100,
           tension_context: formData.tensionContext,
           accepts_conflicts: formData.acceptsConflicts,

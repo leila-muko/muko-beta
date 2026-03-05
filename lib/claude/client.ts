@@ -59,7 +59,10 @@ export async function callClaude(
     throw new Error(`Unexpected response type from Claude: ${content.type}`);
   }
 
-  return content.text;
+  // The SDK may deliver the response bytes interpreted as Latin-1, producing
+  // mojibake strings (e.g. â€" instead of —). Re-encode through UTF-8 to fix.
+  const cleanText = Buffer.from(content.text, 'latin1').toString('utf8');
+  return cleanText;
 }
 
 /**
