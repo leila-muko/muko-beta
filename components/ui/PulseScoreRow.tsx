@@ -5,8 +5,16 @@ import React from "react";
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
 
-// Brand-aligned pill colors: chartreuse, camel, rose, gray (loading)
+// Default pill colors (default variant — spec page etc.)
 const PILL_COLORS = {
+  green: { bg: "rgba(168,180,117,0.14)", color: "#A8B475", border: "rgba(168,180,117,0.30)" },
+  amber: { bg: "rgba(184,135,107,0.14)", color: "#B8876B", border: "rgba(184,135,107,0.30)" },
+  red: { bg: "rgba(169,123,143,0.14)", color: "#A97B8F", border: "rgba(169,123,143,0.30)" },
+  gray: { bg: "rgba(67,67,43,0.06)", color: "rgba(67,67,43,0.45)", border: "rgba(67,67,43,0.12)" },
+} as const;
+
+// Strip variant pill colors — aligned to brand palette
+const STRIP_PILL_COLORS = {
   green: { bg: "rgba(168,180,117,0.14)", color: "#A8B475", border: "rgba(168,180,117,0.30)" },
   amber: { bg: "rgba(184,135,107,0.14)", color: "#B8876B", border: "rgba(184,135,107,0.30)" },
   red: { bg: "rgba(169,123,143,0.14)", color: "#A97B8F", border: "rgba(169,123,143,0.30)" },
@@ -34,8 +42,10 @@ export interface PulseScoreRowProps {
   whatItMeans: string;
   howCalculated: string;
   isPending: boolean;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
+  /** 'default' = full card with expand; 'strip' = slim bar-chart row */
+  variant?: "default" | "strip";
 }
 
 export function PulseScoreRow({
@@ -51,10 +61,130 @@ export function PulseScoreRow({
   isPending,
   isExpanded,
   onToggleExpand,
+  variant = "default",
 }: PulseScoreRowProps) {
   const pillStyle = pill ? PILL_COLORS[pill.variant] : null;
 
-  // Muted background chip for score — uses scoreColor at low opacity
+  /* ── Strip variant ─────────────────────────────────────────────────────── */
+  if (variant === "strip") {
+    const stripPillStyle = pill ? STRIP_PILL_COLORS[pill.variant] : null;
+    return (
+      <div
+        style={{
+          paddingBottom: 14,
+          marginBottom: 14,
+          opacity: isPending ? 0.4 : 1,
+          transition: "opacity 200ms ease",
+        }}
+      >
+        {/* Header row: icon + label left · pill + score right */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 7,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span
+              style={{
+                color: isPending ? "rgba(67,67,43,0.35)" : scoreColor,
+                display: "flex",
+                alignItems: "center",
+                opacity: 0.85,
+              }}
+            >
+              {icon}
+            </span>
+            <span
+              style={{
+                fontFamily: inter,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "#A8A09A",
+              }}
+            >
+              {label}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {pill && stripPillStyle && (
+              <span
+                style={{
+                  fontFamily: inter,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.04em",
+                  color: stripPillStyle.color,
+                  background: stripPillStyle.bg,
+                  border: `1px solid ${stripPillStyle.border}`,
+                  borderRadius: 999,
+                  padding: "2px 9px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {pill.label}
+              </span>
+            )}
+            <span
+              style={{
+                fontFamily: sohne,
+                fontSize: 14,
+                fontWeight: 700,
+                color: isPending ? "rgba(67,67,43,0.30)" : scoreColor,
+                minWidth: 24,
+                textAlign: "right",
+              }}
+            >
+              {isPending ? "—" : displayScore}
+            </span>
+          </div>
+        </div>
+
+        {/* Progress bar — no fill when pending (locked Execution) */}
+        <div
+          style={{
+            height: 3,
+            borderRadius: 2,
+            background: "rgba(67,67,43,0.08)",
+            marginBottom: subLabel ? 5 : 0,
+          }}
+        >
+          {!isPending && (
+            <div
+              style={{
+                height: 3,
+                borderRadius: 2,
+                background: scoreColor,
+                width: `${numericPercent}%`,
+                transition: "width 500ms ease, background 300ms ease",
+              }}
+            />
+          )}
+        </div>
+
+        {/* Subtext */}
+        {subLabel && (
+          <div
+            style={{
+              fontFamily: inter,
+              fontSize: 11,
+              color: "rgba(67,67,43,0.42)",
+              lineHeight: 1.45,
+              marginTop: 3,
+            }}
+          >
+            {subLabel}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ── Default variant ───────────────────────────────────────────────────── */
   const scoreBg = isPending
     ? "rgba(67,67,43,0.04)"
     : `${scoreColor}14`; // hex alpha ~8%

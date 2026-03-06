@@ -242,6 +242,65 @@ const MATERIAL_DESCRIPTIONS: Record<string, string> = {
   hemp: "Highest sustainability score in the sheet — structured drape, improving softness, and a strong provenance story to tell.",
 };
 
+/* ─── Material swatch system ─── */
+const MATERIAL_CATEGORY_MAP: Record<string, string> = {
+  "organic-cotton": "natural",
+  "conventional-cotton": "natural",
+  tencel: "natural",
+  linen: "natural",
+  hemp: "natural",
+  silk: "luxury",
+  "cashmere-blend": "luxury",
+  "wool-merino": "luxury",
+  leather: "luxury",
+  nylon: "synthetic",
+  "recycled-polyester": "synthetic",
+  "virgin-polyester": "synthetic",
+  "vegan-leather": "synthetic",
+  "rayon-viscose": "synthetic",
+  "denim-conventional": "synthetic",
+  "denim-raw-selvedge": "synthetic",
+  "deadstock-fabric": "deadstock",
+};
+
+const MATERIAL_SWATCH_BG: Record<string, string> = {
+  "organic-cotton":
+    "repeating-linear-gradient(0deg,rgba(255,255,255,0.3) 0,rgba(255,255,255,0.3) 1px,transparent 1px,transparent 3px),repeating-linear-gradient(90deg,rgba(0,0,0,0.04) 0,rgba(0,0,0,0.04) 1px,transparent 1px,transparent 3px),#E8DDD0",
+  "conventional-cotton":
+    "repeating-linear-gradient(0deg,rgba(255,255,255,0.3) 0,rgba(255,255,255,0.3) 1px,transparent 1px,transparent 4px),repeating-linear-gradient(90deg,rgba(0,0,0,0.04) 0,rgba(0,0,0,0.04) 1px,transparent 1px,transparent 4px),#DDD5C8",
+  tencel:
+    "repeating-linear-gradient(45deg,rgba(255,255,255,0.25) 0,rgba(255,255,255,0.25) 1px,transparent 1px,transparent 4px),repeating-linear-gradient(-45deg,rgba(0,0,0,0.08) 0,rgba(0,0,0,0.08) 1px,transparent 1px,transparent 4px),#D8C8A8",
+  silk: "linear-gradient(105deg,#F5F0EC,#E8E0D8,#F0EAE4,#E0D8D0,#F5F0EC)",
+  "cashmere-blend":
+    "radial-gradient(ellipse at 30% 30%,rgba(255,255,255,0.2) 0%,transparent 60%),radial-gradient(ellipse at 70% 70%,rgba(255,255,255,0.15) 0%,transparent 60%),#D8C8B8",
+  "wool-merino":
+    "repeating-linear-gradient(45deg,rgba(255,255,255,0.1) 0,rgba(255,255,255,0.1) 1px,transparent 1px,transparent 6px),#C8C0B0",
+  leather:
+    "radial-gradient(ellipse at 40% 35%,rgba(255,255,255,0.08) 0%,transparent 50%),radial-gradient(ellipse at 60% 65%,rgba(0,0,0,0.1) 0%,transparent 55%),#8B6855",
+  nylon: "linear-gradient(160deg,#C0C8D0,#B0B8C0,#C8D0D8)",
+  "recycled-polyester":
+    "repeating-linear-gradient(120deg,rgba(255,255,255,0.1) 0,rgba(255,255,255,0.1) 1px,transparent 1px,transparent 5px),#B8C0C8",
+  "virgin-polyester": "linear-gradient(135deg,#C8D0D8,#B8C0C8)",
+  "vegan-leather":
+    "radial-gradient(ellipse at 35% 35%,rgba(255,255,255,0.12) 0%,transparent 55%),#808890",
+  "denim-conventional":
+    "repeating-linear-gradient(45deg,rgba(255,255,255,0.08) 0,rgba(255,255,255,0.08) 1px,transparent 1px,transparent 6px),repeating-linear-gradient(-45deg,rgba(0,0,0,0.1) 0,rgba(0,0,0,0.1) 1px,transparent 1px,transparent 6px),#6878A0",
+  "rayon-viscose": "linear-gradient(125deg,#C8C0D8,#B8B0C8,#C8C0D8)",
+  "deadstock-fabric":
+    "repeating-linear-gradient(30deg,rgba(255,255,255,0.1) 0,rgba(255,255,255,0.1) 1px,transparent 1px,transparent 8px),repeating-linear-gradient(-30deg,rgba(0,0,0,0.05) 0,rgba(0,0,0,0.05) 1px,transparent 1px,transparent 8px),#A8B890",
+  hemp:
+    "repeating-linear-gradient(0deg,rgba(0,0,0,0.06) 0,rgba(0,0,0,0.06) 1px,transparent 1px,transparent 4px),repeating-linear-gradient(90deg,rgba(0,0,0,0.04) 0,rgba(0,0,0,0.04) 1px,transparent 1px,transparent 4px),#C0B898",
+  "denim-raw-selvedge":
+    "repeating-linear-gradient(42deg,rgba(255,255,255,0.12) 0,rgba(255,255,255,0.12) 1px,transparent 1px,transparent 5px),repeating-linear-gradient(-42deg,rgba(0,0,0,0.15) 0,rgba(0,0,0,0.15) 1px,transparent 1px,transparent 5px),#4A5A78",
+};
+
+const CATEGORY_META: Record<string, { dotColor: string; badgeColor: string; badgeBg: string; badgeBorder: string }> = {
+  natural:   { dotColor: "#A8B475", badgeColor: "#6B7A40", badgeBg: "rgba(168,180,117,0.094)", badgeBorder: "rgba(168,180,117,0.25)" },
+  luxury:    { dotColor: "#B8876B", badgeColor: "#8B5E3C", badgeBg: "rgba(184,135,107,0.094)", badgeBorder: "rgba(184,135,107,0.25)" },
+  synthetic: { dotColor: "#7D96AC", badgeColor: "#4A6A7A", badgeBg: "rgba(125,150,172,0.094)", badgeBorder: "rgba(125,150,172,0.25)" },
+  deadstock: { dotColor: "#CDAAB3", badgeColor: "#6B5A7A", badgeBg: "rgba(205,170,179,0.094)", badgeBorder: "rgba(205,170,179,0.25)" },
+};
+
 const SILHOUETTE_DESCRIPTIONS: Record<string, string> = {
   cocoon: "Volume through shape rather than fit — fabric drape and weight are critical to the read.",
   belted: "Structure via cinching — adds waist definition without complex seaming; works across sizes.",
@@ -585,6 +644,7 @@ export default function SpecStudioPage() {
   const [userManuallySelected, setUserManuallySelected] = useState(false);
 
   const [hoveredMaterialId, setHoveredMaterialId] = useState<string | null>(null);
+  const [materialCategory, setMaterialCategory] = useState<string>("all");
   const [hoveredComplexity, setHoveredComplexity] = useState<ConstructionTier | null>(null);
   const [pulseExpandedRow, setPulseExpandedRow] = useState<string | null>(null);
   const [dismissingChips, setDismissingChips] = useState<Set<string>>(new Set());
@@ -621,6 +681,22 @@ export default function SpecStudioPage() {
   const storeCollectionName = useSessionStore((s) => s.collectionName);
   const storeSeason = useSessionStore((s) => s.season);
   const refinementModifiers = useSessionStore((s) => s.refinementModifiers);
+
+  const [brandProfileName, setBrandProfileName] = useState<string | null>(null);
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from('brand_profiles')
+        .select('brand_name')
+        .eq('user_id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data?.brand_name) setBrandProfileName(data.brand_name);
+        });
+    });
+  }, []);
 
   const [headerCollectionName, setHeaderCollectionName] = useState("Desert Mirage");
   const [headerSeasonLabel, setHeaderSeasonLabel] = useState("SS26");
@@ -1253,7 +1329,7 @@ export default function SpecStudioPage() {
       construction_tier: constructionTier ?? 'moderate',
       timeline_weeks: timelineWeeks,
       season: storeSeason || 'SS27',
-      collectionName: storeCollectionName || headerCollectionName,
+      collectionName: brandProfileName || storeCollectionName || headerCollectionName,
       intent: intentPayload,
     });
     if (!blackboard) return;
@@ -2119,136 +2195,254 @@ export default function SpecStudioPage() {
                   </span>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-                  {materials.map((mat) => {
-                    const isSel = materialId === mat.id;
-                    const isRec = mat.id === recommendedMaterialId;
-                    const isRedirectMat = selectedKeyPiece?.redirect_material_id === mat.id && insight?.type === 'warning';
-                    const isHover = hoveredMaterialId === mat.id;
-                    const deltas = scoreMaterialDeltas(mat);
-                    const matchingChips = chipsByMaterial[mat.id] || [];
-
+                {/* Category filter strip */}
+                <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                  {(["all", "natural", "luxury", "synthetic", "deadstock"] as const).map((cat) => {
+                    const isActive = materialCategory === cat;
+                    const label = cat === "all" ? "All" : cat.charAt(0).toUpperCase() + cat.slice(1);
+                    const meta = cat !== "all" ? CATEGORY_META[cat] : null;
                     return (
                       <button
-                        key={mat.id}
-                        onClick={() => { setMaterialId(mat.id); setUserManuallySelected(true); }}
-                        onMouseEnter={() => setHoveredMaterialId(mat.id)}
-                        onMouseLeave={() => setHoveredMaterialId(null)}
+                        key={cat}
+                        onClick={() => setMaterialCategory(cat)}
                         style={{
-                          textAlign: "left",
-                          borderRadius: 14,
-                          padding: "14px 14px 12px",
-                          background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
-                          border: isSel
-                            ? `1.5px solid ${CHARTREUSE}`
-                            : isRec && !materialId
-                              ? "1.5px solid rgba(169,123,143,0.35)"
-                              : "1px solid rgba(67, 67, 43, 0.10)",
-                          boxShadow: isSel
-                            ? "0 14px 40px rgba(67,67,43,0.10)"
-                            : "0 8px 24px rgba(67,67,43,0.05)",
+                          padding: "4px 11px",
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: isActive ? 600 : 400,
+                          fontFamily: inter,
                           cursor: "pointer",
                           outline: "none",
-                          transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
-                          transform: isSel ? "translateY(-1px)" : "translateY(0)",
-                          position: "relative",
+                          transition: "all 150ms ease",
+                          border: isActive
+                            ? cat === "all"
+                              ? "1.5px solid #D4CFC8"
+                              : `1.5px solid ${meta!.badgeBorder}`
+                            : "1.5px solid #E8E3D6",
+                          background: isActive
+                            ? cat === "all"
+                              ? "#F0EDE8"
+                              : meta!.badgeBg
+                            : "transparent",
+                          color: isActive
+                            ? cat === "all"
+                              ? "#4D302F"
+                              : meta!.badgeColor
+                            : "#A8A09A",
                         }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "flex-start",
-                            justifyContent: "space-between",
-                            gap: 10,
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontSize: 13, marginBottom: 4, color: "rgba(67,67,43,0.35)" }}>
-                              {MATERIAL_ICONS[mat.id] || "○"}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 14,
-                                fontWeight: 650,
-                                color: OLIVE,
-                                fontFamily: sohne,
-                                marginBottom: 2,
-                              }}
-                            >
-                              {mat.name}
-                            </div>
-                          </div>
-
-                          {isHover && !isSel ? (
-                            compactDeltaCluster({
-                              deltas,
-                              isHoverOrActive: true,
-                              isRecommended: isRec,
-                            })
-                          ) : !isSel ? (
-                            aggregateDeltaDot({ deltas })
-                          ) : null}
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "rgba(67,67,43,0.45)",
-                            fontFamily: "var(--font-inter), system-ui, sans-serif",
-                            marginTop: 6,
-                          }}
-                        >
-                          ${mat.cost_per_yard}/yd · {mat.lead_time_weeks}wk
-                        </div>
-
-                        {matchingChips.length > 0 && (
-                          <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                            {matchingChips.map((chip) => (
-                              <span
-                                key={chip.label}
-                                style={{
-                                  padding: "3px 8px",
-                                  borderRadius: 999,
-                                  fontSize: 10,
-                                  fontWeight: 550,
-                                  color: STEEL,
-                                  background: "rgba(125,150,172,0.10)",
-                                  border: "1px solid rgba(125,150,172,0.28)",
-                                  fontFamily: inter,
-                                }}
-                              >
-                                {chip.label}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {isRedirectMat && (
-                          <div style={{ marginTop: 8 }}>
-                            <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(67,67,43,0.06)", color: "rgba(67,67,43,0.45)", fontFamily: inter }}>
-                              COST ALTERNATIVE
-                            </span>
-                          </div>
-                        )}
-
-                        {(isHover || isSel) && (
-                          <div style={{ marginTop: 10 }}>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                lineHeight: 1.5,
-                                color: "rgba(67,67,43,0.70)",
-                                fontFamily: "var(--font-inter), system-ui, sans-serif",
-                              }}
-                            >
-                              {MATERIAL_DESCRIPTIONS[mat.id] || "Shifts weight, drape, and finish — this choice will quietly define the piece's tone."}
-                            </div>
-                          </div>
-                        )}
+                        {label}
                       </button>
                     );
                   })}
                 </div>
+
+                {/* Selected material detail panel */}
+                {selectedMaterial && (
+                  <div
+                    style={{
+                      marginBottom: 12,
+                      padding: "12px 14px",
+                      background: "#FFFFFF",
+                      border: "1px solid #E8E3D6",
+                      borderRadius: 10,
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    {/* Mini swatch */}
+                    <div
+                      style={{
+                        flexShrink: 0,
+                        width: 40,
+                        height: 40,
+                        borderRadius: 8,
+                        background: MATERIAL_SWATCH_BG[selectedMaterial.id] || "#D0C8B8",
+                        border: "1px solid rgba(0,0,0,0.06)",
+                      }}
+                    />
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: "#191919", fontFamily: inter }}>
+                          {selectedMaterial.name}
+                        </span>
+                        {(() => {
+                          const c = MATERIAL_CATEGORY_MAP[selectedMaterial.id] || "natural";
+                          const m = CATEGORY_META[c];
+                          return (
+                            <span
+                              style={{
+                                fontSize: 9.5,
+                                fontWeight: 700,
+                                letterSpacing: "0.06em",
+                                textTransform: "uppercase" as const,
+                                color: m.badgeColor,
+                                background: m.badgeBg,
+                                border: `1px solid ${m.badgeBorder}`,
+                                borderRadius: 4,
+                                padding: "1px 5px",
+                                fontFamily: inter,
+                              }}
+                            >
+                              {c}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          color: "#6B6560",
+                          lineHeight: 1.65,
+                          fontFamily: inter,
+                          marginBottom: 4,
+                        }}
+                      >
+                        {MATERIAL_DESCRIPTIONS[selectedMaterial.id] ||
+                          "Shifts weight, drape, and finish — this choice will quietly define the piece's tone."}
+                      </div>
+                      <div style={{ fontFamily: inter }}>
+                        <span style={{ fontSize: 12, color: "#4D302F", fontWeight: 600 }}>
+                          ${selectedMaterial.cost_per_yard}/yd
+                        </span>
+                        <span style={{ color: "#D4CFC8", margin: "0 5px" }}>·</span>
+                        <span style={{ fontSize: 12, color: "#A8A09A" }}>{selectedMaterial.lead_time_weeks}wk lead</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Swatch grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                  {materials
+                    .filter((mat) => materialCategory === "all" || MATERIAL_CATEGORY_MAP[mat.id] === materialCategory)
+                    .map((mat) => {
+                      const isSel = materialId === mat.id;
+                      const isRedirectMat = selectedKeyPiece?.redirect_material_id === mat.id && insight?.type === "warning";
+                      const cat = MATERIAL_CATEGORY_MAP[mat.id] || "natural";
+                      const meta = CATEGORY_META[cat];
+                      const swatchBg = MATERIAL_SWATCH_BG[mat.id] || "#D0C8B8";
+                      return (
+                        <button
+                          key={mat.id}
+                          onClick={() => { if (!isSel) { setMaterialId(mat.id); setUserManuallySelected(true); } }}
+                          style={{
+                            padding: 0,
+                            border: isSel ? "2px solid #A8B475" : "2px solid transparent",
+                            borderRadius: 10,
+                            overflow: "hidden",
+                            boxShadow: isSel ? "0 0 0 3px rgba(168,180,117,0.13)" : "none",
+                            cursor: "pointer",
+                            outline: "none",
+                            textAlign: "left",
+                            background: "none",
+                            transition: "all 150ms ease",
+                          }}
+                        >
+                          {/* Texture swatch */}
+                          <div
+                            style={{
+                              position: "relative",
+                              height: 72,
+                              background: swatchBg,
+                              borderRadius: "8px 8px 0 0",
+                            }}
+                          >
+                            {/* Category dot */}
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: 6,
+                                right: 6,
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                background: meta.dotColor,
+                                opacity: 0.7,
+                              }}
+                            />
+                            {/* Selected overlay + checkmark */}
+                            {isSel && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  inset: 0,
+                                  background: "rgba(168,180,117,0.15)",
+                                  borderRadius: "8px 8px 0 0",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: "50%",
+                                    background: "#A8B475",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <span style={{ color: "#fff", fontSize: 11, fontWeight: 800, lineHeight: 1 }}>✓</span>
+                                </div>
+                              </div>
+                            )}
+                            {/* Cost alternative badge */}
+                            {isRedirectMat && (
+                              <div style={{ position: "absolute", bottom: 4, left: 4 }}>
+                                <span
+                                  style={{
+                                    padding: "1px 5px",
+                                    borderRadius: 3,
+                                    fontSize: 8,
+                                    fontWeight: 700,
+                                    letterSpacing: "0.10em",
+                                    textTransform: "uppercase" as const,
+                                    background: "rgba(67,67,43,0.08)",
+                                    color: "rgba(67,67,43,0.5)",
+                                    fontFamily: inter,
+                                  }}
+                                >
+                                  ALT
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {/* Label area */}
+                          <div
+                            style={{
+                              padding: "7px 8px 8px",
+                              background: isSel ? "rgba(168,180,117,0.031)" : "#FFFFFF",
+                              borderTop: isSel ? "1px solid rgba(168,180,117,0.188)" : "1px solid #F0EDE8",
+                              borderRadius: "0 0 8px 8px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "#191919",
+                                lineHeight: 1.3,
+                                fontFamily: inter,
+                              }}
+                            >
+                              {mat.name}
+                            </div>
+                            <div style={{ marginTop: 2, fontFamily: inter }}>
+                              <span style={{ fontSize: 11, color: "#6B6560" }}>${mat.cost_per_yard}/yd</span>
+                              <span style={{ color: "#D4CFC8", margin: "0 3px" }}>·</span>
+                              <span style={{ fontSize: 10.5, color: "#A8A09A" }}>{mat.lead_time_weeks}wk</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+
               </div>
 
               {/* Complexity */}
@@ -2724,9 +2918,9 @@ export default function SpecStudioPage() {
         rightContent={
         <>
         <div style={{ padding: "36px 36px 0" }}>
-          {/* Pulse Rail */}
+          {/* Pulse Rail — slim strip */}
           <div style={{ marginBottom: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", fontFamily: sohne, marginBottom: 16 }}>Pulse</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#A8A09A", fontFamily: inter, marginBottom: 14 }}>Pulse</div>
             <PulseScoreRow
               dimensionKey="identity"
               label="Identity"
@@ -2739,8 +2933,7 @@ export default function SpecStudioPage() {
               whatItMeans="Identity measures how well your material, silhouette, palette, and construction choices reinforce the locked direction's brand signals."
               howCalculated="Delta scoring against your locked aesthetic — each spec choice adds or subtracts from the base concept identity score."
               isPending={false}
-              isExpanded={pulseExpandedRow === "identity"}
-              onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === "identity" ? null : "identity")}
+              variant="strip"
             />
             <PulseScoreRow
               dimensionKey="resonance"
@@ -2754,8 +2947,7 @@ export default function SpecStudioPage() {
               whatItMeans="Resonance measures whether your choices are commercially timed — does the market appetite exist for this spec combination right now?"
               howCalculated="Material trend alignment + silhouette saturation score, weighted against your direction's velocity data."
               isPending={false}
-              isExpanded={pulseExpandedRow === "resonance"}
-              onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === "resonance" ? null : "resonance")}
+              variant="strip"
             />
             <PulseScoreRow
               dimensionKey="execution"
@@ -2769,8 +2961,7 @@ export default function SpecStudioPage() {
               whatItMeans="Execution measures cost feasibility — whether your build is viable at the target margin. COGS is calculated from material cost × yardage + complexity multiplier."
               howCalculated="COGS vs margin ceiling: green if under, amber within 5%, red if over. Lead time scored separately against season deadline."
               isPending={!insight}
-              isExpanded={pulseExpandedRow === "execution"}
-              onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === "execution" ? null : "execution")}
+              variant="strip"
             />
             {activeImplications.length > 0 && (
               <button
@@ -2799,32 +2990,23 @@ export default function SpecStudioPage() {
             )}
           </div>
 
+          {/* Major section divider */}
+          <div style={{ height: 1, background: "#E8E3D6", margin: "20px 0 24px" }} />
+
           {/* Muko Insight */}
           {!userManuallySelected ? (
             <div style={{ marginBottom: 28 }}>
-              <div style={{ height: 1, background: "rgba(67,67,43,0.12)", margin: "24px 0" }} />
-              <div
-                style={{
-                  fontFamily: inter,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  color: "rgba(67,67,43,0.38)",
-                  marginBottom: 16,
-                }}
-              >
-                MUKO INSIGHT
+              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>
+                Insight
               </div>
-              <p style={{ margin: 0, fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.35)", fontStyle: "italic" }}>
+              <p style={{ margin: 0, fontFamily: inter, fontSize: 13.5, color: "rgba(67,67,43,0.42)", fontStyle: "italic", lineHeight: 1.6 }}>
                 Select a material to see Muko&apos;s insight
               </p>
             </div>
           ) : specInsightLoading && !specSynthInsightData && !specStreamingText ? (
             <div style={{ marginBottom: 28 }}>
-              <div style={{ height: 1, background: "rgba(67,67,43,0.12)", margin: "24px 0" }} />
-              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>
-                MUKO INSIGHT
+              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>
+                Insight
               </div>
               {/* Skeleton — shown only before first streaming chunk arrives */}
               {[80, 60, 90, 55].map((w, i) => (
@@ -2846,6 +3028,7 @@ export default function SpecStudioPage() {
               mode={specSynthInsightData?.mode}
               isStreaming={specInsightLoading && !!specStreamingText}
               streamingText={specStreamingText}
+              pageMode="concept"
               nextMove={{
                 mode: "spec",
                 suggestions: mukoSynthesis?.suggestions ?? [],

@@ -519,6 +519,20 @@ Fashion-specific language: fit integrity, proportion, restraint, finishing, fabr
 Avoid robotic repetition.
 No explanation of methodology. No "based on data."
 
+HEADLINE RULE
+The insight_title must surface an observation — never issue a directive.
+Do not use imperative verbs in the headline: no "claim," "own," "move," "act," "define," "position."
+The headline should make the designer feel oriented, not warned.
+Wrong: "Romantic Analog is still open — claim emotional authenticity before Sandy Liang and Doen flatten it into a mood board."
+Right style: "Romantic Analog still has room — but the emotional-restraint angle is moving fast."
+
+SEEN_IN BRANDS RULE
+When referencing brand names drawn from seen_in data, use them only to illustrate where an aesthetic is showing up in the market.
+Never frame named brands as competitors the user needs to outrun.
+Never assume a relationship between the user's brand and any named brand — their competitive set may be entirely different.
+Wrong style: "Sandy Liang and Doen already own the soft-girlhood register."
+Right style: "Seen in recent collections from Sandy Liang, Doen, and Sezane — the soft-feminine lane is consolidating fast."
+
 INTENT CALIBRATION ADAPTER (NON-NEGOTIABLE)
 The input includes an "intent" object:
 - primary_goals (0–3 selected goals)
@@ -585,9 +599,9 @@ Must include urgency or timeframe and competitive implication.
 Never include numeric scores. Never include internal labels.
 
 Good patterns:
-"[Aesthetic] is saturating — only brands with a [signature] will survive consolidation."
-"[Aesthetic] is entering its adoption window — claim it before [competitor] flattens it."
-"The [aesthetic] gap is still open at [price tier] — the next two seasons decide who owns it."
+"[Aesthetic] is saturating — only brands with a [signature] will hold through consolidation."
+"[Aesthetic] is entering its adoption window — the [competitor]-adjacent lane is moving fast."
+"The [aesthetic] gap is still open at [price tier] — the next two seasons decide who holds it."
 
 insight_description
 3–4 sentences. Strategic framing sentence first, then analysis.

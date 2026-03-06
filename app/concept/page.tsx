@@ -32,6 +32,7 @@ import {
   getProxyMessage,
   type Aesthetic as ResearcherAesthetic,
 } from "@/lib/agents/researcher";
+import { getFlatForPiece } from "@/components/flats";
 
 /* ─── Pulse icons ─────────────────────────────────────────────────────────── */
 function IconIdentity({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
@@ -63,9 +64,9 @@ function IconExecution({ size = 14, color = "currentColor" }: { size?: number; c
 /* ─── Design tokens ───────────────────────────────────────────────────────── */
 const CHARTREUSE = "#A8B475";
 const STEEL = BRAND.steelBlue;
-const PULSE_GREEN = "#4D7A56";
-const PULSE_YELLOW = "#9B7A3A";
-const PULSE_RED = "#8A3A3A";
+const PULSE_GREEN = "#A8B475";   // Chartreuse — brand positive
+const PULSE_YELLOW = "#B8876B";  // Camel — brand moderate
+const PULSE_RED = "#A97B8F";     // Rose — brand tension
 const OLIVE = BRAND.oliveInk;
 
 /* ─── Type aliases ────────────────────────────────────────────────────────── */
@@ -250,12 +251,6 @@ function matchFreeFormToAesthetic(input: string): string | null {
 }
 
 /* ─── Pulse status helpers ────────────────────────────────────────────────── */
-function getIdentityStatus(score: number | undefined): { label: string; color: string; sublabel: string } {
-  if (score === undefined) return { label: "—", color: "rgba(67,67,43,0.35)", sublabel: "Select a direction to score" };
-  if (score >= 85) return { label: "Strong", color: PULSE_GREEN, sublabel: "Reinforces core DNA" };
-  if (score >= 70) return { label: "Moderate", color: PULSE_YELLOW, sublabel: "Some tension with core values" };
-  return { label: "Tension", color: PULSE_RED, sublabel: "Significant brand tension" };
-}
 function getResonanceStatus(pulse: { status: string; score: number; message: string } | null, saturationScore?: number, collectionsCount?: number): { label: string; color: string; sublabel: string } {
   if (!pulse) return { label: "—", color: "rgba(67,67,43,0.35)", sublabel: "Select a direction to score" };
   const color = pulse.status === "green" ? PULSE_GREEN : pulse.status === "yellow" ? PULSE_YELLOW : PULSE_RED;
@@ -290,10 +285,10 @@ function AestheticChipButton({
       ? 'rgba(169,95,95,0.70)'
       : tension === 'soft'
         ? 'rgba(184,135,59,0.60)'
-        : 'rgba(125,150,172,0.55)'
+        : '#A8B475'
     : hovered && isClickable
-      ? 'rgba(125,150,172,0.35)'
-      : 'rgba(67,67,43,0.18)';
+      ? 'rgba(168,180,117,0.55)'
+      : '#D4CFC8';
 
   const tooltip = isAutoSelected
     ? 'Pre-selected based on your key piece. Tap to deselect.'
@@ -313,27 +308,29 @@ function AestheticChipButton({
         padding: "4px 10px",
         borderRadius: 999,
         fontSize: 11,
-        fontWeight: 500,
+        fontWeight: isActive ? 600 : 500,
         fontFamily: inter,
         cursor: isClickable ? "pointer" : "default",
         display: "inline-flex",
         alignItems: "center",
         gap: 3,
         background: isActive
-          ? "rgba(125,150,172,0.08)"
-          : hovered && isClickable
-            ? "rgba(125,150,172,0.05)"
-            : "transparent",
-        border: `1px solid ${borderColor}`,
+          ? tension === 'hard'
+            ? 'rgba(169,95,95,0.08)'
+            : tension === 'soft'
+              ? 'rgba(184,135,107,0.08)'
+              : '#A8B47515'
+          : "transparent",
+        border: `1.5px solid ${borderColor}`,
         color: isActive
           ? tension === 'hard'
             ? 'rgba(169,95,95,0.90)'
             : tension === 'soft'
               ? 'rgba(184,135,59,0.90)'
-              : "#7D96AC"
+              : '#6B7A40'
           : hovered && isClickable
-            ? "rgba(125,150,172,0.80)"
-            : "rgba(67,67,43,0.52)",
+            ? 'rgba(107,121,64,0.75)'
+            : '#6B6560',
         transition: "all 150ms ease",
       }}
     >
@@ -466,6 +463,28 @@ function loadMoodboardImages(aesthetic: string): string[] {
   if (!folder) return [];
   const all = Array.from({ length: 10 }, (_, i) => `/images/aesthetics/${folder}/${i + 1}.jpg`);
   return seededShuffle(all, `${aesthetic}::`).slice(0, 9);
+}
+
+/* ─── Key Pieces placeholder (used when getFlatForPiece returns null) ─────── */
+function KeyPiecePlaceholder({ category }: { category: string | null }) {
+  const step = 6;
+  const w = 110, h = 150, x0 = 5, y0 = 5;
+  const lines: React.ReactNode[] = [];
+  for (let i = 0; i * step <= w + h; i++) {
+    const o = i * step;
+    lines.push(<line key={`d${i}`} x1={x0 + Math.min(o, w)} y1={o <= w ? y0 : y0 + (o - w)} x2={o <= h ? x0 : x0 + (o - h)} y2={y0 + Math.min(o, h)} stroke="rgba(0,0,0,0.06)" strokeWidth="0.8" />);
+  }
+  for (let x = x0; x <= x0 + w; x += step) {
+    lines.push(<line key={`v${x}`} x1={x} y1={y0} x2={x} y2={y0 + h} stroke="rgba(0,0,0,0.06)" strokeWidth="0.8" />);
+  }
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 120 160" fill="none">
+      <rect x={x0} y={y0} width={w} height={h} rx="8" fill="#E8E3D6" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+      <clipPath id="ph-clip"><rect x={x0} y={y0} width={w} height={h} rx="8" /></clipPath>
+      <g clipPath="url(#ph-clip)">{lines}</g>
+      <text x="60" y="85" textAnchor="middle" fontSize="10" fill="#A8A09A" fontFamily="system-ui, sans-serif">{category ?? ""}</text>
+    </svg>
+  );
 }
 
 /* ─── Main component ──────────────────────────────────────────────────────── */
@@ -709,7 +728,7 @@ export default function ConceptStudioPage() {
       identity_score: identityPulse?.score ?? 80,
       resonance_score: resonancePulse?.score ?? 75,
       season: season || 'SS27',
-      collectionName: storeCollectionName || headerCollectionName,
+      collectionName: brandProfileName || storeCollectionName || headerCollectionName,
       intent: intentPayload,
     });
     if (!blackboard) return;
@@ -838,6 +857,7 @@ export default function ConceptStudioPage() {
 
   const brandProfileId = useRef<string | null>(null);
   const [noBrandProfile, setNoBrandProfile] = useState(false);
+  const [brandProfileName, setBrandProfileName] = useState<string | null>(null);
 
   // On mount: resolve the current user's brand profile id from Supabase
   useEffect(() => {
@@ -849,12 +869,13 @@ export default function ConceptStudioPage() {
       }
       supabase
         .from('brand_profiles')
-        .select('id')
+        .select('id, brand_name')
         .eq('user_id', user.id)
         .single()
         .then(({ data }) => {
           if (data?.id) {
             brandProfileId.current = data.id;
+            if (data.brand_name) setBrandProfileName(data.brand_name);
             setNoBrandProfile(false);
 
             // Batch-score all aesthetics against the brand profile so Pick selection
@@ -1124,7 +1145,17 @@ export default function ConceptStudioPage() {
     }
   }, [conceptSilhouette, conceptPalette, selectedAesthetic, selectedKeyPieceLocal, selectedElements, chipMeta, identityPulse?.score !== undefined]);
 
-  const idStatus = getIdentityStatus(identityScore);
+  const idStatus = {
+    label: identityPulse?.status === "green" ? "Strong"
+         : identityPulse?.status === "yellow" ? "Moderate"
+         : identityPulse?.status === "red" ? "Tension"
+         : "—",
+    color: identityPulse?.status === "green" ? PULSE_GREEN
+         : identityPulse?.status === "yellow" ? PULSE_YELLOW
+         : identityPulse?.status === "red" ? PULSE_RED
+         : "rgba(67,67,43,0.35)",
+    sublabel: identityPulse?.message ?? "Select a direction to score",
+  };
   const resStatus = getResonanceStatus(resonancePulse, resonanceSaturationScore ?? undefined, resonanceCollectionsCount ?? undefined);
   const scoreColor = (score: number) => score >= 80 ? CHARTREUSE : score >= 65 ? BRAND.camel : BRAND.rose;
 
@@ -1282,7 +1313,7 @@ export default function ConceptStudioPage() {
 
   /* ─── Pulse rows ──────────────────────────────────────────────────────────── */
   const pulseRows = [
-    { key: "identity", label: "Identity", icon: (c: string) => <IconIdentity size={14} color={c} />, score: identityScore != null ? `${identityScore}` : "—", scoreNum: identityScore ?? 0, color: identityScore != null ? scoreColor(identityScore) : "rgba(67,67,43,0.35)", chip: identityScore != null ? { variant: idStatus.color === PULSE_GREEN ? "green" as const : idStatus.color === PULSE_YELLOW ? "amber" as const : idStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: idStatus.label } : null, subLabel: noBrandProfile ? "Complete Brand DNA setup to see identity scores" : idStatus.sublabel, what: `Identity measures how well this direction aligns with your brand DNA — keywords, aesthetic positioning, and customer profile. A high score means this direction reinforces who you already are. A low score signals tension that requires intentional navigation.`, how: `Keyword overlap between your brand profile and this direction's signals, weighted by conflict detection. Intentional tensions acknowledged in onboarding are factored in.`, pending: false },
+    { key: "identity", label: "Identity", icon: (c: string) => <IconIdentity size={14} color={c} />, score: identityScore != null ? `${identityScore}` : "—", scoreNum: identityScore ?? 0, color: idStatus.color, chip: identityScore != null ? { variant: idStatus.color === PULSE_GREEN ? "green" as const : idStatus.color === PULSE_YELLOW ? "amber" as const : idStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: idStatus.label } : null, subLabel: noBrandProfile ? "Complete Brand DNA setup to see identity scores" : idStatus.sublabel, what: `Identity measures how well this direction aligns with your brand DNA — keywords, aesthetic positioning, and customer profile. A high score means this direction reinforces who you already are. A low score signals tension that requires intentional navigation.`, how: `Keyword overlap between your brand profile and this direction's signals, weighted by conflict detection. Intentional tensions acknowledged in onboarding are factored in.`, pending: false },
     { key: "resonance", label: "Resonance", icon: (c: string) => <IconResonance size={14} color={c} />, score: resonanceLoading ? "—" : resonanceScore != null ? `${resonanceScore}` : "—", scoreNum: resonanceLoading ? 0 : resonanceScore ?? 0, color: resonanceLoading ? "rgba(67,67,43,0.35)" : resonanceScore != null ? scoreColor(resonanceScore) : "rgba(67,67,43,0.35)", chip: resonanceLoading ? { variant: "gray" as const, status: "Matching direction..." } : resonanceScore != null ? { variant: resStatus.color === PULSE_GREEN ? "green" as const : resStatus.color === PULSE_YELLOW ? "amber" as const : resStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: resStatus.label } : null, subLabel: resonanceLoading ? "\u00A0" : resStatus.sublabel || "\u00A0", what: `Resonance measures market timing — how much consumer interest exists for this direction right now, and whether you're entering at the right moment. High resonance with ascending velocity means the window is open. Peak saturation means you're late.`, how: `Based on checkMarketSaturation(): saturation score from our curated aesthetics library, weighted by trend velocity. Resonance = 100 − saturation, with a 15-point penalty for declining velocity.`, pending: false },
     { key: "execution", label: "Execution", icon: (c: string) => <IconExecution size={14} color={c} />, score: "—", scoreNum: 0, color: "rgba(67,67,43,0.35)", chip: null, subLabel: "Unlocks in Spec Studio", what: `Execution measures whether the physical product you're building is feasible given your timeline, materials, and construction complexity. It unlocks in Spec Studio once you define your product inputs.`, how: `Timeline buffer score based on material lead times and construction complexity relative to your season deadline. Negative buffer scores red. Margin gate applied as a 30% score penalty if COGS exceeds target.`, pending: true },
   ];
@@ -1424,31 +1455,32 @@ export default function ConceptStudioPage() {
                   </div>
 
                   <div style={{ height: 1, background: "rgba(67,67,43,0.10)", margin: "18px 0 16px" }} />
-                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(67,67,43,0.50)", marginBottom: 6 }}>
+                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 6 }}>
                     SHAPE YOUR DIRECTION
                   </div>
-                  <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 16 }}>
+                  <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "#A8A09A", marginBottom: 16, lineHeight: 1.5 }}>
                     Complete your creative vision before moving to production specs.
                   </div>
 
-                  {/* KEY PIECES */}
+                  {/* KEY PIECES — swatch-grid */}
                   {keyPieces.length > 0 && (
-                    <div style={{ marginBottom: 20 }}>
-                      <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.40)", marginBottom: 4 }}>
+                    <div style={{ marginBottom: 24 }}>
+                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#A8A09A", marginBottom: 4 }}>
                         Key Pieces
                       </div>
-                      <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 12 }}>
+                      <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "#A8A09A", marginBottom: 10, lineHeight: 1.5 }}>
                         What the market is moving toward for {selectedAesthetic} this season.
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10 }}>
+                      {/* 4-column flat grid */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
                         {keyPieces.map((piece, i) => {
                           const isSelected = selectedKeyPieceLocal?.item === piece.item && !selectedKeyPieceLocal?.custom;
                           const signalStyle = piece.signal === "high-volume"
-                            ? { bg: "rgba(169,123,143,0.15)", color: "#6B3D52", label: "HIGH VOLUME" }
+                            ? { color: "#8B5E3C", bg: "#B8876B18", border: "#B8876B40", label: "HIGH VOLUME" }
                             : piece.signal === "ascending"
-                            ? { bg: "rgba(168,180,117,0.15)", color: "#5B6A38", label: "ASCENDING ↑" }
-                            : { bg: "rgba(125,150,172,0.15)", color: "#3D5A72", label: "EMERGING" };
-                          const icon = KEY_PIECE_CATEGORY_ICONS[piece.category ?? ""] ?? null;
+                            ? { color: "#6B7A40", bg: "#A8B47518", border: "#A8B47540", label: "ASCENDING ↑" }
+                            : { color: "#7D96AC", bg: "#7D96AC18", border: "#7D96AC40", label: "EMERGING" };
+                          const satPct = resonanceSaturationScore ?? 0;
                           return (
                             <button
                               key={i}
@@ -1462,111 +1494,157 @@ export default function ConceptStudioPage() {
                                 }
                               }}
                               style={{
-                                textAlign: "left",
-                                borderRadius: 14,
-                                padding: "14px 14px 12px",
-                                background: isSelected ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
-                                border: isSelected ? `1.5px solid ${CHARTREUSE}` : "1px solid rgba(67,67,43,0.10)",
-                                boxShadow: isSelected ? "0 14px 40px rgba(67,67,43,0.10)" : "0 8px 24px rgba(67,67,43,0.05)",
+                                display: "flex",
+                                flexDirection: "column",
+                                borderRadius: 10,
+                                overflow: "hidden",
+                                border: isSelected ? "2px solid #A8B475" : "2px solid transparent",
+                                boxShadow: isSelected ? "0 0 0 3px #A8B47520" : "none",
+                                background: "transparent",
                                 cursor: "pointer",
                                 outline: "none",
-                                transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
-                                transform: isSelected ? "translateY(-1px)" : "translateY(0)",
-                                position: "relative",
+                                textAlign: "left",
+                                padding: 0,
+                                transition: "all 0.15s",
                               }}
                             >
-                              {isSelected && (
-                                <div style={{ position: "absolute", top: 8, right: 8, width: 18, height: 18, borderRadius: "50%", background: CHARTREUSE, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                              {/* Illustration area */}
+                              <div style={{
+                                height: 140,
+                                borderRadius: "8px 8px 0 0",
+                                background: isSelected ? "#F5F2EC" : "#EFECE6",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                overflow: "hidden",
+                              }}>
+                                {(() => {
+                                  const flatResult = getFlatForPiece(piece.type, piece.signal);
+                                  if (!flatResult) return <KeyPiecePlaceholder category={piece.category} />;
+                                  const { Flat, color } = flatResult;
+                                  return <Flat color={color} />;
+                                })()}
+                              </div>
+                              {/* Label area */}
+                              <div style={{
+                                background: isSelected ? "#A8B47508" : "#FFFFFF",
+                                borderTop: isSelected ? "1px solid #A8B47530" : "1px solid #F0EDE8",
+                                borderRadius: "0 0 8px 8px",
+                                padding: "8px 8px 7px",
+                              }}>
+                                <div style={{ fontFamily: inter, fontSize: 12, fontWeight: 600, color: "#191919", lineHeight: 1.3, marginBottom: 4 }}>
+                                  {piece.item}
                                 </div>
-                              )}
-                              <div style={{ fontSize: 13, marginBottom: 6, color: "rgba(67,67,43,0.35)" }}>
-                                {icon}
-                              </div>
-                              <div style={{ fontSize: 14, fontWeight: 650, color: OLIVE, fontFamily: sohne, marginBottom: 4 }}>
-                                {piece.item}
-                              </div>
-                              {piece.signal && (
-                                <div style={{ marginBottom: 6 }}>
-                                  <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: signalStyle.bg, color: signalStyle.color, fontFamily: inter }}>
+                                {piece.signal && (
+                                  <span style={{
+                                    display: "inline-block",
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    letterSpacing: "0.07em",
+                                    textTransform: "uppercase" as const,
+                                    color: signalStyle.color,
+                                    background: signalStyle.bg,
+                                    border: `1px solid ${signalStyle.border}`,
+                                    borderRadius: 3,
+                                    padding: "1px 5px",
+                                    marginBottom: 5,
+                                  }}>
                                     {signalStyle.label}
                                   </span>
+                                )}
+                                {/* Saturation bar */}
+                                <div style={{ marginBottom: 3 }}>
+                                  <div style={{ height: 3, background: "#F0EDE8", borderRadius: 2, overflow: "hidden" }}>
+                                    <div style={{
+                                      height: "100%",
+                                      width: `${satPct}%`,
+                                      background: signalStyle.color,
+                                      opacity: 0.7,
+                                    }} />
+                                  </div>
+                                  <div style={{ fontFamily: inter, fontSize: 9.5, color: "#A8A09A", marginTop: 2 }}>
+                                    {satPct}% market saturation
+                                  </div>
                                 </div>
-                              )}
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
-                                {piece.category && (
-                                  <span style={{ padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, border: "1px solid rgba(67,67,43,0.14)", color: "rgba(67,67,43,0.52)" }}>
-                                    {piece.category}
-                                  </span>
-                                )}
-                                {piece.type && (
-                                  <span style={{ padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, border: "1px solid rgba(67,67,43,0.14)", color: "rgba(67,67,43,0.52)" }}>
-                                    {piece.type}
-                                  </span>
-                                )}
+                                {/* Category tag chips */}
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 2 }}>
+                                  {piece.category && (
+                                    <span style={{ fontSize: 9.5, color: "#A8A09A", background: "#F0EDE8", borderRadius: 20, padding: "2px 7px", fontFamily: inter }}>
+                                      {piece.category}
+                                    </span>
+                                  )}
+                                  {piece.type && (
+                                    <span style={{ fontSize: 9.5, color: "#A8A09A", background: "#F0EDE8", borderRadius: 20, padding: "2px 7px", fontFamily: inter }}>
+                                      {piece.type}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </button>
                           );
                         })}
-                        {/* Custom entry */}
-                        {!showCustomInput ? (
-                          <button
-                            onClick={() => setShowCustomInput(true)}
-                            style={{
-                              textAlign: "left",
-                              padding: "14px 14px 12px",
-                              borderRadius: 14,
-                              border: "1px dashed rgba(67,67,43,0.22)",
-                              background: "transparent",
-                              cursor: "pointer",
-                              fontFamily: inter,
-                              fontSize: 12,
-                              color: "rgba(67,67,43,0.50)",
-                              outline: "none",
-                            }}
-                          >
-                            + Add your own piece
-                          </button>
-                        ) : (
-                          <div style={{ padding: "14px 14px 12px", borderRadius: 14, border: "1px dashed rgba(67,67,43,0.22)", background: "rgba(255,255,255,0.60)" }}>
-                            <input
-                              autoFocus
-                              value={customKeyPieceText}
-                              onChange={(e) => setCustomKeyPieceText(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && customKeyPieceText.trim()) {
-                                  const custom: KeyPiece = { item: customKeyPieceText.trim(), signal: null, category: null, type: null, recommended_material_id: null, redirect_material_id: null, custom: true };
-                                  setSelectedKeyPieceLocal(custom);
-                                  setSelectedKeyPiece(custom);
-                                  setCustomKeyPieceConfirmed(true);
-                                }
-                              }}
-                              onBlur={() => {
-                                if (customKeyPieceText.trim()) {
-                                  const custom: KeyPiece = { item: customKeyPieceText.trim(), signal: null, category: null, type: null, recommended_material_id: null, redirect_material_id: null, custom: true };
-                                  setSelectedKeyPieceLocal(custom);
-                                  setSelectedKeyPiece(custom);
-                                  setCustomKeyPieceConfirmed(true);
-                                }
-                              }}
-                              placeholder="e.g. Asymmetric Hem Midi Dress"
-                              style={{ width: "100%", boxSizing: "border-box", border: "none", background: "transparent", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.80)", outline: "none" }}
-                            />
-                            {customKeyPieceConfirmed && (
-                              <div style={{ marginTop: 6, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.44)", fontStyle: "italic" }}>
-                                Muko doesn&apos;t have market data on this piece yet — it won&apos;t affect your score but we&apos;ll track it.
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
+                      {/* Add your own piece */}
+                      {!showCustomInput ? (
+                        <button
+                          onClick={() => setShowCustomInput(true)}
+                          style={{
+                            marginTop: 10,
+                            display: "block",
+                            width: "100%",
+                            padding: "10px 16px",
+                            borderRadius: 6,
+                            border: "1.5px dashed #D4CFC8",
+                            background: "none",
+                            cursor: "pointer",
+                            fontFamily: inter,
+                            fontSize: 12,
+                            color: "#A8A09A",
+                            outline: "none",
+                            textAlign: "left" as const,
+                          }}
+                        >
+                          + Add your own piece
+                        </button>
+                      ) : (
+                        <div style={{ marginTop: 10, padding: "9px 14px", borderRadius: 6, border: "1.5px dashed #D4CFC8", background: "rgba(255,255,255,0.60)" }}>
+                          <input
+                            autoFocus
+                            value={customKeyPieceText}
+                            onChange={(e) => setCustomKeyPieceText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && customKeyPieceText.trim()) {
+                                const custom: KeyPiece = { item: customKeyPieceText.trim(), signal: null, category: null, type: null, recommended_material_id: null, redirect_material_id: null, custom: true };
+                                setSelectedKeyPieceLocal(custom);
+                                setSelectedKeyPiece(custom);
+                                setCustomKeyPieceConfirmed(true);
+                              }
+                            }}
+                            onBlur={() => {
+                              if (customKeyPieceText.trim()) {
+                                const custom: KeyPiece = { item: customKeyPieceText.trim(), signal: null, category: null, type: null, recommended_material_id: null, redirect_material_id: null, custom: true };
+                                setSelectedKeyPieceLocal(custom);
+                                setSelectedKeyPiece(custom);
+                                setCustomKeyPieceConfirmed(true);
+                              }
+                            }}
+                            placeholder="e.g. Asymmetric Hem Midi Dress"
+                            style={{ width: "100%", boxSizing: "border-box", border: "none", background: "transparent", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.80)", outline: "none" }}
+                          />
+                          {customKeyPieceConfirmed && (
+                            <div style={{ marginTop: 6, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.44)", fontStyle: "italic" }}>
+                              Muko doesn&apos;t have market data on this piece yet — it won&apos;t affect your score but we&apos;ll track it.
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* Silhouette selector (required) */}
                   <div style={{ marginBottom: 18 }}>
-                    <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 10 }}>
-                      Silhouette <span style={{ fontWeight: 500, letterSpacing: "0.04em", textTransform: "none", color: "rgba(67,67,43,0.32)" }}>(required)</span>
+                    <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 10 }}>
+                      Silhouette <span style={{ fontWeight: 500, letterSpacing: "0.04em", textTransform: "none" as const, color: "#A8A09A" }}>(required)</span>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
                       {CONCEPT_SILHOUETTES.map((sil) => {
@@ -1580,19 +1658,17 @@ export default function ConceptStudioPage() {
                               textAlign: "left",
                               borderRadius: 14,
                               padding: "14px 14px 12px",
-                              background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
-                              border: isSel ? `1.5px solid ${CHARTREUSE}` : "1px solid rgba(67,67,43,0.10)",
-                              boxShadow: isSel ? "0 14px 40px rgba(67,67,43,0.10)" : "0 8px 24px rgba(67,67,43,0.05)",
+                              background: isSel ? "#A8B47508" : "#FFFFFF",
+                              border: isSel ? "1.5px solid #A8B475" : "1.5px solid #E8E3D6",
                               cursor: "pointer",
                               outline: "none",
-                              transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
-                              transform: isSel ? "translateY(-1px)" : "translateY(0)",
+                              transition: "all 200ms ease",
                               position: "relative",
                             }}
                           >
                             {isAffinity && !isSel && (
                               <div style={{ position: "absolute", top: 8, right: 8 }}>
-                                <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(169,123,143,0.10)", border: "1px solid rgba(169,123,143,0.30)", color: BRAND.rose, fontFamily: inter, whiteSpace: "nowrap" }}>
+                                <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "#CDAAB318", border: "1px solid #CDAAB340", color: "#CDAAB3", fontFamily: inter, whiteSpace: "nowrap" }}>
                                   Best fit
                                 </span>
                               </div>
@@ -1600,10 +1676,10 @@ export default function ConceptStudioPage() {
                             <div style={{ fontSize: 13, marginBottom: 4, color: "rgba(67,67,43,0.35)" }}>
                               {SILHOUETTE_ICONS[sil.id]}
                             </div>
-                            <div style={{ fontSize: 14, fontWeight: 650, color: OLIVE, fontFamily: sohne, marginBottom: 2 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: "#191919", fontFamily: inter, marginBottom: 2 }}>
                               {sil.name}
                             </div>
-                            <div style={{ fontSize: 11, color: "rgba(67,67,43,0.45)", fontFamily: inter, marginTop: 6, lineHeight: 1.4 }}>
+                            <div style={{ fontSize: 11, color: "#A8A09A", fontFamily: inter, marginTop: 6, lineHeight: 1.5 }}>
                               {sil.descriptor}
                             </div>
                           </button>
@@ -1615,10 +1691,10 @@ export default function ConceptStudioPage() {
                   {/* Palette selector (optional) */}
                   {selectedAestheticData?.palette_options && selectedAestheticData.palette_options.length > 0 && (
                     <div>
-                      <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 10 }}>
-                        Palette <span style={{ fontWeight: 500, letterSpacing: "0.04em", textTransform: "none", color: "rgba(67,67,43,0.32)" }}>(optional)</span>
+                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 10 }}>
+                        Palette <span style={{ fontWeight: 500, letterSpacing: "0.04em", textTransform: "none" as const, color: "#A8A09A" }}>(optional)</span>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                         {selectedAestheticData.palette_options.map((pal) => {
                           const isSel = conceptPalette === pal.id;
                           const isAffinity = selectedAestheticData?.palette_affinity?.includes(pal.id) ?? false;
@@ -1627,36 +1703,47 @@ export default function ConceptStudioPage() {
                               key={pal.id}
                               onClick={() => setConceptPalette(isSel ? null : pal.id)}
                               style={{
-                                textAlign: "left",
-                                borderRadius: 14,
-                                padding: "14px 14px 12px",
-                                background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
-                                border: isSel ? `1.5px solid ${CHARTREUSE}` : "1px solid rgba(67,67,43,0.10)",
-                                boxShadow: isSel ? "0 14px 40px rgba(67,67,43,0.10)" : "0 8px 24px rgba(67,67,43,0.05)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 12,
+                                padding: "10px 12px",
+                                borderRadius: 8,
+                                background: isSel ? "#A8B47508" : "transparent",
+                                border: isSel ? "1.5px solid #A8B475" : "1.5px solid transparent",
                                 cursor: "pointer",
                                 outline: "none",
-                                transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
-                                transform: isSel ? "translateY(-1px)" : "translateY(0)",
-                                position: "relative",
+                                textAlign: "left" as const,
+                                width: "100%",
+                                transition: "all 200ms ease",
                               }}
                             >
-                              {isAffinity && !isSel && (
-                                <div style={{ position: "absolute", top: 8, right: 8 }}>
-                                  <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "rgba(169,123,143,0.10)", border: "1px solid rgba(169,123,143,0.30)", color: BRAND.rose, fontFamily: inter, whiteSpace: "nowrap" }}>
-                                    Best fit
-                                  </span>
-                                </div>
-                              )}
-                              <div style={{ display: "flex", gap: 3, marginBottom: 8 }}>
+                              {/* Circular swatches */}
+                              <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
                                 {pal.swatches.slice(0, 6).map((hex, i) => (
-                                  <div key={i} style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: hex, border: "1px solid rgba(0,0,0,0.06)" }} />
+                                  <div key={i} style={{ width: 18, height: 18, borderRadius: "50%", backgroundColor: hex, border: "1px solid rgba(0,0,0,0.08)", flexShrink: 0 }} />
                                 ))}
                               </div>
-                              <div style={{ fontSize: 14, fontWeight: 650, color: OLIVE, fontFamily: sohne, marginBottom: 2 }}>
-                                {pal.name}
+                              {/* Name + description */}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 600, color: "#191919" }}>
+                                    {pal.name}
+                                  </span>
+                                  {isAffinity && !isSel && (
+                                    <span style={{ padding: "1px 7px", borderRadius: 4, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "#CDAAB318", color: "#CDAAB3", border: "1px solid #CDAAB340", fontFamily: inter, whiteSpace: "nowrap" }}>
+                                      Best fit
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontFamily: inter, fontSize: 11.5, color: "#A8A09A", lineHeight: 1.45, marginTop: 2 }}>
+                                  {pal.descriptor}
+                                </div>
                               </div>
-                              <div style={{ fontSize: 11, color: "rgba(67,67,43,0.45)", fontFamily: inter, marginTop: 6, lineHeight: 1.4 }}>
-                                {pal.descriptor}
+                              {/* Radio indicator */}
+                              <div style={{ width: 18, height: 18, borderRadius: "50%", flexShrink: 0, background: isSel ? "#A8B475" : "transparent", border: isSel ? "none" : "1.5px solid #D4CFC8", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                {isSel && (
+                                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3.5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                )}
                               </div>
                             </button>
                           );
@@ -1668,11 +1755,11 @@ export default function ConceptStudioPage() {
                   {/* LAYER THESE IN */}
                   {topDisplayChips.length > 0 && (
                     <>
-                      <div style={{ height: 1, background: "rgba(67,67,43,0.07)", margin: "16px 0 14px" }} />
-                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(67,67,43,0.50)", marginBottom: 4 }}>
+                      <div style={{ height: 1, background: "#E8E3D6", margin: "20px 0 16px" }} />
+                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 4 }}>
                         Layer these in
                       </div>
-                      <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 12 }}>
+                      <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "#A8A09A", marginBottom: 12, lineHeight: 1.5 }}>
                         Creative signals that shape this direction — activate the ones that feel right to amplify your vision.
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -1697,7 +1784,7 @@ export default function ConceptStudioPage() {
                             />
                           );
                         })}
-                        <span style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, background: "transparent", border: `1px dashed ${STEEL}`, color: STEEL }}>+ add</span>
+                        <span style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, background: "transparent", border: "1.5px dashed #D4CFC8", color: "#A8A09A" }}>+ add</span>
                       </div>
                     </>
                   )}
@@ -1796,9 +1883,9 @@ export default function ConceptStudioPage() {
           <>
           <div style={{ padding: "36px 44px 0" }}>
 
-            {/* PULSE RAIL */}
+            {/* PULSE RAIL — slim strip */}
             <div style={{ marginBottom: 0 }}>
-              <div style={{ fontFamily: sohne, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>Pulse</div>
+              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>Pulse</div>
               {pulseRows.map((row) => (
                 <React.Fragment key={row.key}>
                   {/* Proxy message — shown above Resonance when LLM matched a different aesthetic */}
@@ -1819,39 +1906,29 @@ export default function ConceptStudioPage() {
                     whatItMeans={row.what}
                     howCalculated={row.how}
                     isPending={row.pending}
-                    isExpanded={pulseExpandedRow === row.key}
-                    onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === row.key ? null : row.key)}
+                    variant="strip"
                   />
                 </React.Fragment>
               ))}
             </div>
 
+            {/* Major section divider */}
+            <div style={{ height: 1, background: "#E8E3D6", margin: "20px 0 24px" }} />
+
             {/* MUKO INSIGHT */}
             {!selectedAesthetic ? (
               <div style={{ marginBottom: 28 }}>
-                <div style={{ height: 1, background: "rgba(67,67,43,0.12)", margin: "24px 0" }} />
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                    color: "rgba(67,67,43,0.38)",
-                    marginBottom: 16,
-                  }}
-                >
-                  MUKO INSIGHT
+                <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>
+                  Insight
                 </div>
-                <p style={{ margin: 0, fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.35)", fontStyle: "italic" }}>
+                <p style={{ margin: 0, fontFamily: inter, fontSize: 13.5, color: "rgba(67,67,43,0.42)", fontStyle: "italic", lineHeight: 1.6 }}>
                   Select a direction to see Muko&apos;s analysis
                 </p>
               </div>
             ) : conceptInsightLoading && !conceptInsightData && !conceptStreamingText ? (
               <div style={{ marginBottom: 28 }}>
-                <div style={{ height: 1, background: "rgba(67,67,43,0.12)", margin: "24px 0" }} />
-                <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.38)", marginBottom: 16 }}>
-                  MUKO INSIGHT
+                <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>
+                  Insight
                 </div>
                 {/* Skeleton — shown only before first streaming chunk arrives */}
                 {[80, 60, 90, 55].map((w, i) => (
@@ -1873,6 +1950,8 @@ export default function ConceptStudioPage() {
                 mode={conceptInsightData?.mode}
                 isStreaming={conceptInsightLoading && !!conceptStreamingText}
                 streamingText={conceptStreamingText}
+                pageMode="concept"
+                onContinue={() => router.push('/spec')}
                 nextMove={{
                   mode: "concept",
                   items: nextMoveItems,
