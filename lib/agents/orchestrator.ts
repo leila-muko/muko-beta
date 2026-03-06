@@ -482,7 +482,7 @@ export async function runAnalysis(
       const categoryForCOGS = CATEGORIES_MAP[input.category] as { yards_required?: number } | undefined;
       const yardage = categoryForCOGS?.yards_required ?? 2.0;
       const cogsBreakdown = calculateCOGS(
-        resolvedMaterial as Parameters<typeof calculateCOGS>[0],
+        resolvedMaterial as unknown as Parameters<typeof calculateCOGS>[0],
         yardage,
         input.construction_tier,
         false, // lined: not tracked in AnalysisInput — defaults to unlined
@@ -568,6 +568,10 @@ export async function runAnalysis(
       silhouette: input.silhouette,
       target_margin: brandProfile.target_margin,
       collection_role: session.collectionRole ?? null,
+      customer_profile: brandProfile.customer_profile,
+      reference_brands: brandProfile.reference_brands ?? [],
+      excluded_brands: brandProfile.excluded_brands ?? [],
+      price_tier: brandProfile.price_tier,
       resolved_redirects: {
         brand_mismatch: bb.redirect?.type === 'aesthetic'
           ? { suggestion: bb.redirect.suggestion, reason: bb.redirect.reason }
