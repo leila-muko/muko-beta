@@ -22,7 +22,7 @@ function computeCOGS(input: AnalysisInput, brand: BrandProfile): number {
     const cat = CATEGORIES_MAP[input.category] as { yards_required?: number } | undefined;
     const yardage = cat?.yards_required ?? 2.0;
     const breakdown = calculateCOGS(
-      mat as Parameters<typeof calculateCOGS>[0],
+      mat as unknown as Parameters<typeof calculateCOGS>[0],
       yardage,
       input.construction_tier,
       false,

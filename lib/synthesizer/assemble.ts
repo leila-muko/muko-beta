@@ -160,6 +160,14 @@ export interface ConceptBlackboardInput {
   season: string;
   /** Collection name for narrative personalization */
   collectionName: string;
+  /** Brand name from brand profile — distinct from collectionName */
+  brandName?: string;
+  /** Customer profile description from brand onboarding */
+  customerProfile?: string | null;
+  /** Reference brands from brand onboarding */
+  referenceBrands?: string[];
+  /** Excluded brands from brand onboarding */
+  excludedBrands?: string[];
   /** Optional intent calibration from the Intent page */
   intent?: IntentCalibration;
 }
@@ -182,7 +190,10 @@ export function buildConceptBlackboard(
     identity_score: input.identity_score,
     resonance_score: input.resonance_score,
     season: seasonKey,
-    brand_name: input.collectionName || undefined,
+    brand_name: input.brandName ?? input.collectionName ?? undefined,
+    customer_profile: input.customerProfile ?? null,
+    reference_brands: input.referenceBrands ?? [],
+    excluded_brands: input.excludedBrands ?? [],
     aesthetic_context: aestheticContext,
     resolved_redirects: {
       brand_mismatch: null,
@@ -264,6 +275,10 @@ export interface ReportBlackboardInput {
   collectionName: string;
   collection_role?: 'hero' | 'directional' | 'core-evolution' | 'volume-driver' | null;
   intent_mode?: InsightMode;
+  customerProfile?: string | null;
+  referenceBrands?: string[];
+  excludedBrands?: string[];
+  priceTier?: string;
 }
 
 /** Returns null when aestheticSlug or materialId is missing. */
@@ -296,6 +311,10 @@ export function buildReportBlackboard(
     material_cost_note: getMaterialCostNote(input.materialId),
     collection_role: input.collection_role ?? null,
     intent_mode: input.intent_mode,
+    customer_profile: input.customerProfile ?? null,
+    reference_brands: input.referenceBrands ?? [],
+    excluded_brands: input.excludedBrands ?? [],
+    price_tier: input.priceTier ?? 'unspecified',
     resolved_redirects: {
       brand_mismatch: null,
       cost_reduction: costReduction,

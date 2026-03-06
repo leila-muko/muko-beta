@@ -479,41 +479,69 @@ export default function StandardReportPage() {
     const slug = toAestheticSlug(storeAesthetic);
     if (!slug || !storeMaterial) return;
 
-    const materials = materialsData as unknown as Material[];
-    const mat = materials.find((m) => m.id === storeMaterial);
-    const tier = (storeTier ?? 'moderate') as ConstructionTier;
-    const cogsResult = mat
-      ? calculateCOGS(mat, 2.5, tier, false, storeTargetMsrp ?? 0, DEFAULT_TARGET_MARGIN)
-      : null;
-    const cogsUsd = cogsResult?.totalCOGS ?? 0;
-    const marginPass = cogsResult ? !cogsResult.isOverBudget : true;
-    const overallScore = Math.round(derivedIdentity * 0.35 + derivedResonance * 0.35 + derivedExecution * 0.30);
-
-    const blackboard = buildReportBlackboard({
-      aestheticSlug: slug,
-      brandKeywords: storeModifiers,
-      identity_score: derivedIdentity,
-      resonance_score: derivedResonance,
-      execution_score: derivedExecution,
-      overall_score: overallScore,
-      materialId: storeMaterial,
-      cogs_usd: cogsUsd,
-      target_msrp: storeTargetMsrp ?? 0,
-      margin_pass: marginPass,
-      construction_tier: storeTier ?? 'moderate',
-      timeline_weeks: 14,
-      season: storeSeason || 'SS27',
-      collectionName: storeCollection || '',
-      collection_role: collectionRole,
-    });
-    if (!blackboard) return;
-
     reportAbortRef.current?.abort();
     const controller = new AbortController();
     reportAbortRef.current = controller;
 
     (async () => {
       try {
+        // Resolve brand profile — expanded select mirrors concept/page.tsx
+        let brandName = '';
+        let customerProfile: string | null = null;
+        let referenceBrands: string[] = [];
+        let excludedBrands: string[] = [];
+        let priceTier = 'unspecified';
+        try {
+          const sb = createClient();
+          const { data: { user } } = await sb.auth.getUser();
+          if (user) {
+            const { data } = await sb.from('brand_profiles')
+              .select('brand_name, customer_profile, reference_brands, excluded_brands, price_tier')
+              .eq('user_id', user.id)
+              .single();
+            brandName = data?.brand_name ?? '';
+            customerProfile = data?.customer_profile ?? null;
+            referenceBrands = data?.reference_brands ?? [];
+            excludedBrands = data?.excluded_brands ?? [];
+            priceTier = data?.price_tier ?? 'unspecified';
+          }
+        } catch { /* ignore — brand profile optional */ }
+
+        if (controller.signal.aborted) return;
+
+        const materials = materialsData as unknown as Material[];
+        const mat = materials.find((m) => m.id === storeMaterial);
+        const tier = (storeTier ?? 'moderate') as ConstructionTier;
+        const cogsResult = mat
+          ? calculateCOGS(mat, 2.5, tier, false, storeTargetMsrp ?? 0, DEFAULT_TARGET_MARGIN)
+          : null;
+        const cogsUsd = cogsResult?.totalCOGS ?? 0;
+        const marginPass = cogsResult ? !cogsResult.isOverBudget : true;
+        const overallScore = Math.round(derivedIdentity * 0.35 + derivedResonance * 0.35 + derivedExecution * 0.30);
+
+        const blackboard = buildReportBlackboard({
+          aestheticSlug: slug,
+          brandKeywords: storeModifiers,
+          identity_score: derivedIdentity,
+          resonance_score: derivedResonance,
+          execution_score: derivedExecution,
+          overall_score: overallScore,
+          materialId: storeMaterial,
+          cogs_usd: cogsUsd,
+          target_msrp: storeTargetMsrp ?? 0,
+          margin_pass: marginPass,
+          construction_tier: storeTier ?? 'moderate',
+          timeline_weeks: 14,
+          season: storeSeason || 'SS27',
+          collectionName: brandName,
+          collection_role: collectionRole,
+          customerProfile,
+          referenceBrands,
+          excludedBrands,
+          priceTier,
+        });
+        if (!blackboard) return;
+
         const res = await fetch('/api/synthesizer/report', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1064,19 +1092,19 @@ export default function StandardReportPage() {
 
               {(() => {
                 function NarrativeBullet({ bullet, labelColor }: { bullet: string; labelColor: string }) {
-                  const sepIdx = bullet.indexOf(' — ');
-                  if (sepIdx === -1) {
+                  const match = bullet.match(/^(.+?)(?:[—–]|\s{2,})\s*([\s\S]*)$/);
+                  if (!match) {
                     return <p style={{ ...bodyText, marginTop: 6 }}>{bullet}</p>;
                   }
-                  const label = bullet.slice(0, sepIdx);
-                  const text = bullet.slice(sepIdx + 3);
+                  const label = match[1].trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                  const text = match[2].trim();
                   return (
                     <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 7 }}>
                       <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, color: labelColor, flexShrink: 0, letterSpacing: "0.04em" }}>
-                        {label}
+                        {label}:
                       </span>
                       <span style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.52)", lineHeight: 1.55 }}>
-                        — {text}
+                        {text}
                       </span>
                     </div>
                   );

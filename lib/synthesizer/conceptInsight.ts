@@ -40,6 +40,12 @@ export interface ConceptBlackboard {
   brand_name?: string;
   /** Tension context string from brand_profiles (e.g. "trend-aware-classics") */
   tension_context?: string;
+  /** Customer profile description from brand onboarding */
+  customer_profile?: string | null;
+  /** Reference brands from brand onboarding — used as competitive positioning anchors */
+  reference_brands?: string[];
+  /** Excluded brands from brand onboarding — used as tone constraint */
+  excluded_brands?: string[];
   /** Resolved aesthetic context from aesthetics.json */
   aesthetic_context: AestheticContext;
   /** Resolved redirects — brand_mismatch only at concept stage */
@@ -508,10 +514,23 @@ You are a senior fashion creative strategist and merchandiser writing with Vogue
 You advise whether an aesthetic direction is strategically ownable by the team right now.
 You do not summarize trends. You declare positions and consequences.
 
-PERSONALIZATION RULE
-Use "YOUR brand" exactly once in insight_description to establish personalization.
-After that, refer implicitly: the brand, the collection, the customer, the design language.
-Do NOT repeat "YOUR brand" multiple times.
+BRAND REASONING LAYER
+
+You are writing for brand.name specifically. Every sentence must be written through the lens of this brand's specific position — not the category generally.
+
+Apply these reasoning rules in order:
+
+1. KEYWORD LENS — identify which of brand.keywords this aesthetic directly reinforces and which it strains. Name the specific keywords in your reasoning. Do not say "aligns with your DNA" — say which signals specifically.
+
+2. CUSTOMER TEST — if brand.customer is provided, run every commercial claim through her. Would she buy this? What would make her choose this over what she already buys? What would make her walk away. Anchor the insight in her behavior, not the market abstractly.
+
+3. COMPETITIVE TRIANGULATION — if brand.reference_brands are provided, use them as positioning anchors. Where do those brands sit on this aesthetic? Is brand.name ahead of them, behind them, or in unclaimed territory? This is more useful than citing generic market players.
+
+4. CONSTRAINT CHECK — if brand.never_be_brands are provided, use them as a tone and recommendation constraint. Never frame a suggestion in terms that would make brand.name sound like those brands. If Zara is a never-be, speed-to-market framing is off the table regardless of the commercial logic.
+
+5. INTENT OVERRIDE — if intent data is present, it takes priority over generic commercial logic. A hero piece with high creative_expression warrants bolder claims. A volume-driver with longevity tradeoff warrants more conservative framing. Let intent recalibrate the risk language throughout.
+
+THE UNFORGEABLE TEST: before finalizing, ask — could this narrative be lifted onto a different brand's report and still make sense? If yes, rewrite until it cannot. Every paragraph should contain at least one claim that is only true for brand.name specifically.
 
 VOICE
 Decisive. No hedging.
@@ -573,7 +592,7 @@ Compression requirements:
 - Short sentences.
 - Exactly one forward-looking prediction (e.g., "within two seasons," "by FW26," "before SS27").
 - Exactly one competitive anchor (naming a brand or genericization risk).
-- Exactly one brand-personalized line using "YOUR brand" — only once total.
+- Exactly one brand-personalized line using the actual brand name from brand.name (e.g. "Reformation") — never the literal placeholder text "YOUR brand".
 - Remove any duplicate concepts.
 
 OUTPUT FORMAT
@@ -606,7 +625,7 @@ Good patterns:
 insight_description
 3–4 sentences. Strategic framing sentence first, then analysis.
 Must open with the Vogue Business strategic framing sentence.
-Must include exactly one "YOUR brand" line total — not more.
+Must include exactly one line that addresses the brand by its actual name (brand.name) — never use the literal placeholder "YOUR brand" in output.
 Must include exactly one concrete prediction.
 Must not mention production, cost, lead times, or COGS.
 
@@ -631,7 +650,7 @@ Before returning output, check:
 • positioning[0] begins with "Market Gap — "
 • positioning[1] begins with "Competitive Position — "
 • positioning[2] begins with "Brand Permission — "
-• "YOUR brand" appears exactly once in insight_description.
+• The brand's actual name (brand.name) appears exactly once in insight_description. The literal string "YOUR brand" must not appear anywhere in the output.
 • No deprecated fields: opportunity, edit, why_this_works_now, design_guardrails.
 • No markdown symbols anywhere.
 • No nested objects inside positioning.
@@ -655,12 +674,16 @@ export const CONCEPT_SYSTEM_PROMPT = CONCEPT_STUDIO_PROMPT_V6_2;
 export function buildConceptPrompt(bb: ConceptBlackboard): string {
   const raw = {
     brand: {
+      name: bb.brand_name ?? null,
       keywords: bb.brand_keywords,
+      customer: bb.customer_profile ?? null,
       price_tier: bb.price_tier ?? 'unspecified',
+      reference_brands: bb.reference_brands ?? [],
+      never_be_brands: bb.excluded_brands ?? [],
       tension_context:
         bb.tension_context ??
         bb.resolved_redirects.brand_mismatch?.reason ??
-        undefined,
+        null,
     },
     aesthetic: {
       input: bb.aesthetic_input,

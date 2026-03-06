@@ -69,6 +69,14 @@ export interface ReportBlackboard {
   target_margin?: number;
   /** Both resolved redirects */
   resolved_redirects: ResolvedRedirects;
+  /** Customer profile description from brand onboarding */
+  customer_profile: string | null;
+  /** Reference brands from brand onboarding — used as competitive positioning anchors */
+  reference_brands: string[];
+  /** Excluded brands from brand onboarding — used as tone constraint */
+  excluded_brands: string[];
+  /** Brand price tier (e.g. "Contemporary", "Bridge", "Luxury") */
+  price_tier: string;
 }
 
 export interface SynthesizerResult {
@@ -128,7 +136,7 @@ function computeReportData(bb: ReportBlackboard): ReportComputedData {
   const brandFit = bb.identity_score;
   const demand   = bb.resonance_score;
   const saturation = Math.min(95, Math.max(20,
-    Math.round((1 - (bb.aesthetic_context.saturation_score ?? 0.5)) * 100)
+    Math.round((1 - ((bb.aesthetic_context.saturation_score ?? 50) / 100)) * 100)
   ));
   const marginScore = ceiling > 0
     ? Math.min(95, Math.max(20, Math.round(bb.margin_pass
@@ -173,8 +181,8 @@ function computeReportData(bb: ReportBlackboard): ReportComputedData {
     });
   }
 
-  if (bb.aesthetic_context.saturation_score != null && bb.aesthetic_context.saturation_score > 0.60) {
-    const satPct = Math.round(bb.aesthetic_context.saturation_score * 100);
+  if (bb.aesthetic_context.saturation_score != null && bb.aesthetic_context.saturation_score > 60) {
+    const satPct = bb.aesthetic_context.saturation_score;
     considerations.push({
       title: `${titleCase(bb.aesthetic_matched_id)} at ${satPct}% saturation`,
       detail: `Market penetration is elevated. Differentiation through material or silhouette edit will be critical to avoid direct overlap with adjacent market positions.`,
@@ -205,50 +213,42 @@ function computeReportData(bb: ReportBlackboard): ReportComputedData {
     });
   }
 
-  // Actions — derived from redirects and lowest score
+  // Actions — signal-driven, actionable only (max 2).
+  // Rules:
+  //   - seen_in[] is market presence data, not a competitor list — never used here.
+  //   - Resonance is a read-only market signal — excluded from actionable picks.
+  //   - Only Identity and Execution generate dimension actions.
   const actions: ReportComputedData['actions'] = [];
 
-  if (bb.resolved_redirects.cost_reduction) {
-    const altName = titleCase(bb.resolved_redirects.cost_reduction.material_id);
+  if (bb.identity_score < 60) {
     actions.push({
-      title: `Switch material to ${altName}`,
-      detail: bb.resolved_redirects.cost_reduction.reason,
-      tags: ['Cost', 'Execution'],
-    });
-  }
-
-  if (bb.resolved_redirects.brand_mismatch) {
-    actions.push({
-      title: bb.resolved_redirects.brand_mismatch.suggestion,
-      detail: bb.resolved_redirects.brand_mismatch.reason,
+      title: 'Revisit aesthetic direction',
+      detail: `Identity at ${bb.identity_score} signals tension with brand DNA. Consider adjusting the aesthetic angle before committing to production.`,
       tags: ['Identity'],
     });
   }
 
-  if (bb.timeline_weeks > 16 && actions.length < 3) {
+  if (actions.length < 2 && bb.execution_score < 60) {
     actions.push({
-      title: 'Lock sourcing commitments now',
-      detail: `A ${bb.timeline_weeks}-week timeline leaves limited buffer. Place preliminary material orders to secure lead time before seasonal demand peaks.`,
-      tags: ['Timeline', 'Execution'],
-    });
-  } else if (bb.aesthetic_context.seen_in.length > 0 && actions.length < 2) {
-    actions.push({
-      title: `Differentiate from ${bb.aesthetic_context.seen_in[0]}`,
-      detail: `${bb.aesthetic_context.seen_in[0]} is in adjacent territory — execute decisions that create distance, not alignment.`,
-      tags: ['Identity', 'Resonance'],
+      title: 'Simplify before committing',
+      detail: `Execution at ${bb.execution_score} creates production risk. Reduce construction complexity or material lead time before locking the spec.`,
+      tags: ['Execution'],
     });
   }
 
-  if (actions.length < 2) {
-    const weakest = [
-      { label: 'Identity',  score: bb.identity_score,  tags: ['Identity'] },
-      { label: 'Resonance', score: bb.resonance_score, tags: ['Resonance'] },
-      { label: 'Execution', score: bb.execution_score, tags: ['Execution'] },
-    ].sort((a, b) => a.score - b.score)[0];
+  if (actions.length === 0 && bb.identity_score >= 60 && bb.execution_score >= 60 && bb.resonance_score < 50) {
     actions.push({
-      title: `Strengthen ${weakest.label} before committing`,
-      detail: `${weakest.label} at ${weakest.score} is the primary drag on the overall score. Address this dimension before expanding production units.`,
-      tags: weakest.tags,
+      title: 'Time this carefully',
+      detail: 'Market saturation is elevated. The direction is sound — sequence the launch to avoid peak crowding.',
+      tags: ['Resonance'],
+    });
+  }
+
+  if (actions.length === 0) {
+    actions.push({
+      title: 'Protect the margin story',
+      detail: `All signals are healthy. As you develop the spec, watch construction decisions that could compress the ${projectedMargin}% margin.`,
+      tags: ['Execution'],
     });
   }
 
@@ -389,9 +389,24 @@ Banned words: curated, bespoke, iconic, versatile, elevated, timeless, resonant,
 // SYSTEM PROMPT (v4.0) — Strategic Briefing
 // ─────────────────────────────────────────────
 
-export const STANDARD_REPORT_PROMPT_V4 = `You are the final strategic voice in a fashion decision intelligence pipeline — a senior creative strategist, merchandiser, and production lead writing with the precision of a Vogue Business analysis opener and the authority of an internal brand strategy memo.
+export const STANDARD_REPORT_PROMPT_V4 = `PROMPT VERSION: 4.1 — ${new Date().toISOString()}
+
+You are the final strategic voice in a fashion decision intelligence pipeline — a senior creative strategist, merchandiser, and production lead writing with the precision of a Vogue Business analysis opener and the authority of an internal brand strategy memo.
 
 The designer has read the Concept Studio and Spec Studio insights. Do not recap them. Build on them. Your job is the compound story — what all signals mean together — and one clear directive.
+
+BRAND REASONING LAYER
+Apply these rules before writing a single word of output:
+
+1. SUBJECT vs COMPETITOR — brand.name is the subject of this analysis, not a market player. If brand.name appears in seen_in[] or market references, treat it as validation of the direction, not as a competitor to position against. Never frame brand.name as something to outrun.
+
+2. REFERENCE BRANDS AS ANCHORS — if brand.reference_brands is present, use those names specifically when describing market position and competitive territory. They are more useful than generic market players because they represent the designer's own competitive frame of reference.
+
+3. CUSTOMER GROUNDING — if brand.customer is present, ground every commercial claim in her behavior. Replace "the consumer" with a specific behavioral description tied to her profile. Ask: would she buy this? What makes her choose it over what she already buys?
+
+4. NEVER-BE CONSTRAINT — if brand.never_be_brands is present, treat those brands as a hard constraint on framing and angle. If a never-be brand owns a particular positioning angle, do not suggest the analyzed brand pursue that angle — even if the commercial logic is sound.
+
+5. BRAND NAME IN OUTPUT — brand.name must appear by its actual name in either the headline or strategic_frame. Never use "YOUR brand" or "the brand" as a placeholder in the final output. Replace the placeholder with the actual brand name from brand.name before returning.
 
 HIDDEN REASONING (DO NOT PRINT)
 Before writing, internally derive:
@@ -407,6 +422,23 @@ Do not print this reasoning. Use it to sharpen every sentence.
 PERSONALIZATION RULE
 Use "YOUR brand," "YOUR customer," "YOUR price tier" throughout — not "this brand" or generic industry language.
 Write as if you know the designer's collection. Every sentence must feel earned by the data.
+Brand name override: if brand.name is present in the input, replace every instance of "YOUR brand" with the actual brand name in the final output before returning.
+
+COHERENCE RULES (NON-NEGOTIABLE)
+These govern the structural integrity of the output. Apply them after drafting, before returning.
+
+1. ZERO REPETITION — Every claim must appear exactly once across the entire output. If a claim appears in strategic_frame, it cannot reappear in whats_working or tension_to_watch. If a claim appears in whats_working, it cannot reappear in recommendation. Before returning, scan for repeated ideas and rewrite to eliminate them.
+
+2. STRUCTURE CONTRACT:
+   - headline: One verdict sentence. Format: "[Aesthetic] is [trajectory] — [the specific implication for the brand]." Never include score numbers. The headline orients — it does not warn or recap.
+   - strategic_frame: Market context in 2–3 sentences. Sets up why this moment matters. Claims made here may NOT reappear in any other field. Maximum 60 words. Do not exceed this.
+   - whats_working: Exactly 2 items. Each adds new information not already stated in strategic_frame. Labels should surface specific claims, not generic headers like "Identity is aligned."
+   - tension_to_watch: Exactly 1 item. The single most important risk. One sentence only. Must name a specific production decision, material constraint, or timing window — not a dimension score.
+   - recommendation: 2 sentences maximum. The concrete next step. Must not repeat tension_to_watch wording.
+
+3. HEADLINE RULE — Never include score numbers in the headline. The headline is a strategic verdict, not a scorecard readout.
+   Wrong: "Identity at 86, Resonance at 80, and an overall 82 signal strong alignment."
+   Right: "Heritage Hand is landing well for [brand] — the window is open but construction complexity is the variable to control."
 
 OUTPUT FORMAT
 Return JSON only. No markdown. No preamble. No extra keys.
@@ -415,7 +447,7 @@ JSON.parse() must work directly.
 {
   "headline": "string",
   "strategic_frame": "string",
-  "whats_working": ["string", "string", "string"],
+  "whats_working": ["string", "string"],
   "tension_to_watch": ["string"],
   "recommendation": "string",
   "confidence": 0.0,
@@ -430,42 +462,33 @@ JSON.parse() must work directly.
 FIELD RULES
 
 headline
-One sentence. Decision-grade. Names the aesthetic direction + the strategic opportunity or risk.
-Must feel like the first line of a Vogue Business analysis — not a summary, a declaration.
-Include urgency or timeframe if signals support it.
-Never mention numeric scores. Never hedge.
+One sentence. Strategic verdict only.
+Format exactly: "[Aesthetic] is [trajectory] for [brand.name] — [one specific implication]."
+HARD PROHIBITION: No numbers, no scores, no dimension names (Identity/Resonance/Execution) in the headline. If your headline contains a number or a dimension name, rewrite it.
 
-Examples:
-"Undone Glam is entering its ownership window — YOUR brand has the permission to claim it before mid-tier replication flattens the signal."
-"Terrain Luxe is consolidating fast — YOUR brand's material authority is the only credible differentiator left."
-
-strategic_frame
-2–3 sentences. The core tension shaping the opportunity — analytical and editorial.
-Explain WHY this opportunity matters now and what strategic tension YOUR brand must navigate.
-Name the tension explicitly (e.g., "Signal vs Saturation," "Craft vs Margin").
-Do not list what the brand should do here — this is framing, not action.
-
-Example tone:
-"Undone Glam sits at the intersection of restraint and provocation — a balance contemporary brands rarely execute intentionally. When framed with authorship it reads as design authority; when diluted it collapses into unfinished product."
+strategic_frame: MAXIMUM 40 WORDS. One or two sentences only. If you write more than 40 words, you have failed. Count your words before outputting.
 
 whats_working
-Exactly 3 bullets. Each starts with a bolded all-caps label, then " — ", then a specific sentence.
-Labels must come from exactly these options (choose the 3 most relevant):
+Exactly 2 bullets. Each starts with an all-caps label, then " — ", then a specific sentence.
+Labels must come from exactly these options (choose the 2 most relevant):
 "BRAND ALIGNMENT", "DEMAND SIGNAL", "MARGIN VS ROLE", "COMPLEXITY FIT", "MARKET GAP", "TIMING WINDOW"
 
+Each bullet must add information not already stated in strategic_frame.
+Labels should surface a specific claim — not generic headers like "Identity is aligned."
 Sentences must be specific — use numbers from the data when available.
 Each bullet: 15–25 words.
 
 Examples:
-"MARGIN VS ROLE — Margin is healthy. For a hero piece, there is room to invest further in materials or construction without eroding the floor."
-"DEMAND SIGNAL — Market pull for this direction is strong and not yet commoditized at YOUR price tier."
+"MARGIN VS ROLE — For a hero piece, there is room to invest further in materials without eroding the floor."
+"DEMAND SIGNAL — Market pull for this direction is not yet commoditized at YOUR price tier."
+
+HARD PROHIBITION: Do not mention brand.name or any brand from reference_brands or seen_in in whats_working. Market validation should reference consumer behavior or category momentum — not named brands.
 
 tension_to_watch
-1–2 bullets. Same label format.
+EXACTLY ONE string. One sentence. Same label format.
 Labels: "SATURATION RISK", "EXECUTION FRAGILITY", "TIMING WINDOW", "COMPETITIVE ADJACENCY", "COST PRESSURE"
-Focus on the single dimension most likely to collapse the opportunity.
-Be specific. Name competitors or timelines if data supports it.
-1–2 bullets maximum — never more.
+Must name a specific material, construction decision, or timing risk — not a dimension score, not a brand name, not advice about competitive positioning.
+HARD PROHIBITION: Do not mention brand.name, reference_brands, or seen_in brands in tension_to_watch.
 
 recommendation
 One sentence, or two at most. A confident directive — not a suggestion.
@@ -486,10 +509,14 @@ key_inputs_used: specific fields that most influenced the output.
 VALIDATION (DO NOT PRINT)
 Before returning:
 • headline, strategic_frame, whats_working, tension_to_watch, recommendation, confidence, source_trace — all present.
-• whats_working contains exactly 3 strings.
-• tension_to_watch contains 1 or 2 strings.
+• whats_working contains exactly 2 strings.
+• tension_to_watch contains exactly 1 string.
 • Each whats_working bullet starts with a valid all-caps label followed by " — ".
-• Each tension_to_watch bullet starts with a valid all-caps label followed by " — ".
+• tension_to_watch bullet starts with a valid all-caps label followed by " — ".
+• headline contains no score numbers.
+• No claim in strategic_frame is repeated in whats_working, tension_to_watch, or recommendation.
+• No claim in whats_working is repeated in recommendation.
+• "YOUR brand" does not appear anywhere in the output — replaced with the actual brand name.
 • No markdown symbols anywhere.
 • Output is valid JSON.
 If any check fails, rewrite before returning.
@@ -550,7 +577,10 @@ function buildReportPrompt(bb: ReportBlackboard): string {
     brand: {
       name: bb.brand_name ?? 'the brand',
       keywords: bb.brand_keywords,
-      price_tier: 'unspecified', // caller can extend ReportBlackboard to pass this
+      price_tier: bb.price_tier,
+      customer: bb.customer_profile ?? undefined,
+      reference_brands: bb.reference_brands.length > 0 ? bb.reference_brands : undefined,
+      never_be_brands: bb.excluded_brands.length > 0 ? bb.excluded_brands : undefined,
       target_margin: TARGET_MARGIN,
       tension_context: bb.tension_context ?? undefined,
     },
@@ -583,7 +613,11 @@ function buildReportPrompt(bb: ReportBlackboard): string {
       trend_velocity: bb.aesthetic_context.trend_velocity ?? null,
       lead_time_weeks: bb.timeline_weeks,
       cost_per_yard: null,
-      seen_in: bb.aesthetic_context.seen_in,
+      seen_in: bb.aesthetic_context.seen_in.filter(brand =>
+        !bb.reference_brands.includes(brand) &&
+        !bb.excluded_brands.includes(brand) &&
+        brand !== bb.brand_name
+      ),
       consumer_insight: bb.aesthetic_context.consumer_insight,
       risk_factors: bb.aesthetic_context.risk_factors.length > 0
         ? bb.aesthetic_context.risk_factors
@@ -598,25 +632,17 @@ function buildReportPrompt(bb: ReportBlackboard): string {
 // RESPONSE PARSING (v4.0 JSON output)
 // ─────────────────────────────────────────────
 
-interface ReportV4Output {
-  paragraph_position: string;
-  paragraph_tension: string;
-  paragraph_move: string;
-  confidence: number;
-  source_trace: {
-    aesthetic_id: string | null;
-    material_ids: string[];
-    redirect_used: string | null;
-    key_inputs_used: string[];
-  };
-}
-
-interface ReportV5Output {
+// Call 1 response shape — narrative fields only
+interface NarrativeOutput {
   headline: string;
   strategic_frame: string;
   whats_working: string[];
   tension_to_watch: string[];
   recommendation: string;
+}
+
+// Call 2 response shape — metadata fields only
+interface MetadataOutput {
   confidence: number;
   source_trace: {
     aesthetic_id: string | null;
@@ -630,22 +656,60 @@ function stripFences(raw: string): string {
   return raw.trim().replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
 }
 
-function parseReportV4Output(raw: string): ReportV4Output | null {
+function parseNarrativeOutput(raw: string): NarrativeOutput | null {
   try {
-    const parsed = JSON.parse(stripFences(raw)) as ReportV4Output;
-    if (!parsed.paragraph_position || !parsed.paragraph_tension || !parsed.paragraph_move) return null;
-    return parsed;
+    let text = stripFences(raw);
+    text = text
+      .replace(/\u2014/g, '\\u2014')   // em dash → JSON unicode escape (preserves in parsed values)
+      .replace(/\u2013/g, '\\u2013')   // en dash → JSON unicode escape
+      .replace(/[\u2018\u2019]/g, "'") // smart quotes to straight
+      .replace(/[\u201C\u201D]/g, '"');// smart double quotes to straight
+    text = text.replace(/  +/g, ' \u2014 ');  // double spaces → em dash separator
+    try {
+      const parsed = JSON.parse(text) as NarrativeOutput;
+      if (!parsed.headline || !parsed.strategic_frame) return null;
+      return parsed;
+    } catch {
+      // Try to extract partial fields via regex (truncated JSON)
+      const headline = text.match(/"headline"\s*:\s*"([^"]+)"/)?.[1];
+      const strategic_frame = text.match(/"strategic_frame"\s*:\s*"([^"]+)"/)?.[1];
+      const recommendation = text.match(/"recommendation"\s*:\s*"([^"]+)"/)?.[1];
+
+      // Extract array items from whats_working and tension_to_watch sections,
+      // even if the JSON is truncated mid-array. After sanitization, em dashes
+      // appear as the literal escape sequence \\u2014 in the raw text.
+      function extractArrayItems(sectionKey: string): string[] {
+        const sectionMatch = text.match(new RegExp(`"${sectionKey}"\\s*:\\s*\\[([\\s\\S]*?)(?:\\]|$)`));
+        if (!sectionMatch) return [];
+        const items = [...sectionMatch[1].matchAll(/"((?:[^"\\]|\\.)*)"/g)];
+        return items.map(m =>
+          m[1]
+            .replace(/\\u2014/g, '\u2014')
+            .replace(/\\u2013/g, '\u2013')
+        );
+      }
+
+      if (headline && strategic_frame) {
+        return {
+          headline,
+          strategic_frame,
+          whats_working: extractArrayItems('whats_working'),
+          tension_to_watch: extractArrayItems('tension_to_watch'),
+          recommendation: recommendation ?? '',
+        } as NarrativeOutput;
+      }
+      return null;
+    }
   } catch {
     return null;
   }
 }
 
-function parseReportV5Output(raw: string): ReportV5Output | null {
+function parseMetadataOutput(raw: string): MetadataOutput | null {
   try {
-    const parsed = JSON.parse(stripFences(raw)) as ReportV5Output;
-    if (!parsed.headline || !parsed.strategic_frame || !parsed.recommendation) return null;
-    if (!Array.isArray(parsed.whats_working) || parsed.whats_working.length === 0) return null;
-    if (!Array.isArray(parsed.tension_to_watch) || parsed.tension_to_watch.length === 0) return null;
+    const parsed = JSON.parse(stripFences(raw)) as MetadataOutput;
+    if (typeof parsed.confidence !== 'number') return null;
+    if (!parsed.source_trace) return null;
     return parsed;
   } catch {
     return null;
@@ -726,6 +790,31 @@ function buildFallbackInput(bb: ReportBlackboard, mode: InsightMode) {
 }
 
 // ─────────────────────────────────────────────
+// METADATA PROMPT (Call 2 — deterministic)
+// ─────────────────────────────────────────────
+
+const METADATA_PROMPT = `Return JSON only with exactly these fields:
+{
+  "confidence": <float 0-1 based on data completeness>,
+  "source_trace": {
+    "aesthetic_id": "<aesthetic_matched_id or null>",
+    "material_ids": ["<material_id>"],
+    "redirect_used": "<redirect id or null>",
+    "key_inputs_used": ["<list of key inputs>"]
+  }
+}
+No other fields. No markdown.`;
+
+function buildDefaultTrace(bb: ReportBlackboard): MetadataOutput['source_trace'] {
+  return {
+    aesthetic_id: bb.aesthetic_matched_id,
+    material_ids: [bb.material_id],
+    redirect_used: bb.resolved_redirects.cost_reduction?.material_id ?? null,
+    key_inputs_used: ['identity_score', 'resonance_score', 'execution_score', 'material_id'],
+  };
+}
+
+// ─────────────────────────────────────────────
 // MAIN EXPORT
 // ─────────────────────────────────────────────
 
@@ -749,56 +838,95 @@ export async function generateReportNarrative(
     const client = new Anthropic();
     const userPrompt = buildReportPrompt(blackboard);
 
-    const callOnce = () => client.messages.create({
+    console.log('REPORT PROMPT FIRST 200 CHARS:', STANDARD_REPORT_PROMPT_V4.substring(0, 200));
+    console.log('REPORT USER MESSAGE:', JSON.stringify(userPrompt).substring(0, 300));
+
+    // ── CALL 1: Narrative (creative, high-token) ──────────────────────────
+    const callNarrative = () => client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 700,
+      max_tokens: 1400,
       temperature: 0.4,
       system: STANDARD_REPORT_PROMPT_V4,
       messages: [{ role: 'user', content: userPrompt }],
     });
 
-    let response = await callOnce();
-    const raw = response.content[0];
-    if (!raw || raw.type !== 'text' || !raw.text?.trim()) {
-      throw new Error('Empty or non-text response from API');
+    let narrativeResponse = await callNarrative();
+    const rawNarrative = narrativeResponse.content[0];
+    if (!rawNarrative || rawNarrative.type !== 'text' || !rawNarrative.text?.trim()) {
+      throw new Error('Empty or non-text response from narrative API call');
     }
 
     // The SDK may deliver the response bytes interpreted as Latin-1, producing
     // mojibake strings (e.g. â€" instead of —). Re-encode through UTF-8 to fix.
-    const rawText = Buffer.from(raw.text, 'latin1').toString('utf8');
+    const rawNarrativeText = stripFences(
+      Buffer.from(rawNarrative.text, 'latin1').toString('utf8')
+    );
+    console.log('CALL 1 RAW:', rawNarrativeText.substring(0, 2000));
 
-    // Retry once if JSON is invalid
-    let parsed = parseReportV5Output(rawText);
-    if (!parsed) {
-      console.warn('[ReportNarrative] Invalid JSON in response, retrying once');
-      response = await callOnce();
-      const rawRetry = response.content[0];
+    let narrativeParsed = parseNarrativeOutput(rawNarrativeText);
+    if (!narrativeParsed) {
+      console.warn('[ReportNarrative] Call 1: Invalid JSON, retrying once');
+      narrativeResponse = await callNarrative();
+      const rawRetry = narrativeResponse.content[0];
       if (!rawRetry || rawRetry.type !== 'text' || !rawRetry.text?.trim()) {
-        throw new Error('Empty or non-text response from API on retry');
+        throw new Error('Empty or non-text response from narrative API call on retry');
       }
-      const rawRetryText = Buffer.from(rawRetry.text, 'latin1').toString('utf8');
-      parsed = parseReportV5Output(rawRetryText);
-      if (!parsed) throw new Error('JSON parse failed after retry');
+      const rawRetryText = stripFences(
+        Buffer.from(rawRetry.text, 'latin1').toString('utf8')
+      );
+      console.log('CALL 1 RETRY RAW:', rawRetryText.substring(0, 2000));
+      narrativeParsed = parseNarrativeOutput(rawRetryText);
+      if (!narrativeParsed) throw new Error('Call 1 JSON parse failed after retry');
     }
 
-    // Replace "YOUR brand" placeholder with the actual brand name
+    // ── CALL 2: Metadata (deterministic, low-token) ───────────────────────
+    let metaParsed: MetadataOutput;
+    try {
+      const metaResponse = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 200,
+        temperature: 0,
+        system: METADATA_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+      const rawMeta = metaResponse.content[0];
+      if (!rawMeta || rawMeta.type !== 'text' || !rawMeta.text?.trim()) {
+        throw new Error('Empty metadata response');
+      }
+      const rawMetaText = stripFences(
+        Buffer.from(rawMeta.text, 'latin1').toString('utf8')
+      );
+      const attempt = parseMetadataOutput(rawMetaText);
+      if (!attempt) throw new Error('Metadata JSON parse failed');
+      metaParsed = attempt;
+    } catch (metaErr) {
+      console.warn('[ReportNarrative] Call 2 (metadata) failed, using defaults:', metaErr);
+      metaParsed = {
+        confidence: 0.7,
+        source_trace: buildDefaultTrace(blackboard),
+      };
+    }
+
+    // ── MERGE + BRAND NAME REPLACEMENT + MAP ─────────────────────────────
+    const merged = { ...narrativeParsed, ...metaParsed };
+
     const brandName = blackboard.brand_name;
     if (brandName) {
       const r = (s: string) => s.replace(/YOUR brand/g, brandName);
-      parsed.headline = r(parsed.headline);
-      parsed.strategic_frame = r(parsed.strategic_frame);
-      parsed.recommendation = r(parsed.recommendation);
-      parsed.whats_working = parsed.whats_working.map(r);
-      parsed.tension_to_watch = parsed.tension_to_watch.map(r);
+      merged.headline = r(merged.headline);
+      merged.strategic_frame = r(merged.strategic_frame);
+      merged.recommendation = r(merged.recommendation);
+      merged.whats_working = merged.whats_working.map(r);
+      merged.tension_to_watch = merged.tension_to_watch.map(r);
     }
 
     const data: InsightData = {
       // statements[0] = headline, statements[1] = strategic_frame, statements[2] = recommendation
-      statements: [parsed.headline, parsed.strategic_frame, parsed.recommendation],
+      statements: [merged.headline, merged.strategic_frame, merged.recommendation],
       // edit[] = What's Working labeled bullets
-      edit: parsed.whats_working.slice(0, 3),
+      edit: merged.whats_working.slice(0, 3),
       // secondary[] = Tension to Watch labeled bullets
-      secondary: parsed.tension_to_watch.slice(0, 2),
+      secondary: merged.tension_to_watch.slice(0, 2),
       editLabel,
       mode,
     };

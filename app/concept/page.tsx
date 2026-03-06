@@ -206,6 +206,102 @@ function getChipTensionState(chipLabel: string, selectedKeyPiece: KeyPiece | nul
   return 'none';
 }
 
+/* ─── Next Move helpers ───────────────────────────────────────────────────── */
+
+type NextMoveItem = { label: string; rationale: string; type?: 'chip' | 'silhouette_swap' | 'palette_swap' };
+
+const CHIP_PREFIXES = [
+  (l: string) => `Layer in ${l}`,
+  (l: string) => `Consider ${l}`,
+  (l: string) => `Try ${l}`,
+];
+
+const DIMENSION_RATIONALE: Record<string, string> = {
+  identity: "Strengthens brand alignment for this direction",
+  resonance: "Adds trend-aware commercial traction",
+  execution: "Improves build specificity and production clarity",
+};
+
+const TYPE_RATIONALE: Record<string, string> = {
+  spec: "Sharpens the spec language",
+  mood: "Reinforces the mood and visual tone",
+};
+
+/** Builds the final NextMoveItem list from a pre-sorted, pre-filtered label array. */
+function buildNextMoveItems(
+  sortedLabels: string[],
+  allChips: AestheticChip[],
+  ae: string,
+  selectedAesthetic: string | null,
+  conceptSilhouette: string | null,
+  conceptPalette: string | null,
+): NextMoveItem[] {
+  const items: NextMoveItem[] = sortedLabels.map((label, idx) => {
+    const chip = allChips.find((c) => c.label === label);
+    const dim = (chip as unknown as Record<string, unknown>)?.primary_dimension as string | undefined;
+    const rationale =
+      dim && DIMENSION_RATIONALE[dim]
+        ? DIMENSION_RATIONALE[dim]
+        : chip?.type && TYPE_RATIONALE[chip.type]
+          ? TYPE_RATIONALE[chip.type]
+          : "Adds specificity to this direction";
+    const prefix = CHIP_PREFIXES[idx % CHIP_PREFIXES.length];
+    return { label: prefix(label), rationale, type: 'chip' };
+  });
+
+  if (selectedAesthetic && conceptSilhouette) {
+    const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
+      (a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-")
+    );
+    const silAffinity = entry?.silhouette_affinity ?? [];
+    if (!silAffinity.includes(conceptSilhouette)) {
+      const suggested = silAffinity[0];
+      if (suggested) {
+        const suggestedName = CONCEPT_SILHOUETTES.find((s) => s.id === suggested)?.name ?? suggested;
+        items.unshift({
+          label: `Swap to ${suggestedName} silhouette`,
+          rationale: `Strengthens the ${ae} proportion language`,
+          type: 'silhouette_swap',
+        });
+      }
+    }
+    const palAffinity = entry?.palette_affinity ?? [];
+    if (conceptPalette && !palAffinity.includes(conceptPalette)) {
+      const suggestedPal = palAffinity[0];
+      if (suggestedPal) {
+        const palOption = entry?.palette_options?.find((p) => p.id === suggestedPal);
+        const palName = palOption?.name ?? suggestedPal;
+        items.unshift({
+          label: `Swap to ${palName} palette`,
+          rationale: `Better alignment with ${ae} visual language`,
+          type: 'palette_swap',
+        });
+      }
+    }
+  }
+
+  return items.slice(0, 4);
+}
+
+/** Calls /api/filter-chips and returns the indices of contradicted chips. */
+async function filterChipsAgainstSynthesizer(
+  chipLabels: string[],
+  synthEdit: string[],
+): Promise<number[]> {
+  try {
+    const res = await fetch('/api/filter-chips', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chipLabels, synthEdit }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as { contradicted?: number[] };
+    return Array.isArray(data.contradicted) ? data.contradicted : [];
+  } catch {
+    return [];
+  }
+}
+
 /* ─── Free-form aesthetic matcher ─────────────────────────────────────────── */
 function matchFreeFormToAesthetic(input: string): string | null {
   if (!input.trim() || input.trim().length < 2) return null;
@@ -682,6 +778,14 @@ export default function ConceptStudioPage() {
 
   const yourConceptRef = useRef<HTMLDivElement>(null);
 
+  // ─── Brand profile state (must be declared before synthesizer useEffect) ──
+  const brandProfileId = useRef<string | null>(null);
+  const [noBrandProfile, setNoBrandProfile] = useState(false);
+  const [brandProfileName, setBrandProfileName] = useState<string | null>(null);
+  const [customerProfile, setCustomerProfile] = useState<string | null>(null);
+  const [referenceBrands, setReferenceBrands] = useState<string[]>([]);
+  const [excludedBrands, setExcludedBrands] = useState<string[]>([]);
+
   // ─── Synthesizer: reactive MUKO INSIGHT (streaming) ──────────────────────
   const conceptAbortRef = useRef<AbortController | null>(null);
   const [conceptInsightData, setConceptInsightData] = useState<InsightData | null>(null);
@@ -728,8 +832,12 @@ export default function ConceptStudioPage() {
       identity_score: identityPulse?.score ?? 80,
       resonance_score: resonancePulse?.score ?? 75,
       season: season || 'SS27',
-      collectionName: brandProfileName || storeCollectionName || headerCollectionName,
+      collectionName: storeCollectionName || '',
+      brandName: brandProfileName || '',
       intent: intentPayload,
+      customerProfile: customerProfile,
+      referenceBrands: referenceBrands,
+      excludedBrands: excludedBrands,
     });
     if (!blackboard) return;
 
@@ -819,7 +927,7 @@ export default function ConceptStudioPage() {
       controller.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAesthetic, conceptSilhouette, conceptPalette, addedChipKey]);
+  }, [selectedAesthetic, conceptSilhouette, conceptPalette, addedChipKey, brandProfileName, customerProfile, referenceBrands, excludedBrands, refinementModifiers]);
 
   const [freeFormDraft, setFreeFormDraft] = useState("");
   const [freeFormMatch, setFreeFormMatch] = useState<string | null>(null);
@@ -854,10 +962,8 @@ export default function ConceptStudioPage() {
   // When a brand_profile_id is available (future: from Supabase auth/settings),
   // calls the Critic Agent API to compute the Identity Pulse from real brand data.
   // Falls back to the existing static scoring above when no brand profile exists.
-
-  const brandProfileId = useRef<string | null>(null);
-  const [noBrandProfile, setNoBrandProfile] = useState(false);
-  const [brandProfileName, setBrandProfileName] = useState<string | null>(null);
+  // (brandProfileId, brandProfileName, customerProfile, referenceBrands, excludedBrands
+  //  are declared earlier — before the synthesizer useEffect that depends on them)
 
   // On mount: resolve the current user's brand profile id from Supabase
   useEffect(() => {
@@ -869,13 +975,16 @@ export default function ConceptStudioPage() {
       }
       supabase
         .from('brand_profiles')
-        .select('id, brand_name')
+        .select('id, brand_name, customer_profile, reference_brands, excluded_brands')
         .eq('user_id', user.id)
         .single()
         .then(({ data }) => {
           if (data?.id) {
             brandProfileId.current = data.id;
             if (data.brand_name) setBrandProfileName(data.brand_name);
+            setCustomerProfile(data.customer_profile ?? null);
+            setReferenceBrands(data.reference_brands ?? []);
+            setExcludedBrands(data.excluded_brands ?? []);
             setNoBrandProfile(false);
 
             // Batch-score all aesthetics against the brand profile so Pick selection
@@ -1120,7 +1229,7 @@ export default function ConceptStudioPage() {
       identityPulse: {
         score: newIdentity,
         status: newIdentity >= 80 ? "green" : newIdentity >= 60 ? "yellow" : "red",
-        message: newIdentity >= 80 ? "Strong alignment" : newIdentity >= 60 ? "Moderate alignment" : "Weak alignment",
+        message: identityPulse.message,
       },
     });
 
@@ -1235,77 +1344,54 @@ export default function ConceptStudioPage() {
     return base;
   }, [selectedAesthetic, recommendedAesthetic, conceptSilhouette, conceptPalette]);
 
-  const nextMoveItems = useMemo(() => {
+  const [nextMoveItems, setNextMoveItems] = useState<NextMoveItem[]>([]);
+
+  useEffect(() => {
+    let aborted = false;
+
     const ae = selectedAesthetic ?? recommendedAesthetic;
     const allChips = getAestheticChips(ae);
-    const labels = insightContent.sharpenChips.slice(0, 3);
+    const opportunities = insightContent.opportunity;
+    const candidateLabels = insightContent.sharpenChips;
 
-    // Rotating action-phrase prefixes for micro-trend chip titles
-    const chipPrefixes = [
-      (l: string) => `Layer in ${l}`,
-      (l: string) => `Consider ${l}`,
-      (l: string) => `Try ${l}`,
-    ];
+    // Boost chips referenced in the static opportunity[] to the front —
+    // MukoInsightSection assigns MED to index 0 and LOW to the rest,
+    // so sort order here is the confidence signal.
+    const tokens = (s: string) =>
+      s.toLowerCase().split(/[\s,.\-\/]+/).filter((w) => w.length > 2);
+    const overlaps = (a: string, b: string) =>
+      tokens(a).some((w) => tokens(b).includes(w));
+    const isBoosted = (label: string) =>
+      opportunities.some((opp) => overlaps(label, opp));
 
-    // Collection-health rationale per dimension / chip type
-    const dimensionRationale: Record<string, string> = {
-      identity: "Strengthens brand alignment for this direction",
-      resonance: "Adds trend-aware commercial traction",
-      execution: "Improves build specificity and production clarity",
-    };
-    const typeRationale: Record<string, string> = {
-      spec: "Sharpens the spec language",
-      mood: "Reinforces the mood and visual tone",
-    };
+    const staticSorted = [...candidateLabels].sort(
+      (a, b) => (isBoosted(a) ? 0 : 1) - (isBoosted(b) ? 0 : 1)
+    );
 
-    const items: Array<{ label: string; rationale: string; type?: 'chip' | 'silhouette_swap' | 'palette_swap' }> = labels.map((label, idx) => {
-      const chip = allChips.find((c) => c.label === label);
-      const dim = (chip as unknown as Record<string, unknown>)?.primary_dimension as string | undefined;
-      const rationale = dim && dimensionRationale[dim]
-        ? dimensionRationale[dim]
-        : chip?.type && typeRationale[chip.type]
-          ? typeRationale[chip.type]
-          : "Adds specificity to this direction";
-      const prefix = chipPrefixes[idx % chipPrefixes.length];
-      return { label: prefix(label), rationale, type: 'chip' };
-    });
+    // Set static result immediately so UI is never empty while waiting
+    setNextMoveItems(
+      buildNextMoveItems(staticSorted.slice(0, 3), allChips, ae, selectedAesthetic, conceptSilhouette, conceptPalette)
+    );
 
-    // Add silhouette swap suggestion if not aligned
-    if (selectedAesthetic && conceptSilhouette) {
-      const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
-        (a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-")
-      );
-      const silAffinity = entry?.silhouette_affinity ?? [];
-      if (!silAffinity.includes(conceptSilhouette)) {
-        const suggested = silAffinity[0];
-        if (suggested) {
-          const suggestedName = CONCEPT_SILHOUETTES.find((s) => s.id === suggested)?.name ?? suggested;
-          items.unshift({
-            label: `Swap to ${suggestedName} silhouette`,
-            rationale: `Strengthens the ${ae} proportion language`,
-            type: 'silhouette_swap',
-          });
-        }
-      }
+    // If the Synthesizer hasn't loaded yet, static ranking is the final answer
+    if (!conceptInsightData) return () => { aborted = true; };
 
-      // Add palette swap suggestion if not aligned
-      const palAffinity = entry?.palette_affinity ?? [];
-      if (conceptPalette && !palAffinity.includes(conceptPalette)) {
-        const suggestedPal = palAffinity[0];
-        if (suggestedPal) {
-          const palOption = entry?.palette_options?.find((p) => p.id === suggestedPal);
-          const palName = palOption?.name ?? suggestedPal;
-          items.unshift({
-            label: `Swap to ${palName} palette`,
-            rationale: `Better alignment with ${ae} visual language`,
-            type: 'palette_swap',
-          });
-        }
-      }
-    }
+    // Fire a single Haiku call to semantically filter contradicted chips
+    filterChipsAgainstSynthesizer(candidateLabels, conceptInsightData.edit)
+      .then((contradictedIndices) => {
+        if (aborted) return;
+        const filtered = candidateLabels.filter((_, i) => !contradictedIndices.includes(i));
+        const sorted = [...filtered].sort(
+          (a, b) => (isBoosted(a) ? 0 : 1) - (isBoosted(b) ? 0 : 1)
+        );
+        setNextMoveItems(
+          buildNextMoveItems(sorted.slice(0, 3), allChips, ae, selectedAesthetic, conceptSilhouette, conceptPalette)
+        );
+      })
+      .catch(() => { /* keep the static result already set above */ });
 
-    return items.slice(0, 4);
-  }, [selectedAesthetic, recommendedAesthetic, insightContent, conceptSilhouette, conceptPalette]);
+    return () => { aborted = true; };
+  }, [selectedAesthetic, recommendedAesthetic, insightContent, conceptSilhouette, conceptPalette, conceptInsightData]);
 
   const canContinue = Boolean(selectedAesthetic) && Boolean(conceptSilhouette);
   const sohne = "var(--font-sohne-breit), system-ui, sans-serif";

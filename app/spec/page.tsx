@@ -1329,7 +1329,7 @@ export default function SpecStudioPage() {
       construction_tier: constructionTier ?? 'moderate',
       timeline_weeks: timelineWeeks,
       season: storeSeason || 'SS27',
-      collectionName: brandProfileName || storeCollectionName || headerCollectionName,
+      collectionName: brandProfileName || '',
       intent: intentPayload,
     });
     if (!blackboard) return;

@@ -312,7 +312,7 @@ export function MukoInsightSection({
                           letterSpacing: "0.01em",
                         }}
                       >
-                        {POSITION_LABELS[i] ?? bullets.label}
+                        {item.match(/^(.+?)(?:[—–]|\s{2,})/)?.[1]?.trim() ?? POSITION_LABELS[i] ?? bullets.label}
                       </div>
                       <div
                         style={{
@@ -323,7 +323,7 @@ export function MukoInsightSection({
                           lineHeight: 1.6,
                         }}
                       >
-                        {item}
+                        {" \u2014 "}{item.replace(/^.+?(?:[—–]|\s{2,})\s*/, '')}
                       </div>
                     </div>
                   </React.Fragment>
