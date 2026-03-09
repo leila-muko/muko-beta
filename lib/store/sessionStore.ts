@@ -74,6 +74,10 @@ interface SessionState {
   collectionRole: 'hero' | 'directional' | 'core-evolution' | 'volume-driver' | null;
   selectedKeyPiece: KeyPiece | null;
 
+  // Branch tracking
+  parentAnalysisId: string | null;
+  savedAnalysisId: string | null;
+
   // Actions
   setSeason: (season: string) => void;
   setCollectionName: (name: string) => void;
@@ -98,6 +102,8 @@ interface SessionState {
   setIntentTradeoff: (tradeoff: string) => void;
   setCollectionRole: (role: 'hero' | 'directional' | 'core-evolution' | 'volume-driver') => void;
   setSelectedKeyPiece: (piece: KeyPiece | null) => void;
+  setParentAnalysisId: (id: string | null) => void;
+  setSavedAnalysisId: (id: string | null) => void;
 
   lockConcept: () => void;
   unlockConcept: () => void;
@@ -138,6 +144,8 @@ export const useSessionStore = create<SessionState>()(
       intentTradeoff: '',
       collectionRole: null,
       selectedKeyPiece: null,
+      parentAnalysisId: null,
+      savedAnalysisId: null,
 
       // Actions
       setSeason: (season) => set({ season }),
@@ -165,6 +173,8 @@ export const useSessionStore = create<SessionState>()(
       setIntentTradeoff: (intentTradeoff) => set({ intentTradeoff }),
       setCollectionRole: (collectionRole) => set({ collectionRole }),
       setSelectedKeyPiece: (selectedKeyPiece) => set({ selectedKeyPiece }),
+      setParentAnalysisId: (parentAnalysisId) => set({ parentAnalysisId }),
+      setSavedAnalysisId: (savedAnalysisId) => set({ savedAnalysisId }),
 
       lockConcept: () => set({ conceptLocked: true }),
       unlockConcept: () => set({ conceptLocked: false }),
@@ -199,13 +209,15 @@ export const useSessionStore = create<SessionState>()(
         intentTradeoff: '',
         collectionRole: null,
         selectedKeyPiece: null,
+        parentAnalysisId: null,
+        savedAnalysisId: null,
       }),
     }),
     {
       name: 'muko-session',
       partialize: (state) => {
         // Persist everything except actions
-        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setCollectionRole, setSelectedKeyPiece, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
+        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setCollectionRole, setSelectedKeyPiece, setParentAnalysisId, setSavedAnalysisId, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
         return rest;
       },
     }

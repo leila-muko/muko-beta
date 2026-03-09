@@ -357,7 +357,10 @@ export function MukoInsightSection({
 
         {/* ── Next Move — Spec (narrative card style) ──────────────────── */}
         {nextMove.mode === "spec" && nextMove.suggestions.length > 0 && (() => {
-          const suggestions = nextMove.suggestions.slice(0, 3);
+          const suggestions = nextMove.suggestions
+            .slice()
+            .sort((a, b) => (a.kind === 'warning' ? -1 : 0) - (b.kind === 'warning' ? -1 : 0))
+            .slice(0, 3);
           return (
             <SpecNarrativeNextMove
               suggestions={suggestions}
@@ -618,19 +621,24 @@ export function MukoInsightSection({
 
       {/* ── Next Move — Spec ─────────────────────────────────────────────── */}
       {nextMove.mode === "spec" && nextMove.suggestions.length > 0 && (() => {
-        const suggestions = nextMove.suggestions.slice(0, 3);
+        const suggestions = nextMove.suggestions
+          .slice()
+          .sort((a, b) => (a.kind === 'warning' ? -1 : 0) - (b.kind === 'warning' ? -1 : 0))
+          .slice(0, 3);
         const addedCount = suggestions.filter(s => nextMove.appliedIds.has(s.id)).length;
         return (
           <NextMoveCard subtitle={nextMove.subtitle || "Adjustments that improve feasibility without changing your direction."}>
             {suggestions.map((suggestion, i) => {
               let tagType: 'add' | 'swap' | 'redirect' = 'swap';
-              if (suggestion.kind === 'material' || suggestion.kind === 'upgrade-material') {
+              if (suggestion.kind === 'warning') {
+                tagType = 'redirect';
+              } else if (suggestion.kind === 'material' || suggestion.kind === 'upgrade-material') {
                 tagType = 'redirect';
               } else if (suggestion.id === 'invest-finishing') {
                 tagType = 'add';
               }
               const saving = Math.abs(suggestion.after.saving);
-              const impact: 'HIGH' | 'MED' | 'LOW' = saving > 20 ? 'HIGH' : saving > 10 ? 'MED' : 'LOW';
+              const impact: 'HIGH' | 'MED' | 'LOW' = suggestion.kind === 'warning' ? 'MED' : saving > 20 ? 'HIGH' : saving > 10 ? 'MED' : 'LOW';
               const isApplied = nextMove.appliedIds.has(suggestion.id);
               return (
                 <React.Fragment key={suggestion.id}>
@@ -924,10 +932,11 @@ function SpecNarrativeNextMove({
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {suggestions.map((suggestion) => {
           let tagKey: 'add' | 'shift' | 'redirect' = 'shift';
-          if (suggestion.kind === 'material' || suggestion.kind === 'upgrade-material') tagKey = 'redirect';
+          if (suggestion.kind === 'warning') tagKey = 'redirect';
+          else if (suggestion.kind === 'material' || suggestion.kind === 'upgrade-material') tagKey = 'redirect';
           else if (suggestion.id === 'invest-finishing') tagKey = 'add';
           const saving = Math.abs(suggestion.after.saving);
-          const impact: 'HIGH' | 'MED' | 'LOW' = saving > 20 ? 'HIGH' : saving > 10 ? 'MED' : 'LOW';
+          const impact: 'HIGH' | 'MED' | 'LOW' = suggestion.kind === 'warning' ? 'MED' : saving > 20 ? 'HIGH' : saving > 10 ? 'MED' : 'LOW';
           const isApplied = appliedIds.has(suggestion.id);
           return (
             <SpecNarrativeMoveCard
@@ -963,7 +972,7 @@ function SpecNarrativeMoveCard({
 }) {
   const [hovered, setHovered] = useState(false);
   const [flashActive, setFlashActive] = useState(false);
-  const tag = SPEC_TAG_STYLES[tagKey];
+  const tag = { ...SPEC_TAG_STYLES[tagKey], label: suggestion.kind === 'warning' ? 'CONFLICT' : SPEC_TAG_STYLES[tagKey].label };
 
   useEffect(() => {
     if (isApplied) {
@@ -1006,7 +1015,7 @@ function SpecNarrativeMoveCard({
             </span>
           </div>
         </div>
-        {isApplied ? (
+        {suggestion.kind !== 'warning' && (isApplied ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontFamily: inter, fontSize: 11, fontWeight: 700, color: "#A8B475" }}>✓ Applied</span>
             <button onClick={onUndo} style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.40)", textDecoration: "underline", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Undo</button>
@@ -1020,7 +1029,7 @@ function SpecNarrativeMoveCard({
           >
             + Apply
           </button>
-        )}
+        ))}
       </div>
       {/* Title — inter */}
       <div style={{ fontFamily: inter, fontSize: 13.5, fontWeight: 600, color: isApplied ? "#A8B475" : "#191919", lineHeight: 1.3, marginBottom: suggestion.sub ? 6 : 0 }}>
@@ -1244,7 +1253,7 @@ function SpecNextMoveRow({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
           <span style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: TAG_STYLES[tagType].text, background: TAG_STYLES[tagType].bg, border: `1px solid ${TAG_STYLES[tagType].border}`, borderRadius: 3, padding: "1px 5px", lineHeight: 1.4 }}>
-            {TAG_LABELS[tagType]}
+            {suggestion.kind === 'warning' ? 'CONFLICT' : TAG_LABELS[tagType]}
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
             <div style={{ width: 4, height: 4, borderRadius: "50%", background: IMPACT_COLORS[impact], flexShrink: 0 }} />
@@ -1261,7 +1270,7 @@ function SpecNextMoveRow({
             {suggestion.sub}
           </div>
         )}
-        {isApplied ? (
+        {suggestion.kind !== 'warning' && (isApplied ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
             <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: "#A8B475" }}>Applied {"\u2713"}</span>
             <button onClick={onUndo} style={{ fontFamily: inter, fontSize: 10, color: "rgba(67,67,43,0.45)", textDecoration: "underline", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Undo</button>
@@ -1273,7 +1282,7 @@ function SpecNextMoveRow({
           >
             {"\u2190"} Apply
           </button>
-        )}
+        ))}
       </div>
     </div>
   );

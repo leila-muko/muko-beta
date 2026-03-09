@@ -11,7 +11,7 @@ import type {
   ConceptContext as ConceptContextType,
 } from "@/lib/types/spec-studio";
 import { calculateCOGS, generateInsight, checkExecutionFeasibility } from "@/lib/spec-studio/calculator";
-import { findAlternativeMaterial, findUpgradeMaterial } from "@/lib/spec-studio/material-matcher";
+import { findAlternativeMaterial, findUpgradeMaterial, checkSelectedMaterialConflict } from "@/lib/spec-studio/material-matcher";
 import {
   CONSTRUCTION_INFO,
   getOverrideWarning,
@@ -786,8 +786,8 @@ export default function SpecStudioPage() {
   }, [materials, aestheticKws, chipSelection]);
 
   const alternativeMaterial = useMemo(
-    () => (selectedMaterial ? findAlternativeMaterial(selectedMaterial, materials) : null),
-    [selectedMaterial, materials]
+    () => (selectedMaterial ? findAlternativeMaterial(selectedMaterial, materials, 1, conceptSilhouette || undefined) : null),
+    [selectedMaterial, materials, conceptSilhouette]
   );
 
   // ─── Chip match lookups for spec indicators ───────────────────────────────
@@ -845,7 +845,9 @@ export default function SpecStudioPage() {
       materials,
       conceptYardage,
       insight.cogs,
-      insight.ceiling
+      insight.ceiling,
+      1,
+      conceptSilhouette || undefined,
     );
   }, [selectedMaterial, materials, conceptYardage, insight]);
 
@@ -1330,6 +1332,11 @@ export default function SpecStudioPage() {
       timeline_weeks: timelineWeeks,
       season: storeSeason || 'SS27',
       collectionName: brandProfileName || '',
+      silhouette: conceptSilhouette || undefined,
+      category: categoryId || undefined,
+      keyPiece: selectedKeyPiece && !selectedKeyPiece.custom && selectedKeyPiece.type
+        ? { item: selectedKeyPiece.item, type: selectedKeyPiece.type, signal: selectedKeyPiece.signal ?? '' }
+        : undefined,
       intent: intentPayload,
     });
     if (!blackboard) return;
@@ -1618,6 +1625,23 @@ export default function SpecStudioPage() {
 
     // Palette is locked from Concept Studio — no palette suggestions
 
+    // ── Silhouette-material conflict warning for the SELECTED material ───────
+    const silhouetteConflict = checkSelectedMaterialConflict(selectedMaterial, conceptSilhouette || undefined);
+    if (silhouetteConflict) {
+      suggestions.push({
+        id: 'silhouette-material-warning',
+        label: `Material may not suit ${conceptSilhouette} construction`,
+        kind: 'warning',
+        sub: silhouetteConflict.reason,
+        before: { label: selectedMaterial.name, cogs: Math.round(currentCogs) },
+        after: { label: selectedMaterial.name, projectedCogs: Math.round(currentCogs), saving: 0 },
+        action: () => {},
+        undoAction: () => {},
+        materialSilhouetteWarning: true,
+        warningReason: silhouetteConflict.reason,
+      });
+    }
+
     const headline =
       overBy > 0
         ? `$${cogs} estimated COGS — $${overBy} over your $${ceiling} ceiling`
@@ -1644,6 +1668,7 @@ export default function SpecStudioPage() {
     conceptContext.aestheticMatchedId,
     conceptYardage,
     targetMSRP,
+    conceptSilhouette,
   ]);
 
 

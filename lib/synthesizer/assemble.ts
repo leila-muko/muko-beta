@@ -48,10 +48,16 @@ interface MaterialAlternativeEntry {
   reason: string;
 }
 
+interface BrandMismatchEntry {
+  suggestion: string;
+  reason: string;
+}
+
 const aesthetics = aestheticsRaw as unknown as AestheticEntry[];
 const materials = materialsRaw as unknown as MaterialEntry[];
 const redirectsData = redirectsRaw as unknown as {
   material_alternatives?: Record<string, MaterialAlternativeEntry[]>;
+  brand_mismatch?: Record<string, Record<string, BrandMismatchEntry>>;
 };
 
 interface MaterialCostEntry {
@@ -145,6 +151,31 @@ function getMaterialName(materialId: string): string | undefined {
   return (materials.find(m => m.id === materialId) as MaterialEntry | undefined)?.name;
 }
 
+/**
+ * Resolve a brand_mismatch redirect by checking whether any brand keyword
+ * matches an entry in redirects.brand_mismatch[aestheticSlug].
+ * Returns null when there is no conflict or no entry exists.
+ */
+function resolveBrandMismatch(
+  aestheticSlug: string,
+  brandKeywords: string[],
+): ResolvedRedirects['brand_mismatch'] {
+  const byAesthetic = redirectsData.brand_mismatch?.[aestheticSlug];
+  if (!byAesthetic) return null;
+
+  for (const keyword of brandKeywords) {
+    const entry =
+      byAesthetic[keyword] ??
+      byAesthetic[
+        Object.keys(byAesthetic).find(
+          k => k.toLowerCase() === keyword.toLowerCase()
+        ) ?? ''
+      ];
+    if (entry) return { suggestion: entry.suggestion, reason: entry.reason };
+  }
+  return null;
+}
+
 // ─── Concept blackboard ────────────────────────────────────────────────────────
 
 export interface ConceptBlackboardInput {
@@ -218,6 +249,12 @@ export interface SpecBlackboardInput {
   timeline_weeks: number;
   season: string;
   collectionName: string;
+  /** Concept-stage silhouette (straight / relaxed / structured / oversized) */
+  silhouette?: string;
+  /** Product category (e.g. "Tops", "Outerwear") */
+  category?: string;
+  /** Key piece selected in Concept Studio */
+  keyPiece?: { item: string; type: string; signal: string };
   /** Optional intent calibration from the Intent page */
   intent?: IntentCalibration;
 }
@@ -248,8 +285,11 @@ export function buildSpecBlackboard(
     construction_tier: input.construction_tier,
     timeline_weeks: input.timeline_weeks,
     material_cost_note: getMaterialCostNote(input.materialId),
+    category: input.category,
+    silhouette: input.silhouette,
+    keyPiece: input.keyPiece,
     resolved_redirects: {
-      brand_mismatch: null,
+      brand_mismatch: resolveBrandMismatch(input.aestheticSlug, input.brandKeywords),
       cost_reduction: resolveCostReduction(input.materialId, input.margin_pass),
     },
     intent: input.intent,
@@ -279,6 +319,8 @@ export interface ReportBlackboardInput {
   referenceBrands?: string[];
   excludedBrands?: string[];
   priceTier?: string;
+  /** Key piece selected in Concept Studio */
+  keyPiece?: { item: string; type: string; signal: string };
 }
 
 /** Returns null when aestheticSlug or materialId is missing. */
@@ -315,8 +357,9 @@ export function buildReportBlackboard(
     reference_brands: input.referenceBrands ?? [],
     excluded_brands: input.excludedBrands ?? [],
     price_tier: input.priceTier ?? 'unspecified',
+    keyPiece: input.keyPiece,
     resolved_redirects: {
-      brand_mismatch: null,
+      brand_mismatch: resolveBrandMismatch(input.aestheticSlug, input.brandKeywords),
       cost_reduction: costReduction,
     },
   };

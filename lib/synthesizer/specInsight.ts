@@ -72,6 +72,8 @@ export interface SpecBlackboard {
   category?: string;
   /** Silhouette selection */
   silhouette?: string;
+  /** Key piece context from Concept Studio */
+  keyPiece?: { item: string; type: string; signal: string };
   /** Resolved redirects — both brand_mismatch and cost_reduction */
   resolved_redirects: ResolvedRedirects;
   /** Optional intent calibration from the designer's Intent page selections */
@@ -643,6 +645,9 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
       target_margin: targetMargin,
       price_tier: bb.price_tier ?? 'unspecified',
     },
+    key_piece: bb.keyPiece
+      ? `${bb.keyPiece.item} (${bb.keyPiece.type}) — signal: ${bb.keyPiece.signal}`
+      : undefined,
     spec: {
       material_id: bb.material_id,
       material_name: bb.material_name ?? bb.material_id,

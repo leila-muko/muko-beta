@@ -67,6 +67,8 @@ export interface ReportBlackboard {
   material_name?: string;
   /** Brand target margin as a decimal (e.g. 0.60) */
   target_margin?: number;
+  /** Key piece context from Concept Studio */
+  keyPiece?: { item: string; type: string; signal: string };
   /** Both resolved redirects */
   resolved_redirects: ResolvedRedirects;
   /** Customer profile description from brand onboarding */
@@ -114,7 +116,7 @@ export interface ReportComputedData {
   costGatePassed: boolean;
   considerations: Array<{ title: string; detail: string; dimension: 'identity' | 'resonance' | 'execution' }>;
   actions: Array<{ title: string; detail: string; tags: string[] }>;
-  redirect: { label: string; savings?: string; detail: string } | null;
+  redirect: { label: string; savings?: string; detail: string; redirectMaterialId?: string } | null;
 }
 
 export interface ReportSynthesizerResult {
@@ -260,6 +262,7 @@ function computeReportData(bb: ReportBlackboard): ReportComputedData {
       label: `Switch material to ${altName}`,
       savings: 'reduces COGS below ceiling',
       detail: bb.resolved_redirects.cost_reduction.reason,
+      redirectMaterialId: bb.resolved_redirects.cost_reduction.material_id,
     };
   } else if (bb.resolved_redirects.brand_mismatch) {
     redirect = {
@@ -584,6 +587,9 @@ function buildReportPrompt(bb: ReportBlackboard): string {
       target_margin: TARGET_MARGIN,
       tension_context: bb.tension_context ?? undefined,
     },
+    key_piece: bb.keyPiece
+      ? `${bb.keyPiece.item} (${bb.keyPiece.type}) — signal: ${bb.keyPiece.signal}`
+      : undefined,
     analysis: {
       season: bb.season?.toUpperCase() ?? 'unspecified',
       category: bb.category ?? null,
