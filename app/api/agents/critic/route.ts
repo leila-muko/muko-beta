@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     // ── FETCH BRAND PROFILE ──
     const { data: brand, error: brandError } = await supabase
       .from('brand_profiles')
-      .select('id, keywords, tension_context, accepts_conflicts, price_tier, target_margin')
+      .select('id, keywords, tension_context, accepts_conflicts, price_tier, target_margin, reference_brands, excluded_brands, brand_description')
       .eq('id', brand_profile_id)
       .eq('user_id', user.id)
       .single();
@@ -71,6 +71,9 @@ export async function POST(req: NextRequest) {
         accepts_conflicts: brand.accepts_conflicts || false,
         price_tier: brand.price_tier || 'Contemporary',
         target_margin: brand.target_margin || 0.6,
+        reference_brands: brand.reference_brands ?? [],
+        excluded_brands: brand.excluded_brands ?? [],
+        brand_description: brand.brand_description ?? null,
       },
     };
 

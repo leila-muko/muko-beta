@@ -4,14 +4,14 @@ import { NextRequest, NextResponse } from "next/server";
 const client = new Anthropic();
 
 export async function POST(req: NextRequest) {
-  let body: { chipLabels: string[]; synthEdit: string[] };
+  let body: { chipLabels: string[]; synthEdit: string[]; keyPiece?: string | null };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { chipLabels, synthEdit } = body;
+  const { chipLabels, synthEdit, keyPiece } = body;
   if (!Array.isArray(chipLabels) || !Array.isArray(synthEdit)) {
     return NextResponse.json(
       { error: "Missing chipLabels or synthEdit" },
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   const userPrompt = `A fashion brand's Synthesizer has produced these strategic constraints:
 ${synthEdit.join("\n")}
 
-These are candidate design suggestions:
+${keyPiece ? `SELECTED KEY PIECE: "${keyPiece}"\nREQUIREMENT: Remove any candidate chip that is physically incompatible with or directly contradicts a "${keyPiece}". For example, if the key piece is a leather trench, remove suggestions like "sheer layers" or "lightweight fabrics" that cannot coexist with it.\n` : ""}These are candidate design suggestions:
 ${chipLabels.map((l, i) => `${i}: ${l}`).join("\n")}
 
 Return a JSON array of the indices that CONTRADICT or undermine the constraints. Be strict — only flag direct contradictions, not tangential overlap.

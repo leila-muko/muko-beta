@@ -13,15 +13,18 @@ import {
   CONCEPT_STUDIO_PROMPT_V6_2,
   determineConceptMode,
   buildConceptFallbackInput,
+  buildFallbackDecisionGuidance,
   parseConceptV5Output,
 } from '@/lib/synthesizer/conceptInsight';
 import { generateTemplateNarrative } from '@/lib/agents/synthesizer';
 import type { InsightData, InsightMode } from '@/lib/types/insight';
+import { normalizeExecutionLevers } from '@/lib/concept-studio/decision-guidance';
 
 function makeFallback(bb: ConceptBlackboard, editLabel: string, mode: InsightMode) {
   const fallbackInput = buildConceptFallbackInput(bb, mode);
   const data = generateTemplateNarrative(fallbackInput);
   data.editLabel = editLabel;
+  data.decision_guidance = buildFallbackDecisionGuidance(bb, mode);
   return { data, meta: { method: 'template' as const, latency_ms: 0 } };
 }
 
@@ -102,6 +105,14 @@ export async function POST(req: NextRequest) {
             statements: [parsed.insight_title, parsed.insight_description],
             edit: parsed.positioning.slice(0, 3),
             editLabel: 'POSITIONING',
+            decision_guidance: {
+              recommended_direction: parsed.decision_guidance.recommended_direction,
+              commitment_signal: parsed.decision_guidance.commitment_signal,
+              execution_levers: normalizeExecutionLevers(
+                blackboard.aesthetic_matched_id,
+                parsed.decision_guidance.execution_levers,
+              ),
+            },
             mode,
           };
           emit('complete', JSON.stringify({ data, meta: { method: 'llm', latency_ms: 0 } }));

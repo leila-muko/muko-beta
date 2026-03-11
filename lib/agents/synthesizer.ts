@@ -8,6 +8,7 @@
 // seen_in, consumer_insight, risk_factors, seasonal_relevance, adjacent_directions.
 
 import type { InsightData, InsightMode } from '@/lib/types/insight';
+import type { CommitmentSignal, DecisionGuidance } from '@/lib/types/insight';
 import type { ScoreDimensions, ScoreGates } from '@/lib/scoring/types';
 
 // ─────────────────────────────────────────────
@@ -198,6 +199,43 @@ export function generateTemplateNarrative(input: NarrativeInput): InsightData {
     secondary: isPrimaryOpportunity ? edit : opportunity,
     secondaryLabel: isPrimaryOpportunity ? 'THE EDIT' : 'THE OPPORTUNITY',
     mode,
+  };
+}
+
+export function buildTemplateDecisionGuidance(args: {
+  aestheticName: string;
+  mode: InsightMode;
+  identityScore: number;
+  resonanceScore: number;
+  executionLevers: string[];
+}): DecisionGuidance {
+  const { aestheticName, mode, identityScore, resonanceScore, executionLevers } = args;
+
+  let commitmentSignal: CommitmentSignal;
+  if (identityScore >= 82 && resonanceScore >= 72) {
+    commitmentSignal = 'Increase Investment';
+  } else if (mode === 'amplify') {
+    commitmentSignal = 'Hero Expression';
+  } else if (identityScore >= 70) {
+    commitmentSignal = 'Maintain Exposure';
+  } else if (mode === 'reconsider') {
+    commitmentSignal = 'Reduce Exposure';
+  } else {
+    commitmentSignal = 'Controlled Test';
+  }
+
+  const recommendedDirectionBySignal: Record<CommitmentSignal, string> = {
+    'Increase Investment': `Increase assortment weight behind ${aestheticName} while the direction still reads differentiated in-market.`,
+    'Hero Expression': `Anchor ${aestheticName} through one disciplined hero expression within the assortment.`,
+    'Controlled Test': `Introduce ${aestheticName} through a tightly controlled piece-level test that protects assortment clarity.`,
+    'Maintain Exposure': `Maintain exposure to ${aestheticName} through selective reinforcement rather than wider rollout.`,
+    'Reduce Exposure': `Reduce exposure to ${aestheticName} unless the line can deliver a sharper point of view.`,
+  };
+
+  return {
+    recommended_direction: recommendedDirectionBySignal[commitmentSignal],
+    commitment_signal: commitmentSignal,
+    execution_levers: executionLevers.slice(0, 4),
   };
 }
 

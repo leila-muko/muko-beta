@@ -1290,6 +1290,7 @@ export default function SpecStudioPage() {
 
   // ─── Synthesizer: reactive MUKO INSIGHT (streaming) ──────────────────────
   const specAbortRef = useRef<AbortController | null>(null);
+  const specRawJsonRef = useRef<string>('');
   const [specSynthInsightData, setSpecSynthInsightData] = useState<InsightData | null>(null);
   const [specInsightLoading, setSpecInsightLoading] = useState(false);
   const [specStreamingText, setSpecStreamingText] = useState('');
@@ -1348,6 +1349,7 @@ export default function SpecStudioPage() {
     const timer = window.setTimeout(async () => {
       setSpecInsightLoading(true);
       setSpecStreamingText('');
+      specRawJsonRef.current = '';
       try {
         const res = await fetch('/api/synthesizer/spec', {
           method: 'POST',
@@ -1368,12 +1370,11 @@ export default function SpecStudioPage() {
             try {
               const parsed = JSON.parse(data) as { text: string };
               const chunk = parsed.text ?? '';
-              setSpecStreamingText(prev => {
-                const accumulated = prev + chunk;
-                // Extract partial margin_read value for display
-                const match = accumulated.match(/"margin_read"\s*:\s*"([^"]*)/);
-                return match ? match[1] : prev;
-              });
+              specRawJsonRef.current += chunk;
+              const accumulated = specRawJsonRef.current;
+              // Extract partial insight_title value for display
+              const match = accumulated.match(/"insight_title"\s*:\s*"([^"]*)/);
+              setSpecStreamingText(match ? match[1] : (accumulated.length > 10 ? '...' : ''));
             } catch { /* ignore parse errors on partial chunks */ }
           } else if (event === 'complete' || event === 'fallback') {
             try {

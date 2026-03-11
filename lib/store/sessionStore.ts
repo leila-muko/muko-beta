@@ -33,6 +33,11 @@ export interface ChipSelection {
   activatedChips: ActivatedChip[];
 }
 
+export interface DecisionGuidanceState {
+  is_confirmed: boolean;
+  selected_anchor_piece: string | null;
+}
+
 interface SessionState {
   // Step 1: Entry
   season: string;
@@ -73,6 +78,7 @@ interface SessionState {
   intentTradeoff: string;
   collectionRole: 'hero' | 'directional' | 'core-evolution' | 'volume-driver' | null;
   selectedKeyPiece: KeyPiece | null;
+  decisionGuidanceState: DecisionGuidanceState;
 
   // Branch tracking
   parentAnalysisId: string | null;
@@ -102,6 +108,7 @@ interface SessionState {
   setIntentTradeoff: (tradeoff: string) => void;
   setCollectionRole: (role: 'hero' | 'directional' | 'core-evolution' | 'volume-driver') => void;
   setSelectedKeyPiece: (piece: KeyPiece | null) => void;
+  setDecisionGuidanceState: (state: DecisionGuidanceState) => void;
   setParentAnalysisId: (id: string | null) => void;
   setSavedAnalysisId: (id: string | null) => void;
 
@@ -144,6 +151,7 @@ export const useSessionStore = create<SessionState>()(
       intentTradeoff: '',
       collectionRole: null,
       selectedKeyPiece: null,
+      decisionGuidanceState: { is_confirmed: false, selected_anchor_piece: null },
       parentAnalysisId: null,
       savedAnalysisId: null,
 
@@ -173,6 +181,7 @@ export const useSessionStore = create<SessionState>()(
       setIntentTradeoff: (intentTradeoff) => set({ intentTradeoff }),
       setCollectionRole: (collectionRole) => set({ collectionRole }),
       setSelectedKeyPiece: (selectedKeyPiece) => set({ selectedKeyPiece }),
+      setDecisionGuidanceState: (decisionGuidanceState) => set({ decisionGuidanceState }),
       setParentAnalysisId: (parentAnalysisId) => set({ parentAnalysisId }),
       setSavedAnalysisId: (savedAnalysisId) => set({ savedAnalysisId }),
 
@@ -209,6 +218,7 @@ export const useSessionStore = create<SessionState>()(
         intentTradeoff: '',
         collectionRole: null,
         selectedKeyPiece: null,
+        decisionGuidanceState: { is_confirmed: false, selected_anchor_piece: null },
         parentAnalysisId: null,
         savedAnalysisId: null,
       }),

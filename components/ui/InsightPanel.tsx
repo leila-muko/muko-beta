@@ -23,6 +23,11 @@ const FALLBACK: InsightData = {
     'Timing into this window is workable before saturation sets in',
   ],
   secondaryLabel: 'THE OPPORTUNITY',
+  decision_guidance: {
+    recommended_direction: 'Anchor Quiet Structure through one disciplined hero expression within the assortment.',
+    commitment_signal: 'Hero Expression',
+    execution_levers: ['Soft tailoring', 'Elongated proportion', 'Structured shoulders'],
+  },
 };
 
 const DIVIDER = (

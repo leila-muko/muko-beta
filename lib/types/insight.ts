@@ -4,6 +4,19 @@ export type ConceptInsightMode = 'amplify' | 'differentiate' | 'reconsider';
 export type SpecInsightMode = 'invest' | 'constrain';
 export type InsightMode = ConceptInsightMode | SpecInsightMode;
 
+export type CommitmentSignal =
+  | 'Increase Investment'
+  | 'Hero Expression'
+  | 'Controlled Test'
+  | 'Maintain Exposure'
+  | 'Reduce Exposure';
+
+export interface DecisionGuidance {
+  recommended_direction: string;
+  commitment_signal: CommitmentSignal;
+  execution_levers: string[];
+}
+
 export interface InsightData {
   /** Always exactly 3 plain-prose statements. No headers. */
   statements: string[];
@@ -17,6 +30,8 @@ export interface InsightData {
   secondaryLabel?: string;
   /** Optional chip labels (spec chips) to surface in the Sharpen row. */
   sharpenChips?: string[];
+  /** Concept-stage product recommendation derived from the selected direction. */
+  decision_guidance?: DecisionGuidance;
   /** Controls which placeholder content and visual mode is shown. */
   mode: InsightMode;
 }

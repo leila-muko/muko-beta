@@ -10,8 +10,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { InsightData, InsightMode } from '@/lib/types/insight';
 import type { AestheticContext, ResolvedRedirects, IntentCalibration } from '@/lib/synthesizer/blackboard';
-import { generateTemplateNarrative } from '@/lib/agents/synthesizer';
+import { buildTemplateDecisionGuidance, generateTemplateNarrative } from '@/lib/agents/synthesizer';
 import type { NarrativeAestheticContext } from '@/lib/agents/synthesizer';
+import { getAestheticChipLabels, normalizeExecutionLevers } from '@/lib/concept-studio/decision-guidance';
 
 // ─────────────────────────────────────────────
 // TYPES
@@ -52,6 +53,8 @@ export interface ConceptBlackboard {
   resolved_redirects: Pick<ResolvedRedirects, 'brand_mismatch'>;
   /** Optional intent calibration from the designer's Intent page selections */
   intent?: IntentCalibration;
+  /** Key pieces identified for this aesthetic direction */
+  key_pieces?: Array<{ item: string; type?: string; signal?: string }>;
 }
 
 export interface SynthesizerResult {
@@ -289,6 +292,11 @@ JSON.parse() must work directly.
     "string",
     "string"
   ],
+  "decision_guidance": {
+    "recommended_direction": "string",
+    "commitment_signal": "Increase Investment | Hero Expression | Controlled Test | Maintain Exposure | Reduce Exposure",
+    "execution_levers": ["string", "string"]
+  },
   "confidence": 0.0
 }
 
@@ -514,6 +522,23 @@ You are a senior fashion creative strategist and merchandiser writing with Vogue
 You advise whether an aesthetic direction is strategically ownable by the team right now.
 You do not summarize trends. You declare positions and consequences.
 
+DECISION GUIDANCE MAPPING
+
+Generate Decision Guidance using the existing concept insight context. Do not expect separate raw user-entered fields.
+
+Use this normalized mapping internally:
+- trend_direction = selected concept aesthetic name
+- trend_momentum = momentum and timing analysis already present in the concept insight
+- brand_alignment = critic alignment score plus alignment narrative
+- market_gap = the market-gap portion of the concept insight
+- execution_risk = complexity, tension, and build-risk signals already present in concept analysis
+- available_aesthetic_chips = the provided chip list for the selected aesthetic
+- key_pieces = the key pieces identified for this aesthetic direction
+
+You must infer the recommendation from those mapped fields.
+Execution levers must come only from available_aesthetic_chips.
+When relevant key pieces are available, use one or two of them to translate the concept into a concrete product anchor.
+
 BRAND REASONING LAYER
 
 You are writing for brand.name specifically. Every sentence must be written through the lens of this brand's specific position — not the category generally.
@@ -607,6 +632,11 @@ JSON.parse() must work directly.
     "string",
     "string"
   ],
+  "decision_guidance": {
+    "recommended_direction": "string",
+    "commitment_signal": "Increase Investment | Hero Expression | Controlled Test | Maintain Exposure | Reduce Exposure",
+    "execution_levers": ["string", "string"]
+  },
   "confidence": 0.0
 }
 
@@ -643,13 +673,62 @@ Brand Permission: tie to brand keywords; state the one angle that makes this exe
 
 Brevity gate: if any bullet exceeds 22 words, rewrite it shorter before outputting.
 
+decision_guidance
+Required object with exactly 3 fields:
+1) recommended_direction
+2) commitment_signal
+3) execution_levers
+
+recommended_direction
+One sentence. Directive, not analysis.
+Tell the team what role this concept should play inside the assortment.
+No hedging. No "consider," "explore," or "you may want to."
+It must read like merchandising intelligence, not styling advice.
+Reflect timing, brand fit, whitespace, and execution risk.
+Do not list execution levers in the sentence.
+When possible, reference one or two relevant key pieces so the direction lands as a concrete product anchor.
+
+commitment_signal
+Must be exactly one of:
+- Increase Investment
+- Hero Expression
+- Controlled Test
+- Maintain Exposure
+- Reduce Exposure
+
+execution_levers
+Array of 2 to 4 strings.
+These must be selected from the available aesthetic chips provided in the input.
+Do not invent new lever names. Reuse chip labels exactly.
+These are concrete design levers, not full sentences.
+
+DECISION LOGIC
+Generate commitment_signal from:
+- trend_direction
+- trend_momentum
+- brand_alignment
+- market_gap
+- execution_risk
+
+Do not generate commitment_signal from chip data.
+
+Apply this logic:
+- Increase Investment = high momentum, strong alignment, clear whitespace, manageable execution risk
+- Hero Expression = strong alignment with enough momentum to justify a defining statement piece
+- Controlled Test = real opportunity, but timing, alignment, or execution introduces meaningful risk
+- Maintain Exposure = direction is valid but does not warrant broader expansion
+- Reduce Exposure = saturated, weakly aligned, or too risky to justify further commitment
+
 VALIDATION STEP (DO NOT PRINT)
 Before returning output, check:
-• Output contains only: insight_title, insight_description, positioning, confidence.
+• Output contains only: insight_title, insight_description, positioning, decision_guidance, confidence.
 • positioning contains exactly 3 strings.
 • positioning[0] begins with "Market Gap — "
 • positioning[1] begins with "Competitive Position — "
 • positioning[2] begins with "Brand Permission — "
+• decision_guidance.recommended_direction is present.
+• decision_guidance.commitment_signal matches one allowed value exactly.
+• decision_guidance.execution_levers contains 2 to 4 strings, all drawn from the provided aesthetic chips.
 • The brand's actual name (brand.name) appears exactly once in insight_description. The literal string "YOUR brand" must not appear anywhere in the output.
 • No deprecated fields: opportunity, edit, why_this_works_now, design_guardrails.
 • No markdown symbols anywhere.
@@ -688,6 +767,8 @@ export function buildConceptPrompt(bb: ConceptBlackboard): string {
     aesthetic: {
       input: bb.aesthetic_input,
       matched_id: bb.aesthetic_matched_id,
+      key_pieces: bb.key_pieces ?? [],
+      available_execution_levers: getAestheticChipLabels(bb.aesthetic_matched_id),
       saturation_score: bb.aesthetic_context.saturation_score ?? 0,
       saturation_basis: bb.aesthetic_context.saturation_basis ?? undefined,
       trend_velocity: bb.aesthetic_context.trend_velocity ?? 'unknown',
@@ -715,6 +796,11 @@ interface ConceptV5Output {
   insight_title: string;
   insight_description: string;
   positioning: string[];
+  decision_guidance: {
+    recommended_direction: string;
+    commitment_signal: 'Increase Investment' | 'Hero Expression' | 'Controlled Test' | 'Maintain Exposure' | 'Reduce Exposure';
+    execution_levers: string[];
+  };
   confidence: number;
 }
 
@@ -727,6 +813,8 @@ export function parseConceptV5Output(raw: string): ConceptV5Output | null {
     const parsed = JSON.parse(stripFences(raw)) as ConceptV5Output;
     if (!parsed.insight_title || !parsed.insight_description) return null;
     if (!Array.isArray(parsed.positioning) || parsed.positioning.length === 0) return null;
+    if (!parsed.decision_guidance?.recommended_direction || !parsed.decision_guidance?.commitment_signal) return null;
+    if (!Array.isArray(parsed.decision_guidance.execution_levers)) return null;
     return parsed;
   } catch {
     return null;
@@ -782,6 +870,26 @@ export function buildConceptFallbackInput(bb: ConceptBlackboard, mode: InsightMo
   };
 }
 
+export function buildFallbackDecisionGuidance(
+  blackboard: ConceptBlackboard,
+  mode: InsightMode,
+) {
+  const aestheticName = blackboard.aesthetic_matched_id
+    .split('-')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+
+  const fallbackLevers = getAestheticChipLabels(blackboard.aesthetic_matched_id).slice(0, 3);
+
+  return buildTemplateDecisionGuidance({
+    aestheticName,
+    mode,
+    identityScore: blackboard.identity_score,
+    resonanceScore: blackboard.resonance_score,
+    executionLevers: fallbackLevers,
+  });
+}
+
 // ─────────────────────────────────────────────
 // MAIN EXPORT
 // ─────────────────────────────────────────────
@@ -830,6 +938,14 @@ export async function generateConceptInsight(
       statements: [parsed.insight_title, parsed.insight_description],
       edit: parsed.positioning.slice(0, 3),
       editLabel: 'POSITIONING',
+      decision_guidance: {
+        recommended_direction: parsed.decision_guidance.recommended_direction,
+        commitment_signal: parsed.decision_guidance.commitment_signal,
+        execution_levers: normalizeExecutionLevers(
+          blackboard.aesthetic_matched_id,
+          parsed.decision_guidance.execution_levers,
+        ),
+      },
       mode,
     };
 
@@ -840,6 +956,7 @@ export async function generateConceptInsight(
     const fallbackInput = buildConceptFallbackInput(blackboard, mode);
     const data = generateTemplateNarrative(fallbackInput);
     data.editLabel = editLabel;
+    data.decision_guidance = buildFallbackDecisionGuidance(blackboard, mode);
 
     return { data, meta: { method: 'template', latency_ms: Date.now() - start } };
   }

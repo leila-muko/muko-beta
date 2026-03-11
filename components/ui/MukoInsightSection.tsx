@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { CheckIcon, PencilIcon } from "@/components/ui/icons/InsightIcons";
 import type { SpecSuggestion } from "@/lib/types/next-move";
-import type { InsightMode } from "@/lib/types/insight";
+import type { DecisionGuidance, InsightMode } from "@/lib/types/insight";
 
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
@@ -14,11 +14,14 @@ export type ConceptNextMoveItem = { label: string; rationale: string; type?: 'ch
 
 type NextMoveConceptProps = {
   mode: "concept";
-  items: ConceptNextMoveItem[];
-  subtitle?: string;
-  onAdd: (item: string) => void;
-  onRemove?: (item: string) => void;
-  addedItems?: Set<string>;
+  guidance: DecisionGuidance | null;
+  recommendedKeyPieces?: string[];
+  selectedAnchorPiece?: string | null;
+  isConfirmed?: boolean;
+  confirmedAnchorPiece?: string | null;
+  onSelectAnchorPiece?: (piece: string) => void;
+  onConfirm?: () => void;
+  isLoading?: boolean;
 };
 
 type NextMoveSpecProps = {
@@ -323,7 +326,7 @@ export function MukoInsightSection({
                           lineHeight: 1.6,
                         }}
                       >
-                        {" \u2014 "}{item.replace(/^.+?(?:[—–]|\s{2,})\s*/, '')}
+                        {item.replace(/^.+?(?:[—–]|\s{2,})\s*/, '')}
                       </div>
                     </div>
                   </React.Fragment>
@@ -341,18 +344,28 @@ export function MukoInsightSection({
           </div>
         )}
 
-        {/* ── NEXT MOVE — concept mode ─────────────────────────────────── */}
-        {nextMove.mode === "concept" && nextMove.items.length > 0 && (() => {
-          const addedItems = nextMove.addedItems ?? new Set<string>();
-          const addedCount = addedItems.size;
-          return (
-            <ConceptNarrativeNextMove
-              items={nextMove.items}
-              addedItems={addedItems}
-              onAdd={nextMove.onAdd}
-              onRemove={nextMove.onRemove}
+        {/* ── DECISION GUIDANCE — concept mode ─────────────────────────── */}
+        {nextMove.mode === "concept" && (nextMove.guidance || nextMove.isLoading) && (() => {
+          if (nextMove.isLoading && !nextMove.guidance) {
+            return (
+              <div>
+                <div style={{ height: 1, background: "#E8E3D6", margin: "24px 0" }} />
+                <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 12 }}>Decision Guidance</div>
+                <div style={{ height: 156, borderRadius: 10, background: "rgba(67,67,43,0.05)", animation: "mukoCardPulse 1.5s ease-in-out infinite" }} />
+              </div>
+            );
+          }
+          return nextMove.guidance ? (
+            <DecisionGuidanceNarrative
+              guidance={nextMove.guidance}
+              recommendedKeyPieces={nextMove.recommendedKeyPieces ?? []}
+              selectedAnchorPiece={nextMove.selectedAnchorPiece}
+              isConfirmed={nextMove.isConfirmed}
+              confirmedAnchorPiece={nextMove.confirmedAnchorPiece}
+              onSelectAnchorPiece={nextMove.onSelectAnchorPiece}
+              onConfirm={nextMove.onConfirm}
             />
-          );
+          ) : null;
         })()}
 
         {/* ── Next Move — Spec (narrative card style) ──────────────────── */}
@@ -571,53 +584,18 @@ export function MukoInsightSection({
         )}
       </div>
 
-      {/* ── Next Move — Concept ──────────────────────────────────────────── */}
-      {nextMove.mode === "concept" && nextMove.items.length > 0 && (() => {
-        const addedCount = nextMove.addedItems?.size ?? 0;
-        return (
-          <NextMoveCard subtitle={nextMove.subtitle || "Suggested pivots and creative additions \u2014 apply a swap or layer in what resonates."}>
-            {nextMove.items.map((item, i) => {
-              const isSwap = item.type === 'silhouette_swap' || item.type === 'palette_swap';
-              const tagType: 'add' | 'swap' | 'redirect' = isSwap ? 'swap' : 'add';
-              const impact: 'HIGH' | 'MED' | 'LOW' = isSwap ? 'HIGH' : i === 0 ? 'MED' : 'LOW';
-              const isAdded = nextMove.addedItems?.has(item.label) ?? false;
-              return (
-                <React.Fragment key={item.label}>
-                  {i > 0 && <div style={{ height: 1, background: "rgba(125,150,172,0.10)", margin: "0 4px" }} />}
-                  <NextMoveRow
-                    index={i}
-                    action={item.label}
-                    rationale={item.rationale}
-                    tagType={tagType}
-                    impact={impact}
-                    isAdded={isAdded}
-                    applyLabel={isSwap ? "← Apply" : "+ Add"}
-                    onToggle={() => {
-                      if (isAdded) {
-                        nextMove.onRemove?.(item.label);
-                      } else {
-                        nextMove.onAdd(item.label);
-                      }
-                    }}
-                    onUndo={nextMove.onRemove ? () => nextMove.onRemove!(item.label) : undefined}
-                  />
-                </React.Fragment>
-              );
-            })}
-            <NextMoveFooter
-              total={nextMove.items.length}
-              added={addedCount}
-              onApplyAll={() => {
-                nextMove.items.forEach(item => {
-                  if (!(nextMove.addedItems?.has(item.label))) {
-                    nextMove.onAdd(item.label);
-                  }
-                });
-              }}
-            />
-          </NextMoveCard>
-        );
-      })()}
+      {/* ── Decision Guidance — Concept ─────────────────────────────────── */}
+      {nextMove.mode === "concept" && nextMove.guidance && (
+        <DecisionGuidancePanel
+          guidance={nextMove.guidance}
+          recommendedKeyPieces={nextMove.recommendedKeyPieces ?? []}
+          selectedAnchorPiece={nextMove.selectedAnchorPiece}
+          isConfirmed={nextMove.isConfirmed}
+          confirmedAnchorPiece={nextMove.confirmedAnchorPiece}
+          onSelectAnchorPiece={nextMove.onSelectAnchorPiece}
+          onConfirm={nextMove.onConfirm}
+        />
+      )}
 
       {/* ── Next Move — Spec ─────────────────────────────────────────────── */}
       {nextMove.mode === "spec" && nextMove.suggestions.length > 0 && (() => {
@@ -673,8 +651,323 @@ export function MukoInsightSection({
   );
 }
 
+function DecisionGuidanceNarrative({
+  guidance,
+  recommendedKeyPieces,
+  selectedAnchorPiece,
+  isConfirmed,
+  confirmedAnchorPiece,
+  onSelectAnchorPiece,
+  onConfirm,
+}: {
+  guidance: DecisionGuidance;
+  recommendedKeyPieces: string[];
+  selectedAnchorPiece?: string | null;
+  isConfirmed?: boolean;
+  confirmedAnchorPiece?: string | null;
+  onSelectAnchorPiece?: (piece: string) => void;
+  onConfirm?: () => void;
+}) {
+  return (
+    <div>
+      <div style={{ height: 1, background: "#E8E3D6", margin: "24px 0" }} />
+      <DecisionGuidanceCard
+        guidance={guidance}
+        recommendedKeyPieces={recommendedKeyPieces}
+        selectedAnchorPiece={selectedAnchorPiece}
+        isConfirmed={isConfirmed}
+        confirmedAnchorPiece={confirmedAnchorPiece}
+        onSelectAnchorPiece={onSelectAnchorPiece}
+        onConfirm={onConfirm}
+        tone="narrative"
+      />
+    </div>
+  );
+}
+
+function DecisionGuidancePanel({
+  guidance,
+  recommendedKeyPieces,
+  selectedAnchorPiece,
+  isConfirmed,
+  confirmedAnchorPiece,
+  onSelectAnchorPiece,
+  onConfirm,
+}: {
+  guidance: DecisionGuidance;
+  recommendedKeyPieces: string[];
+  selectedAnchorPiece?: string | null;
+  isConfirmed?: boolean;
+  confirmedAnchorPiece?: string | null;
+  onSelectAnchorPiece?: (piece: string) => void;
+  onConfirm?: () => void;
+}) {
+  return (
+    <div style={{ marginTop: 18 }}>
+      <DecisionGuidanceCard
+        guidance={guidance}
+        recommendedKeyPieces={recommendedKeyPieces}
+        selectedAnchorPiece={selectedAnchorPiece}
+        isConfirmed={isConfirmed}
+        confirmedAnchorPiece={confirmedAnchorPiece}
+        onSelectAnchorPiece={onSelectAnchorPiece}
+        onConfirm={onConfirm}
+        tone="default"
+      />
+    </div>
+  );
+}
+
+function DecisionGuidanceCard({
+  guidance,
+  recommendedKeyPieces,
+  selectedAnchorPiece = null,
+  isConfirmed = false,
+  confirmedAnchorPiece = null,
+  onSelectAnchorPiece,
+  onConfirm,
+  tone,
+}: {
+  guidance: DecisionGuidance;
+  recommendedKeyPieces: string[];
+  selectedAnchorPiece?: string | null;
+  isConfirmed?: boolean;
+  confirmedAnchorPiece?: string | null;
+  onSelectAnchorPiece?: (piece: string) => void;
+  onConfirm?: () => void;
+  tone: "narrative" | "default";
+}) {
+  const isNarrative = tone === "narrative";
+  const directive = toDirectiveSentence(guidance.recommended_direction);
+  const anchorPiece = selectedAnchorPiece ?? recommendedKeyPieces[0] ?? null;
+  const supportingPieces = recommendedKeyPieces.filter((piece) => piece !== anchorPiece);
+  return (
+    <div
+      style={{
+        padding: isNarrative ? "20px 20px 18px" : "16px 18px",
+        borderRadius: 10,
+        border: isNarrative ? "1px solid rgba(67,67,43,0.10)" : "1px solid rgba(125,150,172,0.22)",
+        borderLeft: isNarrative ? "1px solid rgba(67,67,43,0.10)" : "3px solid rgba(125,150,172,0.35)",
+        background: isNarrative ? "#FAFAF8" : "transparent",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+        <div style={{ fontFamily: inter, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: isNarrative ? "#7C776F" : "#6D7F8D" }}>
+          Decision Guidance
+        </div>
+      </div>
+      <div style={{ display: "grid", gap: 20 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 12, rowGap: 10 }}>
+            <CommitmentSignalChip signal={guidance.commitment_signal} />
+            <div style={{ fontFamily: sohne, fontSize: isNarrative ? 17 : 15, lineHeight: 1.38, color: "#191919", flex: "1 1 320px", minWidth: 0 }}>
+              {directive}
+            </div>
+          </div>
+        </div>
+        {anchorPiece && (
+          <div style={{ marginTop: 2 }}>
+            <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.11em", textTransform: "uppercase", color: "rgba(67,67,43,0.36)", marginBottom: 9 }}>
+              Suggested Anchor Piece
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <RecommendedKeyPieceChip label={anchorPiece} isSelected />
+            </div>
+            {supportingPieces.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.11em", textTransform: "uppercase", color: "rgba(67,67,43,0.32)", marginBottom: 8 }}>
+                  Supporting Pieces
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {supportingPieces.map((piece) => (
+                    <SupportingPieceChip
+                      key={piece}
+                      label={piece}
+                      onClick={onSelectAnchorPiece ? () => onSelectAnchorPiece(piece) : undefined}
+                    />
+                  ))}
+                </div>
+                {onSelectAnchorPiece && !isConfirmed && (
+                  <div style={{ marginTop: 8, fontFamily: inter, fontSize: 10.5, color: "rgba(67,67,43,0.42)", fontStyle: "italic" }}>
+                    Tap another piece to make it the anchor.
+                  </div>
+                )}
+              </div>
+            )}
+            {isConfirmed && confirmedAnchorPiece && (
+              <div style={{ marginTop: 10, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.54)", lineHeight: 1.5 }}>
+                <span style={{ color: "rgba(67,67,43,0.70)", fontWeight: 600 }}>Direction Confirmed</span>
+                {"  "}
+                <span>Hero Anchor: {toDisplayChipLabel(confirmedAnchorPiece)}</span>
+              </div>
+            )}
+          </div>
+        )}
+        {guidance.execution_levers.length > 0 && (
+          <div style={{ marginTop: 2 }}>
+            <div style={{ fontFamily: inter, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.11em", textTransform: "uppercase", color: "rgba(67,67,43,0.32)", marginBottom: 9 }}>
+              Execution Levers
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {guidance.execution_levers.map((lever) => (
+                <ExecutionLeverChip key={lever} label={lever} />
+              ))}
+            </div>
+          </div>
+        )}
+        {onConfirm ? (
+          <div style={{ marginTop: 2, paddingTop: 2 }}>
+            {isConfirmed ? (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#7B8860", fontFamily: inter, fontSize: 10.5, fontWeight: 600 }}>
+                <span style={{ width: 14, height: 14, borderRadius: 999, border: "1px solid rgba(168,180,117,0.32)", background: "rgba(168,180,117,0.10)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M2 5.2L4 7.1L8 2.9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </span>
+                <span>Direction Confirmed</span>
+              </div>
+            ) : (
+              <button
+                onClick={onConfirm}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  border: "none",
+                  background: "transparent",
+                  padding: 0,
+                  cursor: "pointer",
+                  fontFamily: inter,
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  color: "#6D7F8D",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                <span>Confirm Direction</span>
+                <span style={{ fontSize: 12, lineHeight: 1 }}>→</span>
+              </button>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function CommitmentSignalChip({ signal }: { signal: DecisionGuidance["commitment_signal"] }) {
+  const styles: Record<DecisionGuidance["commitment_signal"], { border: string; bg: string; text: string }> = {
+    'Increase Investment': { border: 'rgba(168,180,117,0.45)', bg: 'rgba(168,180,117,0.16)', text: '#6B7D30' },
+    'Hero Expression': { border: 'rgba(125,150,172,0.42)', bg: 'rgba(125,150,172,0.14)', text: '#4A6E85' },
+    'Controlled Test': { border: 'rgba(184,135,107,0.45)', bg: 'rgba(184,135,107,0.15)', text: '#9A6D47' },
+    'Maintain Exposure': { border: 'rgba(67,67,43,0.18)', bg: 'rgba(67,67,43,0.05)', text: 'rgba(67,67,43,0.76)' },
+    'Reduce Exposure': { border: 'rgba(169,123,143,0.40)', bg: 'rgba(169,123,143,0.14)', text: '#A97B8F' },
+  };
+  const style = styles[signal];
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "6px 11px",
+        borderRadius: 999,
+        border: `1px solid ${style.border}`,
+        background: style.bg,
+        color: style.text,
+        fontFamily: sohne,
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: "0.05em",
+        textTransform: "uppercase",
+        boxShadow: "0 1px 0 rgba(255,255,255,0.35) inset",
+      }}
+    >
+      {signal}
+    </span>
+  );
+}
+
+function ExecutionLeverChip({ label }: { label: string }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "4px 10px",
+        borderRadius: 999,
+        fontSize: 10.5,
+        fontWeight: 500,
+        fontFamily: inter,
+        background: "rgba(67,67,43,0.035)",
+        border: "1px solid rgba(67,67,43,0.11)",
+        color: "rgba(67,67,43,0.58)",
+      }}
+    >
+      {toDisplayChipLabel(label)}
+    </span>
+  );
+}
+
+function RecommendedKeyPieceChip({ label, isSelected = false }: { label: string; isSelected?: boolean }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "5px 11px",
+        borderRadius: 999,
+        fontSize: 10.5,
+        fontWeight: 600,
+        fontFamily: inter,
+        background: isSelected ? "rgba(168,180,117,0.12)" : "rgba(125,150,172,0.07)",
+        border: isSelected ? "1px solid rgba(168,180,117,0.28)" : "1px solid rgba(125,150,172,0.22)",
+        color: isSelected ? "rgba(67,67,43,0.84)" : "rgba(67,67,43,0.76)",
+      }}
+    >
+      {toDisplayChipLabel(label)}
+    </span>
+  );
+}
+
+function SupportingPieceChip({ label, onClick }: { label: string; onClick?: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "5px 11px",
+        borderRadius: 999,
+        fontSize: 10.5,
+        fontWeight: 500,
+        fontFamily: inter,
+        background: "transparent",
+        border: "1px solid rgba(67,67,43,0.14)",
+        color: "rgba(67,67,43,0.66)",
+        cursor: onClick ? "pointer" : "default",
+      }}
+    >
+      {toDisplayChipLabel(label)}
+    </button>
+  );
+}
+
+function toDirectiveSentence(value: string): string {
+  const trimmed = value
+    .replace(/\bone or two pieces\b/gi, "")
+    .replace(/\b\d+\s*(?:to|-)\s*\d+\s*pieces\b/gi, "")
+    .replace(/\b\d+\s*pieces\b/gi, "")
+    .replace(/\s+,/g, ",")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  const sentenceMatch = trimmed.match(/^[^.!?]+[.!?]?/);
+  return sentenceMatch ? sentenceMatch[0].trim() : trimmed;
+}
+
+function toDisplayChipLabel(value: string): string {
+  return value.replace(/\b([a-z])/gi, (match) => match.toUpperCase());
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
-   CONCEPT NARRATIVE NEXT MOVE — new flowing card layout
+   CONCEPT NARRATIVE NEXT MOVE — legacy layout kept for spec-adjacent reuse
 ══════════════════════════════════════════════════════════════════════════ */
 
 function ConceptNarrativeNextMove({

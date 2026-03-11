@@ -201,6 +201,8 @@ export interface ConceptBlackboardInput {
   excludedBrands?: string[];
   /** Optional intent calibration from the Intent page */
   intent?: IntentCalibration;
+  /** Key pieces identified for the selected concept direction */
+  keyPieces?: Array<{ item: string; type?: string; signal?: string }>;
 }
 
 /** Returns null when aestheticSlug is missing — callers must guard. */
@@ -230,6 +232,7 @@ export function buildConceptBlackboard(
       brand_mismatch: null,
     },
     intent: input.intent,
+    key_pieces: input.keyPieces,
   };
 }
 

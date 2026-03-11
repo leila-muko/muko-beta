@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { unstable_batchedUpdates } from "react-dom";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useSessionStore } from "@/lib/store/sessionStore";
@@ -204,102 +205,6 @@ function getChipTensionState(chipLabel: string, selectedKeyPiece: KeyPiece | nul
   if (tensions.hard.includes(chipLabel)) return 'hard';
   if (tensions.soft.includes(chipLabel)) return 'soft';
   return 'none';
-}
-
-/* ─── Next Move helpers ───────────────────────────────────────────────────── */
-
-type NextMoveItem = { label: string; rationale: string; type?: 'chip' | 'silhouette_swap' | 'palette_swap' };
-
-const CHIP_PREFIXES = [
-  (l: string) => `Layer in ${l}`,
-  (l: string) => `Consider ${l}`,
-  (l: string) => `Try ${l}`,
-];
-
-const DIMENSION_RATIONALE: Record<string, string> = {
-  identity: "Strengthens brand alignment for this direction",
-  resonance: "Adds trend-aware commercial traction",
-  execution: "Improves build specificity and production clarity",
-};
-
-const TYPE_RATIONALE: Record<string, string> = {
-  spec: "Sharpens the spec language",
-  mood: "Reinforces the mood and visual tone",
-};
-
-/** Builds the final NextMoveItem list from a pre-sorted, pre-filtered label array. */
-function buildNextMoveItems(
-  sortedLabels: string[],
-  allChips: AestheticChip[],
-  ae: string,
-  selectedAesthetic: string | null,
-  conceptSilhouette: string | null,
-  conceptPalette: string | null,
-): NextMoveItem[] {
-  const items: NextMoveItem[] = sortedLabels.map((label, idx) => {
-    const chip = allChips.find((c) => c.label === label);
-    const dim = (chip as unknown as Record<string, unknown>)?.primary_dimension as string | undefined;
-    const rationale =
-      dim && DIMENSION_RATIONALE[dim]
-        ? DIMENSION_RATIONALE[dim]
-        : chip?.type && TYPE_RATIONALE[chip.type]
-          ? TYPE_RATIONALE[chip.type]
-          : "Adds specificity to this direction";
-    const prefix = CHIP_PREFIXES[idx % CHIP_PREFIXES.length];
-    return { label: prefix(label), rationale, type: 'chip' };
-  });
-
-  if (selectedAesthetic && conceptSilhouette) {
-    const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
-      (a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-")
-    );
-    const silAffinity = entry?.silhouette_affinity ?? [];
-    if (!silAffinity.includes(conceptSilhouette)) {
-      const suggested = silAffinity[0];
-      if (suggested) {
-        const suggestedName = CONCEPT_SILHOUETTES.find((s) => s.id === suggested)?.name ?? suggested;
-        items.unshift({
-          label: `Swap to ${suggestedName} silhouette`,
-          rationale: `Strengthens the ${ae} proportion language`,
-          type: 'silhouette_swap',
-        });
-      }
-    }
-    const palAffinity = entry?.palette_affinity ?? [];
-    if (conceptPalette && !palAffinity.includes(conceptPalette)) {
-      const suggestedPal = palAffinity[0];
-      if (suggestedPal) {
-        const palOption = entry?.palette_options?.find((p) => p.id === suggestedPal);
-        const palName = palOption?.name ?? suggestedPal;
-        items.unshift({
-          label: `Swap to ${palName} palette`,
-          rationale: `Better alignment with ${ae} visual language`,
-          type: 'palette_swap',
-        });
-      }
-    }
-  }
-
-  return items.slice(0, 4);
-}
-
-/** Calls /api/filter-chips and returns the indices of contradicted chips. */
-async function filterChipsAgainstSynthesizer(
-  chipLabels: string[],
-  synthEdit: string[],
-): Promise<number[]> {
-  try {
-    const res = await fetch('/api/filter-chips', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chipLabels, synthEdit }),
-    });
-    if (!res.ok) return [];
-    const data = await res.json() as { contradicted?: number[] };
-    return Array.isArray(data.contradicted) ? data.contradicted : [];
-  } catch {
-    return [];
-  }
 }
 
 /* ─── Free-form aesthetic matcher ─────────────────────────────────────────── */
@@ -605,6 +510,8 @@ export default function ConceptStudioPage() {
     customChips: storeCustomChips,
     setCustomChips: setStoreCustomChips,
     setSelectedKeyPiece,
+    decisionGuidanceState,
+    setDecisionGuidanceState,
     intentGoals,
     intentTradeoff,
     collectionRole: storeCollectionRole,
@@ -712,25 +619,6 @@ export default function ConceptStudioPage() {
     });
   };
 
-  const removeElement = (chip: string) => {
-    if (!selectedAesthetic) return;
-    setSelectedElements((prev) => {
-      const next = new Set(prev);
-      next.delete(`${selectedAesthetic}::${chip}`);
-      return next;
-    });
-  };
-
-  const addedChipLabels = useMemo(() => {
-    if (!selectedAesthetic) return new Set<string>();
-    const prefix = `${selectedAesthetic}::`;
-    const rawLabels = new Set<string>();
-    selectedElements.forEach((key) => {
-      if (key.startsWith(prefix)) rawLabels.add(key.replace(prefix, ""));
-    });
-    return rawLabels;
-  }, [selectedAesthetic, selectedElements]);
-
   // ─── Resonance scoring helper ────────────────────────────────────────────
   const computeAndSetResonance = useCallback((aestheticName: string) => {
     const entry = (aestheticsData as unknown as ResearcherAesthetic[]).find(
@@ -788,16 +676,15 @@ export default function ConceptStudioPage() {
 
   // ─── Synthesizer: reactive MUKO INSIGHT (streaming) ──────────────────────
   const conceptAbortRef = useRef<AbortController | null>(null);
+  const conceptRawJsonRef = useRef<string>('');
+  const criticAbortRef = useRef<AbortController | null>(null);
+  const criticCacheRef = useRef<Map<string, number>>(new Map());
   const [conceptInsightData, setConceptInsightData] = useState<InsightData | null>(null);
   const [conceptInsightLoading, setConceptInsightLoading] = useState(false);
   const [conceptStreamingText, setConceptStreamingText] = useState('');
 
-  const addedChipKey = useMemo(
-    () => Array.from(addedChipLabels).sort().join(','),
-    [addedChipLabels]
-  );
-
   useEffect(() => {
+    console.log('[Muko] Synthesizer effect fired, aesthetic:', selectedAesthetic);
     if (!selectedAesthetic) {
       setConceptInsightData(null);
       setConceptStreamingText('');
@@ -838,7 +725,13 @@ export default function ConceptStudioPage() {
       customerProfile: customerProfile,
       referenceBrands: referenceBrands,
       excludedBrands: excludedBrands,
+      keyPieces: keyPieces.slice(0, 6).map((piece) => ({
+        item: piece.item,
+        type: piece.type,
+        signal: piece.signal,
+      })),
     });
+    console.log('[Muko] blackboard result:', blackboard ? 'valid' : 'null');
     if (!blackboard) return;
 
     conceptAbortRef.current?.abort();
@@ -846,8 +739,10 @@ export default function ConceptStudioPage() {
     conceptAbortRef.current = controller;
 
     const timer = window.setTimeout(async () => {
+      console.log('[Muko] Synthesizer timer firing');
       setConceptInsightLoading(true);
       setConceptStreamingText('');
+      conceptRawJsonRef.current = '';
       try {
         const res = await fetch('/api/synthesizer/concept', {
           method: 'POST',
@@ -855,6 +750,7 @@ export default function ConceptStudioPage() {
           body: JSON.stringify(blackboard),
           signal: controller.signal,
         });
+        console.log('[Muko] Synthesizer fetch status:', res.status, 'ok:', res.ok);
         if (!res.ok || !res.body || controller.signal.aborted) return;
 
         const reader = res.body.getReader();
@@ -864,22 +760,23 @@ export default function ConceptStudioPage() {
         let currentData = '';
 
         const processMessage = (event: string, data: string) => {
+          console.log('[Muko] SSE event:', event, data?.slice(0, 100));
           if (event === 'chunk') {
             try {
               const parsed = JSON.parse(data) as { text: string };
               const chunk = parsed.text ?? '';
-              setConceptStreamingText(prev => {
-                const accumulated = prev + chunk;
-                // Extract partial brand_alignment value for display
-                const match = accumulated.match(/"brand_alignment"\s*:\s*"([^"]*)/);
-                return match ? match[1] : prev;
-              });
+              conceptRawJsonRef.current += chunk;
+              const accumulated = conceptRawJsonRef.current;
+              // Extract partial insight_title value for display
+              const match = accumulated.match(/"insight_title"\s*:\s*"([^"]*)/);
+              setConceptStreamingText(match ? match[1] : (accumulated.length > 10 ? '...' : ''));
             } catch { /* ignore parse errors on partial chunks */ }
           } else if (event === 'complete' || event === 'fallback') {
             try {
               const result = JSON.parse(data) as { data: InsightData; meta: { method: string } };
+              console.log('[Muko] Synthesizer setting data:', result?.data?.insight_title);
               if (!controller.signal.aborted) {
-                setConceptInsightData(result.data);
+                setConceptInsightData(result.data ?? result);
                 setConceptStreamingText('');
                 // Fire-and-forget DB log
                 try {
@@ -901,6 +798,7 @@ export default function ConceptStudioPage() {
           const lines = buffer.split('\n');
           buffer = lines.pop() ?? '';
           for (const line of lines) {
+            if (controller.signal.aborted) break;
             if (line.startsWith('event: ')) {
               currentEvent = line.slice(7).trim();
             } else if (line.startsWith('data: ')) {
@@ -915,19 +813,21 @@ export default function ConceptStudioPage() {
       } catch (e) {
         if ((e as Error).name === 'AbortError') return;
       } finally {
+        console.log('[Muko] Synthesizer stream ended, aborted:', controller.signal.aborted);
+        setConceptInsightLoading(false);
         if (!controller.signal.aborted) {
-          setConceptInsightLoading(false);
           setConceptStreamingText('');
         }
       }
     }, 400);
 
     return () => {
+      console.log('[Muko] Synthesizer cleanup running');
       window.clearTimeout(timer);
       controller.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAesthetic, conceptSilhouette, conceptPalette, addedChipKey, brandProfileName, customerProfile, referenceBrands, excludedBrands, refinementModifiers]);
+  }, [selectedAesthetic, conceptSilhouette, conceptPalette, brandProfileName, customerProfile, referenceBrands, excludedBrands, refinementModifiers]);
 
   const [freeFormDraft, setFreeFormDraft] = useState("");
   const [freeFormMatch, setFreeFormMatch] = useState<string | null>(null);
@@ -968,24 +868,35 @@ export default function ConceptStudioPage() {
   // On mount: resolve the current user's brand profile id from Supabase
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    console.log('[Muko] Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log('[Muko] Supabase anon key (first 10):', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.slice(0, 10));
+    supabase.auth.getUser().then(async ({ data: { user }, error: getUserError }) => {
+      console.log('[Muko] getUser() result:', { user, error: getUserError });
       if (!user) {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        console.log('[Muko] getSession() fallback result:', { session: sessionData?.session, error: sessionError });
         setNoBrandProfile(true);
         return;
       }
+      console.log('[Muko] brand_profiles query — user.id:', user.id);
+      console.log('[Muko] brand_profiles query — table: brand_profiles, filter: user_id =', user.id, ', select: id, brand_name, customer_profile, reference_brands, excluded_brands');
       supabase
         .from('brand_profiles')
         .select('id, brand_name, customer_profile, reference_brands, excluded_brands')
         .eq('user_id', user.id)
         .single()
-        .then(({ data }) => {
-          if (data?.id) {
+        .then(({ data, error }) => {
+          console.log('[Muko] brand_profiles query result — data:', data, '| error:', error);
+          if (data && !error) {
             brandProfileId.current = data.id;
-            if (data.brand_name) setBrandProfileName(data.brand_name);
-            setCustomerProfile(data.customer_profile ?? null);
-            setReferenceBrands(data.reference_brands ?? []);
-            setExcludedBrands(data.excluded_brands ?? []);
-            setNoBrandProfile(false);
+            criticCacheRef.current.clear();
+            unstable_batchedUpdates(() => {
+              if (data.brand_name) setBrandProfileName(data.brand_name);
+              setCustomerProfile(data.customer_profile ?? null);
+              setReferenceBrands(data.reference_brands ?? []);
+              setExcludedBrands(data.excluded_brands ?? []);
+              setNoBrandProfile(false);
+            });
 
             // Batch-score all aesthetics against the brand profile so Pick selection
             // can use real Critic identity scores instead of static constants.
@@ -1029,6 +940,21 @@ export default function ConceptStudioPage() {
     debounce(async (aestheticKeywords: string[], aestheticName: string) => {
       if (!aestheticKeywords.length || !brandProfileId.current) return;
 
+      // Fix 2: cancel any in-flight request from a previous aesthetic selection
+      criticAbortRef.current?.abort();
+      criticAbortRef.current = new AbortController();
+
+      // Fix 3: serve from cache if this aesthetic+brand combo was already scored
+      const cacheKey = `${aestheticName}::${brandProfileId.current}`;
+      const cachedScore = criticCacheRef.current.get(cacheKey);
+      if (cachedScore !== undefined) {
+        const cachedStatus = cachedScore >= 70 ? 'green' : cachedScore >= 40 ? 'yellow' : 'red';
+        useSessionStore.setState({
+          identityPulse: { score: cachedScore, status: cachedStatus, message: "Brand alignment confirmed" },
+        });
+        return;
+      }
+
       // Set loading state via store
       useSessionStore.setState({
         identityPulse: { score: identityPulse?.score ?? 0, status: identityPulse?.status ?? "yellow", message: "Analyzing..." },
@@ -1043,6 +969,7 @@ export default function ConceptStudioPage() {
             aesthetic_name: aestheticName,
             brand_profile_id: brandProfileId.current,
           }),
+          signal: criticAbortRef.current.signal,
         });
 
         if (!res.ok) {
@@ -1050,6 +977,8 @@ export default function ConceptStudioPage() {
           throw new Error(err.error || `Critic agent request failed (${res.status})`);
         }
         const data = await res.json();
+        // Fix 3: store result so re-selecting this aesthetic skips the API call
+        criticCacheRef.current.set(cacheKey, data.pulse.score);
         useSessionStore.setState({
           identityPulse: {
             status: data.pulse.status,
@@ -1058,6 +987,8 @@ export default function ConceptStudioPage() {
           },
         });
       } catch (error) {
+        // Fix 2: silently ignore results from requests cancelled by a newer selection
+        if (error instanceof Error && error.name === 'AbortError') return;
         console.error("Identity pulse update failed:", error);
         useSessionStore.setState({
           identityPulse: {
@@ -1106,6 +1037,94 @@ export default function ConceptStudioPage() {
   const [customKeyPieceText, setCustomKeyPieceText] = useState("");
   const [customKeyPieceConfirmed, setCustomKeyPieceConfirmed] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
+
+  const recommendedKeyPieces = useMemo(() => {
+    const rankSignal = (signal?: string) => {
+      if (signal === "ascending") return 3;
+      if (signal === "high-volume") return 2;
+      if (signal === "emerging") return 1;
+      return 0;
+    };
+
+    return keyPieces
+      .filter((piece) => !piece.custom && piece.item)
+      .slice()
+      .sort((a, b) => rankSignal(b.signal) - rankSignal(a.signal))
+      .slice(0, 2)
+      .map((piece) => piece.item);
+  }, [keyPieces]);
+
+  useEffect(() => {
+    setDecisionGuidanceState({ is_confirmed: false, selected_anchor_piece: null });
+  }, [selectedAesthetic, setDecisionGuidanceState]);
+
+  useEffect(() => {
+    if (decisionGuidanceState.is_confirmed) return;
+    const defaultAnchor = recommendedKeyPieces[0] ?? null;
+    if (decisionGuidanceState.selected_anchor_piece === defaultAnchor) return;
+    setDecisionGuidanceState({
+      is_confirmed: false,
+      selected_anchor_piece: defaultAnchor,
+    });
+  }, [decisionGuidanceState.is_confirmed, decisionGuidanceState.selected_anchor_piece, recommendedKeyPieces, setDecisionGuidanceState]);
+
+  const handleSelectAnchorPiece = useCallback((pieceName: string) => {
+    const anchorPiece = keyPieces.find((piece) => !piece.custom && piece.item === pieceName) ?? null;
+    setDecisionGuidanceState({
+      is_confirmed: false,
+      selected_anchor_piece: pieceName,
+    });
+    if (anchorPiece) {
+      setSelectedKeyPieceLocal(anchorPiece);
+      setSelectedKeyPiece(anchorPiece);
+    }
+  }, [keyPieces, setDecisionGuidanceState, setSelectedKeyPiece]);
+
+  const handleConfirmDirection = useCallback(() => {
+    const anchorPieceName = decisionGuidanceState.selected_anchor_piece ?? recommendedKeyPieces[0] ?? null;
+    const anchorPiece = anchorPieceName
+      ? keyPieces.find((piece) => !piece.custom && piece.item === anchorPieceName) ?? null
+      : null;
+    const executionLevers = conceptInsightData?.decision_guidance?.execution_levers ?? [];
+
+    setDecisionGuidanceState({
+      is_confirmed: true,
+      selected_anchor_piece: anchorPieceName,
+    });
+
+    if (anchorPiece) {
+      setSelectedKeyPieceLocal(anchorPiece);
+      setSelectedKeyPiece(anchorPiece);
+    }
+
+    if (selectedAesthetic && executionLevers.length > 0) {
+      setSelectedElements((prev) => {
+        const next = new Set(prev);
+        executionLevers.forEach((lever) => {
+          next.add(`${selectedAesthetic}::${lever}`);
+        });
+        return next;
+      });
+
+      setChipMeta((prev) => {
+        const next = new Map(prev);
+        executionLevers.forEach((lever) => {
+          const key = `${selectedAesthetic}::${lever}`;
+          const existing = next.get(key);
+          next.set(key, existing ? { ...existing, userConfirmed: true } : { source: 'manual', userConfirmed: true });
+        });
+        return next;
+      });
+    }
+  }, [
+    decisionGuidanceState.selected_anchor_piece,
+    conceptInsightData?.decision_guidance?.execution_levers,
+    keyPieces,
+    recommendedKeyPieces,
+    selectedAesthetic,
+    setDecisionGuidanceState,
+    setSelectedKeyPiece,
+  ]);
 
   // Auto-select implied chips when key piece changes
   useEffect(() => {
@@ -1343,55 +1362,6 @@ export default function ConceptStudioPage() {
 
     return base;
   }, [selectedAesthetic, recommendedAesthetic, conceptSilhouette, conceptPalette]);
-
-  const [nextMoveItems, setNextMoveItems] = useState<NextMoveItem[]>([]);
-
-  useEffect(() => {
-    let aborted = false;
-
-    const ae = selectedAesthetic ?? recommendedAesthetic;
-    const allChips = getAestheticChips(ae);
-    const opportunities = insightContent.opportunity;
-    const candidateLabels = insightContent.sharpenChips;
-
-    // Boost chips referenced in the static opportunity[] to the front —
-    // MukoInsightSection assigns MED to index 0 and LOW to the rest,
-    // so sort order here is the confidence signal.
-    const tokens = (s: string) =>
-      s.toLowerCase().split(/[\s,.\-\/]+/).filter((w) => w.length > 2);
-    const overlaps = (a: string, b: string) =>
-      tokens(a).some((w) => tokens(b).includes(w));
-    const isBoosted = (label: string) =>
-      opportunities.some((opp) => overlaps(label, opp));
-
-    const staticSorted = [...candidateLabels].sort(
-      (a, b) => (isBoosted(a) ? 0 : 1) - (isBoosted(b) ? 0 : 1)
-    );
-
-    // Set static result immediately so UI is never empty while waiting
-    setNextMoveItems(
-      buildNextMoveItems(staticSorted.slice(0, 3), allChips, ae, selectedAesthetic, conceptSilhouette, conceptPalette)
-    );
-
-    // If the Synthesizer hasn't loaded yet, static ranking is the final answer
-    if (!conceptInsightData) return () => { aborted = true; };
-
-    // Fire a single Haiku call to semantically filter contradicted chips
-    filterChipsAgainstSynthesizer(candidateLabels, conceptInsightData.edit)
-      .then((contradictedIndices) => {
-        if (aborted) return;
-        const filtered = candidateLabels.filter((_, i) => !contradictedIndices.includes(i));
-        const sorted = [...filtered].sort(
-          (a, b) => (isBoosted(a) ? 0 : 1) - (isBoosted(b) ? 0 : 1)
-        );
-        setNextMoveItems(
-          buildNextMoveItems(sorted.slice(0, 3), allChips, ae, selectedAesthetic, conceptSilhouette, conceptPalette)
-        );
-      })
-      .catch(() => { /* keep the static result already set above */ });
-
-    return () => { aborted = true; };
-  }, [selectedAesthetic, recommendedAesthetic, insightContent, conceptSilhouette, conceptPalette, conceptInsightData]);
 
   const canContinue = Boolean(selectedAesthetic) && Boolean(conceptSilhouette);
   const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
@@ -1992,7 +1962,8 @@ export default function ConceptStudioPage() {
                     whatItMeans={row.what}
                     howCalculated={row.how}
                     isPending={row.pending}
-                    variant="strip"
+                    isExpanded={pulseExpandedRow === row.key}
+                    onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === row.key ? null : row.key)}
                   />
                 </React.Fragment>
               ))}
@@ -2040,36 +2011,14 @@ export default function ConceptStudioPage() {
                 onContinue={() => router.push('/spec')}
                 nextMove={{
                   mode: "concept",
-                  items: nextMoveItems,
-                  onAdd: (label) => {
-                    const item = nextMoveItems.find((i) => i.label === label);
-                    if (item?.type === 'silhouette_swap') {
-                      const match = label.match(/(\w+) silhouette/);
-                      if (match) setConceptSilhouette(match[1].toLowerCase());
-                    } else if (item?.type === 'palette_swap') {
-                      const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
-                        (a) => a.name === selectedAesthetic || a.id === selectedAesthetic?.toLowerCase().replace(/\s+/g, "-")
-                      );
-                      const palAffinity = entry?.palette_affinity ?? [];
-                      if (palAffinity[0]) setConceptPalette(palAffinity[0]);
-                    } else if (selectedAesthetic) {
-                      const chipName = label.replace(/^(Layer in |Consider |Try )/, "");
-                      toggleElement(`${selectedAesthetic}::${chipName}`);
-                    }
-                  },
-                  onRemove: (label) => {
-                    const chipName = label.replace(/^(Layer in |Consider |Try |Swap to )/, "");
-                    removeElement(chipName);
-                  },
-                  addedItems: new Set(
-                    nextMoveItems
-                      .filter((i) => {
-                        if (i.type === 'silhouette_swap' || i.type === 'palette_swap') return false;
-                        const chipName = i.label.replace(/^(Layer in |Consider |Try )/, "");
-                        return addedChipLabels.has(chipName);
-                      })
-                      .map((i) => i.label)
-                  ),
+                  guidance: conceptInsightData?.decision_guidance ?? null,
+                  recommendedKeyPieces,
+                  selectedAnchorPiece: decisionGuidanceState.selected_anchor_piece,
+                  isConfirmed: decisionGuidanceState.is_confirmed,
+                  confirmedAnchorPiece: decisionGuidanceState.selected_anchor_piece,
+                  onSelectAnchorPiece: handleSelectAnchorPiece,
+                  onConfirm: conceptInsightData?.decision_guidance ? handleConfirmDirection : undefined,
+                  isLoading: conceptInsightLoading && !conceptInsightData?.decision_guidance,
                 }}
               />
             )}

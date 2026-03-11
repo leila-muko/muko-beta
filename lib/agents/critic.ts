@@ -285,6 +285,7 @@ export async function checkBrandAlignment(input: CriticInput): Promise<CriticRes
       aesthetic_name,
       brand_keywords: brand.keywords,
       brand_description: brand.brand_description ?? null,
+      reference_brands: brand.reference_brands ?? [],
       tension_context: brand.tension_context,
       conflict_descriptions: triggeredConflicts.map((c) => c.description),
     });
@@ -352,6 +353,7 @@ export async function checkBrandAlignment(input: CriticInput): Promise<CriticRes
       aesthetic_name,
       brand_keywords: brand.keywords,
       brand_description: brand.brand_description ?? null,
+      reference_brands: brand.reference_brands ?? [],
       tension_context: null,
       conflict_descriptions: [],
     });
@@ -415,6 +417,7 @@ interface LLMVibeCheckInput {
   aesthetic_name: string;
   brand_keywords: string[];
   brand_description: string | null;  // v1.1
+  reference_brands?: string[];       // v1.1
   tension_context: string | null;
   conflict_descriptions: string[];
 }
@@ -425,13 +428,20 @@ async function runLLMVibeCheck(input: LLMVibeCheckInput): Promise<LLMVibeResult>
     aesthetic_name,
     brand_keywords,
     brand_description,
+    reference_brands,
     tension_context,
     conflict_descriptions,
   } = input;
 
   const systemPrompt = `You are a senior fashion brand strategist with 15+ years of experience at houses like The Row, Toteme, and Reformation. You evaluate whether aesthetic directions fit a brand's identity with precision and nuance. You understand that fashion brands often hold intentional tensions (e.g., accessible-luxe, timeless-trendy) and you score for how well the brand can EXECUTE the aesthetic, not just whether the keywords match perfectly.
 
-You always return valid JSON. No preamble. No markdown. No explanation outside the JSON.`;
+You always return valid JSON. No preamble. No markdown. No explanation outside the JSON.
+
+NEVER return generic messages like "Brand alignment confirmed", "Strong alignment", or "Good fit". The message must always name specific keywords, qualities, or aesthetic traits that explain the score.
+Examples of good messages:
+- "Connects through sustainable and feminine — both core to this brand's identity"
+- "Strong overlap on Timeless and Minimalist, though Rustic creates minor tension"
+- "Artisanal and Ethical directly mirror this brand's craft-forward positioning"`;
 
   const userMessage = `
 Evaluate the brand alignment for this analysis:
@@ -441,8 +451,7 @@ Aesthetic keywords: [${aesthetic_keywords.join(', ')}]
 
 BRAND PROFILE:
 Brand keywords: [${brand_keywords.join(', ')}]
-${brand_description ? `Brand description: "${brand_description}"` : ''}
-${tension_context ? `Brand's stated tension context: "${tension_context}"\n(This means the brand intentionally holds this tension — factor this into your scoring)` : ''}
+${brand_description ? `Brand description: "${brand_description}"\n` : ''}${reference_brands?.length ? `Admired reference brands (use to infer aesthetic sensibility): ${reference_brands.join(', ')}\n` : ''}${tension_context ? `Brand's stated tension context: "${tension_context}"\n(This means the brand intentionally holds this tension — factor this into your scoring)` : ''}
 ${conflict_descriptions.length > 0 ? `Detected keyword tensions: ${conflict_descriptions.join('; ')}` : ''}
 
 TASK:
@@ -451,13 +460,13 @@ Score how well this aesthetic aligns with this brand's identity. Consider:
 2. Whether the brand's tension_context resolves any detected conflicts
 3. Whether the aesthetic can authentically be executed within this brand's world
 4. Market positioning fit (implied by the brand keywords)
-5. The brand description as qualitative context for fit assessment
+5. Use the brand description and reference brands as qualitative signal for aesthetic sensibility — infer what these brands share aesthetically and whether this aesthetic fits that world.
 
 Return ONLY this JSON object:
 {
   "alignment_score": <integer 0-100>,
   "status": "<green|yellow|red>",
-  "message": "<one concise sentence explaining the alignment, written for a Design Director — specific, not generic>",
+  "message": "<one specific sentence naming the 1-2 keywords or qualities that drive the alignment or tension — never generic phrases like 'Brand alignment confirmed' or 'Strong fit'. Always name what specifically connects or conflicts.>",
   "reasoning": "<2-3 sentences of internal reasoning — what drove the score>"
 }
 
@@ -472,7 +481,7 @@ Scoring guide:
       model: 'claude-haiku-4-5-20251001',
       maxTokens: 400,
       systemPrompt,
-      temperature: 0.2,
+      temperature: 0,
     });
 
     const parsed = parseJSONResponse<LLMVibeResult & { reasoning?: string }>(raw);
