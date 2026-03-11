@@ -727,8 +727,8 @@ export default function ConceptStudioPage() {
       excludedBrands: excludedBrands,
       keyPieces: keyPieces.slice(0, 6).map((piece) => ({
         item: piece.item,
-        type: piece.type,
-        signal: piece.signal,
+        type: piece.type ?? undefined,
+        signal: piece.signal ?? undefined,
       })),
     });
     console.log('[Muko] blackboard result:', blackboard ? 'valid' : 'null');
@@ -774,7 +774,7 @@ export default function ConceptStudioPage() {
           } else if (event === 'complete' || event === 'fallback') {
             try {
               const result = JSON.parse(data) as { data: InsightData; meta: { method: string } };
-              console.log('[Muko] Synthesizer setting data:', result?.data?.insight_title);
+              console.log('[Muko] Synthesizer setting data:', result?.data?.statements?.[0]);
               if (!controller.signal.aborted) {
                 setConceptInsightData(result.data ?? result);
                 setConceptStreamingText('');
@@ -1039,7 +1039,7 @@ export default function ConceptStudioPage() {
   const [showCustomInput, setShowCustomInput] = useState(false);
 
   const recommendedKeyPieces = useMemo(() => {
-    const rankSignal = (signal?: string) => {
+    const rankSignal = (signal?: string | null) => {
       if (signal === "ascending") return 3;
       if (signal === "high-volume") return 2;
       if (signal === "emerging") return 1;

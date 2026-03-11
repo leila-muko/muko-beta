@@ -37,6 +37,7 @@ import type { InsightData, SpecInsightMode } from "@/lib/types/insight";
 import { buildSpecBlackboard } from "@/lib/synthesizer/assemble";
 import { createClient } from "@/lib/supabase/client";
 import type { SpecSuggestion } from "@/lib/types/next-move";
+import { ScorecardModal } from "@/components/spec-studio/ScorecardModal";
 
 /* ─── Icons: matched to Concept Studio (star, users, cog) ─── */
 function IconIdentity({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
@@ -602,7 +603,7 @@ function RemoveSignalButton({ onClick }: { onClick: () => void }) {
 
 export default function SpecStudioPage() {
   const router = useRouter();
-  const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole } = useSessionStore();
+  const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setParentAnalysisId } = useSessionStore();
   const categories: Category[] = categoriesData.categories as unknown as Category[];
   const materials: Material[] = materialsData as unknown as Material[];
   const allSubcategories = subcategoriesData as Record<string, SubcategoryEntry[]>;
@@ -638,6 +639,11 @@ export default function SpecStudioPage() {
     return isFW ? 24 : 20;
   });
   const [pulseUpdated, setPulseUpdated] = useState(false);
+
+  // Scorecard modal state
+  const [showScorecardModal, setShowScorecardModal] = useState(false);
+  const [isRunningAnalysis, setIsRunningAnalysis] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState(0);
 
   const [hasInitialized, setHasInitialized] = useState(false);
 
@@ -3094,8 +3100,17 @@ export default function SpecStudioPage() {
                   setColorPalette(palOption.swatches, palOption.name);
                 }
               }
-              setCurrentStep(4);
-              router.push("/report");
+              // Start loading animation, then open scorecard modal
+              setIsRunningAnalysis(true);
+              setLoadingPhase(0);
+              const phaseDelays = [650, 1300, 1950, 2500];
+              phaseDelays.forEach((delay, i) => {
+                setTimeout(() => setLoadingPhase(i + 1), delay);
+              });
+              setTimeout(() => {
+                setIsRunningAnalysis(false);
+                setShowScorecardModal(true);
+              }, 2900);
             }}
             style={{
               width: "100%",
@@ -3144,6 +3159,59 @@ export default function SpecStudioPage() {
         identityScore={conceptContext.identityScore}
         resonanceScore={conceptContext.resonanceScore}
       />
+
+      {/* ═══ ANALYSIS LOADING OVERLAY ═══ */}
+      {isRunningAnalysis && (() => {
+        const phases = ["Scoring identity…", "Calibrating resonance…", "Analyzing execution…", "Finalizing…"];
+        return (
+          <div style={{
+            position: "fixed", inset: 0,
+            background: "rgba(250,249,246,0.92)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 8000,
+          }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{
+                fontSize: 13, fontWeight: 600,
+                fontFamily: sohne,
+                color: OLIVE,
+                letterSpacing: "0.04em",
+                minHeight: 20,
+              }}>
+                {phases[Math.min(loadingPhase, phases.length - 1)]}
+              </div>
+              <div style={{ marginTop: 16, display: "flex", gap: 6, justifyContent: "center" }}>
+                {phases.map((_, i) => (
+                  <div key={i} style={{
+                    width: 6, height: 6, borderRadius: "50%",
+                    background: i < loadingPhase ? CHARTREUSE : "rgba(67,67,43,0.18)",
+                    transition: "background 300ms ease",
+                  }} />
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══ SCORECARD MODAL ═══ */}
+      {showScorecardModal && (() => {
+        const mukoScore = Math.round((dynamicIdentityScore + dynamicResonanceScore + executionScore) / 3);
+        return (
+          <ScorecardModal
+            identityScore={dynamicIdentityScore}
+            resonanceScore={dynamicResonanceScore}
+            executionScore={executionScore}
+            mukoScore={mukoScore}
+            marginGatePassed={marginGatePassed}
+            insight={insight ? { cogs: insight.cogs, ceiling: insight.ceiling } : null}
+            targetMsrp={targetMSRP}
+            mukoInsight={specSynthInsightData?.statements?.[0] ?? null}
+            suggestions={mukoSynthesis?.suggestions ?? []}
+            onRevise={() => setShowScorecardModal(false)}
+          />
+        );
+      })()}
     </div>
   );
 }

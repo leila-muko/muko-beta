@@ -60,7 +60,10 @@ export interface BrandProfile {
       reason: string;
     }>;
     
-    // Versioning
+    // Piece name (user-facing label, e.g. "Architectural Cape")
+  piece_name?: string | null;
+
+  // Versioning
     data_version: string | null;
     agent_versions: {
       orchestrator?: string;

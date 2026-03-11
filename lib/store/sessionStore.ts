@@ -84,6 +84,10 @@ interface SessionState {
   parentAnalysisId: string | null;
   savedAnalysisId: string | null;
 
+  // Collections hub
+  activeCollection: string | null;
+  assortmentInsightCache: Record<string, string>;
+
   // Actions
   setSeason: (season: string) => void;
   setCollectionName: (name: string) => void;
@@ -111,6 +115,8 @@ interface SessionState {
   setDecisionGuidanceState: (state: DecisionGuidanceState) => void;
   setParentAnalysisId: (id: string | null) => void;
   setSavedAnalysisId: (id: string | null) => void;
+  setActiveCollection: (name: string | null) => void;
+  setAssortmentInsightCache: (collectionName: string, insight: string) => void;
 
   lockConcept: () => void;
   unlockConcept: () => void;
@@ -154,6 +160,8 @@ export const useSessionStore = create<SessionState>()(
       decisionGuidanceState: { is_confirmed: false, selected_anchor_piece: null },
       parentAnalysisId: null,
       savedAnalysisId: null,
+      activeCollection: null,
+      assortmentInsightCache: {},
 
       // Actions
       setSeason: (season) => set({ season }),
@@ -184,6 +192,11 @@ export const useSessionStore = create<SessionState>()(
       setDecisionGuidanceState: (decisionGuidanceState) => set({ decisionGuidanceState }),
       setParentAnalysisId: (parentAnalysisId) => set({ parentAnalysisId }),
       setSavedAnalysisId: (savedAnalysisId) => set({ savedAnalysisId }),
+      setActiveCollection: (activeCollection) => set({ activeCollection }),
+      setAssortmentInsightCache: (collectionName, insight) =>
+        set((state) => ({
+          assortmentInsightCache: { ...state.assortmentInsightCache, [collectionName]: insight },
+        })),
 
       lockConcept: () => set({ conceptLocked: true }),
       unlockConcept: () => set({ conceptLocked: false }),
@@ -227,7 +240,7 @@ export const useSessionStore = create<SessionState>()(
       name: 'muko-session',
       partialize: (state) => {
         // Persist everything except actions
-        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setCollectionRole, setSelectedKeyPiece, setParentAnalysisId, setSavedAnalysisId, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
+        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setCollectionRole, setSelectedKeyPiece, setParentAnalysisId, setSavedAnalysisId, setActiveCollection, setAssortmentInsightCache, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
         return rest;
       },
     }

@@ -42,16 +42,39 @@ export default function EntryScreen() {
   const [touchedSeason, setTouchedSeason] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
 
-  const recentCollections = [
-    { id: 1, name: 'Italy Winter 25' },
-    { id: 2, name: 'Urban Fall 2025' },
-  ];
+  const recentCollections = useMemo(() => {
+    const names = new Set<string>();
+
+    if (collectionName.trim()) names.add(collectionName.trim());
+
+    try {
+      const saved = window.localStorage.getItem('muko_collectionName');
+      if (saved?.trim()) names.add(saved.trim());
+    } catch {}
+
+    return Array.from(names).map((name) => ({ id: name, name }));
+  }, [collectionName]);
 
   const nameError = touchedName && !collectionName.trim() ? 'Please enter a collection name.' : '';
   const seasonError = touchedSeason && !selectedSeason ? 'Please select a season.' : '';
   const canContinue = !!collectionName.trim() && !!selectedSeason;
 
-  const { setSeason, setCollectionName: setStoreCollectionName, setCurrentStep } = useSessionStore();
+  const {
+    setSeason,
+    setCollectionName: setStoreCollectionName,
+    setCurrentStep,
+    setActiveCollection,
+  } = useSessionStore();
+
+  const handleOpenCollection = (name: string) => {
+    setCollectionName(name);
+    setStoreCollectionName(name);
+    setActiveCollection(name);
+    try {
+      window.localStorage.setItem('muko_collectionName', name);
+    } catch {}
+    router.push('/collections');
+  };
 
   const handleContinue = () => {
     setTouchedName(true);
@@ -138,34 +161,49 @@ export default function EntryScreen() {
           </h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {recentCollections.map((collection) => (
-              <button
-                key={collection.id}
+            {recentCollections.length > 0 ? (
+              recentCollections.map((collection) => (
+                <button
+                  key={collection.id}
+                  onClick={() => handleOpenCollection(collection.name)}
+                  style={{
+                    textAlign: 'left',
+                    fontSize: 13,
+                    color: 'rgba(67,67,43,0.58)',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    padding: '9px 12px',
+                    cursor: 'pointer',
+                    fontFamily: inter,
+                    fontWeight: 500,
+                    borderRadius: 8,
+                    transition: 'all 160ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(67,67,43,0.04)';
+                    e.currentTarget.style.color = OLIVE;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'rgba(67,67,43,0.58)';
+                  }}
+                >
+                  {collection.name}
+                </button>
+              ))
+            ) : (
+              <div
                 style={{
                   textAlign: 'left',
                   fontSize: 13,
-                  color: 'rgba(67,67,43,0.58)',
-                  backgroundColor: 'transparent',
-                  border: 'none',
+                  color: 'rgba(67,67,43,0.40)',
                   padding: '9px 12px',
-                  cursor: 'pointer',
                   fontFamily: inter,
-                  fontWeight: 500,
-                  borderRadius: 8,
-                  transition: 'all 160ms ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(67,67,43,0.04)';
-                  e.currentTarget.style.color = OLIVE;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = 'rgba(67,67,43,0.58)';
                 }}
               >
-                {collection.name}
-              </button>
-            ))}
+                No collections yet.
+              </div>
+            )}
           </div>
         </div>
       </aside>
