@@ -1,12 +1,19 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import materialsData from '@/data/materials.json';
 import { CollectionReportView } from '@/components/report/CollectionReportView';
 import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
 import { buildCollectionReport } from '@/lib/collection-report/buildCollectionReport';
-import type { CollectionComplexity, CollectionPieceRole, CollectionReportInput, CollectionReportPayload } from '@/lib/collection-report/types';
+import type {
+  CollectionComplexity,
+  CollectionPieceRole,
+  CollectionReportBrandInput,
+  CollectionReportInput,
+  CollectionReportIntentInput,
+  CollectionReportPayload,
+} from '@/lib/collection-report/types';
 import { createClient } from '@/lib/supabase/client';
 import { useSessionStore } from '@/lib/store/sessionStore';
 
@@ -31,6 +38,15 @@ interface AnalysisRow {
   piece_name?: string | null;
   created_at: string;
   agent_versions?: Record<string, string | null> | null;
+}
+
+interface BrandProfileRow {
+  brand_name: string | null;
+  keywords: string[] | null;
+  customer_profile: string | null;
+  price_tier: string | null;
+  tension_context: string | null;
+  reference_brands: string[] | null;
 }
 
 const materialNameById = new Map(
@@ -76,12 +92,16 @@ function toCollectionInput({
   versionLabel,
   snapshotId,
   pieces,
+  brand,
+  intent,
 }: {
   collectionName: string;
   season: string;
   versionLabel?: string | null;
   snapshotId?: string | null;
   pieces: AnalysisRow[];
+  brand?: CollectionReportBrandInput | null;
+  intent?: CollectionReportIntentInput | null;
 }): CollectionReportInput {
   return {
     collection_name: collectionName,
@@ -89,6 +109,8 @@ function toCollectionInput({
     version_label: versionLabel ?? null,
     snapshot_id: snapshotId ?? null,
     generated_at: new Date().toISOString(),
+    brand: brand ?? null,
+    intent: intent ?? null,
     pieces: pieces.map((row) => ({
       id: row.id,
       piece_name: getPieceName(row),
@@ -104,6 +126,40 @@ function toCollectionInput({
       margin_passed: row.gates_passed?.cost ?? null,
     })),
   };
+}
+
+function readIntentFromStorage(): CollectionReportIntentInput | null {
+  try {
+    const raw = window.localStorage.getItem('muko_intent');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      success?: string[];
+      tradeoff?: string | null;
+      collectionRole?: string | null;
+      tensions?: {
+        trendForward_vs_timeless?: 'left' | 'center' | 'right';
+        creative_vs_commercial?: 'left' | 'center' | 'right';
+        elevated_vs_accessible?: 'left' | 'center' | 'right';
+        novelty_vs_continuity?: 'left' | 'center' | 'right';
+      };
+    };
+    const mapTension = (value?: 'left' | 'center' | 'right') =>
+      value === 'left' ? 20 : value === 'right' ? 80 : 50;
+
+    return {
+      primary_goals: parsed.success ?? [],
+      tradeoff: parsed.tradeoff ?? null,
+      collection_role: parsed.collectionRole ?? null,
+      tension_sliders: {
+        trend_forward: mapTension(parsed.tensions?.trendForward_vs_timeless),
+        creative_expression: mapTension(parsed.tensions?.creative_vs_commercial),
+        elevated_design: mapTension(parsed.tensions?.elevated_vs_accessible),
+        novelty: mapTension(parsed.tensions?.novelty_vs_continuity),
+      },
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function fetchCollectionAnalyses(
@@ -144,7 +200,28 @@ async function fetchCollectionAnalyses(
   }));
 }
 
-export default function ReportPage() {
+async function fetchBrandProfile(userId: string): Promise<CollectionReportBrandInput | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('brand_profiles')
+    .select('brand_name, keywords, customer_profile, price_tier, tension_context, reference_brands')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const row = data as BrandProfileRow;
+  return {
+    brand_name: row.brand_name,
+    keywords: row.keywords,
+    customer_profile: row.customer_profile,
+    price_tier: row.price_tier,
+    tension_context: row.tension_context,
+    reference_brands: row.reference_brands,
+  };
+}
+
+function ReportPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeCollection = useSessionStore((state) => state.activeCollection);
@@ -165,6 +242,7 @@ export default function ReportPage() {
     const resolvedCollectionName =
       collectionFromUrl || activeCollection || collectionName || 'Untitled Collection';
     const resolvedSeason = seasonFromUrl || season || 'Current Season';
+    const intent = typeof window !== 'undefined' ? readIntentFromStorage() : null;
 
     if (!category && !aestheticInput && !materialId) {
       return null;
@@ -176,6 +254,7 @@ export default function ReportPage() {
       generated_at: new Date().toISOString(),
       version_label: 'Session Snapshot',
       snapshot_id: 'live-session',
+      intent,
       pieces: [
         {
           id: 'session-piece',
@@ -239,9 +318,15 @@ export default function ReportPage() {
 
       try {
         let input = sessionFallbackInput;
+        const intent = typeof window !== 'undefined' ? readIntentFromStorage() : null;
         const {
           data: { user },
         } = await supabase.auth.getUser();
+        let brand: CollectionReportBrandInput | null = null;
+
+        if (user) {
+          brand = await fetchBrandProfile(user.id);
+        }
 
         if (user && activeCollectionName) {
           try {
@@ -254,7 +339,15 @@ export default function ReportPage() {
                 versionLabel: 'Latest Snapshot',
                 snapshotId: data[0].created_at,
                 pieces: data,
+                brand,
+                intent,
               });
+            } else if (input) {
+              input = {
+                ...input,
+                brand,
+                intent,
+              };
             }
           } catch {
             // If collection fetch fails, keep any available session fallback instead of blanking the page.
@@ -268,6 +361,8 @@ export default function ReportPage() {
             generated_at: new Date().toISOString(),
             version_label: 'Collection Snapshot',
             snapshot_id: 'minimal-fallback',
+            brand,
+            intent,
             pieces: [],
           };
         }
@@ -292,6 +387,8 @@ export default function ReportPage() {
                 generated_at: new Date().toISOString(),
                 version_label: 'Stored Snapshot',
                 snapshot_id: 'local-storage',
+                brand,
+                intent,
                 pieces: [],
               };
             }
@@ -330,6 +427,7 @@ export default function ReportPage() {
       } catch {
         const activeCollectionName = collectionFromUrl || activeCollection || collectionName;
         const activeSeason = seasonFromUrl || season || 'Current Season';
+        const intent = typeof window !== 'undefined' ? readIntentFromStorage() : null;
 
         if (!cancelled && activeCollectionName) {
           setReport(
@@ -339,6 +437,7 @@ export default function ReportPage() {
               generated_at: new Date().toISOString(),
               version_label: 'Fallback Snapshot',
               snapshot_id: 'error-fallback',
+              intent,
               pieces: [],
             }).collection_report
           );
@@ -433,6 +532,14 @@ export default function ReportPage() {
       {!loading && !report && error ? <ErrorState message={error} /> : null}
       {!loading && !report && !error ? <EmptyState /> : null}
     </main>
+  );
+}
+
+export default function ReportPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <ReportPageContent />
+    </Suspense>
   );
 }
 

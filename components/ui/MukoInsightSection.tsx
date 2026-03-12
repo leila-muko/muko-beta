@@ -22,6 +22,8 @@ type NextMoveConceptProps = {
   onSelectAnchorPiece?: (piece: string) => void;
   onConfirm?: () => void;
   isLoading?: boolean;
+  onRoleSelect?: (role: 'hero' | 'directional' | 'core-evolution' | 'volume-driver') => void;
+  currentRole?: string | null;
 };
 
 type NextMoveSpecProps = {
@@ -60,10 +62,378 @@ export interface MukoInsightSectionProps {
   pageMode?: "concept" | "spec";
   /** Called when "Apply All & Continue →" is clicked in concept narrative mode */
   onContinue?: () => void;
+  /** Whether the continue action is available (concept mode) */
+  canContinue?: boolean;
 }
 
 /* ─── Fixed positioning row labels (concept narrative mode) ─────────────── */
 const POSITION_LABELS = ["Market Gap", "Reference Point", "Brand Permission"];
+
+/* ─── Decision Guidance Rail — concept mode ─────────────────────────────── */
+
+type CollectionRoleId = 'hero' | 'directional' | 'core-evolution' | 'volume-driver';
+
+const ROLE_CARDS: Array<{ id: CollectionRoleId; name: string; description: string }> = [
+  { id: 'hero', name: 'Hero', description: "The statement. Margin pressure acceptable if it's right." },
+  { id: 'directional', name: 'Directional', description: 'Pushes brand forward — needs to work commercially too.' },
+  { id: 'core-evolution', name: 'Core Evolution', description: 'A proven category, refreshed for the season.' },
+  { id: 'volume-driver', name: 'Volume Driver', description: 'This needs to sell. Margin and simplicity take priority.' },
+];
+
+const ANALYSIS_LABELS = ["Market Gap", "Competitive Position", "Brand Permission"];
+
+function signalToRole(signal: string): CollectionRoleId {
+  switch (signal) {
+    case 'Hero Expression': return 'hero';
+    case 'Increase Investment': return 'hero';
+    case 'Controlled Test': return 'directional';
+    case 'Maintain Exposure': return 'core-evolution';
+    case 'Reduce Exposure': return 'volume-driver';
+    default: return 'hero';
+  }
+}
+
+function roleToDisplayName(role: string): string {
+  switch (role) {
+    case 'hero': return 'Hero';
+    case 'directional': return 'Directional';
+    case 'core-evolution': return 'Core Evolution';
+    case 'volume-driver': return 'Volume Driver';
+    default: return role;
+  }
+}
+
+
+function ConceptDecisionRail({
+  headline,
+  paragraphs,
+  bullets,
+  guidance,
+  isLoading,
+  isStreaming,
+  streamingText,
+  recommendedKeyPieces,
+  selectedAnchorPiece,
+  onSelectAnchorPiece,
+  onRoleSelect,
+  currentRole,
+  onContinue,
+  canContinue,
+  nextMove,
+}: {
+  headline: string;
+  paragraphs: string[];
+  bullets: { label: string; items: string[] };
+  guidance: DecisionGuidance | null;
+  isLoading?: boolean;
+  isStreaming: boolean;
+  streamingText: string;
+  recommendedKeyPieces: string[];
+  selectedAnchorPiece?: string | null;
+  onSelectAnchorPiece?: (piece: string) => void;
+  onRoleSelect?: (role: CollectionRoleId) => void;
+  currentRole?: string | null;
+  onContinue?: () => void;
+  canContinue?: boolean;
+  nextMove?: NextMoveProps;
+}) {
+  const mukoRecommendedRole: CollectionRoleId | null = guidance ? signalToRole(guidance.commitment_signal) : null;
+  const [analysisExpanded, setAnalysisExpanded] = useState(false);
+  const [localSelectedRole, setLocalSelectedRole] = useState<CollectionRoleId | null>(
+    () => (currentRole as CollectionRoleId | null) ?? mukoRecommendedRole
+  );
+
+  useEffect(() => {
+    if (currentRole) {
+      setLocalSelectedRole(currentRole as CollectionRoleId);
+    } else if (mukoRecommendedRole && !localSelectedRole) {
+      setLocalSelectedRole(mukoRecommendedRole);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRole, mukoRecommendedRole]);
+
+  const handleRoleSelect = (roleId: CollectionRoleId) => {
+    setLocalSelectedRole(roleId);
+    onRoleSelect?.(roleId);
+  };
+
+  const anchorPiece = selectedAnchorPiece ?? recommendedKeyPieces[0] ?? null;
+  const executionLevers = guidance?.execution_levers ?? [];
+
+  function getFirstSentence(text: string): string {
+    const match = text.match(/^[^.!?]*[.!?]/);
+    return match ? match[0] : text;
+  }
+
+  const zoneLabel: React.CSSProperties = {
+    fontFamily: inter,
+    fontSize: 9,
+    fontWeight: 600,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    color: "rgba(67,67,43,0.38)",
+  };
+  const hairline: React.CSSProperties = {
+    height: 1,
+    background: "rgba(67,67,43,0.08)",
+    marginBottom: 16,
+  };
+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      {isStreaming && (
+        <style>{`@keyframes mukoCursorBlink{0%,100%{opacity:1}50%{opacity:0}}@keyframes mukoCardPulse{0%,100%{opacity:0.5}50%{opacity:0.8}}`}</style>
+      )}
+
+      {/* ── Zone 1 — Muko's Read ─────────────────────────────────────────── */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ ...zoneLabel, marginBottom: 10 }}>MUKO&apos;S READ</div>
+
+        {/* Role badge */}
+        {guidance && (
+          <div style={{ marginBottom: 12 }}>
+            <span style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "5px 11px",
+              borderRadius: 999,
+              background: "#A8B475",
+              color: "#fff",
+              fontFamily: inter,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase" as const,
+            }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "rgba(255,255,255,0.80)", flexShrink: 0 }} />
+              {guidance.commitment_signal}
+            </span>
+          </div>
+        )}
+
+        {/* Guidance statement */}
+        <div style={{ fontFamily: sohne, fontSize: 14, fontWeight: 500, lineHeight: 1.45, color: "#43432B" }}>
+          {isStreaming && streamingText ? (
+            <>
+              {streamingText}
+              <span style={{ display: "inline-block", width: 2, height: "1em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
+            </>
+          ) : isStreaming ? (
+            <span style={{ opacity: 0.35, animation: "mukoCardPulse 1.2s ease-in-out infinite" }}>{headline}</span>
+          ) : (
+            headline
+          )}
+        </div>
+      </div>
+
+      {/* ── Zone 2 — Insight Paragraph ───────────────────────────────────── */}
+      {!isStreaming && paragraphs.length > 0 && (
+        <div style={{ marginLeft: 24, marginBottom: 20, borderLeft: "2px solid #A8B475", paddingLeft: 20 }}>
+          {paragraphs[0] && (() => {
+            const text = paragraphs[0];
+            const firstSentence = getFirstSentence(text);
+            const rest = text.slice(firstSentence.length);
+            return (
+              <p style={{ margin: 0, fontFamily: inter, fontSize: 12.5, lineHeight: 1.65, color: "rgba(67,67,43,0.65)" }}>
+                <span style={{ fontWeight: 500, color: "#43432B" }}>{firstSentence}</span>
+                {rest}
+              </p>
+            );
+          })()}
+
+          {bullets.items.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                onClick={() => setAnalysisExpanded(e => !e)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: inter, fontSize: 11, fontWeight: 600, color: "#A8B475" }}
+              >
+                See full analysis
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ transform: analysisExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 180ms ease", flexShrink: 0 }}>
+                  <path d="M2 4.5L6 8L10 4.5" stroke="#A8B475" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              {analysisExpanded && (
+                <div style={{ marginTop: 10, borderTop: "1px solid rgba(67,67,43,0.08)", paddingTop: 8 }}>
+                  {bullets.items.slice(0, 3).map((item, i) => {
+                    const parsedLabel = item.match(/^(.+?)(?:[—–]|\s{2,})/)?.[1]?.trim();
+                    const label = parsedLabel ?? ANALYSIS_LABELS[i] ?? "";
+                    const value = item.replace(/^.+?(?:[—–]|\s{2,})\s*/, '');
+                    return (
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 8, padding: "7px 0" }}>
+                        <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "#B8876B", paddingTop: 1, lineHeight: 1.5 }}>
+                          {label}
+                        </div>
+                        <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.65)", lineHeight: 1.55 }}>
+                          {value}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Spec Next Move (spec mode only) ─────────────────────────────── */}
+      {nextMove?.mode === "spec" && nextMove.suggestions.length > 0 && (() => {
+        const suggestions = nextMove.suggestions
+          .slice()
+          .sort((a, b) => (a.kind === 'warning' ? -1 : 0) - (b.kind === 'warning' ? -1 : 0))
+          .slice(0, 3);
+        return (
+          <>
+            <div style={hairline} />
+            <SpecNarrativeNextMove
+              suggestions={suggestions}
+              appliedIds={nextMove.appliedIds}
+              onApply={nextMove.onApply}
+              onUndo={nextMove.onUndo}
+            />
+          </>
+        );
+      })()}
+
+      {/* ── Zone 3 — Your Decision ───────────────────────────────────────── */}
+      {(guidance || isLoading) && (
+        <>
+          <div style={hairline} />
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ ...zoneLabel, marginBottom: 12 }}>YOUR DECISION — PIECE ROLE</div>
+
+            {isLoading && !guidance ? (
+              <div style={{ height: 120, borderRadius: 10, background: "rgba(67,67,43,0.05)", animation: "mukoCardPulse 1.5s ease-in-out infinite" }} />
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {ROLE_CARDS.map(card => {
+                  const isSelected = localSelectedRole === card.id;
+                  const isMukoPick = mukoRecommendedRole === card.id;
+                  return (
+                    <div
+                      key={card.id}
+                      onClick={() => handleRoleSelect(card.id)}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: isSelected ? "1.5px solid #A8B475" : "1.5px solid rgba(67,67,43,0.10)",
+                        background: isSelected ? "#eef1e3" : "transparent",
+                        cursor: "pointer",
+                        transition: "border-color 140ms ease, background 140ms ease",
+                      }}
+                    >
+                      {isMukoPick && (
+                        <div style={{ fontFamily: inter, fontSize: 8, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: "#A8B475", marginBottom: 4 }}>
+                          MUKO&apos;S PICK
+                        </div>
+                      )}
+                      <div style={{ fontFamily: inter, fontSize: 12, fontWeight: 600, color: "#43432B", marginBottom: 4 }}>
+                        {card.name}
+                      </div>
+                      <div style={{ fontFamily: inter, fontSize: 11, lineHeight: 1.5, color: "rgba(67,67,43,0.55)" }}>
+                        {card.description}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Zone 4 — Suggested Pieces ────────────────────────────────────── */}
+      {(anchorPiece || executionLevers.length > 0) && (
+        <>
+          <div style={hairline} />
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ ...zoneLabel, marginBottom: 12 }}>SUGGESTED PIECES</div>
+
+            <div style={{ background: "#FAFAF8", border: "1px solid rgba(67,67,43,0.08)", borderRadius: 10, padding: "14px 16px" }}>
+              {anchorPiece && (
+                <>
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", marginBottom: 5 }}>
+                    ANCHOR PIECE
+                  </div>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 3 }}>
+                    <div style={{ fontFamily: inter, fontSize: 13, fontWeight: 600, color: "#43432B" }}>
+                      {toDisplayChipLabel(anchorPiece)}
+                    </div>
+                    {onSelectAnchorPiece && (
+                      <button
+                        onClick={() => onSelectAnchorPiece(anchorPiece)}
+                        style={{ flexShrink: 0, padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 600, fontFamily: inter, background: "rgba(168,180,117,0.12)", border: "1px solid rgba(168,180,117,0.40)", color: "#6B7A3E", cursor: "pointer", whiteSpace: "nowrap" as const }}
+                      >
+                        Apply
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.50)", marginBottom: executionLevers.length > 0 ? 14 : 0 }}>
+                    Sets the collection&apos;s visual signature
+                  </div>
+                </>
+              )}
+
+              {executionLevers.length > 0 && (
+                <>
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", marginBottom: 8 }}>
+                    EXECUTION LEVERS
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {executionLevers.map(lever => (
+                      <span key={lever} style={{ padding: "4px 9px", borderRadius: 20, fontFamily: inter, fontSize: 11, background: "rgba(125,150,172,0.10)", color: "#7D96AC", border: "1px solid rgba(125,150,172,0.20)" }}>
+                        {toDisplayChipLabel(lever)}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Zone 5 — CTA ─────────────────────────────────────────────────── */}
+      {onContinue && (
+        <>
+          <div style={hairline} />
+          <div>
+            <button
+              onClick={canContinue ? onContinue : undefined}
+              disabled={!canContinue}
+              style={{
+                width: "100%",
+                padding: 14,
+                borderRadius: 10,
+                fontSize: 12,
+                fontWeight: 700,
+                fontFamily: sohne,
+                letterSpacing: "0.02em",
+                color: canContinue ? "#7D96AC" : "rgba(67,67,43,0.30)",
+                background: canContinue ? "rgba(125,150,172,0.07)" : "rgba(255,255,255,0.46)",
+                border: canContinue ? "1.5px solid #7D96AC" : "1.5px solid rgba(67,67,43,0.10)",
+                cursor: canContinue ? "pointer" : "not-allowed",
+                opacity: canContinue ? 1 : 0.65,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                transition: "all 280ms ease",
+              }}
+            >
+              <span>Lock direction &amp; build specs</span>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{ opacity: canContinue ? 1 : 0.4 }}>
+                <path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export function MukoInsightSection({
   headline,
@@ -76,6 +446,7 @@ export function MukoInsightSection({
   streamingText = '',
   pageMode,
   onContinue,
+  canContinue,
 }: MukoInsightSectionProps) {
   const [dlExpanded, setDlExpanded] = useState(true);
   const [bulletsExpanded, setBulletsExpanded] = useState(true);
@@ -101,290 +472,28 @@ export function MukoInsightSection({
   }
 
   /* ══════════════════════════════════════════════════════════════════════
-     CONCEPT NARRATIVE MODE — flowing Situation → Meaning → Action layout
+     CONCEPT NARRATIVE MODE — Decision Guidance Rail
   ══════════════════════════════════════════════════════════════════════ */
   if (pageMode === "concept") {
+    const nmProps = nextMove.mode === "concept" ? nextMove : null;
     return (
-      <div style={{ marginBottom: 28 }}>
-
-        {/* Streaming keyframes */}
-        {isStreaming && (
-          <style>{`@keyframes mukoCursorBlink{0%,100%{opacity:1}50%{opacity:0}}@keyframes mukoCardPulse{0%,100%{opacity:0.5}50%{opacity:0.8}}`}</style>
-        )}
-
-        {/* ── INSIGHT — Headline anchors the panel ───────────────────── */}
-        <div
-          style={{
-            fontFamily: sohne,
-            fontWeight: 500,
-            fontSize: 20,
-            color: "#191919",
-            lineHeight: 1.3,
-            marginBottom: 14,
-            borderLeft: "3px solid #A8B475",
-            paddingLeft: 16,
-          }}
-        >
-          {isStreaming && streamingText ? (
-            <>
-              {streamingText}
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 2,
-                  height: "1em",
-                  background: "#A8B475",
-                  marginLeft: 2,
-                  verticalAlign: "text-bottom",
-                  animation: "mukoCursorBlink 0.9s step-start infinite",
-                }}
-              />
-            </>
-          ) : isStreaming ? (
-            <span style={{ opacity: 0.35, animation: "mukoCardPulse 1.2s ease-in-out infinite" }}>
-              {headline}
-            </span>
-          ) : (
-            headline
-          )}
-        </div>
-
-        {/* Body paragraphs — no wrapping card, no box-shadow */}
-        {!isStreaming && paragraphs.map((p, i) => (
-          <p
-            key={i}
-            style={{
-              margin: i < paragraphs.length - 1 ? "0 0 10px" : "0 0 0",
-              fontFamily: inter,
-              fontSize: 13.5,
-              color: "rgba(67,67,43,0.82)",
-              lineHeight: 1.65,
-            }}
-          >
-            {p}
-          </p>
-        ))}
-
-        {/* Construction Implications (kept as-is, concept mode rarely has these) */}
-        {constructionImplications && constructionImplications.length > 0 && (
-          <div style={{
-            marginTop: 16,
-            marginBottom: 0,
-            borderRadius: 10,
-            border: "1px solid rgba(67,67,43,0.09)",
-            background: "transparent",
-            padding: "16px 20px",
-          }}>
-            <button
-              onClick={() => setDlExpanded(e => !e)}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                width: "100%", background: "none", border: "none", cursor: "pointer",
-                padding: 0, marginBottom: dlExpanded ? 6 : 0,
-              }}
-            >
-              <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#A8A09A" }}>
-                construction implications ({constructionImplications.length})
-              </span>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, transform: dlExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 180ms ease", color: "rgba(67,67,43,0.35)" }}>
-                <path d="M2 4.5L6 8L10 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            {dlExpanded && (
-              <>
-                <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "rgba(67,67,43,0.40)", marginBottom: 12 }}>
-                  These signals influence complexity, cost, and production risk.
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  {constructionImplications.map((s, i) => {
-                    const isExpanded = expandedChips.has(s.chip);
-                    const hasComplexity = s.complexity_flag === "high";
-                    const firstSentence = getFirstSentence(s.detail);
-                    return (
-                      <div key={i}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                          <span style={{ padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, background: "rgba(125,150,172,0.08)", border: "1px solid rgba(125,150,172,0.55)", color: "#7D96AC", display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
-                            {s.chip}
-                          </span>
-                          <div style={{ flex: 1 }} />
-                          {hasComplexity && (
-                            <span style={{ fontFamily: inter, fontSize: 10, fontStyle: "italic", color: "#B8876B", flexShrink: 0 }}>↑ complexity</span>
-                          )}
-                          <button onClick={() => toggleChip(s.chip)} style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.38)", background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
-                            {isExpanded ? "[− less]" : "[+ more]"}
-                          </button>
-                        </div>
-                        <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.64)", lineHeight: 1.65 }}>
-                          {isExpanded ? s.detail : (
-                            <>{firstSentence}{s.cost_note && <span style={{ fontWeight: 600 }}>{" "}{getLastSentence(s.cost_note)}</span>}</>
-                          )}
-                        </div>
-                        {isExpanded && (
-                          <>
-                            {s.cost_note && <div style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.45)", marginTop: 8, lineHeight: 1.6 }}>$ {s.cost_note}</div>}
-                            {s.avoid && (
-                              <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(67,67,43,0.07)" }}>
-                                <div style={{ fontFamily: inter, fontSize: 11, color: "rgba(169,123,143,0.70)", lineHeight: 1.6 }}>
-                                  <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "#A97B8F", marginRight: 4 }}>AVOID</span>
-                                  {s.avoid}
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ── SECTION DIVIDER ─────────────────────────────────────────── */}
-        <div style={{ height: 1, background: "#E8E3D6", margin: "24px 0" }} />
-
-        {/* ── POSITIONING — two-column grid ───────────────────────────── */}
-        {bullets.items.length > 0 && (
-          <div style={{ marginBottom: 0 }}>
-            <button
-              onClick={() => setBulletsExpanded(e => !e)}
-              disabled={isStreaming}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                width: "100%",
-                background: "none",
-                border: "none",
-                cursor: isStreaming ? "default" : "pointer",
-                padding: 0,
-                marginBottom: bulletsExpanded ? 12 : 0,
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: inter,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase" as const,
-                  color: "#A8A09A",
-                }}
-              >
-                {bullets.label || "Positioning"}
-              </span>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 12 12"
-                fill="none"
-                style={{
-                  flexShrink: 0,
-                  transform: bulletsExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                  transition: "transform 180ms ease",
-                  color: "rgba(67,67,43,0.30)",
-                }}
-              >
-                <path d="M2 4.5L6 8L10 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-
-            {bulletsExpanded && !isStreaming && (
-              <div>
-                {bullets.items.slice(0, 3).map((item, i) => (
-                  <React.Fragment key={i}>
-                    {i > 0 && (
-                      <div style={{ height: 1, background: "#F0EDE8" }} />
-                    )}
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "108px 1fr",
-                        gap: 0,
-                      }}
-                    >
-                      <div
-                        style={{
-                          padding: "11px 12px 11px 0",
-                          fontFamily: inter,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "#A8B475",
-                          lineHeight: 1.4,
-                          letterSpacing: "0.01em",
-                        }}
-                      >
-                        {item.match(/^(.+?)(?:[—–]|\s{2,})/)?.[1]?.trim() ?? POSITION_LABELS[i] ?? bullets.label}
-                      </div>
-                      <div
-                        style={{
-                          padding: "11px 0",
-                          fontFamily: inter,
-                          fontSize: 13,
-                          color: "rgba(67,67,43,0.70)",
-                          lineHeight: 1.6,
-                        }}
-                      >
-                        {item.replace(/^.+?(?:[—–]|\s{2,})\s*/, '')}
-                      </div>
-                    </div>
-                  </React.Fragment>
-                ))}
-              </div>
-            )}
-
-            {isStreaming && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-                {[70, 55, 80].map((w, i) => (
-                  <div key={i} style={{ height: 11, borderRadius: 4, background: "rgba(67,67,43,0.07)", width: `${w}%`, animation: "mukoCardPulse 1.5s ease-in-out infinite" }} />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── DECISION GUIDANCE — concept mode ─────────────────────────── */}
-        {nextMove.mode === "concept" && (nextMove.guidance || nextMove.isLoading) && (() => {
-          if (nextMove.isLoading && !nextMove.guidance) {
-            return (
-              <div>
-                <div style={{ height: 1, background: "#E8E3D6", margin: "24px 0" }} />
-                <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 12 }}>Decision Guidance</div>
-                <div style={{ height: 156, borderRadius: 10, background: "rgba(67,67,43,0.05)", animation: "mukoCardPulse 1.5s ease-in-out infinite" }} />
-              </div>
-            );
-          }
-          return nextMove.guidance ? (
-            <DecisionGuidanceNarrative
-              guidance={nextMove.guidance}
-              recommendedKeyPieces={nextMove.recommendedKeyPieces ?? []}
-              selectedAnchorPiece={nextMove.selectedAnchorPiece}
-              isConfirmed={nextMove.isConfirmed}
-              confirmedAnchorPiece={nextMove.confirmedAnchorPiece}
-              onSelectAnchorPiece={nextMove.onSelectAnchorPiece}
-              onConfirm={nextMove.onConfirm}
-            />
-          ) : null;
-        })()}
-
-        {/* ── Next Move — Spec (narrative card style) ──────────────────── */}
-        {nextMove.mode === "spec" && nextMove.suggestions.length > 0 && (() => {
-          const suggestions = nextMove.suggestions
-            .slice()
-            .sort((a, b) => (a.kind === 'warning' ? -1 : 0) - (b.kind === 'warning' ? -1 : 0))
-            .slice(0, 3);
-          return (
-            <SpecNarrativeNextMove
-              suggestions={suggestions}
-              appliedIds={nextMove.appliedIds}
-              onApply={nextMove.onApply}
-              onUndo={nextMove.onUndo}
-            />
-          );
-        })()}
-
-      </div>
+      <ConceptDecisionRail
+        headline={headline}
+        paragraphs={paragraphs}
+        bullets={bullets}
+        guidance={nmProps?.guidance ?? null}
+        isLoading={nmProps?.isLoading}
+        isStreaming={isStreaming}
+        streamingText={streamingText}
+        recommendedKeyPieces={nmProps?.recommendedKeyPieces ?? []}
+        selectedAnchorPiece={nmProps?.selectedAnchorPiece}
+        onSelectAnchorPiece={nmProps?.onSelectAnchorPiece}
+        onRoleSelect={nmProps?.onRoleSelect}
+        currentRole={nmProps?.currentRole}
+        onContinue={onContinue}
+        canContinue={canContinue}
+        nextMove={nextMove}
+      />
     );
   }
 

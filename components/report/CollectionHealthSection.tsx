@@ -63,6 +63,20 @@ function HealthCard({
       >
         {detail.interpretation}
       </p>
+
+      {detail.basis ? (
+        <p
+          style={{
+            margin: '10px 0 0',
+            fontFamily: fonts.body,
+            fontSize: 12,
+            lineHeight: 1.6,
+            color: reportPalette.faint,
+          }}
+        >
+          {detail.basis}
+        </p>
+      ) : null}
     </div>
   );
 }

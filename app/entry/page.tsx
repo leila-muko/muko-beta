@@ -14,6 +14,7 @@ const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
 
 export default function EntryScreen() {
   const router = useRouter();
+  const store = useSessionStore();
 
   const allSeasons = useMemo(
     () => [
@@ -23,15 +24,9 @@ export default function EntryScreen() {
     []
   );
 
-  const [collectionName, setCollectionName] = useState(() => {
-    try {
-      const saved = window.localStorage.getItem('muko_collectionName');
-      if (saved) return saved;
-    } catch {}
-    return useSessionStore.getState().collectionName || 'Spring Requiem';
-  });
+  const [collectionName, setCollectionName] = useState(() => store.collectionName || 'Spring Requiem');
   const [selectedSeason, setSelectedSeason] = useState<string | null>(() => {
-    const storeSeason = useSessionStore.getState().season;
+    const storeSeason = store.season;
     if (storeSeason) {
       const match = allSeasons.find((s) => s.label === storeSeason);
       if (match) return match.id;
@@ -47,11 +42,6 @@ export default function EntryScreen() {
 
     if (collectionName.trim()) names.add(collectionName.trim());
 
-    try {
-      const saved = window.localStorage.getItem('muko_collectionName');
-      if (saved?.trim()) names.add(saved.trim());
-    } catch {}
-
     return Array.from(names).map((name) => ({ id: name, name }));
   }, [collectionName]);
 
@@ -64,7 +54,28 @@ export default function EntryScreen() {
     setCollectionName: setStoreCollectionName,
     setCurrentStep,
     setActiveCollection,
-  } = useSessionStore();
+  } = store;
+
+  useEffect(() => {
+    try {
+      const savedName = window.localStorage.getItem('muko_collectionName')?.trim();
+      const savedSeason = window.localStorage.getItem('muko_seasonLabel')?.trim();
+
+      if (savedName) {
+        setCollectionName(savedName);
+        setStoreCollectionName(savedName);
+        setActiveCollection(savedName);
+      }
+
+      if (savedSeason) {
+        const match = allSeasons.find((season) => season.label === savedSeason);
+        if (match) {
+          setSelectedSeason(match.id);
+          setSeason(savedSeason);
+        }
+      }
+    } catch {}
+  }, [allSeasons, setActiveCollection, setSeason, setStoreCollectionName]);
 
   const handleOpenCollection = (name: string) => {
     setCollectionName(name);

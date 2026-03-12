@@ -19,6 +19,7 @@
 //   persist                        →  Supabase `analyses` row
 
 import { createClient } from '@/lib/supabase/server';
+import type { IntentCalibration } from '@/lib/synthesizer/blackboard';
 import { generateReportNarrative } from '@/lib/synthesizer/reportNarrative';
 import type { ReportBlackboard } from '@/lib/synthesizer/reportNarrative';
 import { resolveAestheticContext } from '@/lib/synthesizer/assemble';
@@ -264,6 +265,7 @@ async function persistAnalysis(
 ): Promise<string | null> {
   try {
     const supabase = await createClient();
+    const intent = bb.session.intent as IntentCalibration | undefined;
 
     const row = {
       // brand
@@ -272,6 +274,7 @@ async function persistAnalysis(
       // session context
       season:              bb.input.season,
       collection_name:     bb.input.collection_name,
+      collection_role:     bb.session.collectionRole ?? null,
 
       // product specs
       category:            bb.input.category,
@@ -306,6 +309,14 @@ async function persistAnalysis(
       // versioning
       data_version:   '1.0.0',
       agent_versions: result.agent_versions,
+
+      // intent calibration
+      intent_goals:            intent?.primary_goals ?? [],
+      intent_tradeoff:         intent?.tradeoff ?? null,
+      intent_tension_trend:    intent?.tension_sliders?.trend_forward ?? null,
+      intent_tension_creative: intent?.tension_sliders?.creative_expression ?? null,
+      intent_tension_elevated: intent?.tension_sliders?.elevated_design ?? null,
+      intent_tension_novelty:  intent?.tension_sliders?.novelty ?? null,
     };
 
     const { data, error } = await supabase

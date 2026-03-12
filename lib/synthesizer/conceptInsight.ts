@@ -9,6 +9,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { InsightData, InsightMode } from '@/lib/types/insight';
+import type { CommitmentSignal, DecisionGuidance } from '@/lib/types/insight';
 import type { AestheticContext, ResolvedRedirects, IntentCalibration } from '@/lib/synthesizer/blackboard';
 import { buildTemplateDecisionGuidance, generateTemplateNarrative } from '@/lib/agents/synthesizer';
 import type { NarrativeAestheticContext } from '@/lib/agents/synthesizer';
@@ -55,11 +56,39 @@ export interface ConceptBlackboard {
   intent?: IntentCalibration;
   /** Key pieces identified for this aesthetic direction */
   key_pieces?: Array<{ item: string; type?: string; signal?: string }>;
+  /** Collection context for collection-aware Decision Guidance */
+  collection_context?: {
+    brand: {
+      name?: string | null;
+      keywords?: string[];
+      customer_profile?: string | null;
+      price_tier?: string | null;
+      target_margin?: number | null;
+      tension_context?: string | null;
+    };
+    existing_pieces: Array<{
+      piece_name: string;
+      score: number;
+      dimensions?: Record<string, number> | null;
+      collection_role?: string | null;
+    }>;
+    piece_count: number;
+  };
 }
 
 export interface SynthesizerResult {
   data: InsightData;
   meta: { method: 'llm' | 'template'; latency_ms: number };
+}
+
+export interface CollectionGuidanceSummary {
+  stage: 'directional' | 'comparative' | 'diagnostic';
+  piece_count: number;
+  weakest_dimension: 'identity' | 'resonance' | 'execution' | null;
+  overrepresented_role: string | null;
+  missing_role: string | null;
+  urgent_gap: string;
+  anchor_recommendation: string;
 }
 
 // ─────────────────────────────────────────────
@@ -96,6 +125,166 @@ function sanitizePayload<T extends Record<string, unknown>>(obj: T): Omit<T, typ
     delete result[field];
   }
   return result as Omit<T, typeof INTERNAL_FIELDS_TO_STRIP[number]>;
+}
+
+function titleCaseToken(value: string | null | undefined): string {
+  return (value ?? '')
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+    .trim();
+}
+
+function normalizeRole(value: string | null | undefined): 'hero' | 'core' | 'support' {
+  const token = (value ?? '').toLowerCase().trim();
+  if (token === 'hero' || token === 'core' || token === 'support') return token;
+  return 'core';
+}
+
+function inferWeakestDimension(
+  pieces: NonNullable<ConceptBlackboard['collection_context']>['existing_pieces'],
+): 'identity' | 'resonance' | 'execution' | null {
+  if (pieces.length === 0) return null;
+
+  const totals = { identity: 0, resonance: 0, execution: 0 };
+  const counts = { identity: 0, resonance: 0, execution: 0 };
+
+  for (const piece of pieces) {
+    const dimensions = piece.dimensions ?? {};
+    for (const key of ['identity', 'resonance', 'execution'] as const) {
+      const value = dimensions[key];
+      if (typeof value === 'number') {
+        totals[key] += value;
+        counts[key] += 1;
+      }
+    }
+  }
+
+  const averages = (['identity', 'resonance', 'execution'] as const)
+    .map((key) => ({
+      key,
+      average: counts[key] > 0 ? totals[key] / counts[key] : Infinity,
+    }))
+    .filter((entry) => Number.isFinite(entry.average))
+    .sort((a, b) => a.average - b.average);
+
+  return averages[0]?.key ?? null;
+}
+
+export function summarizeCollectionGuidanceContext(bb: ConceptBlackboard): CollectionGuidanceSummary {
+  const pieces = bb.collection_context?.existing_pieces ?? [];
+  const pieceCount = bb.collection_context?.piece_count ?? pieces.length;
+  const roles = pieces.map((piece) => normalizeRole(piece.collection_role));
+  const roleCounts = roles.reduce<Record<string, number>>((acc, role) => {
+    acc[role] = (acc[role] ?? 0) + 1;
+    return acc;
+  }, {});
+  const weakestDimension = inferWeakestDimension(pieces);
+  const overrepresentedRole = Object.entries(roleCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const missingRole = (['hero', 'core', 'support'] as const).find((role) => !roleCounts[role]) ?? null;
+  const anchor = bb.key_pieces?.[0]?.item ?? `${titleCaseToken(bb.aesthetic_matched_id)} anchor piece`;
+  const anchorType = bb.key_pieces?.[0]?.type ? titleCaseToken(bb.key_pieces[0].type) : 'hero piece';
+
+  if (pieceCount === 0) {
+    return {
+      stage: 'directional',
+      piece_count: 0,
+      weakest_dimension: null,
+      overrepresented_role: null,
+      missing_role: 'hero',
+      urgent_gap: `No anchor is set yet; start with a ${anchorType.toLowerCase()} that can define the line.`,
+      anchor_recommendation: `Start with ${anchor} as the collection anchor, then build a support layer around it.`,
+    };
+  }
+
+  if (pieceCount <= 2) {
+    const roleGap = missingRole ?? (roleCounts.hero ? 'support' : 'hero');
+    return {
+      stage: 'comparative',
+      piece_count: pieceCount,
+      weakest_dimension: weakestDimension,
+      overrepresented_role: overrepresentedRole,
+      missing_role: roleGap,
+      urgent_gap:
+        roleGap === 'hero'
+          ? 'No hero piece is carrying the assortment yet.'
+          : roleGap === 'support'
+            ? 'The support layer is too thin to make the lead idea read as a range.'
+            : 'A stronger core layer is missing between the hero idea and the support pieces.',
+      anchor_recommendation: `Close the ${roleGap} gap next so ${anchor} does not sit in isolation.`,
+    };
+  }
+
+  const urgentGap =
+    weakestDimension === 'execution'
+      ? 'Complexity is concentrating into too few pieces.'
+      : weakestDimension === 'resonance'
+        ? 'The collection needs a clearer commercial role mix.'
+        : weakestDimension === 'identity'
+          ? 'The line is losing point of view across the current pieces.'
+          : 'The collection needs a sharper hierarchy.';
+
+  return {
+    stage: 'diagnostic',
+    piece_count: pieceCount,
+    weakest_dimension: weakestDimension,
+    overrepresented_role: overrepresentedRole,
+    missing_role: missingRole,
+    urgent_gap: urgentGap,
+    anchor_recommendation: `Prioritize the ${weakestDimension ?? 'role-balance'} issue before adding more breadth around ${anchor}.`,
+  };
+}
+
+function buildCollectionAwareFallbackDecisionGuidance(
+  blackboard: ConceptBlackboard,
+  summary: CollectionGuidanceSummary,
+  fallbackLevers: string[],
+): DecisionGuidance {
+  const aestheticName = blackboard.aesthetic_matched_id
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+  const topKeyPiece = blackboard.key_pieces?.[0]?.item ?? `${aestheticName} anchor`;
+  const roleGapLabel = titleCaseToken(summary.missing_role);
+
+  let commitmentSignal: CommitmentSignal = 'Controlled Test';
+  let recommendedDirection = `Introduce ${aestheticName} through a controlled assortment test.`;
+
+  if (summary.stage === 'directional') {
+    commitmentSignal =
+      blackboard.identity_score >= 78 && blackboard.resonance_score >= 68
+        ? 'Hero Expression'
+        : 'Controlled Test';
+    recommendedDirection = `Start the collection with ${topKeyPiece} as the hero anchor, then build a ${blackboard.intent?.piece_role === 'volume-driver' ? 'commercially legible' : 'disciplined'} support layer around it.`;
+  } else if (summary.stage === 'comparative') {
+    commitmentSignal =
+      blackboard.identity_score >= 74 && blackboard.resonance_score >= 66
+        ? 'Maintain Exposure'
+        : 'Controlled Test';
+    recommendedDirection =
+      summary.missing_role === 'hero'
+        ? `Add a hero anchor next so the current pieces stop reading like fragments of ${aestheticName} without a lead statement.`
+        : summary.missing_role === 'support'
+          ? `Add a support-driven companion piece next so ${topKeyPiece} reads as a range instead of a standalone gesture.`
+          : `Add a clearer core piece next to bridge ${topKeyPiece} into a repeatable ${aestheticName} assortment.`;
+  } else {
+    commitmentSignal =
+      blackboard.identity_score >= 80 && blackboard.resonance_score >= 70
+        ? 'Maintain Exposure'
+        : 'Controlled Test';
+    recommendedDirection =
+      summary.weakest_dimension === 'execution'
+        ? `Hold the line on newness and simplify the most demanding ${summary.overrepresented_role ?? 'hero'} piece before expanding ${aestheticName} further.`
+        : summary.weakest_dimension === 'resonance'
+          ? `Add the missing ${roleGapLabel.toLowerCase() || 'commercial'} role now so ${aestheticName} lands as a collection, not only a point of view.`
+          : `Edit the overbuilt ${summary.overrepresented_role ?? 'core'} layer and add one clearer counter-role so ${aestheticName} keeps a sharper point of view.`;
+  }
+
+  return {
+    recommended_direction: recommendedDirection,
+    commitment_signal: commitmentSignal,
+    execution_levers: fallbackLevers.slice(0, 4),
+  };
 }
 
 // ─────────────────────────────────────────────
@@ -534,10 +723,29 @@ Use this normalized mapping internally:
 - execution_risk = complexity, tension, and build-risk signals already present in concept analysis
 - available_aesthetic_chips = the provided chip list for the selected aesthetic
 - key_pieces = the key pieces identified for this aesthetic direction
+- collection_context = brand DNA and existing collection pieces (when provided)
+
+The input may also include collection_context.summary with:
+- stage = directional | comparative | diagnostic
+- weakest_dimension
+- overrepresented_role
+- missing_role
+- urgent_gap
+- anchor_recommendation
+
+Use this summary to sharpen the recommendation. It exists to prevent generic outputs and to force the correct progression stage.
 
 You must infer the recommendation from those mapped fields.
 Execution levers must come only from available_aesthetic_chips.
 When relevant key pieces are available, use one or two of them to translate the concept into a concrete product anchor.
+
+COLLECTION CONTEXT GUIDANCE (use when collection_context is present)
+When collection_context.piece_count = 0: recommend the strongest anchor piece and what role or category to build around it. The recommended_direction should orient the team on where to start.
+When collection_context.piece_count = 1 or 2: identify the role and category that is missing relative to the existing pieces. Name the gap directly in recommended_direction (e.g., "volume-driver top is missing", "no hero piece to anchor the range").
+When collection_context.piece_count >= 3: diagnose collection health — which score dimension (identity, resonance, execution) is dragging the average, what role is overrepresented, and what is the single most urgent gap. recommended_direction should surface that one priority, not a list.
+Use brand.keywords and brand.customer_profile (from collection_context.brand) to ensure the guidance is brand-specific, not generic.
+Do not mention collection_context, piece_count, or score field names in any output field.
+If collection_context.summary is present, recommended_direction must explicitly resolve that urgent gap rather than restating the aesthetic generally.
 
 BRAND REASONING LAYER
 
@@ -751,6 +959,9 @@ export const CONCEPT_SYSTEM_PROMPT = CONCEPT_STUDIO_PROMPT_V6_2;
 // ─────────────────────────────────────────────
 
 export function buildConceptPrompt(bb: ConceptBlackboard): string {
+  const collectionSummary = bb.collection_context
+    ? summarizeCollectionGuidanceContext(bb)
+    : undefined;
   const raw = {
     brand: {
       name: bb.brand_name ?? null,
@@ -784,6 +995,12 @@ export function buildConceptPrompt(bb: ConceptBlackboard): string {
       resonance: bb.resonance_score,
     },
     intent: bb.intent ?? undefined,
+    collection_context: bb.collection_context
+      ? {
+          ...bb.collection_context,
+          summary: collectionSummary,
+        }
+      : undefined,
   };
   return JSON.stringify(sanitizePayload(raw as Record<string, unknown>));
 }
@@ -812,9 +1029,22 @@ export function parseConceptV5Output(raw: string): ConceptV5Output | null {
   try {
     const parsed = JSON.parse(stripFences(raw)) as ConceptV5Output;
     if (!parsed.insight_title || !parsed.insight_description) return null;
-    if (!Array.isArray(parsed.positioning) || parsed.positioning.length === 0) return null;
+    if (!Array.isArray(parsed.positioning) || parsed.positioning.length !== 3) return null;
+    if (
+      !parsed.positioning[0]?.startsWith('Market Gap — ') ||
+      !parsed.positioning[1]?.startsWith('Competitive Position — ') ||
+      !parsed.positioning[2]?.startsWith('Brand Permission — ')
+    ) return null;
     if (!parsed.decision_guidance?.recommended_direction || !parsed.decision_guidance?.commitment_signal) return null;
-    if (!Array.isArray(parsed.decision_guidance.execution_levers)) return null;
+    if (
+      !['Increase Investment', 'Hero Expression', 'Controlled Test', 'Maintain Exposure', 'Reduce Exposure']
+        .includes(parsed.decision_guidance.commitment_signal)
+    ) return null;
+    if (
+      !Array.isArray(parsed.decision_guidance.execution_levers) ||
+      parsed.decision_guidance.execution_levers.length < 2 ||
+      parsed.decision_guidance.execution_levers.length > 4
+    ) return null;
     return parsed;
   } catch {
     return null;
@@ -880,6 +1110,11 @@ export function buildFallbackDecisionGuidance(
     .join(' ');
 
   const fallbackLevers = getAestheticChipLabels(blackboard.aesthetic_matched_id).slice(0, 3);
+  const summary = summarizeCollectionGuidanceContext(blackboard);
+
+  if (blackboard.collection_context) {
+    return buildCollectionAwareFallbackDecisionGuidance(blackboard, summary, fallbackLevers);
+  }
 
   return buildTemplateDecisionGuidance({
     aestheticName,

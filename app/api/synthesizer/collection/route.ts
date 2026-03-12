@@ -59,6 +59,7 @@ function parseCollectionReportJSON(raw: string) {
           decision_points: string[];
         };
         overall_read: string;
+        overall_read_detail?: string;
       };
     };
   } catch {
@@ -80,13 +81,14 @@ function parseCollectionReportJSON(raw: string) {
             recommendations: string[];
           };
           key_risks: Array<{ title: string; detail: string }>;
-          next_steps: {
-            immediate_actions: string[];
-            decision_points: string[];
-          };
-          overall_read: string;
+        next_steps: {
+          immediate_actions: string[];
+          decision_points: string[];
         };
+        overall_read: string;
+        overall_read_detail?: string;
       };
+    };
     }
 
     throw new Error('Unable to parse collection report JSON');
@@ -101,6 +103,12 @@ async function attemptSynthesizerUpgrade(payload: CollectionReportInput): Promis
   try {
     const { callClaude } = await import('@/lib/claude/client');
     const fallback = buildCollectionReport(payload);
+    const brandText = payload.brand
+      ? JSON.stringify(payload.brand)
+      : 'none';
+    const intentText = payload.intent
+      ? JSON.stringify(payload.intent)
+      : 'none';
     const piecesText = payload.pieces
       .map((piece) => {
         return [
@@ -142,13 +150,17 @@ async function attemptSynthesizerUpgrade(payload: CollectionReportInput): Promis
       "immediate_actions": ["string", "string", "string"],
       "decision_points": ["string", "string", "string"]
     },
-    "overall_read": "string"
+    "overall_read": "string",
+    "overall_read_detail": "string"
   }
 }
 
 Rules:
 - Use the deterministic report only as structured grounding, not as final wording.
 - Keep copy specific to the collection and avoid generic phrasing.
+- Treat brand DNA and collection intent as first-class inputs. The thesis should sound like a creative director's line-review readout, not a recap.
+- Recommendations must bridge observation to prescription. Name the piece role, category, or material-direction move when the collection context supports it.
+- Collection-health logic is intent-relative. A statement-led collection can tolerate more hero concentration and more silhouette spread than a commercial brief.
 - "working", "watch", "recommendations", "immediate_actions", and "decision_points" must each contain exactly 3 items.
 - "key_risks" must contain 2 to 4 items.
 - Do not mention fallback logic, JSON, AI, or models inside the content.
@@ -156,6 +168,8 @@ Rules:
 
 Collection: ${payload.collection_name}
 Season: ${payload.season}
+Brand DNA: ${brandText}
+Collection intent: ${intentText}
 Pieces:
 ${piecesText}
 
@@ -193,6 +207,7 @@ ${JSON.stringify(fallback.collection_report)}`;
         key_risks: parsed.collection_report.key_risks,
         next_steps: parsed.collection_report.next_steps,
         overall_read: parsed.collection_report.overall_read,
+        overall_read_detail: parsed.collection_report.overall_read_detail ?? fallback.collection_report.overall_read_detail,
         meta: {
           ...fallback.collection_report.meta,
           source: 'synthesizer',

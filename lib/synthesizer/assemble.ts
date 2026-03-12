@@ -203,6 +203,8 @@ export interface ConceptBlackboardInput {
   intent?: IntentCalibration;
   /** Key pieces identified for the selected concept direction */
   keyPieces?: Array<{ item: string; type?: string; signal?: string }>;
+  /** Collection context for collection-aware Decision Guidance */
+  collection_context?: ConceptBlackboard['collection_context'];
 }
 
 /** Returns null when aestheticSlug is missing — callers must guard. */
@@ -233,6 +235,7 @@ export function buildConceptBlackboard(
     },
     intent: input.intent,
     key_pieces: input.keyPieces,
+    collection_context: input.collection_context,
   };
 }
 

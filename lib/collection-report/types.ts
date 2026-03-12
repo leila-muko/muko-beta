@@ -12,6 +12,7 @@ export interface CollectionHealthDetail {
   score: number;
   label: string;
   interpretation: string;
+  basis?: string;
 }
 
 export interface CollectionRisk {
@@ -78,10 +79,32 @@ export interface CollectionReportPayload {
     decision_points: string[];
   };
   overall_read: string;
+  overall_read_detail?: string;
   meta: {
     source: CollectionReportSource;
     snapshot_id?: string | null;
   };
+}
+
+export interface CollectionReportBrandInput {
+  brand_name?: string | null;
+  keywords?: string[] | null;
+  customer_profile?: string | null;
+  price_tier?: string | null;
+  tension_context?: string | null;
+  reference_brands?: string[] | null;
+}
+
+export interface CollectionReportIntentInput {
+  primary_goals?: string[] | null;
+  tradeoff?: string | null;
+  collection_role?: string | null;
+  tension_sliders?: {
+    trend_forward?: number | null;
+    creative_expression?: number | null;
+    elevated_design?: number | null;
+    novelty?: number | null;
+  } | null;
 }
 
 export interface CollectionReportResponse {
@@ -114,4 +137,6 @@ export interface CollectionReportInput {
   version_label?: string | null;
   snapshot_id?: string | null;
   pieces: CollectionReportInputPiece[];
+  brand?: CollectionReportBrandInput | null;
+  intent?: CollectionReportIntentInput | null;
 }

@@ -184,9 +184,9 @@ export default function IntentCalibrationPage() {
     return "center";
   });
 
-  const [touched, setTouched] = useState({ success: false, tradeoff: false, role: false });
+  const [touched, setTouched] = useState({ success: false, tradeoff: false });
 
-  const canContinue = success.length > 0 && !!tradeoff && !!collectionRole;
+  const canContinue = success.length > 0 && !!tradeoff;
 
   const toggleSuccess = (id: SuccessId) => {
     setTouched((t) => ({ ...t, success: true }));
@@ -715,96 +715,6 @@ export default function IntentCalibrationPage() {
                 )}
               </div>
 
-              {/* Section 2.5 — Collection Role */}
-              <div>
-                <div
-                  style={{
-                    fontFamily: sohne,
-                    fontSize: 15,
-                    fontWeight: 500,
-                    color: OLIVE,
-                    marginBottom: 6,
-                  }}
-                >
-                  What role is this piece playing in your collection?
-                </div>
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 12,
-                    fontStyle: "italic",
-                    color: "rgba(67,67,43,0.44)",
-                    marginBottom: 14,
-                  }}
-                >
-                  Pick one. This tells Muko how to weight tradeoffs.
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {(
-                    [
-                      { id: "hero" as CollectionRoleId, title: "Hero / Image piece", desc: "The statement. Margin pressure is acceptable if it's right." },
-                      { id: "directional" as CollectionRoleId, title: "Directional but scalable", desc: "Pushes the brand forward — needs to work commercially too." },
-                      { id: "core-evolution" as CollectionRoleId, title: "Core evolution", desc: "A proven category, refreshed for the season." },
-                      { id: "volume-driver" as CollectionRoleId, title: "Volume driver", desc: "This needs to sell. Margin and simplicity take priority." },
-                    ]
-                  ).map((opt) => {
-                    const active = collectionRole === opt.id;
-                    return (
-                      <IntentCard
-                        key={opt.id}
-                        active={active}
-                        disabled={false}
-                        onClick={() => {
-                          setTouched((t) => ({ ...t, role: true }));
-                          setCollectionRole(opt.id);
-                        }}
-                        chartreuse={CHARTREUSE}
-                        steel={STEEL}
-                      >
-                        <div>
-                          <div
-                            style={{
-                              fontFamily: inter,
-                              fontSize: 13,
-                              fontWeight: 500,
-                              color: active ? OLIVE : "rgba(67,67,43,0.78)",
-                            }}
-                          >
-                            {opt.title}
-                          </div>
-                          <div
-                            style={{
-                              marginTop: 4,
-                              fontFamily: inter,
-                              fontSize: 12,
-                              color: "rgba(67,67,43,0.52)",
-                              lineHeight: 1.5,
-                            }}
-                          >
-                            {opt.desc}
-                          </div>
-                        </div>
-                      </IntentCard>
-                    );
-                  })}
-                </div>
-
-                {touched.role && !collectionRole && (
-                  <div
-                    style={{
-                      marginTop: 10,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: BRAND.rose,
-                      fontFamily: inter,
-                    }}
-                  >
-                    Choose a collection role to continue.
-                  </div>
-                )}
-              </div>
-
               {/* Section 3 — Tension sliders */}
               <div>
                 <div
@@ -895,15 +805,6 @@ export default function IntentCalibrationPage() {
                   label="TRADEOFF"
                   value={tradeoffText}
                   filled={!!tradeoff}
-                  chartreuse={CHARTREUSE}
-                />
-                <IntentPulseRow
-                  label="PIECE ROLE"
-                  value={collectionRole
-                    ? { hero: "Hero / Image piece", directional: "Directional but scalable", "core-evolution": "Core evolution", "volume-driver": "Volume driver" }[collectionRole]
-                    : "—"
-                  }
-                  filled={!!collectionRole}
                   chartreuse={CHARTREUSE}
                   isLast
                 />

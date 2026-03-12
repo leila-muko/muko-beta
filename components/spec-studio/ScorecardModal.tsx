@@ -146,39 +146,60 @@ export function ScorecardModal({
         throw new Error("No authenticated user found for collection save.");
       }
 
-      const { data, error } = await supabase
+      const trimmedPieceName = pieceName.trim();
+      const baseInsert = {
+        user_id: userId,
+        collection_name: effectiveCollection,
+        season: season || "SS27",
+        category: category || null,
+        target_msrp: storeTargetMsrp ?? null,
+        aesthetic_input: aestheticInput || null,
+        material_id: materialId || null,
+        silhouette: silhouette || null,
+        construction_tier: constructionTier ?? null,
+        construction_tier_override: constructionTierOverride ?? false,
+        score: mukoScore,
+        dimensions: {
+          identity: identityScore,
+          resonance: resonanceScore,
+          execution: executionScore,
+        },
+        gates_passed: {
+          cost: marginGatePassed,
+        },
+        collection_role: collectionRole || null,
+        narrative: scorecardData?.insight ?? fallbackText ?? mukoInsight ?? '',
+        agent_versions: {
+          scorecard_modal: "v1",
+          ...(trimmedPieceName ? { saved_piece_name: trimmedPieceName } : {}),
+          ...(collectionRole ? { collection_role: collectionRole } : {}),
+        },
+        parent_analysis_id: null,
+      };
+
+      let insertResult = await supabase
         .from("analyses")
         .insert({
-          user_id: userId,
-          collection_name: effectiveCollection,
-          season: season || "SS27",
-          category: category || null,
-          target_msrp: storeTargetMsrp ?? null,
-          aesthetic_input: aestheticInput || null,
-          material_id: materialId || null,
-          silhouette: silhouette || null,
-          construction_tier: constructionTier ?? null,
-          construction_tier_override: constructionTierOverride ?? false,
-          score: mukoScore,
-          dimensions: {
-            identity: identityScore,
-            resonance: resonanceScore,
-            execution: executionScore,
-          },
-          gates_passed: {
-            cost: marginGatePassed,
-          },
-          narrative: scorecardData?.insight ?? fallbackText ?? mukoInsight ?? '',
-          agent_versions: {
-            scorecard_modal: "v1",
-            ...(pieceName.trim() ? { saved_piece_name: pieceName.trim() } : {}),
-            ...(collectionRole ? { collection_role: collectionRole } : {}),
-          },
-          parent_analysis_id: null,
+          ...baseInsert,
+          piece_name: trimmedPieceName || null,
         })
         .select("id")
         .single();
-      if (error) throw error;
+
+      const missingPieceNameColumn =
+        insertResult.error?.code === "PGRST204" &&
+        insertResult.error.message?.includes("'piece_name' column");
+
+      if (missingPieceNameColumn) {
+        insertResult = await supabase
+          .from("analyses")
+          .insert(baseInsert)
+          .select("id")
+          .single();
+      }
+
+      if (insertResult.error) throw insertResult.error;
+      const { data } = insertResult;
       if (data?.id) setSavedAnalysisId(data.id as string);
     } catch (error) {
       if (error instanceof Error) {

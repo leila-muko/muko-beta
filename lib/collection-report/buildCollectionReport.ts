@@ -4,8 +4,10 @@ import type {
   CollectionHealthDetail,
   CollectionPieceRole,
   CollectionPieceStatus,
+  CollectionReportBrandInput,
   CollectionReportInput,
   CollectionReportInputPiece,
+  CollectionReportIntentInput,
   CollectionReportPayload,
   CollectionReportResponse,
   CollectionRisk,
@@ -82,13 +84,137 @@ function toDistribution(counts: Record<string, number>, total: number): Collecti
     }));
 }
 
-function describeRoleBalance(score: number, roles: Record<CollectionPieceRole, number>) {
+interface StrategyProfile {
+  roleTargets: Record<CollectionPieceRole, number>;
+  complexityCeiling: number;
+  silhouetteTarget: number;
+  redundancyTolerance: number;
+  identityBias: number;
+  resonanceBias: number;
+  executionBias: number;
+  framing: string;
+}
+
+function getPrimaryGoal(intent?: CollectionReportIntentInput | null) {
+  return intent?.primary_goals?.[0]?.trim() || '';
+}
+
+function getStrategyProfile(intent?: CollectionReportIntentInput | null): StrategyProfile {
+  const creative = intent?.tension_sliders?.creative_expression ?? 50;
+  const novelty = intent?.tension_sliders?.novelty ?? 50;
+  const trend = intent?.tension_sliders?.trend_forward ?? 50;
+  const role = normalizeToken(intent?.collection_role);
+  const tradeoff = normalizeToken(intent?.tradeoff);
+  const primaryGoal = normalizeToken(getPrimaryGoal(intent));
+
+  const profile: StrategyProfile = {
+    roleTargets: { hero: 0.2, core: 0.5, support: 0.3 },
+    complexityCeiling: 58,
+    silhouetteTarget: 60,
+    redundancyTolerance: 42,
+    identityBias: 0.34,
+    resonanceBias: 0.33,
+    executionBias: 0.33,
+    framing: 'balanced collection health',
+  };
+
+  if (
+    role === 'hero' ||
+    primaryGoal.includes('brand') ||
+    primaryGoal.includes('statement') ||
+    creative >= 66 ||
+    novelty >= 64
+  ) {
+    profile.roleTargets = { hero: 0.34, core: 0.38, support: 0.28 };
+    profile.complexityCeiling = 66;
+    profile.silhouetteTarget = 72;
+    profile.redundancyTolerance = 50;
+    profile.identityBias = 0.44;
+    profile.resonanceBias = 0.28;
+    profile.executionBias = 0.28;
+    profile.framing = 'statement-led brief';
+  }
+
+  if (
+    role === 'volume-driver' ||
+    primaryGoal.includes('commercial') ||
+    primaryGoal.includes('sales') ||
+    tradeoff.includes('longevity') ||
+    creative <= 38
+  ) {
+    profile.roleTargets = { hero: 0.12, core: 0.44, support: 0.44 };
+    profile.complexityCeiling = 42;
+    profile.silhouetteTarget = 50;
+    profile.redundancyTolerance = 34;
+    profile.identityBias = 0.26;
+    profile.resonanceBias = 0.38;
+    profile.executionBias = 0.36;
+    profile.framing = 'commercially-driven brief';
+  }
+
+  if (trend >= 68) {
+    profile.redundancyTolerance += 6;
+    profile.silhouetteTarget += 4;
+  }
+
+  if (tradeoff.includes('line in the sand')) {
+    profile.identityBias += 0.05;
+    profile.executionBias -= 0.03;
+    profile.resonanceBias -= 0.02;
+  }
+
+  return profile;
+}
+
+function summarizeIntent(intent?: CollectionReportIntentInput | null) {
+  const primaryGoal = getPrimaryGoal(intent);
+  const role = titleCase(intent?.collection_role);
+  const tradeoff = intent?.tradeoff?.trim() || '';
+  const parts = [primaryGoal, role !== 'Unknown' ? role : '', tradeoff].filter(Boolean);
+  if (parts.length === 0) return 'No intent calibration available.';
+  return `Measured against ${parts.join(' / ')}.`;
+}
+
+function buildGapRecommendation(args: {
+  dominantCategory?: string;
+  topMaterial?: string;
+  supportShare: number;
+  heroShare: number;
+  silhouetteDiversity: CollectionHealthDetail;
+  complexityLoad: CollectionHealthDetail;
+}) {
+  if (args.supportShare < 28) {
+    return `Add a support-led ${args.dominantCategory ? args.dominantCategory.toLowerCase().replace(/s$/, '') : 'piece'} in ${args.topMaterial?.toLowerCase() ?? 'a simpler material'} to make the headline ideas easier to merchandise.`;
+  }
+
+  if (args.silhouetteDiversity.label === 'Low') {
+    return `Introduce one sharper silhouette shift outside ${args.dominantCategory?.toLowerCase() ?? 'the current category center'} so the line stops repeating the same outline.`;
+  }
+
+  if (args.complexityLoad.score <= 48) {
+    return `Hold one hero in ${args.topMaterial?.toLowerCase() ?? 'the lead fabrication'} and strip complexity out of the next supporting style before development load compounds.`;
+  }
+
+  if (args.heroShare < 18) {
+    return `Add one clearer hero ${args.dominantCategory ? args.dominantCategory.toLowerCase().replace(/s$/, '') : 'piece'} to give the assortment a visible lead story.`;
+  }
+
+  return 'Keep new additions disciplined around one clear role gap rather than broadening the range in every direction at once.';
+}
+
+function describeRoleBalance(
+  score: number,
+  roles: Record<CollectionPieceRole, number>,
+  strategy: StrategyProfile,
+  intentSummary: string
+) {
   const dominantRole = (Object.entries(roles).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'core') as CollectionPieceRole;
 
   if (score >= 75) {
     return {
       label: 'Balanced',
       interpretation: 'Hero, core, and support pieces are carrying distinct roles without one tier overpowering the edit.',
+      basis: intentSummary || `Benchmarked against a ${strategy.framing}.`,
     };
   }
 
@@ -96,6 +222,7 @@ function describeRoleBalance(score: number, roles: Record<CollectionPieceRole, n
     return {
       label: 'Hero-led',
       interpretation: 'The collection is currently over-concentrated in hero concepts and needs a steadier support layer around them.',
+      basis: intentSummary || `Benchmarked against a ${strategy.framing}.`,
     };
   }
 
@@ -103,27 +230,37 @@ function describeRoleBalance(score: number, roles: Record<CollectionPieceRole, n
     return {
       label: 'Support-heavy',
       interpretation: 'The base is present, but the collection needs more signature energy to hold the assortment together.',
+      basis: intentSummary || `Benchmarked against a ${strategy.framing}.`,
     };
   }
 
   return {
     label: 'Moderate',
     interpretation: 'The line is directionally sound, though one role tier is starting to outweigh the rest of the architecture.',
+    basis: intentSummary || `Benchmarked against a ${strategy.framing}.`,
   };
 }
 
-function describeComplexityLoad(score: number, highCount: number, total: number) {
+function describeComplexityLoad(
+  score: number,
+  highCount: number,
+  total: number,
+  strategy: StrategyProfile,
+  intentSummary: string
+) {
   if (score >= 72) {
     return {
-      label: 'Elevated',
-      interpretation: 'Development burden is high relative to assortment size and should be edited before sampling capacity tightens.',
+      label: 'Controlled',
+      interpretation: 'Development burden is staying inside the collection’s current risk tolerance, leaving room for selective ambition.',
+      basis: `${intentSummary} Complexity tolerance set for a ${strategy.framing}.`,
     };
   }
 
   if (score <= 42) {
     return {
-      label: 'Light',
-      interpretation: 'Build complexity is controlled, leaving room to invest in selective hero expressions where needed.',
+      label: 'Strained',
+      interpretation: 'Development burden is too high for the current brief and should be edited before sampling capacity tightens.',
+      basis: `${intentSummary} Complexity tolerance set for a ${strategy.framing}.`,
     };
   }
 
@@ -133,14 +270,22 @@ function describeComplexityLoad(score: number, highCount: number, total: number)
       highCount > 0 && highCount / Math.max(total, 1) >= 0.35
         ? 'A few demanding pieces are carrying disproportionate development weight.'
         : 'Construction effort is present but still workable at this stage of the assortment.',
+    basis: `${intentSummary} Complexity tolerance set for a ${strategy.framing}.`,
   };
 }
 
-function describeSilhouetteDiversity(score: number, uniqueSilhouettes: number, total: number) {
+function describeSilhouetteDiversity(
+  score: number,
+  uniqueSilhouettes: number,
+  total: number,
+  strategy: StrategyProfile,
+  intentSummary: string
+) {
   if (score >= 70) {
     return {
       label: 'Diverse',
       interpretation: 'The collection is showing enough silhouette variation to feel intentional rather than repetitive.',
+      basis: `${intentSummary} Shape breadth calibrated for a ${strategy.framing}.`,
     };
   }
 
@@ -148,20 +293,28 @@ function describeSilhouetteDiversity(score: number, uniqueSilhouettes: number, t
     return {
       label: 'Low',
       interpretation: 'Several pieces are landing in overlapping shapes, which narrows the assortment read.',
+      basis: `${intentSummary} Shape breadth calibrated for a ${strategy.framing}.`,
     };
   }
 
   return {
     label: 'Moderate',
     interpretation: 'There is some range in shape, but a few repeated outlines are starting to compress assortment breadth.',
+    basis: `${intentSummary} Shape breadth calibrated for a ${strategy.framing}.`,
   };
 }
 
-function describeRedundancyRisk(score: number, dominantCategoryShare: number) {
+function describeRedundancyRisk(
+  score: number,
+  dominantCategoryShare: number,
+  strategy: StrategyProfile,
+  intentSummary: string
+) {
   if (score >= 68) {
     return {
-      label: 'Elevated',
-      interpretation: 'Category and silhouette overlap are high enough that parts of the line may compete with one another.',
+      label: 'Contained',
+      interpretation: 'Category and silhouette overlap are controlled enough that pieces still read with distinct jobs.',
+      basis: `${intentSummary} Redundancy tolerance calibrated for a ${strategy.framing}.`,
     };
   }
 
@@ -169,12 +322,14 @@ function describeRedundancyRisk(score: number, dominantCategoryShare: number) {
     return {
       label: 'Moderate',
       interpretation: 'The assortment is leaning heavily on one category, so edit discipline will matter as more pieces are added.',
+      basis: `${intentSummary} Redundancy tolerance calibrated for a ${strategy.framing}.`,
     };
   }
 
   return {
-    label: 'Contained',
-    interpretation: 'Overlap risk is present but not yet strong enough to undermine the line architecture.',
+    label: 'Elevated',
+    interpretation: 'Category and silhouette overlap are high enough that parts of the line may compete with one another.',
+    basis: `${intentSummary} Redundancy tolerance calibrated for a ${strategy.framing}.`,
   };
 }
 
@@ -182,6 +337,8 @@ function getScoreExplanation(
   label: 'Identity' | 'Resonance' | 'Execution',
   score: number,
   context: {
+    brandName?: string;
+    intentSummary: string;
     dominantCategory?: string;
     topMaterial?: string;
     heroShare: number;
@@ -192,11 +349,11 @@ function getScoreExplanation(
 ): string {
   if (label === 'Identity') {
     if (score >= 80) {
-      return `The collection reads coherently through ${context.dominantCategory ?? 'the key categories'}, with a clear point of view reinforced by its material language.`;
+      return `${context.brandName ?? 'The collection'} reads coherently through ${context.dominantCategory ?? 'the key categories'}, with a point of view that stays consistent under the current brief.`;
     }
 
     if (score >= 65) {
-      return `The direction is recognizable, though a sharper edit around ${context.dominantCategory ?? 'the lead category'} would make the brand language feel more deliberate.`;
+      return `The direction is recognizable, though a sharper edit around ${context.dominantCategory ?? 'the lead category'} would make the brand language feel more deliberate for this collection intent.`;
     }
 
     return 'The collection direction is still fragmented, and the strongest pieces are not yet pulling the rest of the line into one coherent story.';
@@ -204,7 +361,7 @@ function getScoreExplanation(
 
   if (label === 'Resonance') {
     if (score >= 80) {
-      return `The collection lands in a commercially relevant space, with enough clarity around ${context.dominantCategory ?? 'the lead categories'} to feel timely rather than generic.`;
+      return `The assortment lands in a commercially relevant space, with enough clarity around ${context.dominantCategory ?? 'the lead categories'} to feel timely without blurring into category sameness.`;
     }
 
     if (score >= 65) {
@@ -215,17 +372,19 @@ function getScoreExplanation(
   }
 
   if (score >= 80) {
-    return `Build feasibility is strong, with ${context.topMaterial ?? 'material choices'} and complexity load staying within a manageable development range.`;
+    return `Build feasibility is strong, with ${context.topMaterial ?? 'material choices'} and complexity load staying inside the risk tolerance implied by the collection brief.`;
   }
 
   if (score >= 65) {
-    return `Execution is workable, though complexity concentration and a ${context.supportShare < 25 ? 'thin support layer' : 'few demanding hero pieces'} create pressure points.`;
+    return `Execution is workable, though complexity concentration and a ${context.supportShare < 25 ? 'thin support layer' : 'few demanding hero pieces'} create pressure points against the current intent.`;
   }
 
   return 'Execution risk is elevated, with too much complexity or concentration for the collection to move cleanly into sampling without edits.';
 }
 
 function buildThesis(input: CollectionReportInput, context: {
+  brand?: CollectionReportBrandInput | null;
+  intent?: CollectionReportIntentInput | null;
   identity: number;
   resonance: number;
   execution: number;
@@ -234,6 +393,9 @@ function buildThesis(input: CollectionReportInput, context: {
   roleBalanceLabel: string;
   silhouetteLabel: string;
 }) {
+  const brandName = context.brand?.brand_name || input.collection_name;
+  const leadGoal = getPrimaryGoal(context.intent);
+  const customer = context.brand?.customer_profile?.split(/[.!?]/)[0]?.trim();
   const strongest =
     context.identity >= context.resonance && context.identity >= context.execution
       ? 'brand coherence'
@@ -249,7 +411,7 @@ function buildThesis(input: CollectionReportInput, context: {
           ? 'a cleaner execution edit'
           : 'tighter assortment discipline';
 
-  return `This collection is building toward a ${context.dominantCategory ? `${context.dominantCategory.toLowerCase()}-led` : 'focused'} story with clear ${strongest} and a polished ${context.topMaterial ? context.topMaterial.toLowerCase() : 'material'} sensibility. Its main opportunity is ${mainTension} before development decisions lock.`;
+  return `${brandName} is building a ${context.dominantCategory ? `${context.dominantCategory.toLowerCase()}-led` : 'focused'} collection that is strongest when it pushes ${strongest}${leadGoal ? ` in service of ${leadGoal.toLowerCase()}` : ''}. ${customer ? `For a customer anchored in ${customer.toLowerCase()},` : 'Right now,'} the line feels most convincing through ${context.topMaterial ? context.topMaterial.toLowerCase() : 'its material language'}, but it still needs ${mainTension} before development decisions lock.`;
 }
 
 function buildOverviewNote(silhouetteScore: number, dominantSilhouetteShare: number) {
@@ -276,7 +438,7 @@ function buildRisks(args: {
 }): CollectionRisk[] {
   const risks: CollectionRisk[] = [];
 
-  if (args.complexityLoad.score >= 68) {
+  if (args.complexityLoad.score <= 48) {
     risks.push({
       title: 'Complexity concentration',
       detail: 'Too much development weight is sitting in a small number of pieces, which raises sampling and execution pressure.',
@@ -297,7 +459,7 @@ function buildRisks(args: {
     });
   }
 
-  if (args.redundancyRisk.score >= 68 && args.dominantCategory) {
+  if (args.redundancyRisk.score <= 42 && args.dominantCategory) {
     risks.push({
       title: `${args.dominantCategory} dependence`,
       detail: `The line is leaning heavily on ${args.dominantCategory.toLowerCase()}, so performance risk is concentrated in one area.`,
@@ -315,6 +477,8 @@ function buildRisks(args: {
 }
 
 function buildOverallRead(args: {
+  brand?: CollectionReportBrandInput | null;
+  intent?: CollectionReportIntentInput | null;
   identity: number;
   resonance: number;
   execution: number;
@@ -323,21 +487,39 @@ function buildOverallRead(args: {
   riskCount: number;
 }) {
   if (args.identity >= 80 && args.resonance >= 75 && args.execution >= 72 && args.riskCount <= 2) {
-    return 'Proceed with refinement';
+    return `${args.brand?.brand_name ?? 'This collection'} is ready to move forward with refinement, not rethinking.`;
   }
 
   if (args.identity >= 78 && (args.roleBalance.label !== 'Balanced' || args.silhouetteDiversity.label === 'Low')) {
-    return 'Strong direction, but rebalance before sampling';
+    return 'The direction is convincing, but the assortment needs rebalancing before sampling earns the headline.';
   }
 
   if (args.identity >= 75 && args.execution < 70) {
-    return 'High brand coherence with execution watchouts';
+    return 'Brand clarity is landing; development discipline is the gate to readiness.';
   }
 
-  return 'Commercially promising, but reduce redundancy before lock';
+  return 'The collection is promising, but the line edit is not resolved enough to lock cleanly.';
+}
+
+function buildOverallReadDetail(args: {
+  dominantCategory?: string;
+  roleBalance: CollectionHealthDetail;
+  complexityLoad: CollectionHealthDetail;
+  silhouetteDiversity: CollectionHealthDetail;
+  recommendation: string;
+}) {
+  return [
+    args.dominantCategory ? `${args.dominantCategory} is still carrying too much of the collection’s outcome.` : null,
+    args.roleBalance.label !== 'Balanced' ? args.roleBalance.interpretation : null,
+    args.complexityLoad.score >= 68 ? args.complexityLoad.interpretation : null,
+    args.silhouetteDiversity.label === 'Low' ? args.silhouetteDiversity.interpretation : null,
+    args.recommendation,
+  ].filter(Boolean)[0] ?? args.recommendation;
 }
 
 function summarizeInsight(args: {
+  brand?: CollectionReportBrandInput | null;
+  intent?: CollectionReportIntentInput | null;
   roleBalance: CollectionHealthDetail;
   complexityLoad: CollectionHealthDetail;
   silhouetteDiversity: CollectionHealthDetail;
@@ -352,13 +534,13 @@ function summarizeInsight(args: {
   const recommendations: string[] = [];
 
   if (args.heroShare >= 18) {
-    working.push('The collection has enough hero energy to anchor the line and give the assortment a clear lead story.');
+    working.push(`The collection has enough hero energy to anchor the line, so the lead story is legible instead of diffused across too many ideas.`);
   } else {
-    working.push('Core pieces are carrying the line consistently, which gives the assortment a stable commercial base.');
+    working.push('Core pieces are carrying the line consistently, which gives the assortment a stable commercial base to build on.');
   }
 
   if (args.roleBalance.label === 'Balanced') {
-    working.push('Role distribution is reading with discipline, so the collection feels intentionally built rather than accumulated.');
+    working.push('Role distribution is reading with discipline, so the collection feels intentionally built rather than accumulated piece by piece.');
   }
 
   if (args.topMaterial) {
@@ -366,10 +548,10 @@ function summarizeInsight(args: {
   }
 
   if (args.silhouetteDiversity.label === 'Low') {
-    watch.push('Shape repetition is compressing the collection, making adjacent pieces feel closer than they should.');
+    watch.push(`Shape repetition is compressing the collection, making adjacent ${args.dominantCategory?.toLowerCase() ?? 'pieces'} feel closer than they should.`);
   }
 
-  if (args.complexityLoad.score >= 68) {
+  if (args.complexityLoad.score <= 48) {
     watch.push('Complexity is stacking into too few pieces, which could slow development disproportionate to assortment size.');
   }
 
@@ -377,20 +559,20 @@ function summarizeInsight(args: {
     watch.push('The support architecture is thin, so hero ideas may arrive without enough surrounding clarity.');
   }
 
-  if (args.redundancyRisk.score >= 68 && args.dominantCategory) {
+  if (args.redundancyRisk.score <= 42 && args.dominantCategory) {
     watch.push(`Too much of the collection outcome depends on ${args.dominantCategory.toLowerCase()}, increasing concentration risk.`);
   }
 
-  recommendations.push('Edit repeated silhouettes before sampling so each piece has a clearer job within the line.');
+  recommendations.push(buildGapRecommendation(args));
 
   if (args.supportShare < 28) {
-    recommendations.push('Add or strengthen support pieces that make the hero concepts easier to merchandise and style into a full assortment.');
+    recommendations.push(`Add or strengthen support pieces that make the hero concepts easier to merchandise${args.topMaterial ? `, ideally in ${args.topMaterial.toLowerCase()} or an adjacent easier fabric` : ''}.`);
   }
 
-  if (args.complexityLoad.score >= 68) {
+  if (args.complexityLoad.score <= 48) {
     recommendations.push('Validate feasibility on the most complex pieces now, then simplify construction or fabrication where the payoff is marginal.');
   } else {
-    recommendations.push('Protect the strongest direction by keeping new additions disciplined around role and silhouette rather than expanding breadth indiscriminately.');
+    recommendations.push(`Protect the strongest direction by keeping new additions disciplined around role and silhouette${args.intent?.collection_role ? ` for a ${titleCase(args.intent.collection_role).toLowerCase()} brief` : ''}.`);
   }
 
   return {
@@ -401,6 +583,8 @@ function summarizeInsight(args: {
 }
 
 export function buildCollectionReport(input: CollectionReportInput): CollectionReportResponse {
+  const strategy = getStrategyProfile(input.intent);
+  const intentSummary = summarizeIntent(input.intent);
   const pieces = input.pieces.map((piece) => ({
     id: piece.id,
     piece_name: piece.piece_name?.trim() || 'Untitled Piece',
@@ -434,13 +618,8 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
   const supportShare = percentage(roles.support, total);
 
   const roleBalanceScore = (() => {
-    const targets: Record<CollectionPieceRole, number> = {
-      hero: 0.2,
-      core: 0.5,
-      support: 0.3,
-    };
-    const variance = (Object.keys(targets) as CollectionPieceRole[]).reduce((sum, key) => {
-      return sum + Math.abs((roles[key] / total) - targets[key]);
+    const variance = (Object.keys(strategy.roleTargets) as CollectionPieceRole[]).reduce((sum, key) => {
+      return sum + Math.abs((roles[key] / total) - strategy.roleTargets[key]);
     }, 0);
 
     return clamp((1 - variance / 1.2) * 100);
@@ -452,44 +631,62 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     low: 0.3,
   };
 
-  const complexityLoadScore = clamp(
+  const rawComplexityLoad = clamp(
     (pieces.reduce((sum, piece) => sum + complexityWeights[piece.complexity], 0) / total) * 100
+  );
+  const complexityLoadScore = clamp(
+    100 - Math.max(0, rawComplexityLoad - strategy.complexityCeiling) * 2.2
   );
 
   const uniqueSilhouettes = Object.keys(silhouetteCounts).filter((token) => token !== 'unknown').length;
-  const silhouetteDiversityScore = clamp((uniqueSilhouettes / total) * 100);
+  const rawSilhouetteDiversity = clamp((uniqueSilhouettes / total) * 100);
+  const silhouetteDiversityScore = clamp(
+    100 - Math.abs(rawSilhouetteDiversity - strategy.silhouetteTarget) * 1.6
+  );
   const dominantSilhouetteShare = Object.values(silhouetteCounts).sort((a, b) => b - a)[0]
     ? percentage(Object.values(silhouetteCounts).sort((a, b) => b - a)[0], total)
     : 0;
   const dominantCategoryToken = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
   const dominantCategoryShare = dominantCategoryToken ? percentage(categoryCounts[dominantCategoryToken], total) : 0;
-  const redundancyRiskScore = clamp((100 - silhouetteDiversityScore) * 0.6 + dominantCategoryShare * 0.4);
+  const rawRedundancyRisk = clamp((100 - rawSilhouetteDiversity) * 0.6 + dominantCategoryShare * 0.4);
+  const redundancyRiskScore = clamp(
+    Math.max(0, rawRedundancyRisk - strategy.redundancyTolerance) * 1.7
+  );
 
   const roleBalance = {
     score: roleBalanceScore,
-    ...describeRoleBalance(roleBalanceScore, roles),
+    ...describeRoleBalance(roleBalanceScore, roles, strategy, intentSummary),
   };
   const complexityLoad = {
     score: complexityLoadScore,
-    ...describeComplexityLoad(complexityLoadScore, complexityCounts.high ?? 0, total),
+    ...describeComplexityLoad(complexityLoadScore, complexityCounts.high ?? 0, total, strategy, intentSummary),
   };
   const silhouetteDiversity = {
     score: silhouetteDiversityScore,
-    ...describeSilhouetteDiversity(silhouetteDiversityScore, uniqueSilhouettes, total),
+    ...describeSilhouetteDiversity(silhouetteDiversityScore, uniqueSilhouettes, total, strategy, intentSummary),
   };
   const redundancyRisk = {
     score: redundancyRiskScore,
-    ...describeRedundancyRisk(redundancyRiskScore, dominantCategoryShare),
+    ...describeRedundancyRisk(redundancyRiskScore, dominantCategoryShare, strategy, intentSummary),
   };
 
-  const identity = average(
+  const rawIdentity = average(
     pieces.map((piece) => piece.dimensions?.identity ?? Math.round(piece.score * 0.95))
   );
-  const resonance = average(
+  const rawResonance = average(
     pieces.map((piece) => piece.dimensions?.resonance ?? piece.score)
   );
-  const execution = average(
+  const rawExecution = average(
     pieces.map((piece) => piece.dimensions?.execution ?? Math.round(piece.score * 0.9))
+  );
+  const identity = clamp(
+    rawIdentity + (roleBalanceScore >= 72 ? 4 : 0) + (silhouetteDiversityScore >= 70 ? 2 : 0)
+  );
+  const resonance = clamp(
+    rawResonance + (redundancyRiskScore <= 30 ? 3 : 0) - (dominantCategoryShare >= 55 ? 4 : 0)
+  );
+  const execution = clamp(
+    rawExecution + (complexityLoadScore >= 70 ? 4 : 0) - (supportShare < 22 ? 3 : 0)
   );
 
   const dominantCategory = dominantCategoryToken ? titleCase(dominantCategoryToken) : undefined;
@@ -504,6 +701,8 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     .map((item) => item.label);
 
   const scoresContext = {
+    brandName: input.brand?.brand_name ?? undefined,
+    intentSummary,
     dominantCategory,
     topMaterial: topMaterialLabel,
     heroShare,
@@ -528,6 +727,8 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
   };
 
   const insight = summarizeInsight({
+    brand: input.brand,
+    intent: input.intent,
     roleBalance,
     complexityLoad,
     silhouetteDiversity,
@@ -550,6 +751,8 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
   });
 
   const overallRead = buildOverallRead({
+    brand: input.brand,
+    intent: input.intent,
     identity,
     resonance,
     execution,
@@ -557,9 +760,16 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     silhouetteDiversity,
     riskCount: keyRisks.length,
   });
+  const overallReadDetail = buildOverallReadDetail({
+    dominantCategory,
+    roleBalance,
+    complexityLoad,
+    silhouetteDiversity,
+    recommendation: insight.recommendations[0] ?? 'Keep editing toward a clearer collection hierarchy.',
+  });
 
   const immediateActions = [
-    complexityLoad.score >= 68
+    complexityLoad.score <= 48
       ? 'Validate feasibility, costing, and timeline on the most complex hero pieces before sampling slots tighten.'
       : 'Confirm the lead hero pieces and keep the rest of the line disciplined around them.',
     silhouetteDiversity.label === 'Low'
@@ -574,7 +784,7 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     dominantCategory
       ? `Decide whether to maintain the current concentration in ${dominantCategory.toLowerCase()} or reallocate into adjacent categories.`
       : 'Decide whether the current category concentration is intentional or needs rebalancing.',
-    complexityLoad.score >= 68
+    complexityLoad.score <= 48
       ? 'Choose where elevated complexity is truly worth the investment and where a simpler build would preserve the idea.'
       : 'Decide how much construction ambition the team wants to hold before costs begin to distort the assortment.',
     silhouetteDiversity.label === 'Low'
@@ -593,6 +803,8 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
         version_label: input.version_label ?? null,
       },
       collection_thesis: buildThesis(input, {
+        brand: input.brand,
+        intent: input.intent,
         identity,
         resonance,
         execution,
@@ -636,6 +848,7 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
         decision_points: decisionPoints,
       },
       overall_read: overallRead,
+      overall_read_detail: overallReadDetail,
       meta: {
         source: 'fallback',
         snapshot_id: input.snapshot_id ?? null,

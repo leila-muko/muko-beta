@@ -85,7 +85,6 @@ export async function POST(req: NextRequest) {
           if (!parsed) {
             console.warn('[SpecRoute] Invalid JSON in response, emitting fallback');
             emit('fallback', JSON.stringify(makeFallback(blackboard, editLabel, mode)));
-            controller.close();
             return;
           }
 

@@ -531,6 +531,26 @@ primary_goals bias:
 
 Do NOT restate intent explicitly. Let it shape strictness and framing.
 
+TENSION CALIBRATION
+The input "intent" object contains a "tensions" map with four sliders, each 0–100.
+Apply them as continuous bias signals — do not print or name them in output.
+
+trend_forward (0–100)
+Above 60: bias recommendations toward trend relevance and moment-specific urgency.
+Below 40: bias toward longevity and timelessness; deprioritize season-specific references.
+
+creative_expression (0–100)
+Above 60: tolerate more creative risk in material, silhouette, and construction choices.
+Below 40: flag commercial viability more aggressively; treat unconventional choices as execution threats.
+
+elevated_design (0–100)
+Above 60: protect design integrity over cost; treat material or construction compromises as brand risks.
+Below 40: prioritize margin and accessibility; treat premium spec choices as cost threats requiring justification.
+
+novelty (0–100)
+Above 60: reward differentiation; frame the spec as a point of distinction from established programs.
+Below 40: reward consistency with established brand programs; treat outlier choices as coherence risks.
+
 HIDDEN REASONING (DO NOT PRINT)
 Before writing, internally derive:
 1) Binding constraint — cost, timeline, or construction?

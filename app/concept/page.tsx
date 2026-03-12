@@ -515,6 +515,7 @@ export default function ConceptStudioPage() {
     intentGoals,
     intentTradeoff,
     collectionRole: storeCollectionRole,
+    setCollectionRole,
   } = useSessionStore();
 
   const [headerCollectionName, setHeaderCollectionName] = useState<string>("Collection");
@@ -674,6 +675,23 @@ export default function ConceptStudioPage() {
   const [referenceBrands, setReferenceBrands] = useState<string[]>([]);
   const [excludedBrands, setExcludedBrands] = useState<string[]>([]);
 
+  // ─── Collection context state for Decision Guidance ──────────────────────
+  const [collectionPieces, setCollectionPieces] = useState<Array<{
+    id: string;
+    piece_name: string;
+    score: number;
+    dimensions: Record<string, number> | null;
+    collection_role: string | null;
+  }>>([]);
+  const [brandProfile3, setBrandProfile3] = useState<{
+    brand_name: string | null;
+    keywords: string[] | null;
+    customer_profile: string | null;
+    price_tier: string | null;
+    target_margin: number | null;
+    tension_context: string | null;
+  } | null>(null);
+
   // ─── Synthesizer: reactive MUKO INSIGHT (streaming) ──────────────────────
   const conceptAbortRef = useRef<AbortController | null>(null);
   const conceptRawJsonRef = useRef<string>('');
@@ -730,6 +748,23 @@ export default function ConceptStudioPage() {
         type: piece.type ?? undefined,
         signal: piece.signal ?? undefined,
       })),
+      collection_context: {
+        brand: {
+          name: brandProfile3?.brand_name ?? brandProfileName,
+          keywords: brandProfile3?.keywords ?? undefined,
+          customer_profile: brandProfile3?.customer_profile ?? customerProfile,
+          price_tier: brandProfile3?.price_tier ?? undefined,
+          target_margin: brandProfile3?.target_margin ?? undefined,
+          tension_context: brandProfile3?.tension_context ?? undefined,
+        },
+        existing_pieces: collectionPieces.map((p) => ({
+          piece_name: p.piece_name,
+          score: p.score,
+          dimensions: p.dimensions,
+          collection_role: p.collection_role,
+        })),
+        piece_count: collectionPieces.length,
+      },
     });
     console.log('[Muko] blackboard result:', blackboard ? 'valid' : 'null');
     if (!blackboard) return;
@@ -827,7 +862,7 @@ export default function ConceptStudioPage() {
       controller.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAesthetic, conceptSilhouette, conceptPalette, brandProfileName, customerProfile, referenceBrands, excludedBrands, refinementModifiers]);
+  }, [selectedAesthetic, conceptSilhouette, conceptPalette, brandProfileName, customerProfile, referenceBrands, excludedBrands, refinementModifiers, identityPulse?.score, resonancePulse?.score, collectionPieces, brandProfile3]);
 
   const [freeFormDraft, setFreeFormDraft] = useState("");
   const [freeFormMatch, setFreeFormMatch] = useState<string | null>(null);
@@ -880,16 +915,53 @@ export default function ConceptStudioPage() {
       }
       console.log('[Muko] brand_profiles query — user.id:', user.id);
       console.log('[Muko] brand_profiles query — table: brand_profiles, filter: user_id =', user.id, ', select: id, brand_name, customer_profile, reference_brands, excluded_brands');
-      supabase
+      // Fetch brand profile and collection pieces in parallel
+      const collectionName = (() => {
+        try { return window.localStorage.getItem('muko_collectionName') ?? ''; } catch { return ''; }
+      })();
+
+      const brandProfilePromise = supabase
         .from('brand_profiles')
-        .select('id, brand_name, customer_profile, reference_brands, excluded_brands')
+        .select('id, brand_name, keywords, customer_profile, price_tier, target_margin, tension_context, reference_brands, excluded_brands')
         .eq('user_id', user.id)
-        .single()
-        .then(({ data, error }) => {
+        .single();
+
+      const collectionPiecesPromise = collectionName
+        ? supabase
+            .from('analyses')
+            .select('id, piece_name, score, dimensions, collection_role')
+            .eq('collection_name', collectionName)
+            .eq('user_id', user.id)
+        : Promise.resolve({ data: [], error: null });
+
+      Promise.all([brandProfilePromise, collectionPiecesPromise]).then(
+        ([{ data, error }, { data: piecesData, error: piecesError }]) => {
           console.log('[Muko] brand_profiles query result — data:', data, '| error:', error);
+          if (piecesError) console.warn('[Muko] collection pieces query error:', piecesError);
+
+          if (piecesData) {
+            const filtered = (piecesData as Array<{
+              id: string;
+              piece_name: string;
+              score: number;
+              dimensions: Record<string, number> | null;
+              collection_role: string | null;
+            }>).filter((p) => p.piece_name);
+            setCollectionPieces(filtered);
+            console.log('[COLLECTION_CONTEXT_DEBUG] piece_count:', filtered.length, 'first piece_name:', filtered[0]?.piece_name ?? null, 'collection_name used:', collectionName);
+          }
+
           if (data && !error) {
             brandProfileId.current = data.id;
             criticCacheRef.current.clear();
+            setBrandProfile3({
+              brand_name: data.brand_name ?? null,
+              keywords: data.keywords ?? null,
+              customer_profile: data.customer_profile ?? null,
+              price_tier: data.price_tier ?? null,
+              target_margin: data.target_margin ?? null,
+              tension_context: data.tension_context ?? null,
+            });
             unstable_batchedUpdates(() => {
               if (data.brand_name) setBrandProfileName(data.brand_name);
               setCustomerProfile(data.customer_profile ?? null);
@@ -1913,25 +1985,6 @@ export default function ConceptStudioPage() {
                 );
               })}
             </div>
-            {/* Spacer for sticky footer */}
-            <div style={{ height: 72 }} />
-          </div>
-
-          {/* Sticky CTA */}
-          <div style={{ position: "sticky", bottom: 0, padding: "0 44px 24px", background: "linear-gradient(to bottom, rgba(250,249,246,0) 0%, rgba(250,249,246,0.92) 16%, rgba(250,249,246,1) 100%)", paddingTop: 20, zIndex: 10 }}>
-            <button
-              onClick={() => {
-                if (!canContinue) return;
-                useSessionStore.setState({ aestheticMatchedId: selectedAesthetic, refinementModifiers: interpretation?.modifiers ?? [], moodboardImages: topMoodboardImages, conceptSilhouette, conceptPalette });
-                setCurrentStep(3);
-                router.push("/spec");
-              }}
-              disabled={!canContinue}
-              style={{ width: "100%", padding: "14px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: sohne, letterSpacing: "0.02em", color: canContinue ? STEEL : "rgba(67,67,43,0.30)", background: canContinue ? "rgba(125,150,172,0.07)" : "rgba(255,255,255,0.46)", border: canContinue ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)", cursor: canContinue ? "pointer" : "not-allowed", transition: "all 280ms ease", opacity: canContinue ? 1 : 0.65, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}
-            >
-              <span>{selectedAesthetic && !conceptSilhouette ? "Select a silhouette to continue" : "Lock direction & build specs"}</span>
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{ opacity: canContinue ? 1 : 0.4 }}><path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </button>
           </div>
           </>
         }
@@ -2008,7 +2061,13 @@ export default function ConceptStudioPage() {
                 isStreaming={conceptInsightLoading && !!conceptStreamingText}
                 streamingText={conceptStreamingText}
                 pageMode="concept"
-                onContinue={() => router.push('/spec')}
+                canContinue={canContinue}
+                onContinue={() => {
+                  if (!canContinue) return;
+                  useSessionStore.setState({ aestheticMatchedId: selectedAesthetic, refinementModifiers: interpretation?.modifiers ?? [], moodboardImages: topMoodboardImages, conceptSilhouette, conceptPalette });
+                  setCurrentStep(3);
+                  router.push('/spec');
+                }}
                 nextMove={{
                   mode: "concept",
                   guidance: conceptInsightData?.decision_guidance ?? null,
@@ -2019,6 +2078,8 @@ export default function ConceptStudioPage() {
                   onSelectAnchorPiece: handleSelectAnchorPiece,
                   onConfirm: conceptInsightData?.decision_guidance ? handleConfirmDirection : undefined,
                   isLoading: conceptInsightLoading && !conceptInsightData?.decision_guidance,
+                  onRoleSelect: setCollectionRole,
+                  currentRole: storeCollectionRole,
                 }}
               />
             )}

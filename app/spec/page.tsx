@@ -10,7 +10,7 @@ import type {
   ConstructionTier,
   ConceptContext as ConceptContextType,
 } from "@/lib/types/spec-studio";
-import { calculateCOGS, generateInsight, checkExecutionFeasibility } from "@/lib/spec-studio/calculator";
+import { calculateCOGS, generateInsight, checkExecutionFeasibility, applyRoleModifiers } from "@/lib/spec-studio/calculator";
 import { findAlternativeMaterial, findUpgradeMaterial, checkSelectedMaterialConflict } from "@/lib/spec-studio/material-matcher";
 import {
   CONSTRUCTION_INFO,
@@ -1075,6 +1075,7 @@ export default function SpecStudioPage() {
       }
       if (selectedKeyPiece.recommended_material_id) {
         setMaterialId(selectedKeyPiece.recommended_material_id);
+        setUserManuallySelected(true);
       }
     }
   // Only run when selectedKeyPiece changes (not on every render)
@@ -1272,7 +1273,7 @@ export default function SpecStudioPage() {
   // ─────────────────────────────────────────────────────────────────────────
 
   // Blended execution score: both fail = 35, one fails = 50, yellow = 65, green = 80
-  const executionScore = (() => {
+  const baseExecutionScore = (() => {
     const costRed      = costStatus === 'red';
     const timelineRed  = timelineStatus === 'red';
     const timelineYellow = timelineStatus === 'yellow';
@@ -1285,6 +1286,13 @@ export default function SpecStudioPage() {
   })();
 
   const marginGatePassed = !insight || insight.type !== "warning";
+
+  const executionScore = applyRoleModifiers(
+    baseExecutionScore,
+    storeCollectionRole ?? '',
+    { cost: marginGatePassed },
+    constructionTier ?? ''
+  );
 
   const timelineBuffer = selectedMaterial
     ? (selectedMaterial.lead_time_weeks ?? 0) <= 6 ? 6
@@ -1434,7 +1442,7 @@ export default function SpecStudioPage() {
       controller.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materialId, constructionTier, categoryId, targetMSRP]);
+  }, [materialId, constructionTier, categoryId, targetMSRP, userManuallySelected]);
 
   // ─── Fix #1: Write execution state to store so report page gets real data ──
   useEffect(() => {
@@ -2156,7 +2164,7 @@ export default function SpecStudioPage() {
               {/* Delivery label + required subtitle */}
               <div style={{ display: "flex", flexDirection: "column", gap: 1, marginLeft: 8 }}>
                 <span style={microLabel}>Delivery</span>
-                <span style={{ fontSize: 9, fontFamily: "var(--font-inter), system-ui, sans-serif", letterSpacing: "0.02em", color: timelineFeasibility ? (timelineStatus === 'red' ? '#8A3A3A' : timelineStatus === 'yellow' ? BRAND.camel : "rgba(67,67,43,0.32)") : "rgba(67,67,43,0.32)" }}>
+                <span suppressHydrationWarning style={{ fontSize: 9, fontFamily: "var(--font-inter), system-ui, sans-serif", letterSpacing: "0.02em", color: timelineFeasibility ? (timelineStatus === 'red' ? '#8A3A3A' : timelineStatus === 'yellow' ? BRAND.camel : "rgba(67,67,43,0.32)") : "rgba(67,67,43,0.32)" }}>
                   {timelineFeasibility ? `${timelineFeasibility.required_weeks}wk required` : "\u00a0"}
                 </span>
               </div>

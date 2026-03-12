@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 
         const anthropicStream = client.messages.stream({
           model: 'claude-sonnet-4-6',
-          max_tokens: 650,
+          max_tokens: 900,
           temperature: 0.55,
           system: CONCEPT_STUDIO_PROMPT_V6_2,
           messages: [{ role: 'user', content: userPrompt }],
@@ -88,7 +88,6 @@ export async function POST(req: NextRequest) {
           if (!parsed) {
             console.warn('[ConceptRoute] Invalid JSON in response, emitting fallback');
             emit('fallback', JSON.stringify(makeFallback(blackboard, editLabel, mode)));
-            controller.close();
             return;
           }
 
@@ -101,6 +100,11 @@ export async function POST(req: NextRequest) {
             parsed.positioning = parsed.positioning.map(r);
           }
 
+          const normalizedExecutionLevers = normalizeExecutionLevers(
+            blackboard.aesthetic_matched_id,
+            parsed.decision_guidance.execution_levers,
+          );
+
           const data: InsightData = {
             statements: [parsed.insight_title, parsed.insight_description],
             edit: parsed.positioning.slice(0, 3),
@@ -108,10 +112,9 @@ export async function POST(req: NextRequest) {
             decision_guidance: {
               recommended_direction: parsed.decision_guidance.recommended_direction,
               commitment_signal: parsed.decision_guidance.commitment_signal,
-              execution_levers: normalizeExecutionLevers(
-                blackboard.aesthetic_matched_id,
-                parsed.decision_guidance.execution_levers,
-              ),
+              execution_levers: normalizedExecutionLevers.length > 0
+                ? normalizedExecutionLevers
+                : buildFallbackDecisionGuidance(blackboard, mode).execution_levers,
             },
             mode,
           };

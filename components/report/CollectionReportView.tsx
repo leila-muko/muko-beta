@@ -48,7 +48,7 @@ export function CollectionReportView({ report }: { report: CollectionReportPaylo
       <PieceSummaryTable pieces={report.piece_summary} />
       <KeyRisksSection risks={report.key_risks} />
       <NextStepsSection nextSteps={report.next_steps} />
-      <OverallReadCallout value={report.overall_read} />
+      <OverallReadCallout value={report.overall_read} detail={report.overall_read_detail} />
 
       <div
         style={{

@@ -1,6 +1,6 @@
 import { fonts, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
 
-export function OverallReadCallout({ value }: { value: string }) {
+export function OverallReadCallout({ value, detail }: { value: string; detail?: string }) {
   return (
     <section
       style={{
@@ -31,6 +31,21 @@ export function OverallReadCallout({ value }: { value: string }) {
       >
         {value}
       </p>
+
+      {detail ? (
+        <p
+          style={{
+            margin: '12px 0 0',
+            maxWidth: 760,
+            fontFamily: fonts.body,
+            fontSize: 14,
+            lineHeight: 1.7,
+            color: 'rgba(248,244,236,0.78)',
+          }}
+        >
+          {detail}
+        </p>
+      ) : null}
     </section>
   );
 }
