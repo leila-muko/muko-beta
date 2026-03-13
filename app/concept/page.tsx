@@ -3,9 +3,9 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { unstable_batchedUpdates } from "react-dom";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useSessionStore } from "@/lib/store/sessionStore";
-import type { KeyPiece } from "@/lib/store/sessionStore";
+import type { CollectionRoleId, KeyPiece, PieceRolesById } from "@/lib/store/sessionStore";
 import {
   BRAND,
   AESTHETICS,
@@ -15,7 +15,6 @@ import {
 import {
   seededShuffle,
   matchAestheticToFolder,
-  interpretRefine,
 } from "../../lib/concept-studio/utils";
 import FloatingMukoOrb from "@/components/FloatingMukoOrb";
 import aestheticsData from "@/data/aesthetics.json";
@@ -30,10 +29,11 @@ import { debounce } from "@/lib/utils/debounce";
 import {
   checkMarketSaturation,
   getResonanceScore,
-  getProxyMessage,
   type Aesthetic as ResearcherAesthetic,
 } from "@/lib/agents/researcher";
 import { getFlatForPiece } from "@/components/flats";
+import { combineDirection } from "@/lib/concept-studio/combineDirection";
+import { SUGGESTED_INTERPRETATION_CHIPS } from "@/lib/concept-studio/interpretations";
 
 /* ─── Pulse icons ─────────────────────────────────────────────────────────── */
 function IconIdentity({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
@@ -71,15 +71,6 @@ const PULSE_RED = "#A97B8F";     // Rose — brand tension
 const OLIVE = BRAND.oliveInk;
 
 /* ─── Type aliases ────────────────────────────────────────────────────────── */
-type Confidence = "high" | "med" | "low";
-type Interpretation = {
-  base: string;
-  modifiers: string[];
-  note: string;
-  confidence: Confidence;
-  unsupportedHits: string[];
-};
-
 /* ─── Chip data types ─────────────────────────────────────────────────────── */
 interface AestheticChip {
   label: string;
@@ -500,6 +491,367 @@ function KeyPiecePlaceholder({ category }: { category: string | null }) {
   );
 }
 
+type ConceptStageId = "direction" | "language" | "product";
+
+type ExecutionGuidancePoint = {
+  title: string;
+  description: string;
+};
+
+type PieceRecommendationEntry = {
+  piece: KeyPiece;
+  recommendation: { bucket: "core" | "interpretation"; reason: string } | null;
+};
+
+const COLLECTION_ROLE_OPTIONS = [
+  { id: "hero", name: "Hero", description: "The statement piece that carries the season." },
+  { id: "directional", name: "Directional", description: "Pushes the collection forward without losing commercial footing." },
+  { id: "core-evolution", name: "Core Evolution", description: "A proven category refreshed for this direction." },
+  { id: "volume-driver", name: "Volume Driver", description: "The stabilizer that keeps the assortment commercially grounded." },
+] as const;
+
+type ProductStructureSummary = {
+  counts: Record<CollectionRoleId, number>;
+  assignedCount: number;
+  notes: string[];
+};
+
+type ProductPieceSuggestion = {
+  summary: string;
+  suggestedRoles: CollectionRoleId[];
+};
+
+type ProductPieceRead = {
+  title?: string;
+  body: string;
+};
+
+type ProductStrategicImplication = {
+  summary: string;
+  suggestedRoles: CollectionRoleId[];
+};
+
+function getStageIndex(stage: ConceptStageId): number {
+  if (stage === "direction") return 0;
+  if (stage === "language") return 1;
+  return 2;
+}
+
+function buildExecutionGuidance(options: {
+  interpretationSummary: string;
+  conceptSilhouette: string;
+  conceptPalette: string | null;
+  paletteOptions: Array<{ id: string; name: string }>;
+  signals: Array<{ label: string; reason: string }>;
+  executionLevers: string[];
+}): ExecutionGuidancePoint[] {
+  const guidance: ExecutionGuidancePoint[] = [];
+  const silhouetteName =
+    CONCEPT_SILHOUETTES.find((silhouette) => silhouette.id === options.conceptSilhouette)?.name.toLowerCase() ??
+    options.conceptSilhouette;
+  const paletteName =
+    options.paletteOptions.find((palette) => palette.id === options.conceptPalette)?.name ?? options.conceptPalette;
+
+  guidance.push({
+    title: "Execution emphasis",
+    description: `Keep the collection grounded in ${silhouetteName} proportions so the direction reads with control, not noise.`,
+  });
+
+  if (paletteName) {
+    guidance.push({
+      title: "Palette discipline",
+      description: `Use ${paletteName.toLowerCase()} to hold the mood with restraint and keep the story editorial.`,
+    });
+  }
+
+  if (options.interpretationSummary && options.interpretationSummary !== "Pure direction") {
+    guidance.push({
+      title: "Interpretation",
+      description: `Let ${options.interpretationSummary.toLowerCase()} shape the styling language rather than sitting on top of it.`,
+    });
+  }
+
+  const leverSource = options.executionLevers.length > 0 ? options.executionLevers : options.signals.map((signal) => signal.label);
+  leverSource.slice(0, 2).forEach((lever, index) => {
+    guidance.push({
+      title: index === 0 ? "Priority signal" : "Supporting signal",
+      description: `${lever} should read as a clear collection cue, not a scattered accent.`,
+    });
+  });
+
+  return guidance.slice(0, 4);
+}
+
+function getRoleName(role: CollectionRoleId): string {
+  return COLLECTION_ROLE_OPTIONS.find((option) => option.id === role)?.name ?? role;
+}
+
+function MukoPickTag({ label = "Muko Pick" }: { label?: string }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "2px 7px",
+        borderRadius: 999,
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        fontFamily: "var(--font-inter), system-ui, sans-serif",
+        color: "#6B7A40",
+        background: "rgba(168,180,117,0.12)",
+        border: "1px solid rgba(168,180,117,0.24)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function getSignalLabel(signal: KeyPiece["signal"]): string | null {
+  if (signal === "high-volume") return "High volume";
+  if (signal === "ascending") return "Ascending";
+  if (signal === "emerging") return "Emerging";
+  return null;
+}
+
+function getSuggestedRolesForPiece(
+  entry: PieceRecommendationEntry,
+  options: {
+    conceptSilhouette: string;
+    conceptPaletteName: string | null;
+    interpretationSummary: string;
+    signalCount: number;
+  }
+): CollectionRoleId[] {
+  const isStructuredLanguage = options.conceptSilhouette === "structured" || options.conceptSilhouette === "straight";
+  const isInterpretationLed = entry.recommendation?.bucket === "interpretation" || options.interpretationSummary !== "Pure direction";
+
+  if (entry.piece.custom) return ["directional", "core-evolution"];
+  if (entry.piece.signal === "high-volume") return ["volume-driver", "core-evolution"];
+  if (entry.piece.signal === "ascending" && isStructuredLanguage && !isInterpretationLed) return ["hero", "directional"];
+  if (entry.piece.signal === "ascending") return ["directional", "hero"];
+  if (isInterpretationLed && options.signalCount >= 2) return ["directional", "core-evolution"];
+  if (entry.piece.signal === "emerging") return ["directional", "core-evolution"];
+  return options.conceptPaletteName ? ["core-evolution", "volume-driver"] : ["volume-driver", "core-evolution"];
+}
+
+function getPrimarySuggestedRole(
+  entry: PieceRecommendationEntry,
+  options: {
+    conceptSilhouette: string;
+    conceptPaletteName: string | null;
+    interpretationSummary: string;
+    signalCount: number;
+  }
+): CollectionRoleId {
+  return getSuggestedRolesForPiece(entry, options)[0];
+}
+
+function scoreStartingPiecePriority(
+  entry: PieceRecommendationEntry,
+  options: {
+    conceptSilhouette: string;
+    conceptPaletteName: string | null;
+    interpretationSummary: string;
+    signalCount: number;
+  }
+): number {
+  const primaryRole = getPrimarySuggestedRole(entry, options);
+  const roleScore =
+    primaryRole === "hero"
+      ? 40
+      : primaryRole === "directional"
+      ? 30
+      : primaryRole === "core-evolution"
+      ? 22
+      : 14;
+  const signalScore =
+    entry.piece.signal === "ascending"
+      ? 12
+      : entry.piece.signal === "emerging"
+      ? 8
+      : entry.piece.signal === "high-volume"
+      ? 6
+      : 2;
+  const sourceScore =
+    options.interpretationSummary !== "Pure direction"
+      ? entry.recommendation?.bucket === "interpretation"
+        ? 10
+        : 6
+      : entry.recommendation?.bucket === "core"
+      ? 10
+      : 4;
+  const customPenalty = entry.piece.custom ? -12 : 0;
+
+  return roleScore + signalScore + sourceScore + customPenalty;
+}
+
+function buildPieceSuggestion(
+  entry: PieceRecommendationEntry,
+  options: {
+    conceptSilhouette: string;
+    conceptPaletteName: string | null;
+    interpretationSummary: string;
+    signalCount: number;
+  }
+): ProductPieceSuggestion {
+  const suggestedRoles = getSuggestedRolesForPiece(entry, options);
+  const roleLine =
+    suggestedRoles[0] === "hero"
+      ? "This piece is one of the strongest candidates to carry the lead expression."
+      : suggestedRoles[0] === "directional"
+      ? "This piece is strongest when it sharpens the point of view rather than carrying the whole assortment."
+      : suggestedRoles[0] === "core-evolution"
+      ? "This piece reads as a stabilizing expression of the direction."
+      : "This piece is better suited to commercial grounding than directional leadership.";
+
+  return {
+    summary: roleLine,
+    suggestedRoles,
+  };
+}
+
+function buildPieceRead(
+  entry: PieceRecommendationEntry,
+  resonanceScore: number | null | undefined,
+  options: {
+    directionName: string | null;
+    conceptSilhouette: string;
+    conceptPaletteName: string | null;
+    interpretationSummary: string;
+    signalLabels: string[];
+  }
+): ProductPieceRead {
+  const silhouetteName =
+    CONCEPT_SILHOUETTES.find((silhouette) => silhouette.id === options.conceptSilhouette)?.name.toLowerCase() ??
+    options.conceptSilhouette;
+  const sourceClause = entry.recommendation?.bucket === "interpretation"
+    ? "It matters because it translates your interpretation into a visible product decision."
+    : "It matters because it keeps the collection legible at product level.";
+  const languageClause = options.conceptPaletteName
+    ? `${silhouetteName} proportions and ${options.conceptPaletteName.toLowerCase()} keep the language disciplined around it.`
+    : `${silhouetteName} proportions are what keep this piece aligned to the collection language.`;
+  const marketClause =
+    entry.piece.signal === "high-volume"
+      ? "Commercially, it has the broadest stabilizing potential and can absorb volume without flattening the story."
+      : entry.piece.signal === "ascending"
+      ? "Commercially, it has enough momentum to lead with confidence if the execution stays controlled."
+      : entry.piece.signal === "emerging"
+      ? "Commercially, it reads as a sharper point of view, so execution discipline matters more than scale."
+      : entry.piece.custom
+      ? "Commercially, treat it as an authored choice and validate the role through the assortment around it."
+      : "Commercially, it should support the collection through clarity rather than novelty.";
+  const executionClause = entry.piece.note
+    ? entry.piece.note
+    : entry.piece.type
+    ? `Keep the ${entry.piece.type} execution disciplined so the piece reads intentional rather than overstated.`
+    : "Keep the execution restrained so the role reads clearly.";
+  const pressureClause = resonanceScore != null && resonanceScore < 75
+    ? "The current market window is more selective, so the role assignment needs to be disciplined."
+    : "The current market window supports a clear role if the assortment around it stays balanced.";
+
+  return {
+    title: entry.piece.item,
+    body: `${sourceClause} ${languageClause} ${marketClause} ${executionClause} ${pressureClause}`,
+  };
+}
+
+function buildStartingPieceRead(
+  entry: PieceRecommendationEntry,
+  options: {
+    directionName: string | null;
+    conceptSilhouette: string;
+    conceptPaletteName: string | null;
+    interpretationSummary: string;
+  }
+): ProductPieceRead {
+  const directionName = options.directionName ?? "this direction";
+  const silhouetteName =
+    CONCEPT_SILHOUETTES.find((silhouette) => silhouette.id === options.conceptSilhouette)?.name.toLowerCase() ??
+    options.conceptSilhouette;
+  const languageClause = options.conceptPaletteName
+    ? `${silhouetteName} proportions and ${options.conceptPaletteName.toLowerCase()} keep it consistent with the collection language now taking shape.`
+    : `${silhouetteName} proportions keep it consistent with the collection language now taking shape.`;
+  const interpretationClause =
+    options.interpretationSummary && options.interpretationSummary !== "Pure direction"
+      ? `It carries the clearest expression of ${directionName} while staying aligned to the ${options.interpretationSummary.toLowerCase()} inflection defining this collection.`
+      : `It currently carries the clearest expression of ${directionName} at product level.`;
+  const marketClause =
+    entry.piece.signal === "ascending"
+      ? "Its market signal also gives you enough momentum to evaluate the line from a confident lead expression."
+      : entry.piece.signal === "high-volume"
+      ? "Its market signal gives it enough breadth to test how the collection can scale without losing character."
+      : entry.piece.signal === "emerging"
+      ? "Its market signal keeps the point of view sharp, which makes it useful as an early read on how far the line can push."
+      : "It offers the clearest early read on how the assortment is beginning to organize itself.";
+
+  return {
+    title: entry.piece.item,
+    body: `${entry.piece.item} currently carries the clearest expression of the collection DNA. ${interpretationClause} ${languageClause} ${marketClause}`,
+  };
+}
+
+function buildStrategicImplication(
+  entry: PieceRecommendationEntry,
+  options: {
+    conceptSilhouette: string;
+    conceptPaletteName: string | null;
+    interpretationSummary: string;
+    signalCount: number;
+  }
+): ProductStrategicImplication {
+  const suggestedRoles = getSuggestedRolesForPiece(entry, options);
+  const summary =
+    suggestedRoles[0] === "hero"
+      ? "This piece can lead the collection if you want a sharper statement."
+      : suggestedRoles[0] === "directional"
+      ? "This piece is better suited to sharpening the assortment than stabilizing it."
+      : suggestedRoles[0] === "core-evolution"
+      ? "This piece stabilizes the collection rather than leading it."
+      : "This piece works best as the commercial spine of the assortment.";
+
+  return {
+    summary,
+    suggestedRoles,
+  };
+}
+
+function buildCollectionStructureSummary(roles: PieceRolesById): ProductStructureSummary {
+  const counts: Record<CollectionRoleId, number> = {
+    hero: 0,
+    directional: 0,
+    "core-evolution": 0,
+    "volume-driver": 0,
+  };
+
+  Object.values(roles).forEach((role) => {
+    counts[role] += 1;
+  });
+
+  const assignedCount = Object.keys(roles).length;
+  const notes: string[] = [];
+
+  if (assignedCount === 0) {
+    notes.push("Assign roles piece by piece to start revealing the collection structure.");
+  } else {
+    if (counts.hero === 0) notes.push("A Hero has not yet been assigned.");
+    if (counts["volume-driver"] === 0 && assignedCount >= 2) notes.push("The assortment is currently anchored in directional and core pieces with no volume driver yet.");
+    if (counts["core-evolution"] === 0 && assignedCount >= 2) notes.push("The mix still needs a grounded core evolution layer.");
+    if (counts.directional >= 2 && counts["core-evolution"] === 0) notes.push("You have directional energy, but the assortment needs more stabilizing clarity.");
+    if (notes.length === 0) notes.push("The role mix is reading balanced, with a clear structure emerging.");
+  }
+
+  return {
+    counts,
+    assignedCount,
+    notes: notes.slice(0, 2),
+  };
+}
+
 /* ─── Main component ──────────────────────────────────────────────────────── */
 export default function ConceptStudioPage() {
   const router = useRouter();
@@ -519,6 +871,11 @@ export default function ConceptStudioPage() {
     setConceptPalette,
     collectionAesthetic: storeCollectionAesthetic,
     setCollectionAesthetic,
+    directionInterpretationText: storeDirectionInterpretationText,
+    directionInterpretationChips: storeDirectionInterpretationChips,
+    setDirectionInterpretationText,
+    setDirectionInterpretationModifiers,
+    setDirectionInterpretationChips,
     setCustomChips: setStoreCustomChips,
     setSelectedKeyPiece,
     decisionGuidanceState,
@@ -527,6 +884,10 @@ export default function ConceptStudioPage() {
     intentTradeoff,
     collectionRole: storeCollectionRole,
     setCollectionRole,
+    activeProductPieceId,
+    setActiveProductPieceId,
+    pieceRolesById,
+    setPieceRolesById,
   } = useSessionStore();
 
   const [headerCollectionName, setHeaderCollectionName] = useState<string>("Collection");
@@ -534,9 +895,19 @@ export default function ConceptStudioPage() {
   const [lockedCollectionAesthetic, setLockedCollectionAesthetic] = useState<string | null>(storeCollectionAesthetic);
   const [isAestheticSelectionUnlocked, setIsAestheticSelectionUnlocked] = useState(false);
   const [showAestheticChangeModal, setShowAestheticChangeModal] = useState(false);
-  const [aestheticInflection, setAestheticInflection] = useState("");
+  const [aestheticInflection, setAestheticInflection] = useState(storeDirectionInterpretationText);
+  const [selectedInterpretationChips, setSelectedInterpretationChips] = useState<string[]>(storeDirectionInterpretationChips);
   const [inflectionSuggestions, setInflectionSuggestions] = useState<string[]>([]);
   const [loadingInflectionSuggestions, setLoadingInflectionSuggestions] = useState(false);
+  const [brandProfile3, setBrandProfile3] = useState<{
+    brand_name: string | null;
+    keywords: string[] | null;
+    customer_profile: string | null;
+    price_tier: string | null;
+    target_margin: number | null;
+    tension_context: string | null;
+  } | null>(null);
+  const brandKeywordSource = brandProfile3?.keywords ?? refinementModifiers;
 
   useEffect(() => { setCurrentStep(2); }, [setCurrentStep]);
   useEffect(() => {
@@ -575,10 +946,10 @@ export default function ConceptStudioPage() {
   // Empty until the batch fetch completes — falls back to static scoring in the meantime.
   const [allCriticScores, setAllCriticScores] = useState<Record<string, number>>({});
 
-  const { recommendedAesthetic, mukoPickLabel } = useMemo(() => {
+  const { recommendedAesthetic } = useMemo(() => {
     // No real scores yet — fall back to static brand-agnostic ranking
     if (Object.keys(allCriticScores).length === 0) {
-      return { recommendedAesthetic: computeRecommendedAesthetic(refinementModifiers), mukoPickLabel: "Muko's Pick" };
+      return { recommendedAesthetic: computeRecommendedAesthetic(brandKeywordSource) };
     }
 
     // Score each aesthetic using real Critic identity + static resonance
@@ -593,14 +964,14 @@ export default function ConceptStudioPage() {
 
     if (eligible.length > 0) {
       eligible.sort((a, b) => b.heroScore - a.heroScore);
-      return { recommendedAesthetic: eligible[0].aesthetic, mukoPickLabel: "Muko's Pick" };
+      return { recommendedAesthetic: eligible[0].aesthetic };
     }
 
-    // No aesthetic clears the threshold — surface the closest-fit with a different label
+    // No aesthetic clears the threshold — surface the closest-fit option.
     scored.sort((a, b) => b.identityScore - a.identityScore);
-    return { recommendedAesthetic: scored[0]?.aesthetic ?? computeRecommendedAesthetic(refinementModifiers), mukoPickLabel: "Closest Match" };
-  }, [allCriticScores, refinementModifiers]);
-  const selectedAesthetic = AESTHETICS.includes(aestheticInput as any) ? aestheticInput : null;
+    return { recommendedAesthetic: scored[0]?.aesthetic ?? computeRecommendedAesthetic(brandKeywordSource) };
+  }, [allCriticScores, brandKeywordSource]);
+  const selectedAesthetic = AESTHETICS.includes(aestheticInput as (typeof AESTHETICS)[number]) ? aestheticInput : null;
   const selectedIsAlternative = Boolean(selectedAesthetic && selectedAesthetic !== recommendedAesthetic);
   const lockedAestheticName = useMemo(
     () => resolveAestheticName(lockedCollectionAesthetic),
@@ -702,6 +1073,14 @@ export default function ConceptStudioPage() {
   }, [aestheticInflection, persistInflectionDraft]);
 
   useEffect(() => {
+    setDirectionInterpretationText(aestheticInflection);
+  }, [aestheticInflection, setDirectionInterpretationText]);
+
+  useEffect(() => {
+    setDirectionInterpretationChips(selectedInterpretationChips);
+  }, [selectedInterpretationChips, setDirectionInterpretationChips]);
+
+  useEffect(() => {
     if (!selectedAesthetic || resonancePulse) return;
     computeAndSetResonance(selectedAesthetic);
   }, [computeAndSetResonance, resonancePulse, selectedAesthetic]);
@@ -778,15 +1157,6 @@ export default function ConceptStudioPage() {
     if (trimmed) return trimmed;
     return collectionPieces.find((piece) => piece.aesthetic_inflection?.trim())?.aesthetic_inflection?.trim() ?? null;
   }, [aestheticInflection, collectionPieces]);
-  const [brandProfile3, setBrandProfile3] = useState<{
-    brand_name: string | null;
-    keywords: string[] | null;
-    customer_profile: string | null;
-    price_tier: string | null;
-    target_margin: number | null;
-    tension_context: string | null;
-  } | null>(null);
-
   // ─── Synthesizer: reactive MUKO INSIGHT (streaming) ──────────────────────
   const conceptAbortRef = useRef<AbortController | null>(null);
   const conceptRawJsonRef = useRef<string>('');
@@ -828,7 +1198,7 @@ export default function ConceptStudioPage() {
     const blackboard = buildConceptBlackboard({
       aestheticInput: aestheticInput || selectedAesthetic,
       aestheticSlug: slug,
-      brandKeywords: refinementModifiers,
+      brandKeywords: brandKeywordSource,
       identity_score: identityPulse?.score ?? 80,
       resonance_score: resonancePulse?.score ?? 75,
       season: season || 'SS27',
@@ -962,7 +1332,7 @@ export default function ConceptStudioPage() {
       controller.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAesthetic, conceptSilhouette, conceptPalette, brandProfileName, customerProfile, referenceBrands, excludedBrands, refinementModifiers, identityPulse?.score, resonancePulse?.score, collectionPieces, brandProfile3, activeCollectionInflection]);
+  }, [selectedAesthetic, conceptSilhouette, conceptPalette, brandProfileName, customerProfile, referenceBrands, excludedBrands, brandKeywordSource, identityPulse?.score, resonancePulse?.score, collectionPieces, brandProfile3, activeCollectionInflection]);
 
   useEffect(() => {
     if (!selectedAesthetic) {
@@ -980,7 +1350,7 @@ export default function ConceptStudioPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             aesthetic_name: selectedAesthetic,
-            brand_keywords: brandProfile3?.keywords ?? refinementModifiers,
+            brand_keywords: brandKeywordSource,
           }),
         });
         const data = await res.json().catch(() => ({ suggestions: [] }));
@@ -1003,7 +1373,7 @@ export default function ConceptStudioPage() {
     return () => {
       cancelled = true;
     };
-  }, [brandProfile3?.keywords, refinementModifiers, selectedAesthetic]);
+  }, [brandKeywordSource, selectedAesthetic]);
 
   const [freeFormDraft, setFreeFormDraft] = useState("");
   const [freeFormMatch, setFreeFormMatch] = useState<string | null>(null);
@@ -1022,14 +1392,6 @@ export default function ConceptStudioPage() {
     }, 400);
     return () => window.clearTimeout(timer);
   }, [freeFormDraft]);
-
-  const [refineText, setRefineText] = useState("");
-  const [interpretation, setInterpretation] = useState<Interpretation | null>(null);
-  useEffect(() => {
-    if (!selectedAesthetic) { setRefineText(""); setInterpretation(null); return; }
-    setRefineText(`${selectedAesthetic}, but…`);
-    setInterpretation({ base: selectedAesthetic, modifiers: [], note: `Interpreting this as: ${selectedAesthetic}`, confidence: "high", unsupportedHits: [] });
-  }, [selectedAesthetic]);
 
   // Pulse scores are only populated after the user selects a direction
 
@@ -1235,9 +1597,35 @@ export default function ConceptStudioPage() {
   const selectedAestheticData = selectedAesthetic
     ? (aestheticsData as unknown as AestheticDataEntry[]).find((a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-"))
     : null;
+  const combinedDirection = useMemo(
+    () =>
+      selectedAesthetic
+        ? combineDirection({
+            aestheticName: selectedAesthetic,
+            freeText: aestheticInflection,
+            selectedInterpretationChips,
+            season,
+          })
+        : null,
+    [aestheticInflection, season, selectedAesthetic, selectedInterpretationChips]
+  );
+  const interpretationSuggestions = useMemo(() => {
+    const merged = [...selectedInterpretationChips, ...inflectionSuggestions, ...SUGGESTED_INTERPRETATION_CHIPS];
+    return Array.from(new Set(merged)).slice(0, 8);
+  }, [inflectionSuggestions, selectedInterpretationChips]);
+  const interpretationSummary = useMemo(() => {
+    if (combinedDirection?.interpretationText.trim()) return combinedDirection.interpretationText.trim();
+    if (combinedDirection?.modifierLabels.length) return combinedDirection.modifierLabels.join(" + ");
+    return "Pure direction";
+  }, [combinedDirection]);
+
+  useEffect(() => {
+    setDirectionInterpretationModifiers(combinedDirection?.modifierLabels ?? []);
+  }, [combinedDirection, setDirectionInterpretationModifiers]);
 
   // KEY PIECES — derived from aesthetic + season
   const keyPieces = useMemo((): KeyPiece[] => {
+    if (combinedDirection) return combinedDirection.keyPieces.map((recommendation) => recommendation.piece);
     if (!selectedAesthetic) return [];
     const entry = (aestheticsData as unknown as AestheticDataEntry[]).find(
       (a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-")
@@ -1245,9 +1633,10 @@ export default function ConceptStudioPage() {
     if (!entry?.key_pieces) return [];
     const seasonKey = (season.includes("FW") || season.includes("Fall") || season.includes("fall")) ? "fw26" : "ss27";
     return entry.key_pieces[seasonKey] ?? entry.key_pieces["fw26"] ?? Object.values(entry.key_pieces)[0] ?? [];
-  }, [selectedAesthetic, season]);
+  }, [combinedDirection, selectedAesthetic, season]);
 
   const [selectedKeyPieceLocal, setSelectedKeyPieceLocal] = useState<KeyPiece | null>(null);
+  const [customProductPieces, setCustomProductPieces] = useState<KeyPiece[]>([]);
   const [customKeyPieceText, setCustomKeyPieceText] = useState("");
   const [customKeyPieceConfirmed, setCustomKeyPieceConfirmed] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -1269,48 +1658,124 @@ export default function ConceptStudioPage() {
   }, [keyPieces]);
 
   useEffect(() => {
+    setCustomProductPieces([]);
+    setPieceRolesById({});
+    setActiveProductPieceId(null);
+    setCollectionRole(null);
+    setSelectedKeyPieceLocal(null);
+    setSelectedKeyPiece(null);
     setDecisionGuidanceState({ is_confirmed: false, selected_anchor_piece: null });
-  }, [selectedAesthetic, setDecisionGuidanceState]);
+  }, [selectedAesthetic, setActiveProductPieceId, setCollectionRole, setDecisionGuidanceState, setPieceRolesById, setSelectedKeyPiece]);
 
   useEffect(() => {
-    if (decisionGuidanceState.is_confirmed) return;
-    const defaultAnchor = recommendedKeyPieces[0] ?? null;
-    if (decisionGuidanceState.selected_anchor_piece === defaultAnchor) return;
-    setDecisionGuidanceState({
-      is_confirmed: false,
-      selected_anchor_piece: defaultAnchor,
-    });
-  }, [decisionGuidanceState.is_confirmed, decisionGuidanceState.selected_anchor_piece, recommendedKeyPieces, setDecisionGuidanceState]);
-
-  const handleSelectAnchorPiece = useCallback((pieceName: string) => {
-    const anchorPiece = keyPieces.find((piece) => !piece.custom && piece.item === pieceName) ?? null;
-    setDecisionGuidanceState({
-      is_confirmed: false,
-      selected_anchor_piece: pieceName,
-    });
-    if (anchorPiece) {
-      setSelectedKeyPieceLocal(anchorPiece);
-      setSelectedKeyPiece(anchorPiece);
+    const allStagePieceIds = new Set([...keyPieces, ...customProductPieces].map((piece) => piece.item));
+    if (activeProductPieceId && !allStagePieceIds.has(activeProductPieceId)) {
+      setActiveProductPieceId(null);
     }
-  }, [keyPieces, setDecisionGuidanceState, setSelectedKeyPiece]);
+  }, [activeProductPieceId, customProductPieces, keyPieces, setActiveProductPieceId]);
+
+  const productPieceEntries = useMemo<PieceRecommendationEntry[]>(
+    () => [
+      ...keyPieces.map((piece, index) => ({
+        piece,
+        recommendation:
+          combinedDirection?.keyPieces.find((candidate) => candidate.piece.item === piece.item) ??
+          combinedDirection?.keyPieces[index] ??
+          null,
+      })),
+      ...customProductPieces.map((piece) => ({
+        piece,
+        recommendation: null,
+      })),
+    ],
+    [combinedDirection?.keyPieces, customProductPieces, keyPieces]
+  );
+
+  const activeProductPieceEntry = useMemo(
+    () => productPieceEntries.find((entry) => entry.piece.item === activeProductPieceId) ?? null,
+    [activeProductPieceId, productPieceEntries]
+  );
+
+  useEffect(() => {
+    if (!activeProductPieceEntry) {
+      setSelectedKeyPieceLocal(null);
+      setSelectedKeyPiece(null);
+      setDecisionGuidanceState({
+        is_confirmed: false,
+        selected_anchor_piece: null,
+      });
+      setCollectionRole(null);
+      return;
+    }
+    setSelectedKeyPieceLocal(activeProductPieceEntry.piece);
+    setSelectedKeyPiece(activeProductPieceEntry.piece);
+    setDecisionGuidanceState({
+      is_confirmed: false,
+      selected_anchor_piece: activeProductPieceEntry.piece.item,
+    });
+    setCollectionRole(pieceRolesById[activeProductPieceEntry.piece.item] ?? null);
+  }, [activeProductPieceEntry, pieceRolesById, setCollectionRole, setDecisionGuidanceState, setSelectedKeyPiece]);
+
+  const handleSelectProductPiece = useCallback((pieceName: string) => {
+    setActiveProductPieceId(pieceName);
+  }, [setActiveProductPieceId]);
+
+  const handleAssignRoleToPiece = useCallback((pieceName: string, role: CollectionRoleId) => {
+    const nextRoles: PieceRolesById = {};
+    Object.entries(pieceRolesById).forEach(([id, existingRole]) => {
+      if (existingRole === "hero" && role === "hero" && id !== pieceName) return;
+      nextRoles[id] = existingRole;
+    });
+    nextRoles[pieceName] = role;
+    setPieceRolesById(nextRoles);
+    setCollectionRole(role);
+  }, [pieceRolesById, setCollectionRole, setPieceRolesById]);
+
+  const commitCustomProductPiece = useCallback(() => {
+    const nextName = customKeyPieceText.trim();
+    if (!nextName) return;
+    const existing = [...keyPieces, ...customProductPieces].some((piece) => piece.item.toLowerCase() === nextName.toLowerCase());
+    if (!existing) {
+      setCustomProductPieces((prev) => [
+        ...prev,
+        {
+          item: nextName,
+          signal: null,
+          category: null,
+          type: null,
+          recommended_material_id: null,
+          redirect_material_id: null,
+          custom: true,
+        },
+      ]);
+    }
+    setCustomKeyPieceConfirmed(true);
+    setActiveProductPieceId(nextName);
+    setShowCustomInput(false);
+    setCustomKeyPieceText("");
+  }, [customKeyPieceText, customProductPieces, keyPieces, setActiveProductPieceId]);
 
   const handleConfirmDirection = useCallback(async () => {
-    const anchorPieceName = decisionGuidanceState.selected_anchor_piece ?? recommendedKeyPieces[0] ?? null;
-    const anchorPiece = anchorPieceName
-      ? keyPieces.find((piece) => !piece.custom && piece.item === anchorPieceName) ?? null
+    const heroPieceName = Object.entries(pieceRolesById).find(([, role]) => role === "hero")?.[0] ?? null;
+    const primaryPieceName = heroPieceName ?? activeProductPieceId ?? recommendedKeyPieces[0] ?? null;
+    const primaryPiece = primaryPieceName
+      ? [...keyPieces, ...customProductPieces].find((piece) => piece.item === primaryPieceName) ?? null
       : null;
     const executionLevers = conceptInsightData?.decision_guidance?.execution_levers ?? [];
     const shouldPersistCollectionAesthetic = collectionPieces.length === 0 || isAestheticSelectionUnlocked;
     const selectedAestheticSlug = selectedAesthetic ? toAestheticSlug(selectedAesthetic) : null;
+    const primaryRole = primaryPieceName ? pieceRolesById[primaryPieceName] ?? null : null;
 
     setDecisionGuidanceState({
       is_confirmed: true,
-      selected_anchor_piece: anchorPieceName,
+      selected_anchor_piece: primaryPieceName,
     });
 
-    if (anchorPiece) {
-      setSelectedKeyPieceLocal(anchorPiece);
-      setSelectedKeyPiece(anchorPiece);
+    if (primaryPiece) {
+      setSelectedKeyPieceLocal(primaryPiece);
+      setSelectedKeyPiece(primaryPiece);
+      setActiveProductPieceId(primaryPiece.item);
+      setCollectionRole(primaryRole);
     }
 
     if (shouldPersistCollectionAesthetic && selectedAestheticSlug) {
@@ -1363,11 +1828,15 @@ export default function ConceptStudioPage() {
       });
     }
   }, [
-    decisionGuidanceState.selected_anchor_piece,
+    activeProductPieceId,
     conceptInsightData?.decision_guidance?.execution_levers,
+    customProductPieces,
+    pieceRolesById,
     keyPieces,
     recommendedKeyPieces,
     selectedAesthetic,
+    setActiveProductPieceId,
+    setCollectionRole,
     setDecisionGuidanceState,
     setCollectionAesthetic,
     setSelectedKeyPiece,
@@ -1541,13 +2010,27 @@ export default function ConceptStudioPage() {
   /* ─── Select handler ──────────────────────────────────────────────────────── */
   const handleSelectAesthetic = (aesthetic: string) => {
     if (isAestheticSelectorLocked) return;
+    const aestheticSlug = toAestheticSlug(aesthetic);
+    setCurrentStageState("direction");
+    setStageTransitionDirection(1);
     setSelectedElements(new Set());
     setCustomChips({});
     setChipMeta(new Map());
+    setSelectedInterpretationChips([]);
+    setAestheticInflection("");
+    setDirectionInterpretationModifiers([]);
     // Clear silhouette/palette when aesthetic changes (affinity recommendations change)
     setConceptSilhouette('');
     setConceptPalette(null);
     setAestheticInput(aesthetic);
+    setLockedCollectionAesthetic(aestheticSlug);
+    setCollectionAesthetic(aestheticSlug);
+    setIsAestheticSelectionUnlocked(false);
+    try {
+      window.localStorage.setItem(COLLECTION_AESTHETIC_STORAGE_KEY, aestheticSlug);
+    } catch {
+      // Ignore storage failures.
+    }
 
     // If pulse is already pre-populated (e.g. Muko's Pick on first load), just lock — don't recalculate identity
     if (!identityPulse) {
@@ -1590,6 +2073,14 @@ export default function ConceptStudioPage() {
     const entry = (aestheticsData as unknown as AestheticDataEntry[]).find((a) => a.name === ae);
     const base = getDirectionInsight(ae, content?.identityScore ?? 80, content?.resonanceScore ?? 75, chips, entry?.trend_velocity ?? "peak");
 
+    if (combinedDirection && ae === selectedAesthetic) {
+      base.headline = combinedDirection.insight.headline;
+      base.p1 = combinedDirection.insight.summary;
+      base.p2 = combinedDirection.insight.marketNote;
+      base.p3 = combinedDirection.insight.opportunity;
+      base.opportunity = combinedDirection.signals.slice(0, 3).map((signal) => `${signal.label} — ${signal.reason}`);
+    }
+
     // Extend headline with silhouette/palette context
     if (conceptSilhouette && selectedAesthetic) {
       const silName = CONCEPT_SILHOUETTES.find((s) => s.id === conceptSilhouette)?.name ?? conceptSilhouette;
@@ -1609,7 +2100,7 @@ export default function ConceptStudioPage() {
     }
 
     return base;
-  }, [selectedAesthetic, recommendedAesthetic, conceptSilhouette, conceptPalette]);
+  }, [combinedDirection, selectedAesthetic, recommendedAesthetic, conceptSilhouette, conceptPalette]);
 
   const canContinue = Boolean(selectedAesthetic) && Boolean(conceptSilhouette);
   const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
@@ -1624,10 +2115,218 @@ export default function ConceptStudioPage() {
 
   /* ─── Top card chip data ──────────────────────────────────────────────────── */
   const topChips = getAestheticChips(topAesthetic);
-  const topSpecChips = topChips.filter((c) => c.type === "spec").slice(0, 4);
-  const topMoodChips = topChips.filter((c) => c.type === "mood").slice(0, 2);
-  const topDisplayChips = [...topSpecChips, ...topMoodChips];
+  const topDisplayChips = selectedAesthetic && combinedDirection
+    ? combinedDirection.signals.map((signal) => {
+        const matchingChip = topChips.find((chip) => chip.label === signal.label);
+        return matchingChip ?? {
+          label: signal.label,
+          type: "mood" as const,
+          material: null,
+          silhouette: null,
+          complexity_mod: 0,
+          palette: null,
+        };
+      })
+    : [...topChips.filter((c) => c.type === "spec").slice(0, 4), ...topChips.filter((c) => c.type === "mood").slice(0, 2)];
   const topContent = AESTHETIC_CONTENT[topAesthetic];
+  const orderedSilhouettes = useMemo(() => {
+    const order = combinedDirection?.silhouetteOrder ?? [];
+    return CONCEPT_SILHOUETTES.slice().sort((a, b) => {
+      const aIndex = order.indexOf(a.id);
+      const bIndex = order.indexOf(b.id);
+      return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+    });
+  }, [combinedDirection]);
+  const orderedPaletteOptions = useMemo(() => {
+    const options = selectedAestheticData?.palette_options ?? [];
+    const order = combinedDirection?.paletteOrder ?? [];
+    return options.slice().sort((a, b) => {
+      const aIndex = order.indexOf(a.id);
+      const bIndex = order.indexOf(b.id);
+      return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+    });
+  }, [combinedDirection, selectedAestheticData?.palette_options]);
+  const [showAllInterpretationSuggestions, setShowAllInterpretationSuggestions] = useState(false);
+  const [showAllSignals, setShowAllSignals] = useState(false);
+  const [currentStageState, setCurrentStageState] = useState<ConceptStageId>("direction");
+  const [stageTransitionDirection, setStageTransitionDirection] = useState<1 | -1>(1);
+  const visibleInterpretationSuggestions = showAllInterpretationSuggestions ? interpretationSuggestions : interpretationSuggestions.slice(0, 5);
+  const visibleSignals = showAllSignals ? topDisplayChips : topDisplayChips.slice(0, 5);
+  const hasInterpretationLayer = Boolean(aestheticInflection.trim() || selectedInterpretationChips.length > 0);
+  const hasLanguageChoices = Boolean(conceptSilhouette || conceptPalette || selectedElements.size > 0);
+  const canAdvanceToStage2 = Boolean(selectedAesthetic && hasInterpretationLayer);
+  const canAdvanceToStage3 = Boolean(canAdvanceToStage2 && hasLanguageChoices);
+  const assignedRoleCount = Object.keys(pieceRolesById).length;
+  const heroAssignedPieceId = Object.entries(pieceRolesById).find(([, role]) => role === "hero")?.[0] ?? null;
+  const canLockDirection = Boolean(canAdvanceToStage3 && assignedRoleCount > 0);
+  const highestAvailableStage: ConceptStageId = canAdvanceToStage3 ? "product" : canAdvanceToStage2 ? "language" : "direction";
+  const currentStage: ConceptStageId =
+    currentStageState === "product" && !canAdvanceToStage3
+      ? highestAvailableStage
+      : currentStageState === "language" && !canAdvanceToStage2
+      ? "direction"
+      : currentStageState;
+  const activePaletteName =
+    orderedPaletteOptions.find((palette) => palette.id === conceptPalette)?.name ?? conceptPalette ?? null;
+  const productSuggestionOptions = useMemo(
+    () => ({
+      conceptSilhouette,
+      conceptPaletteName: activePaletteName,
+      interpretationSummary,
+      signalCount: (combinedDirection?.signals ?? []).length,
+    }),
+    [activePaletteName, combinedDirection?.signals, conceptSilhouette, interpretationSummary]
+  );
+  const suggestedStartingPieceEntry = useMemo(
+    () =>
+      productPieceEntries
+        .slice()
+        .sort((a, b) => scoreStartingPiecePriority(b, productSuggestionOptions) - scoreStartingPiecePriority(a, productSuggestionOptions))[0] ?? null,
+    [productPieceEntries, productSuggestionOptions]
+  );
+  const pieceRecommendations = useMemo(() => {
+    if (!suggestedStartingPieceEntry) return productPieceEntries;
+    return productPieceEntries.slice().sort((a, b) => {
+      if (a.piece.item === suggestedStartingPieceEntry.piece.item) return -1;
+      if (b.piece.item === suggestedStartingPieceEntry.piece.item) return 1;
+      return 0;
+    });
+  }, [productPieceEntries, suggestedStartingPieceEntry]);
+  const executionGuidancePoints = useMemo(
+    () =>
+      conceptSilhouette
+        ? buildExecutionGuidance({
+            interpretationSummary,
+            conceptSilhouette,
+            conceptPalette,
+            paletteOptions: orderedPaletteOptions.map((palette) => ({ id: palette.id, name: palette.name })),
+            signals: combinedDirection?.signals ?? [],
+            executionLevers: conceptInsightData?.decision_guidance?.execution_levers ?? [],
+          })
+        : [],
+    [
+      combinedDirection?.signals,
+      conceptInsightData?.decision_guidance?.execution_levers,
+      conceptPalette,
+      conceptSilhouette,
+      interpretationSummary,
+      orderedPaletteOptions,
+    ]
+  );
+  const stageFrames = [
+    { id: "direction" as const, label: "Define Direction", helper: "Set the concept anchor and strategic read." },
+    { id: "language" as const, label: "Shape Collection Language", helper: "Translate direction into silhouette, palette, and signals." },
+    { id: "product" as const, label: "Build Product Expression", helper: "Evaluate pieces one by one and assign their role in the assortment." },
+  ];
+  const completedStages = {
+    direction: canAdvanceToStage2,
+    language: canAdvanceToStage3,
+    product: canLockDirection,
+  };
+  const activePieceSuggestion = useMemo(
+    () =>
+      activeProductPieceEntry
+        ? buildPieceSuggestion(activeProductPieceEntry, productSuggestionOptions)
+        : null,
+    [activeProductPieceEntry, productSuggestionOptions]
+  );
+  const activePieceRead = useMemo(
+    () =>
+      currentStage !== "product"
+        ? null
+        : activeProductPieceEntry
+        ? buildPieceRead(activeProductPieceEntry, resonanceScore, {
+            directionName: combinedDirection?.dnaLines[0] ?? selectedAesthetic ?? null,
+            conceptSilhouette,
+            conceptPaletteName: activePaletteName,
+            interpretationSummary,
+            signalLabels: (combinedDirection?.signals ?? []).map((signal) => signal.label),
+          })
+        : suggestedStartingPieceEntry
+        ? buildStartingPieceRead(suggestedStartingPieceEntry, {
+            directionName: combinedDirection?.dnaLines[0] ?? selectedAesthetic ?? null,
+            conceptSilhouette,
+            conceptPaletteName: activePaletteName,
+            interpretationSummary,
+          })
+        : null,
+    [activePaletteName, activeProductPieceEntry, combinedDirection?.dnaLines, combinedDirection?.signals, conceptSilhouette, currentStage, interpretationSummary, resonanceScore, selectedAesthetic, suggestedStartingPieceEntry]
+  );
+  const activeStrategicImplication = useMemo(
+    () =>
+      activeProductPieceEntry
+        ? buildStrategicImplication(activeProductPieceEntry, productSuggestionOptions)
+        : null,
+    [activeProductPieceEntry, productSuggestionOptions]
+  );
+  const collectionStructureSummary = useMemo(
+    () => buildCollectionStructureSummary(pieceRolesById),
+    [pieceRolesById]
+  );
+  const stageAwareHeadline =
+    currentStage === "language"
+      ? `Execution Guidance for ${combinedDirection?.dnaLines[0] ?? selectedAesthetic ?? recommendedAesthetic}`
+      : conceptInsightData?.statements[0] ?? insightContent.headline;
+  const stageAwareParagraphs =
+    currentStage === "language"
+      ? [
+          `Translate ${combinedDirection?.dnaLines[0] ?? selectedAesthetic ?? "this direction"} into a disciplined visual grammar before committing to the product mix.`,
+          conceptSilhouette
+            ? `${CONCEPT_SILHOUETTES.find((silhouette) => silhouette.id === conceptSilhouette)?.name ?? conceptSilhouette} is now setting the collection posture. Use palette and signals to reinforce that read.`
+            : "",
+        ].filter(Boolean)
+      : conceptInsightData
+      ? [conceptInsightData.statements[1] ?? "", conceptInsightData.statements[2] ?? ""].filter(Boolean)
+      : [insightContent.p1, insightContent.p2, insightContent.p3];
+  const navigateStage = useCallback(
+    (nextStage: ConceptStageId) => {
+      const currentIndex = getStageIndex(currentStage);
+      const nextIndex = getStageIndex(nextStage);
+      const highestIndex = getStageIndex(highestAvailableStage);
+      if (nextIndex > highestIndex) return;
+      setStageTransitionDirection(nextIndex > currentIndex ? 1 : -1);
+      setCurrentStageState(nextStage);
+    },
+    [currentStage, highestAvailableStage]
+  );
+  const stageTransitionProps = {
+    initial: (direction: 1 | -1) => ({ opacity: 0, y: direction > 0 ? 24 : -18 }),
+    animate: { opacity: 1, y: 0 },
+    exit: (direction: 1 | -1) => ({ opacity: 0, y: direction > 0 ? -20 : 18 }),
+    transition: { duration: 0.28, ease: [0.22, 0.8, 0.2, 1] },
+  };
+  const handleContinueToSpecs = useCallback(async () => {
+    if (!canLockDirection || !selectedAesthetic) return;
+    if (!heroAssignedPieceId) {
+      const shouldContinue = window.confirm("You haven't assigned a Hero role yet. Continue anyway?");
+      if (!shouldContinue) return;
+    }
+    await handleConfirmDirection();
+    useSessionStore.setState({
+      aestheticMatchedId: selectedAesthetic,
+      moodboardImages: topMoodboardImages,
+      conceptSilhouette,
+      conceptPalette,
+      directionInterpretationText: aestheticInflection.trim(),
+      directionInterpretationModifiers: combinedDirection?.modifierLabels ?? [],
+      directionInterpretationChips: selectedInterpretationChips,
+    });
+    setCurrentStep(3);
+    router.push('/spec');
+  }, [
+    aestheticInflection,
+    canLockDirection,
+    combinedDirection?.modifierLabels,
+    conceptPalette,
+    conceptSilhouette,
+    handleConfirmDirection,
+    heroAssignedPieceId,
+    router,
+    selectedAesthetic,
+    selectedInterpretationChips,
+    setCurrentStep,
+    topMoodboardImages,
+  ]);
 
   /* ─── RENDER ──────────────────────────────────────────────────────────────── */
   return (
@@ -1670,43 +2369,9 @@ export default function ConceptStudioPage() {
             <div>
               <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 28, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1 }}>Concept Studio</h1>
               <p style={{ margin: "10px 0 0", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.52)", lineHeight: 1.55, maxWidth: 460 }}>
-                We analyzed your brand DNA against live market data to find your strongest direction. Start with our pick or explore all eight below.
+                Choose one core collection direction, define how your brand is interpreting it this season, and let Muko translate that into grounded product guidance.
               </p>
             </div>
-            {!isAestheticSelectorLocked && (
-              <button
-                onClick={() => handleSelectAesthetic(recommendedAesthetic)}
-                style={{
-                  flexShrink: 0,
-                  marginTop: 4,
-                  padding: "7px 16px 7px 12px",
-                  borderRadius: 999,
-                  border: "1.5px solid rgba(77,48,47,0.35)",
-                  background: "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  cursor: "pointer",
-                  transition: "background 200ms ease, border-color 200ms ease",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(77,48,47,0.06)";
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(77,48,47,0.55)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(77,48,47,0.35)";
-                }}
-              >
-                <span
-                  className="muko-pick-dot"
-                  style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#A8B475", flexShrink: 0 }}
-                />
-                <span style={{ fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "#4D302F", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
-                  {mukoPickLabel}
-                </span>
-              </button>
-            )}
           </div>
 
           <div style={{ padding: "0 44px 48px" }}>
@@ -1714,7 +2379,7 @@ export default function ConceptStudioPage() {
             {isAestheticSelectorLocked && lockedAestheticName && (
               <div style={{ marginBottom: 24 }}>
                 <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-tertiary, rgba(67,67,43,0.40))", marginBottom: 8 }}>
-                  Collection Aesthetic
+                  Collection Direction
                 </div>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 12px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "rgba(255,255,255,0.78)", color: OLIVE, fontFamily: inter, fontSize: 12, fontWeight: 600 }}>
                   <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
@@ -1737,424 +2402,565 @@ export default function ConceptStudioPage() {
               <>
                 <div ref={yourConceptRef} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                   <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: CHARTREUSE, whiteSpace: "nowrap" }}>
-                    Your Concept
+                    Collection Direction
                   </span>
                   <div style={{ flex: 1, height: 1, background: "rgba(168,180,117,0.25)" }} />
                 </div>
 
                 <div
                   style={{
-                    position: "relative",
                     width: "100%",
-                    textAlign: "left",
+                    borderRadius: 16,
+                    border: "1px solid rgba(67,67,43,0.08)",
+                    background: "linear-gradient(180deg, rgba(255,255,255,0.95), rgba(247,243,235,0.92))",
                     padding: "18px 20px",
-                    borderRadius: 10,
-                    background: "transparent",
-                    border: `1px solid ${CHARTREUSE}`,
-                    boxShadow: "0 4px 16px rgba(168,180,117,0.18), 0 1px 4px rgba(0,0,0,0.06)",
-                    marginBottom: 28,
-                    overflow: "hidden",
-                    boxSizing: "border-box",
+                    marginBottom: 18,
                   }}
                 >
-                  <div style={{ position: "absolute", top: 10, right: 10, width: 22, height: 22, borderRadius: "50%", background: CHARTREUSE, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 8 }}>
+                    Locked Direction
                   </div>
-
-                  <span style={{ fontFamily: sohne, fontWeight: 500, fontSize: 20, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.15, display: "block", marginBottom: 8 }}>
+                  <span style={{ fontFamily: sohne, fontWeight: 500, fontSize: 24, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1, display: "block", marginBottom: 8 }}>
                     {topAesthetic}
                   </span>
+                  <p style={{ margin: "0 0 14px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.58)", lineHeight: 1.55, maxWidth: 520 }}>
+                    Move through the collection in sequence: define the direction, shape its language, then decide which pieces carry it forward.
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                    {topMoodboardImages.slice(0, 6).map((src, i) => (
+                      <div key={`top-mb-${i}`} style={{ aspectRatio: "1", borderRadius: 10, overflow: "hidden", animation: `fadeIn 220ms ease ${i * 20}ms both` }}>
+                        <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} loading="lazy" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-                  {topContent?.description && (
-                    <p style={{ margin: "0 0 12px", fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.58)", lineHeight: 1.55 }}>
-                      {topContent.description}
-                    </p>
-                  )}
-
-                  <div style={{ padding: "0 18px" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 14 }}>
-                      {topMoodboardImages.map((src, i) => (
-                        <div key={`top-mb-${i}`} style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", animation: `fadeIn 220ms ease ${i * 20}ms both` }}>
-                          <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} loading="lazy" />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 18 }}>
+                  {stageFrames.map((stage) => {
+                    const stageIndex = getStageIndex(stage.id);
+                    const currentIndex = getStageIndex(currentStage);
+                    const isActive = currentStage === stage.id;
+                    const isComplete = completedStages[stage.id];
+                    const isClickable = stageIndex <= getStageIndex(highestAvailableStage);
+                    return (
+                      <button
+                        key={stage.id}
+                        onClick={() => isClickable && navigateStage(stage.id)}
+                        style={{
+                          textAlign: "left",
+                          borderRadius: 14,
+                          border: isActive ? "1px solid rgba(168,180,117,0.45)" : "1px solid rgba(67,67,43,0.08)",
+                          background: isActive ? "rgba(168,180,117,0.08)" : isComplete ? "rgba(255,255,255,0.94)" : "rgba(255,255,255,0.72)",
+                          padding: "13px 14px",
+                          cursor: isClickable ? "pointer" : "default",
+                          opacity: stageIndex > currentIndex && !isComplete && !isActive ? 0.72 : 1,
+                        }}
+                      >
+                        <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: isActive ? "#6B7A40" : "rgba(67,67,43,0.36)", marginBottom: 6 }}>
+                          {isComplete ? "Complete" : isActive ? "Current" : "Upcoming"}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ height: 1, background: "rgba(67,67,43,0.10)", margin: "18px 0 16px" }} />
-                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 6 }}>
-                    SHAPE YOUR DIRECTION
-                  </div>
-                  <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "#A8A09A", marginBottom: 16, lineHeight: 1.5 }}>
-                    Complete your creative vision before moving to production specs.
-                  </div>
-
-                  <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-tertiary, rgba(67,67,43,0.40))", marginBottom: 4 }}>
-                      How are you inflecting this direction?
-                    </div>
-                    <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "var(--text-secondary, rgba(67,67,43,0.58))", marginBottom: 10, lineHeight: 1.5 }}>
-                      Optional. Push the aesthetic in a specific direction.
-                    </div>
-                    <input
-                      type="text"
-                      value={aestheticInflection}
-                      onChange={(e) => setAestheticInflection(e.target.value.slice(0, 100))}
-                      maxLength={100}
-                      placeholder="e.g. with heritage craft tension, with utilitarian edge..."
-                      style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: 13, borderRadius: 10, border: "1px solid rgba(67,67,43,0.12)", background: "rgba(255,255,255,0.88)", color: OLIVE, fontFamily: inter, outline: "none" }}
-                    />
-                    {inflectionSuggestions.length > 0 && (
-                      <div style={{ marginTop: 10 }}>
-                        <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: CHARTREUSE, marginBottom: 7 }}>
-                          Muko Suggests
+                        <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 500, color: OLIVE, lineHeight: 1.2, marginBottom: 4 }}>
+                          {stage.label}
                         </div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                          {inflectionSuggestions.map((suggestion) => (
-                            <button
-                              key={suggestion}
-                              onClick={() => setAestheticInflection(suggestion)}
-                              style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(168,180,117,0.45)", background: "rgba(168,180,117,0.14)", color: CHARTREUSE, fontFamily: inter, fontSize: 11, cursor: "pointer" }}
-                            >
-                              {suggestion}
-                            </button>
-                          ))}
+                        <div style={{ fontFamily: inter, fontSize: 11, lineHeight: 1.5, color: "rgba(67,67,43,0.54)" }}>
+                          {stage.helper}
                         </div>
-                      </div>
-                    )}
-                    {loadingInflectionSuggestions && inflectionSuggestions.length === 0 && (
-                      <div style={{ marginTop: 8, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.36)" }}>
-                        Generating inflection suggestions…
-                      </div>
-                    )}
-                  </div>
+                      </button>
+                    );
+                  })}
+                </div>
 
-                  {/* KEY PIECES — swatch-grid */}
-                  {keyPieces.length > 0 && (
-                    <div style={{ marginBottom: 24 }}>
-                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#A8A09A", marginBottom: 4 }}>
-                        Key Pieces
-                      </div>
-                      <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "#A8A09A", marginBottom: 10, lineHeight: 1.5 }}>
-                        What the market is moving toward for {selectedAesthetic} this season.
-                      </div>
-                      {/* 4-column flat grid */}
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-                        {keyPieces.map((piece, i) => {
-                          const isSelected = selectedKeyPieceLocal?.item === piece.item && !selectedKeyPieceLocal?.custom;
-                          const signalStyle = piece.signal === "high-volume"
-                            ? { color: "#8B5E3C", bg: "#B8876B18", border: "#B8876B40", label: "HIGH VOLUME" }
-                            : piece.signal === "ascending"
-                            ? { color: "#6B7A40", bg: "#A8B47518", border: "#A8B47540", label: "ASCENDING ↑" }
-                            : { color: "#7D96AC", bg: "#7D96AC18", border: "#7D96AC40", label: "EMERGING" };
-                          const satPct = resonanceSaturationScore ?? 0;
-                          return (
-                            <button
-                              key={i}
-                              onClick={() => {
-                                if (isSelected) {
-                                  setSelectedKeyPieceLocal(null);
-                                  setSelectedKeyPiece(null);
-                                } else {
-                                  setSelectedKeyPieceLocal(piece);
-                                  setSelectedKeyPiece(piece);
-                                }
-                              }}
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                borderRadius: 10,
-                                overflow: "hidden",
-                                border: isSelected ? "2px solid #A8B475" : "2px solid transparent",
-                                boxShadow: isSelected ? "0 0 0 3px #A8B47520" : "none",
-                                background: "transparent",
-                                cursor: "pointer",
-                                outline: "none",
-                                textAlign: "left",
-                                padding: 0,
-                                transition: "all 0.15s",
-                              }}
-                            >
-                              {/* Illustration area */}
-                              <div style={{
-                                height: 140,
-                                borderRadius: "8px 8px 0 0",
-                                background: isSelected ? "#F5F2EC" : "#EFECE6",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                overflow: "hidden",
-                              }}>
-                                {(() => {
-                                  const flatResult = getFlatForPiece(piece.type, piece.signal);
-                                  if (!flatResult) return <KeyPiecePlaceholder category={piece.category} />;
-                                  const { Flat, color } = flatResult;
-                                  return <Flat color={color} />;
-                                })()}
-                              </div>
-                              {/* Label area */}
-                              <div style={{
-                                background: isSelected ? "#A8B47508" : "#FFFFFF",
-                                borderTop: isSelected ? "1px solid #A8B47530" : "1px solid #F0EDE8",
-                                borderRadius: "0 0 8px 8px",
-                                padding: "8px 8px 7px",
-                              }}>
-                                <div style={{ fontFamily: inter, fontSize: 12, fontWeight: 600, color: "#191919", lineHeight: 1.3, marginBottom: 4 }}>
-                                  {piece.item}
-                                </div>
-                                {piece.signal && (
-                                  <span style={{
-                                    display: "inline-block",
-                                    fontSize: 9,
-                                    fontWeight: 700,
-                                    letterSpacing: "0.07em",
-                                    textTransform: "uppercase" as const,
-                                    color: signalStyle.color,
-                                    background: signalStyle.bg,
-                                    border: `1px solid ${signalStyle.border}`,
-                                    borderRadius: 3,
-                                    padding: "1px 5px",
-                                    marginBottom: 5,
-                                  }}>
-                                    {signalStyle.label}
-                                  </span>
-                                )}
-                                {/* Saturation bar */}
-                                <div style={{ marginBottom: 3 }}>
-                                  <div style={{ height: 3, background: "#F0EDE8", borderRadius: 2, overflow: "hidden" }}>
-                                    <div style={{
-                                      height: "100%",
-                                      width: `${satPct}%`,
-                                      background: signalStyle.color,
-                                      opacity: 0.7,
-                                    }} />
-                                  </div>
-                                  <div style={{ fontFamily: inter, fontSize: 9.5, color: "#A8A09A", marginTop: 2 }}>
-                                    {satPct}% market saturation
-                                  </div>
-                                </div>
-                                {/* Category tag chips */}
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 2 }}>
-                                  {piece.category && (
-                                    <span style={{ fontSize: 9.5, color: "#A8A09A", background: "#F0EDE8", borderRadius: 20, padding: "2px 7px", fontFamily: inter }}>
-                                      {piece.category}
-                                    </span>
-                                  )}
-                                  {piece.type && (
-                                    <span style={{ fontSize: 9.5, color: "#A8A09A", background: "#F0EDE8", borderRadius: 20, padding: "2px 7px", fontFamily: inter }}>
-                                      {piece.type}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {/* Add your own piece */}
-                      {!showCustomInput ? (
-                        <button
-                          onClick={() => setShowCustomInput(true)}
-                          style={{
-                            marginTop: 10,
-                            display: "block",
-                            width: "100%",
-                            padding: "10px 16px",
-                            borderRadius: 6,
-                            border: "1.5px dashed #D4CFC8",
-                            background: "none",
-                            cursor: "pointer",
-                            fontFamily: inter,
-                            fontSize: 12,
-                            color: "#A8A09A",
-                            outline: "none",
-                            textAlign: "left" as const,
-                          }}
-                        >
-                          + Add your own piece
-                        </button>
-                      ) : (
-                        <div style={{ marginTop: 10, padding: "9px 14px", borderRadius: 6, border: "1.5px dashed #D4CFC8", background: "rgba(255,255,255,0.60)" }}>
-                          <input
-                            autoFocus
-                            value={customKeyPieceText}
-                            onChange={(e) => setCustomKeyPieceText(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && customKeyPieceText.trim()) {
-                                const custom: KeyPiece = { item: customKeyPieceText.trim(), signal: null, category: null, type: null, recommended_material_id: null, redirect_material_id: null, custom: true };
-                                setSelectedKeyPieceLocal(custom);
-                                setSelectedKeyPiece(custom);
-                                setCustomKeyPieceConfirmed(true);
-                              }
-                            }}
-                            onBlur={() => {
-                              if (customKeyPieceText.trim()) {
-                                const custom: KeyPiece = { item: customKeyPieceText.trim(), signal: null, category: null, type: null, recommended_material_id: null, redirect_material_id: null, custom: true };
-                                setSelectedKeyPieceLocal(custom);
-                                setSelectedKeyPiece(custom);
-                                setCustomKeyPieceConfirmed(true);
-                              }
-                            }}
-                            placeholder="e.g. Asymmetric Hem Midi Dress"
-                            style={{ width: "100%", boxSizing: "border-box", border: "none", background: "transparent", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.80)", outline: "none" }}
-                          />
-                          {customKeyPieceConfirmed && (
-                            <div style={{ marginTop: 6, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.44)", fontStyle: "italic" }}>
-                              Muko doesn&apos;t have market data on this piece yet — it won&apos;t affect your score but we&apos;ll track it.
+                <div style={{ position: "relative", minHeight: 760 }}>
+                  <AnimatePresence mode="wait" custom={stageTransitionDirection}>
+                    <motion.div
+                      key={currentStage}
+                      custom={stageTransitionDirection}
+                      variants={stageTransitionProps}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      style={{
+                        borderRadius: 18,
+                        border: "1px solid rgba(67,67,43,0.08)",
+                        background: "rgba(255,255,255,0.86)",
+                        boxShadow: "0 18px 40px rgba(17,17,12,0.06)",
+                        padding: "22px 22px 20px",
+                      }}
+                    >
+                      {currentStage === "direction" && (
+                        <>
+                          <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: CHARTREUSE, marginBottom: 6 }}>
+                            Stage 1
+                          </div>
+                          <div style={{ fontFamily: sohne, fontSize: 22, fontWeight: 500, color: OLIVE, marginBottom: 4 }}>
+                            Define Direction
+                          </div>
+                          <div style={{ fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.56)", marginBottom: 22, lineHeight: 1.55 }}>
+                            Set the concept anchor and define your interpretation.
+                          </div>
+
+                          <div style={{ marginBottom: 24 }}>
+                            <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 6 }}>
+                              Brand Interpretation
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                            <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.56)", marginBottom: 10, lineHeight: 1.5 }}>
+                              Define what makes your version of this direction distinct this season.
+                            </div>
+                            <input
+                              type="text"
+                              value={aestheticInflection}
+                              onChange={(e) => setAestheticInflection(e.target.value.slice(0, 100))}
+                              maxLength={100}
+                              placeholder="e.g. softer tailoring, fluid drape, matte restraint..."
+                              style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: 13, borderRadius: 10, border: "1px solid rgba(67,67,43,0.12)", background: "rgba(255,255,255,0.88)", color: OLIVE, fontFamily: inter, outline: "none" }}
+                            />
+                            <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {visibleInterpretationSuggestions.map((suggestion) => {
+                                const isSelected = selectedInterpretationChips.includes(suggestion);
+                                return (
+                                  <button
+                                    key={suggestion}
+                                    onClick={() =>
+                                      setSelectedInterpretationChips((prev) =>
+                                        prev.includes(suggestion) ? prev.filter((item) => item !== suggestion) : [...prev, suggestion]
+                                      )
+                                    }
+                                    style={{
+                                      whiteSpace: "nowrap",
+                                      padding: "6px 11px",
+                                      borderRadius: 999,
+                                      border: isSelected ? "1px solid rgba(168,180,117,0.70)" : "1px solid rgba(67,67,43,0.12)",
+                                      background: isSelected ? "rgba(168,180,117,0.16)" : "rgba(255,255,255,0.78)",
+                                      color: isSelected ? "#6B7A40" : "rgba(67,67,43,0.62)",
+                                      fontFamily: inter,
+                                      fontSize: 11,
+                                      fontWeight: isSelected ? 600 : 500,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    {suggestion}
+                                  </button>
+                                );
+                              })}
+                              {interpretationSuggestions.length > visibleInterpretationSuggestions.length && (
+                                <button
+                                  onClick={() => setShowAllInterpretationSuggestions((value) => !value)}
+                                  style={{ padding: "6px 11px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.12)", background: "rgba(255,255,255,0.78)", color: "rgba(67,67,43,0.56)", fontFamily: inter, fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+                                >
+                                  {showAllInterpretationSuggestions ? "Show less" : `+${interpretationSuggestions.length - visibleInterpretationSuggestions.length} more`}
+                                </button>
+                              )}
+                            </div>
+                          </div>
 
-                  {/* Silhouette selector (required) */}
-                  <div style={{ marginBottom: 18 }}>
-                    <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 10 }}>
-                      Silhouette <span style={{ fontWeight: 500, letterSpacing: "0.04em", textTransform: "none" as const, color: "#A8A09A" }}>(required)</span>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-                      {CONCEPT_SILHOUETTES.map((sil) => {
-                        const isSel = conceptSilhouette === sil.id;
-                        const isAffinity = selectedAestheticData?.silhouette_affinity?.includes(sil.id) ?? false;
-                        return (
-                          <button
-                            key={sil.id}
-                            onClick={() => setConceptSilhouette(sil.id)}
+                          <motion.div
+                            key={`${selectedAesthetic}-${interpretationSummary}`}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.2, ease: "easeOut" }}
                             style={{
-                              textAlign: "left",
-                              borderRadius: 14,
-                              padding: "14px 14px 12px",
-                              background: isSel ? "#A8B47508" : "#FFFFFF",
-                              border: isSel ? "1.5px solid #A8B475" : "1.5px solid #E8E3D6",
-                              cursor: "pointer",
-                              outline: "none",
-                              transition: "all 200ms ease",
-                              position: "relative",
+                              marginBottom: 28,
+                              borderRadius: 16,
+                              border: "1px solid rgba(67,67,43,0.10)",
+                              background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,240,232,0.88))",
+                              padding: "20px 22px",
                             }}
                           >
-                            {isAffinity && !isSel && (
-                              <div style={{ position: "absolute", top: 8, right: 8 }}>
-                                <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "#CDAAB318", border: "1px solid #CDAAB340", color: "#CDAAB3", fontFamily: inter, whiteSpace: "nowrap" }}>
-                                  Best fit
-                                </span>
-                              </div>
+                            <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 10 }}>
+                              Collection DNA
+                            </div>
+                            <div style={{ fontFamily: sohne, fontSize: 26, fontWeight: 500, color: OLIVE, letterSpacing: "-0.02em", lineHeight: 1.05, marginBottom: 4 }}>
+                              {combinedDirection?.dnaLines[0] ?? selectedAesthetic}
+                            </div>
+                            <div style={{ fontFamily: inter, fontSize: 15, fontWeight: 600, color: "rgba(67,67,43,0.72)", lineHeight: 1.35 }}>
+                              {combinedDirection?.dnaLines[1] ?? interpretationSummary}
+                            </div>
+                            {combinedDirection && (
+                              <p style={{ margin: "10px 0 0", fontFamily: inter, fontSize: 11.5, lineHeight: 1.55, color: "rgba(67,67,43,0.56)" }}>
+                                Recommendations below are recalibrating to this combined direction.
+                              </p>
                             )}
-                            <div style={{ fontSize: 13, marginBottom: 4, color: "rgba(67,67,43,0.35)" }}>
-                              {SILHOUETTE_ICONS[sil.id]}
-                            </div>
-                            <div style={{ fontSize: 13.5, fontWeight: 600, color: "#191919", fontFamily: inter, marginBottom: 2 }}>
-                              {sil.name}
-                            </div>
-                            <div style={{ fontSize: 11, color: "#A8A09A", fontFamily: inter, marginTop: 6, lineHeight: 1.5 }}>
-                              {sil.descriptor}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                          </motion.div>
 
-                  {/* Palette selector (optional) */}
-                  {selectedAestheticData?.palette_options && selectedAestheticData.palette_options.length > 0 && (
-                    <div>
-                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 10 }}>
-                        Palette <span style={{ fontWeight: 500, letterSpacing: "0.04em", textTransform: "none" as const, color: "#A8A09A" }}>(optional)</span>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        {selectedAestheticData.palette_options.map((pal) => {
-                          const isSel = conceptPalette === pal.id;
-                          const isAffinity = selectedAestheticData?.palette_affinity?.includes(pal.id) ?? false;
-                          return (
+                          <div style={{ display: "flex", justifyContent: "flex-end" }}>
                             <button
-                              key={pal.id}
-                              onClick={() => setConceptPalette(isSel ? null : pal.id)}
+                              onClick={() => navigateStage("language")}
+                              disabled={!canAdvanceToStage2}
                               style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 12,
-                                padding: "10px 12px",
-                                borderRadius: 8,
-                                background: isSel ? "#A8B47508" : "transparent",
-                                border: isSel ? "1.5px solid #A8B475" : "1.5px solid transparent",
-                                cursor: "pointer",
-                                outline: "none",
-                                textAlign: "left" as const,
-                                width: "100%",
-                                transition: "all 200ms ease",
+                                padding: "12px 18px",
+                                borderRadius: 999,
+                                border: canAdvanceToStage2 ? "1.5px solid #7D96AC" : "1px solid rgba(67,67,43,0.10)",
+                                background: canAdvanceToStage2 ? "rgba(125,150,172,0.08)" : "rgba(255,255,255,0.6)",
+                                color: canAdvanceToStage2 ? "#7D96AC" : "rgba(67,67,43,0.30)",
+                                fontFamily: sohne,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: canAdvanceToStage2 ? "pointer" : "not-allowed",
                               }}
                             >
-                              {/* Circular swatches */}
-                              <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
-                                {pal.swatches.slice(0, 6).map((hex, i) => (
-                                  <div key={i} style={{ width: 18, height: 18, borderRadius: "50%", backgroundColor: hex, border: "1px solid rgba(0,0,0,0.08)", flexShrink: 0 }} />
-                                ))}
+                              Continue to Collection Language
+                            </button>
+                          </div>
+                        </>
+                      )}
+
+                      {currentStage === "language" && (
+                        <>
+                          <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: CHARTREUSE, marginBottom: 6 }}>
+                            Stage 2
+                          </div>
+                          <div style={{ fontFamily: sohne, fontSize: 22, fontWeight: 500, color: OLIVE, marginBottom: 4 }}>
+                            Shape Collection Language
+                          </div>
+                          <div style={{ fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.56)", marginBottom: 22, lineHeight: 1.55 }}>
+                            Translate the direction into silhouette, palette, and signals.
+                          </div>
+
+                          <div style={{ marginBottom: 20 }}>
+                            <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 10 }}>
+                              Silhouette
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+                              {orderedSilhouettes.map((sil) => {
+                                const isSel = conceptSilhouette === sil.id;
+                                const isAffinity = selectedAestheticData?.silhouette_affinity?.includes(sil.id) ?? false;
+                                return (
+                                  <button
+                                    key={sil.id}
+                                    onClick={() => setConceptSilhouette(sil.id)}
+                                    style={{
+                                      textAlign: "left",
+                                      borderRadius: 14,
+                                      padding: "14px 14px 12px",
+                                      background: isSel ? "#A8B47508" : isAffinity ? "rgba(168,180,117,0.03)" : "#FFFFFF",
+                                      border: isSel ? "1.5px solid #A8B475" : isAffinity ? "1.5px solid rgba(168,180,117,0.18)" : "1.5px solid #E8E3D6",
+                                      cursor: "pointer",
+                                      position: "relative",
+                                      boxShadow: isAffinity && !isSel ? "0 6px 18px rgba(67,67,43,0.035)" : "none",
+                                    }}
+                                  >
+                                    <div style={{ fontSize: 13, marginBottom: 4, color: "rgba(67,67,43,0.35)" }}>
+                                      {SILHOUETTE_ICONS[sil.id]}
+                                    </div>
+                                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "#191919", fontFamily: inter, marginBottom: 2 }}>
+                                      {sil.name}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#A8A09A", fontFamily: inter, marginTop: 6, lineHeight: 1.5 }}>
+                                      {sil.descriptor}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {selectedAestheticData?.palette_options && selectedAestheticData.palette_options.length > 0 && (
+                            <div style={{ marginBottom: 20 }}>
+                              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 10 }}>
+                                Palette
                               </div>
-                              {/* Name + description */}
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                  <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 600, color: "#191919" }}>
-                                    {pal.name}
-                                  </span>
-                                  {isAffinity && !isSel && (
-                                    <span style={{ padding: "1px 7px", borderRadius: 4, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, background: "#CDAAB318", color: "#CDAAB3", border: "1px solid #CDAAB340", fontFamily: inter, whiteSpace: "nowrap" }}>
-                                      Best fit
-                                    </span>
-                                  )}
-                                </div>
-                                <div style={{ fontFamily: inter, fontSize: 11.5, color: "#A8A09A", lineHeight: 1.45, marginTop: 2 }}>
-                                  {pal.descriptor}
-                                </div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                {orderedPaletteOptions.map((pal) => {
+                                  const isSel = conceptPalette === pal.id;
+                                  const isAffinity = selectedAestheticData?.palette_affinity?.includes(pal.id) ?? false;
+                                  return (
+                                    <button
+                                      key={pal.id}
+                                      onClick={() => setConceptPalette(isSel ? null : pal.id)}
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 12,
+                                        padding: "10px 12px",
+                                        borderRadius: 8,
+                                        background: isSel ? "#A8B47508" : isAffinity ? "rgba(168,180,117,0.03)" : "transparent",
+                                        border: isSel ? "1.5px solid #A8B475" : isAffinity ? "1.5px solid rgba(168,180,117,0.16)" : "1.5px solid transparent",
+                                        cursor: "pointer",
+                                        textAlign: "left",
+                                        boxShadow: isAffinity && !isSel ? "0 6px 18px rgba(67,67,43,0.035)" : "none",
+                                      }}
+                                    >
+                                      <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+                                        {pal.swatches.slice(0, 6).map((hex, i) => (
+                                          <div key={i} style={{ width: 18, height: 18, borderRadius: "50%", backgroundColor: hex, border: "1px solid rgba(0,0,0,0.08)" }} />
+                                        ))}
+                                      </div>
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                          <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 600, color: "#191919" }}>
+                                            {pal.name}
+                                          </span>
+                                        </div>
+                                        <div style={{ fontFamily: inter, fontSize: 11.5, color: "#A8A09A", lineHeight: 1.45, marginTop: 2 }}>
+                                          {pal.descriptor}
+                                        </div>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
                               </div>
-                              {/* Radio indicator */}
-                              <div style={{ width: 18, height: 18, borderRadius: "50%", flexShrink: 0, background: isSel ? "#A8B475" : "transparent", border: isSel ? "none" : "1.5px solid #D4CFC8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                {isSel && (
-                                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.5 9L10 3.5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            </div>
+                          )}
+
+                          {topDisplayChips.length > 0 && (
+                            <div style={{ marginBottom: 28 }}>
+                              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 4 }}>
+                                Layer These In
+                              </div>
+                              <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.56)", marginBottom: 12, lineHeight: 1.5 }}>
+                                Signals that bring this collection DNA into focus.
+                              </div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                {visibleSignals.map((chip) => {
+                                  const chipKey = `${topAesthetic}::${chip.label}`;
+                                  const isActive = selectedElements.has(chipKey);
+                                  const meta = chipMeta.get(chipKey);
+                                  const isAutoSelected = meta?.source === 'key-piece';
+                                  const tension: TensionState = isActive && !isAutoSelected ? getChipTensionState(chip.label, selectedKeyPieceLocal) : 'none';
+                                  return (
+                                    <AestheticChipButton
+                                      key={chip.label}
+                                      label={chip.label}
+                                      isActive={isActive}
+                                      isClickable={true}
+                                      onClick={() => toggleElement(chipKey)}
+                                      isAutoSelected={isAutoSelected}
+                                      tension={tension}
+                                    />
+                                  );
+                                })}
+                                {topDisplayChips.length > visibleSignals.length && (
+                                  <button
+                                    onClick={() => setShowAllSignals((value) => !value)}
+                                    style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, fontFamily: inter, background: "rgba(255,255,255,0.78)", border: "1px solid rgba(67,67,43,0.12)", color: "rgba(67,67,43,0.56)", cursor: "pointer" }}
+                                  >
+                                    {showAllSignals ? "Show less" : `+${topDisplayChips.length - visibleSignals.length} more`}
+                                  </button>
                                 )}
                               </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                            </div>
+                          )}
 
-                  {/* LAYER THESE IN */}
-                  {topDisplayChips.length > 0 && (
-                    <>
-                      <div style={{ height: 1, background: "#E8E3D6", margin: "20px 0 16px" }} />
-                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 4 }}>
-                        Layer these in
-                      </div>
-                      <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "#A8A09A", marginBottom: 12, lineHeight: 1.5 }}>
-                        Creative signals that shape this direction — activate the ones that feel right to amplify your vision.
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {topDisplayChips.map((chip) => {
-                          const chipKey = `${topAesthetic}::${chip.label}`;
-                          const isActive = selectedElements.has(chipKey);
-                          const meta = chipMeta.get(chipKey);
-                          const isAutoSelected = meta?.source === 'key-piece';
-                          // Only compute tension for manually selected chips (auto-selected chips never self-penalize)
-                          const tension: TensionState = isActive && !isAutoSelected
-                            ? getChipTensionState(chip.label, selectedKeyPieceLocal)
-                            : 'none';
-                          return (
-                            <AestheticChipButton
-                              key={chip.label}
-                              label={chip.label}
-                              isActive={isActive}
-                              isClickable={true}
-                              onClick={() => toggleElement(chipKey)}
-                              isAutoSelected={isAutoSelected}
-                              tension={tension}
-                            />
-                          );
-                        })}
-                        <span style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, background: "transparent", border: "1.5px dashed #D4CFC8", color: "#A8A09A" }}>+ add</span>
-                      </div>
-                    </>
-                  )}
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                            <button
+                              onClick={() => navigateStage("direction")}
+                              style={{ padding: "12px 18px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", color: "rgba(67,67,43,0.62)", fontFamily: sohne, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                            >
+                              Back to Direction
+                            </button>
+                            <button
+                              onClick={() => navigateStage("product")}
+                              disabled={!canAdvanceToStage3}
+                              style={{
+                                padding: "12px 18px",
+                                borderRadius: 999,
+                                border: canAdvanceToStage3 ? "1.5px solid #7D96AC" : "1px solid rgba(67,67,43,0.10)",
+                                background: canAdvanceToStage3 ? "rgba(125,150,172,0.08)" : "rgba(255,255,255,0.6)",
+                                color: canAdvanceToStage3 ? "#7D96AC" : "rgba(67,67,43,0.30)",
+                                fontFamily: sohne,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: canAdvanceToStage3 ? "pointer" : "not-allowed",
+                              }}
+                            >
+                              Continue to Product Expression
+                            </button>
+                          </div>
+                        </>
+                      )}
+
+                      {currentStage === "product" && (
+                        <>
+                          <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: CHARTREUSE, marginBottom: 6 }}>
+                            Stage 3
+                          </div>
+                          <div style={{ fontFamily: sohne, fontSize: 22, fontWeight: 500, color: OLIVE, marginBottom: 4 }}>
+                            Build Product Expression
+                          </div>
+                          <div style={{ fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.56)", marginBottom: 22, lineHeight: 1.55 }}>
+                            Review pieces one by one, assign their role, and build the assortment structure.
+                          </div>
+
+                          <div style={{ marginBottom: 26 }}>
+                            <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 4 }}>
+                              Piece Review
+                            </div>
+                            <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.56)", marginBottom: 12, lineHeight: 1.5 }}>
+                              Review the assortment piece by piece and decide how each one should function in the line.
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                              {pieceRecommendations.map(({ piece, recommendation }) => {
+                                const isSelected = activeProductPieceId === piece.item;
+                                const isSuggestedStartingPiece = suggestedStartingPieceEntry?.piece.item === piece.item;
+                                const assignedRole = pieceRolesById[piece.item] ?? null;
+                                const signalLabel = getSignalLabel(piece.signal);
+                                const signalStyle = piece.signal === "high-volume"
+                                  ? { color: "#8B5E3C", bg: "#B8876B18", border: "#B8876B40", label: "High volume" }
+                                  : piece.signal === "ascending"
+                                  ? { color: "#6B7A40", bg: "#A8B47518", border: "#A8B47540", label: "Ascending" }
+                                  : { color: "#7D96AC", bg: "#7D96AC18", border: "#7D96AC40", label: "Emerging" };
+                                return (
+                                  <button
+                                    key={piece.item}
+                                    onClick={() => handleSelectProductPiece(piece.item)}
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      borderRadius: 10,
+                                      overflow: "hidden",
+                                      border: isSelected
+                                        ? "1.5px solid #A8B475"
+                                        : isSuggestedStartingPiece
+                                        ? "1px solid rgba(168,180,117,0.22)"
+                                        : "1px solid rgba(67,67,43,0.08)",
+                                      boxShadow: isSelected
+                                        ? "0 0 0 3px rgba(168,180,117,0.14)"
+                                        : isSuggestedStartingPiece
+                                        ? "0 10px 24px rgba(67,67,43,0.05)"
+                                        : "0 8px 24px rgba(67,67,43,0.04)",
+                                      background: "#FFFFFF",
+                                      cursor: "pointer",
+                                      textAlign: "left",
+                                      padding: 0,
+                                      transition: "border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease",
+                                      transform: isSelected ? "translateY(-1px)" : isSuggestedStartingPiece ? "translateY(-1px)" : "translateY(0)",
+                                    }}
+                                  >
+                                    <div style={{ height: 136, background: isSelected ? "#F5F2EC" : isSuggestedStartingPiece ? "#F1EFE8" : "#EFECE6", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                                      {(() => {
+                                        const flatResult = getFlatForPiece(piece.type, piece.signal);
+                                        if (!flatResult) return <KeyPiecePlaceholder category={piece.category} />;
+                                        const { Flat, color } = flatResult;
+                                        return <Flat color={color} />;
+                                      })()}
+                                    </div>
+                                    <div style={{ background: isSelected ? "#A8B47508" : isSuggestedStartingPiece ? "rgba(168,180,117,0.04)" : "#FFFFFF", borderTop: "1px solid #F0EDE8", padding: "10px 10px 9px" }}>
+                                      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 6 }}>
+                                        <span style={{ fontSize: 9.5, color: recommendation?.bucket === "interpretation" ? "#6B7A40" : "rgba(67,67,43,0.56)", background: recommendation?.bucket === "interpretation" ? "rgba(168,180,117,0.12)" : "#F0EDE8", borderRadius: 999, padding: "3px 8px", fontFamily: inter, fontWeight: 600 }}>
+                                          {piece.custom ? "Custom piece" : recommendation?.bucket === "interpretation" ? "From interpretation" : "Core to direction"}
+                                        </span>
+                                        {signalLabel && (
+                                          <span style={{ fontSize: 9.5, color: signalStyle.color, background: signalStyle.bg, border: `1px solid ${signalStyle.border}`, borderRadius: 999, padding: "3px 8px", fontFamily: inter, fontWeight: 600 }}>
+                                            {signalLabel}
+                                          </span>
+                                        )}
+                                        {assignedRole && (
+                                          <span style={{ fontSize: 9.5, color: assignedRole === "hero" ? "#7D96AC" : "rgba(67,67,43,0.62)", background: assignedRole === "hero" ? "rgba(125,150,172,0.10)" : "#F4F0EA", borderRadius: 999, padding: "3px 8px", fontFamily: inter, fontWeight: 600 }}>
+                                            {getRoleName(assignedRole)}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div style={{ fontFamily: inter, fontSize: 12.5, fontWeight: 600, color: "#191919", lineHeight: 1.3, marginBottom: 4 }}>
+                                        {piece.item}
+                                      </div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {!showCustomInput ? (
+                              <button
+                                onClick={() => setShowCustomInput(true)}
+                                style={{ marginTop: 10, display: "block", width: "100%", padding: "10px 16px", borderRadius: 8, border: "1.5px dashed #D4CFC8", background: "none", cursor: "pointer", fontFamily: inter, fontSize: 12, color: "#A8A09A", textAlign: "left" }}
+                              >
+                                + Add your own piece
+                              </button>
+                            ) : (
+                              <div style={{ marginTop: 10, padding: "9px 14px", borderRadius: 8, border: "1.5px dashed #D4CFC8", background: "rgba(255,255,255,0.60)" }}>
+                                <input
+                                  autoFocus
+                                  value={customKeyPieceText}
+                                  onChange={(e) => setCustomKeyPieceText(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && customKeyPieceText.trim()) commitCustomProductPiece();
+                                  }}
+                                  onBlur={() => {
+                                    if (customKeyPieceText.trim()) commitCustomProductPiece();
+                                  }}
+                                  placeholder="e.g. Asymmetric Hem Midi Dress"
+                                  style={{ width: "100%", boxSizing: "border-box", border: "none", background: "transparent", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.80)", outline: "none" }}
+                                />
+                                {customKeyPieceConfirmed && (
+                                  <div style={{ marginTop: 6, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.44)", fontStyle: "italic" }}>
+                                    Muko doesn&apos;t have market data on this piece yet. It won&apos;t affect scoring, but it will carry into specs.
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ marginBottom: 28 }}>
+                            <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 6 }}>
+                              Assign Role
+                            </div>
+                            <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.56)", marginBottom: 12, lineHeight: 1.5 }}>
+                              How should this piece behave in the collection?
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                              {COLLECTION_ROLE_OPTIONS.map((role) => {
+                                const isSelected = activeProductPieceEntry ? pieceRolesById[activeProductPieceEntry.piece.item] === role.id : false;
+                                return (
+                                  <button
+                                    key={role.id}
+                                    onClick={() => activeProductPieceEntry && handleAssignRoleToPiece(activeProductPieceEntry.piece.item, role.id)}
+                                    disabled={!activeProductPieceEntry}
+                                    style={{
+                                      textAlign: "left",
+                                      padding: "12px 13px",
+                                      borderRadius: 12,
+                                      border: isSelected ? "1.5px solid #A8B475" : "1px solid rgba(67,67,43,0.10)",
+                                      background: isSelected ? "#eef1e3" : "rgba(255,255,255,0.8)",
+                                      cursor: activeProductPieceEntry ? "pointer" : "not-allowed",
+                                      opacity: activeProductPieceEntry ? 1 : 0.45,
+                                    }}
+                                  >
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+                                      <div style={{ fontFamily: inter, fontSize: 12, fontWeight: 600, color: "#43432B" }}>
+                                        {role.name}
+                                      </div>
+                                      {activePieceSuggestion?.suggestedRoles.includes(role.id) && (
+                                        <MukoPickTag />
+                                      )}
+                                    </div>
+                                    <div style={{ fontFamily: inter, fontSize: 11, lineHeight: 1.5, color: "rgba(67,67,43,0.55)" }}>
+                                      {role.description}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                            <button
+                              onClick={() => navigateStage("language")}
+                              style={{ padding: "12px 18px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", color: "rgba(67,67,43,0.62)", fontFamily: sohne, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                            >
+                              Back to Collection Language
+                            </button>
+                            <button
+                              onClick={handleContinueToSpecs}
+                              disabled={!canLockDirection}
+                              style={{
+                                padding: "12px 18px",
+                                borderRadius: 999,
+                                border: canLockDirection ? "1.5px solid #7D96AC" : "1px solid rgba(67,67,43,0.10)",
+                                background: canLockDirection ? "rgba(125,150,172,0.08)" : "rgba(255,255,255,0.6)",
+                                color: canLockDirection ? "#7D96AC" : "rgba(67,67,43,0.30)",
+                                fontFamily: sohne,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: canLockDirection ? "pointer" : "not-allowed",
+                              }}
+                            >
+                              Lock Direction &amp; Build Specs
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
                 </div>
 
               </>
@@ -2165,7 +2971,7 @@ export default function ConceptStudioPage() {
                 {/* ── EXPLORE OTHER DIRECTIONS ───────────────────────────────────────── */}
                 <div style={{ marginBottom: 20 }}>
                   <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 5 }}>EXPLORE OTHER DIRECTIONS</div>
-                  <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 12 }}>Type a direction and we'll match it — or select from below.</div>
+                  <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 12 }}>Type a direction and we&apos;ll match it — or select from below.</div>
                   <div style={{ position: "relative" }}>
                     <input
                       type="text"
@@ -2220,7 +3026,6 @@ export default function ConceptStudioPage() {
                           steelBlue={STEEL}
                           chartreuse={CHARTREUSE}
                           isMukoPick={aesthetic === recommendedAesthetic}
-                          mukoPickLabel={mukoPickLabel}
                         />
                       </motion.div>
                     );
@@ -2290,12 +3095,8 @@ export default function ConceptStudioPage() {
               </div>
             ) : (
               <MukoInsightSection
-                headline={conceptInsightData?.statements[0] ?? insightContent.headline}
-                paragraphs={
-                  conceptInsightData
-                    ? [conceptInsightData.statements[1] ?? '', conceptInsightData.statements[2] ?? ''].filter(Boolean)
-                    : [insightContent.p1, insightContent.p2, insightContent.p3]
-                }
+                headline={stageAwareHeadline}
+                paragraphs={stageAwareParagraphs}
                 bullets={{
                   label: conceptInsightData?.editLabel ?? 'POSITIONING',
                   items: conceptInsightData?.edit ?? insightContent.opportunity,
@@ -2304,25 +3105,26 @@ export default function ConceptStudioPage() {
                 isStreaming={conceptInsightLoading && !!conceptStreamingText}
                 streamingText={conceptStreamingText}
                 pageMode="concept"
-                canContinue={canContinue}
-                onContinue={() => {
-                  if (!canContinue) return;
-                  useSessionStore.setState({ aestheticMatchedId: selectedAesthetic, refinementModifiers: interpretation?.modifiers ?? [], moodboardImages: topMoodboardImages, conceptSilhouette, conceptPalette });
-                  setCurrentStep(3);
-                  router.push('/spec');
-                }}
+                canContinue={canLockDirection}
+                conceptStage={currentStage}
+                executionGuidance={executionGuidancePoints}
+                productPieceRead={activePieceRead}
+                productStrategicImplication={activeStrategicImplication}
+                productStructure={collectionStructureSummary}
+                hasSelectedProductPiece={Boolean(activeProductPieceEntry)}
+                onContinue={handleContinueToSpecs}
                 nextMove={{
                   mode: "concept",
                   guidance: conceptInsightData?.decision_guidance ?? null,
                   recommendedKeyPieces,
-                  selectedAnchorPiece: decisionGuidanceState.selected_anchor_piece,
+                  selectedAnchorPiece: activeProductPieceId,
                   isConfirmed: decisionGuidanceState.is_confirmed,
-                  confirmedAnchorPiece: decisionGuidanceState.selected_anchor_piece,
-                  onSelectAnchorPiece: handleSelectAnchorPiece,
+                  confirmedAnchorPiece: heroAssignedPieceId,
+                  onSelectAnchorPiece: handleSelectProductPiece,
                   onConfirm: conceptInsightData?.decision_guidance ? handleConfirmDirection : undefined,
                   isLoading: conceptInsightLoading && !conceptInsightData?.decision_guidance,
-                  onRoleSelect: setCollectionRole,
-                  currentRole: storeCollectionRole,
+                  onRoleSelect: (role) => activeProductPieceId && handleAssignRoleToPiece(activeProductPieceId, role),
+                  currentRole: activeProductPieceId ? pieceRolesById[activeProductPieceId] ?? null : null,
                 }}
               />
             )}
@@ -2335,7 +3137,7 @@ export default function ConceptStudioPage() {
       {/* ═══ FLOATING MUKO ORB ═══ */}
       <FloatingMukoOrb
         step="concept"
-        context={{ aesthetic: selectedAesthetic, refineText, identityScore: identityPulse?.score, resonanceScore: resonancePulse?.score }}
+        context={{ aesthetic: selectedAesthetic, refineText: interpretationSummary, identityScore: identityPulse?.score, resonanceScore: resonancePulse?.score }}
         conceptName={(() => {
           if (!selectedAesthetic) return undefined;
           const entry = (aestheticsData as Array<{ id: string; name: string }>).find(a => a.id === selectedAesthetic);
@@ -2367,6 +3169,7 @@ export default function ConceptStudioPage() {
                   setIsAestheticSelectionUnlocked(true);
                   setLockedCollectionAesthetic(null);
                   setCollectionAesthetic(null);
+                  setDirectionInterpretationModifiers([]);
                   try {
                     window.localStorage.removeItem(COLLECTION_AESTHETIC_STORAGE_KEY);
                   } catch {
@@ -2396,7 +3199,7 @@ export default function ConceptStudioPage() {
 function DirectionCard({
   aesthetic, content, chips, isHovered, moodboardImages,
   idColor, resColor, topIdScore, topResScore, onHoverEnter, onHoverLeave, onSelect,
-  inter, sohne, steelBlue, chartreuse, isMukoPick, mukoPickLabel = "Muko's Pick",
+  inter, sohne, steelBlue, chartreuse, isMukoPick,
 }: {
   aesthetic: string;
   content: { description: string; identityScore: number; resonanceScore: number } | undefined;
@@ -2415,7 +3218,6 @@ function DirectionCard({
   steelBlue: string;
   chartreuse: string;
   isMukoPick?: boolean;
-  mukoPickLabel?: string;
 }) {
   const idScore = content?.identityScore ?? 0;
   const resScore = content?.resonanceScore ?? 0;
@@ -2429,9 +3231,9 @@ function DirectionCard({
       style={{
         position: "relative",
         borderRadius: 8,
-        background: "transparent",
-        border: isHovered ? "1px solid rgba(67,67,43,0.18)" : "1px solid rgba(67,67,43,0.08)",
-        boxShadow: isHovered ? "0 4px 14px rgba(0,0,0,0.07)" : "none",
+        background: isMukoPick ? "rgba(255,255,255,0.9)" : "transparent",
+        border: isHovered ? "1px solid rgba(67,67,43,0.18)" : isMukoPick ? "1px solid rgba(168,180,117,0.18)" : "1px solid rgba(67,67,43,0.08)",
+        boxShadow: isHovered ? "0 4px 14px rgba(0,0,0,0.07)" : isMukoPick ? "0 8px 22px rgba(67,67,43,0.04)" : "none",
         padding: "14px 16px",
         cursor: "pointer",
         transition: "border-color 150ms ease, box-shadow 150ms ease",
@@ -2471,14 +3273,8 @@ function DirectionCard({
           </div>
         </div>
 
-        {/* Right: muko's pick badge + select button */}
+        {/* Right: select affordance */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          {isMukoPick && (
-            <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 999, background: "rgba(168,180,117,0.12)", border: "1px solid rgba(168,180,117,0.40)" }}>
-              <span style={{ display: "inline-block", width: 5, height: 5, borderRadius: "50%", background: "#A8B475", flexShrink: 0 }} />
-              <span style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "#6B7A3E", whiteSpace: "nowrap" }}>{mukoPickLabel}</span>
-            </div>
-          )}
           {/* Select button — clips to 0 width when not hovered */}
           <div style={{ overflow: "hidden", maxWidth: isHovered ? "80px" : "0px", opacity: isHovered ? 1 : 0, transition: "max-width 180ms ease, opacity 150ms ease" }}>
             <span style={{ display: "block", whiteSpace: "nowrap", padding: "4px 11px", borderRadius: 999, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em", border: `1px solid ${chartreuse}`, background: "transparent", color: chartreuse, fontFamily: inter, pointerEvents: "none" }}>

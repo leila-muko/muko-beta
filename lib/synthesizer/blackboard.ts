@@ -199,7 +199,7 @@ function resolveAestheticContext(
   aestheticId: string
 ): { context: AestheticContext; isProxy: boolean } {
   // Direct match first
-  let entry = aesthetics.find(a => a.id === aestheticId);
+  const entry = aesthetics.find(a => a.id === aestheticId);
   let isProxy = false;
 
   // Fallback: resolve through brand_mismatch proxy if direct match missing

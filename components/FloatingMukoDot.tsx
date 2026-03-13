@@ -43,7 +43,11 @@ function getMockResponse(question: string): string {
 }
 
 /* ─── Component ─── */
-export default function FloatingMukoDot({
+export default function FloatingMukoDot(props: FloatingMukoDotProps) {
+  return <FloatingMukoDotInner key={props.step} {...props} />;
+}
+
+function FloatingMukoDotInner({
   step,
   context,
   contextLabel = "this direction",
@@ -89,13 +93,6 @@ export default function FloatingMukoDot({
     messagesEnd.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  /* ─── Reset on step change ─── */
-  useEffect(() => {
-    setMessages([]);
-    setMode("rest");
-    setInputValue("");
-  }, [step]);
-
   /* ─── Send handler ─── */
   // TODO Week 5-6: Replace mock with Claude API call, pass `context` as system prompt.
   const handleSend = (text: string) => {
@@ -103,10 +100,10 @@ export default function FloatingMukoDot({
     setMessages(prev => [...prev, { role: "user", content: text.trim() }]);
     setInputValue("");
     setIsTyping(true);
-    setTimeout(() => {
+    window.setTimeout(() => {
       setMessages(prev => [...prev, { role: "muko", content: getMockResponse(text.trim()) }]);
       setIsTyping(false);
-    }, 800 + Math.random() * 600);
+    }, 1100);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

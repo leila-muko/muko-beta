@@ -116,7 +116,7 @@ export default function SignInPage() {
               fontWeight: 400,
             }}
           >
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link 
               href="/auth/signup" 
               className="hover:underline transition-all"

@@ -58,7 +58,11 @@ const ORB_REST   = "#4D302F";   // warm dark brown in dormant state
 /* ════════════════════════════════════════════════════════════════
    Component
    ════════════════════════════════════════════════════════════════ */
-export default function FloatingMukoOrb({
+export default function FloatingMukoOrb(props: FloatingMukoOrbProps) {
+  return <FloatingMukoOrbInner key={props.step} {...props} />;
+}
+
+function FloatingMukoOrbInner({
   step,
   context,
   conceptName,
@@ -107,13 +111,6 @@ export default function FloatingMukoOrb({
     messagesEnd.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /* ─── Reset on step change ─── */
-  useEffect(() => {
-    setMessages([]);
-    setOrbState("rest");
-    setInputValue("");
-  }, [step]);
-
   /* ─── Send handler ─── */
   const handleSend = (text: string) => {
     if (!text.trim() || orbState === "thinking") return;
@@ -121,10 +118,10 @@ export default function FloatingMukoOrb({
     setInputValue("");
     setOrbState("thinking");
     // TODO Week 5-6: Replace with Claude API, passing `context` as system prompt
-    setTimeout(() => {
+    window.setTimeout(() => {
       setMessages(prev => [...prev, { role: "muko", content: getMockResponse(text.trim()) }]);
       setOrbState("active");
-    }, 900 + Math.random() * 500);
+    }, 1150);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

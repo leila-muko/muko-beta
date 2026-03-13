@@ -4,88 +4,167 @@
  *
  * PRD Reference: Section 4 (Technical Architecture), V2.1 Section 2 (Agent Table)
  * Philosophy: Pure math, no LLM. 100% reliable, 0ms latency.
- *
- * Formula:
- *   Material Cost = cost_per_yard × yards_required × complexity_modifier
- *   Labor Cost    = labor_base × construction_multiplier
- *   Overhead      = (Material + Labor) × overhead_rate
- *   COGS          = Material + Labor + Overhead
- *   Gate Pass     = COGS <= MSRP × (1 - target_margin)
  */
 
-const fs = require("fs");
-const path = require("path");
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-// ─── Load Reference Data ──────────────────────────────────────────────────────
+interface MaterialRecord {
+  id: string;
+  name: string;
+  cost_per_yard: number;
+  complexity_tier: string;
+  sustainability_score?: number | null;
+}
 
-// materials.json is a root array
-const materialsData: unknown[] = JSON.parse(
+interface CategoryRecord {
+  id: string;
+  name: string;
+  yards_required?: number | null;
+  knit_weight_kg?: number | null;
+  labor_base_usd: number;
+}
+
+interface CategoriesPayload {
+  categories: CategoryRecord[];
+}
+
+interface CostRedirect {
+  type: "material" | "construction" | "pricing";
+  action: string;
+  detail: string;
+  new_cogs: number;
+  savings: number;
+  savings_pct: number;
+  gate_passes: boolean;
+  caution: string | null;
+  sustainability_score?: number | null;
+}
+
+interface SuccessResult {
+  success: true;
+  cost_gate_passed: boolean;
+  total_cogs: number;
+  actual_margin_pct: number;
+  target_margin_pct: number;
+  breakdown: {
+    material_cost: number;
+    labor_cost: number;
+    overhead_cost: number;
+    overhead_rate_pct: number;
+  };
+  gate: {
+    target_msrp: number;
+    max_allowable_cogs: number;
+    cogs_excess: number;
+    margin_gap_pct: number;
+  };
+  inputs_resolved: {
+    material: string;
+    material_cost_per_yard: number;
+    material_complexity_tier: string;
+    material_complexity_modifier: number;
+    category: string;
+    yards_required: number | null;
+    knit_weight_kg: number | null;
+    labor_base_usd: number;
+    construction_tier: string;
+    construction_multiplier: number;
+    material_note: string | null;
+  };
+  redirects: CostRedirect[];
+}
+
+type ErrorResult = { success: false; errors: string[] };
+type COGSResult = SuccessResult | ErrorResult;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const materialsData = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../data/materials.json"), "utf8")
-);
+) as MaterialRecord[];
 const categoriesData = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../data/categories.json"), "utf8")
-);
+) as CategoriesPayload;
 
-// ─── Complexity modifier derived from complexity_tier field ───────────────────
 const COMPLEXITY_MODIFIER: Record<string, number> = {
   low: 1.0,
   moderate: 1.15,
-  high: 1.30,
+  high: 1.3,
 };
 
-// Index by ID for O(1) lookup
-const MATERIALS: Record<string, any> = Object.fromEntries(
-  (materialsData as any[]).map((m: any) => [m.id, m])
+const MATERIALS: Record<string, MaterialRecord> = Object.fromEntries(
+  materialsData.map((material) => [material.id, material])
 );
-const CATEGORIES: Record<string, any> = Object.fromEntries(
-  (categoriesData.categories as any[]).map((c: any) => [c.id, c])
+const CATEGORIES: Record<string, CategoryRecord> = Object.fromEntries(
+  categoriesData.categories.map((category) => [category.id, category])
 );
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-/**
- * Construction Multipliers
- * Applied to labor_base to reflect complexity overhead (not total labor).
- * The labor_base in categories.json already prices the standard complexity
- * for that category. These multipliers adjust for deviation from standard.
- *
- * PRD V2.1 reference values: Low=1.2x, High=2.5x
- * Calibrated: labor_base represents "moderate" — multipliers are relative to it.
- *   Low  = simpler than standard (-25%)
- *   High = more complex (+35%)
- */
 const CONSTRUCTION_MULTIPLIERS: Record<string, number> = {
-  low: 0.75,      // Simplified: fewer seams, no lining, basic closures
-  moderate: 1.0,  // Standard for category (labor_base is calibrated to this)
-  high: 1.35,     // Complex: full lining, hardware, tailored details
+  low: 0.75,
+  moderate: 1.0,
+  high: 1.35,
 };
 
-/**
- * Overhead Rate
- * Covers: shipping, packaging, QC, storage, misc factory costs.
- * Industry standard for contemporary brands: 15–20%.
- */
 const OVERHEAD_RATE = 0.18;
-
-/**
- * Default target margin if brand profile doesn't specify.
- * Contemporary brand standard: 60% gross margin.
- */
 const DEFAULT_TARGET_MARGIN = 0.6;
 
-// ─── Main Function ────────────────────────────────────────────────────────────
+function buildSuccessResult(args: {
+  costGatePassed: boolean;
+  totalCOGS: number;
+  actualMargin: number;
+  targetMargin: number;
+  materialCost: number;
+  laborCost: number;
+  overheadCost: number;
+  targetMsrp: number;
+  maxAllowableCOGS: number;
+  cogsExcessAmount: number;
+  material: MaterialRecord;
+  complexityModifier: number;
+  category: CategoryRecord;
+  constructionTier: string;
+  multiplier: number;
+  materialNote: string | null;
+  redirects: CostRedirect[];
+}): SuccessResult {
+  return {
+    success: true,
+    cost_gate_passed: args.costGatePassed,
+    total_cogs: round(args.totalCOGS),
+    actual_margin_pct: round(args.actualMargin * 100),
+    target_margin_pct: round(args.targetMargin * 100),
+    breakdown: {
+      material_cost: round(args.materialCost),
+      labor_cost: round(args.laborCost),
+      overhead_cost: round(args.overheadCost),
+      overhead_rate_pct: OVERHEAD_RATE * 100,
+    },
+    gate: {
+      target_msrp: args.targetMsrp,
+      max_allowable_cogs: round(args.maxAllowableCOGS),
+      cogs_excess: round(args.cogsExcessAmount),
+      margin_gap_pct: args.costGatePassed ? 0 : round((args.targetMargin - args.actualMargin) * 100),
+    },
+    inputs_resolved: {
+      material: args.material.name,
+      material_cost_per_yard: args.material.cost_per_yard,
+      material_complexity_tier: args.material.complexity_tier,
+      material_complexity_modifier: args.complexityModifier,
+      category: args.category.name,
+      yards_required: args.category.yards_required ?? null,
+      knit_weight_kg: args.category.knit_weight_kg ?? null,
+      labor_base_usd: args.category.labor_base_usd,
+      construction_tier: args.constructionTier,
+      construction_multiplier: args.multiplier,
+      material_note: args.materialNote,
+    },
+    redirects: args.redirects,
+  };
+}
 
-/**
- * calculateCOGS()
- *
- * @param input.material_id      - e.g. "tencel", "silk", "organic-cotton"
- * @param input.category_id      - e.g. "trench-coat", "midi-dress"
- * @param input.construction_tier - "low" | "moderate" | "high"
- * @param input.target_msrp      - Target retail price in USD, e.g. 450
- * @param input.target_margin    - Override brand margin, e.g. 0.65 (65%)
- *
- * @returns COGSResult — Full cost breakdown + gate pass/fail
- */
 function calculateCOGS({
   material_id,
   category_id,
@@ -98,8 +177,7 @@ function calculateCOGS({
   construction_tier: string;
   target_msrp: number;
   target_margin?: number;
-}) {
-  // ── Step 1: Validate inputs ──────────────────────────────────────────────
+}): COGSResult {
   const errors = validateInputs({ material_id, category_id, construction_tier, target_msrp, target_margin });
   if (errors.length > 0) {
     return { success: false, errors };
@@ -110,44 +188,25 @@ function calculateCOGS({
   const multiplier = CONSTRUCTION_MULTIPLIERS[construction_tier];
   const complexityModifier = COMPLEXITY_MODIFIER[material.complexity_tier] ?? 1.0;
 
-  // ── Step 2: Material Cost ────────────────────────────────────────────────
-  // Most garments: cost_per_yard × yards_required × complexity_modifier
-  // Knits (sweaters/cardigans): cost is per kg weight, handled separately
   let materialCost: number;
   let materialNote: string | null = null;
 
   if (category.knit_weight_kg) {
-    // Knit category: price by weight
-    // We use cost_per_yard as a proxy for cost_per_100g (acceptable for beta)
-    const knitCostPerKg = material.cost_per_yard * 4; // rough industry conversion
+    const knitCostPerKg = material.cost_per_yard * 4;
     materialCost = knitCostPerKg * category.knit_weight_kg;
     materialNote = `Knit category: ${category.knit_weight_kg}kg @ $${knitCostPerKg.toFixed(2)}/kg`;
   } else {
-    materialCost = material.cost_per_yard * category.yards_required * complexityModifier;
+    materialCost = material.cost_per_yard * (category.yards_required ?? 0) * complexityModifier;
   }
 
-  // ── Step 3: Labor Cost ───────────────────────────────────────────────────
-  // labor_base (from categories.json) × construction_multiplier
   const laborCost = category.labor_base_usd * multiplier;
-
-  // ── Step 4: Overhead ─────────────────────────────────────────────────────
-  // Applied to (material + labor) subtotal.
-  // Covers: duty, shipping, QC, packaging, waste factor.
   const subtotal = materialCost + laborCost;
   const overheadCost = subtotal * OVERHEAD_RATE;
-
-  // ── Step 5: Total COGS ───────────────────────────────────────────────────
   const totalCOGS = materialCost + laborCost + overheadCost;
-
-  // ── Step 6: Margin Gate ──────────────────────────────────────────────────
-  // Gate formula: COGS <= MSRP × (1 - margin)
-  // e.g. $450 MSRP @ 60% margin → max COGS = $450 × 0.40 = $180
   const maxAllowableCOGS = target_msrp * (1 - target_margin);
   const costGatePassed = totalCOGS <= maxAllowableCOGS;
   const actualMargin = (target_msrp - totalCOGS) / target_msrp;
   const cogsExcessAmount = costGatePassed ? 0 : totalCOGS - maxAllowableCOGS;
-
-  // ── Step 7: Generate Redirect Suggestions ────────────────────────────────
   const redirects = costGatePassed
     ? []
     : generateCostRedirects({
@@ -160,59 +219,27 @@ function calculateCOGS({
         target_margin,
       });
 
-  // ── Step 8: Return Result ─────────────────────────────────────────────────
-  return {
-    success: true,
-
-    // Summary
-    cost_gate_passed: costGatePassed,
-    total_cogs: round(totalCOGS),
-    actual_margin_pct: round(actualMargin * 100),
-    target_margin_pct: round(target_margin * 100),
-
-    // Breakdown
-    breakdown: {
-      material_cost: round(materialCost),
-      labor_cost: round(laborCost),
-      overhead_cost: round(overheadCost),
-      overhead_rate_pct: OVERHEAD_RATE * 100,
-    },
-
-    // Gate details
-    gate: {
-      target_msrp,
-      max_allowable_cogs: round(maxAllowableCOGS),
-      cogs_excess: round(cogsExcessAmount),
-      margin_gap_pct: costGatePassed ? 0 : round((target_margin - actualMargin) * 100),
-    },
-
-    // Source data (for transparency + audit trail)
-    inputs_resolved: {
-      material: material.name,
-      material_cost_per_yard: material.cost_per_yard,
-      material_complexity_tier: material.complexity_tier,
-      material_complexity_modifier: complexityModifier,
-      category: category.name,
-      yards_required: category.yards_required || null,
-      knit_weight_kg: category.knit_weight_kg || null,
-      labor_base_usd: category.labor_base_usd,
-      construction_tier,
-      construction_multiplier: multiplier,
-      material_note: materialNote,
-    },
-
-    // Redirects (only populated if gate fails)
+  return buildSuccessResult({
+    costGatePassed,
+    totalCOGS,
+    actualMargin,
+    targetMargin: target_margin,
+    materialCost,
+    laborCost,
+    overheadCost,
+    targetMsrp: target_msrp,
+    maxAllowableCOGS,
+    cogsExcessAmount,
+    material,
+    complexityModifier,
+    category,
+    constructionTier: construction_tier,
+    multiplier,
+    materialNote,
     redirects,
-  };
+  });
 }
 
-// ─── Redirect Generator ───────────────────────────────────────────────────────
-
-/**
- * generateCostRedirects()
- * When the margin gate fails, suggest 1–3 actionable alternatives.
- * Returns suggestions sorted by estimated savings (highest first).
- */
 function generateCostRedirects({
   material,
   category,
@@ -222,21 +249,18 @@ function generateCostRedirects({
   target_msrp,
   target_margin,
 }: {
-  material: any;
-  category: any;
+  material: MaterialRecord;
+  category: CategoryRecord;
   construction_tier: string;
   totalCOGS: number;
   maxAllowableCOGS: number;
   target_msrp: number;
   target_margin: number;
-}) {
-  const redirects: any[] = [];
+}): CostRedirect[] {
+  const redirects: CostRedirect[] = [];
 
-  // ── Option A: Cheaper material alternative ──────────────────────────────
-  const materialAlternatives = findCheaperMaterials(material, category, construction_tier, maxAllowableCOGS);
-  redirects.push(...materialAlternatives);
+  redirects.push(...findCheaperMaterials(material, category, construction_tier, maxAllowableCOGS));
 
-  // ── Option B: Reduce construction tier ─────────────────────────────────
   if (construction_tier === "high") {
     const moderateResult = calculateCOGS({
       material_id: material.id,
@@ -245,13 +269,13 @@ function generateCostRedirects({
       target_msrp,
       target_margin,
     });
-    if (moderateResult.cost_gate_passed) {
-      const savings = totalCOGS - (moderateResult as any).total_cogs;
+    if (moderateResult.success && moderateResult.cost_gate_passed) {
+      const savings = totalCOGS - moderateResult.total_cogs;
       redirects.push({
         type: "construction",
         action: "Reduce construction to Moderate",
-        detail: `Moderate complexity reduces labor to $${(moderateResult as any).breakdown.labor_cost}`,
-        new_cogs: (moderateResult as any).total_cogs,
+        detail: `Moderate complexity reduces labor to $${moderateResult.breakdown.labor_cost}`,
+        new_cogs: moderateResult.total_cogs,
         savings: round(savings),
         savings_pct: round((savings / totalCOGS) * 100),
         gate_passes: true,
@@ -266,13 +290,13 @@ function generateCostRedirects({
       target_msrp,
       target_margin,
     });
-    if (lowResult.cost_gate_passed) {
-      const savings = totalCOGS - (lowResult as any).total_cogs;
+    if (lowResult.success && lowResult.cost_gate_passed) {
+      const savings = totalCOGS - lowResult.total_cogs;
       redirects.push({
         type: "construction",
         action: "Reduce construction to Low",
-        detail: `Simple construction reduces labor to $${(lowResult as any).breakdown.labor_cost}`,
-        new_cogs: (lowResult as any).total_cogs,
+        detail: `Simple construction reduces labor to $${lowResult.breakdown.labor_cost}`,
+        new_cogs: lowResult.total_cogs,
         savings: round(savings),
         savings_pct: round((savings / totalCOGS) * 100),
         gate_passes: true,
@@ -281,11 +305,9 @@ function generateCostRedirects({
     }
   }
 
-  // ── Option C: Raise MSRP suggestion ────────────────────────────────────
   const breakEvenMSRP = totalCOGS / (1 - target_margin);
   const msrpIncrease = breakEvenMSRP - target_msrp;
   if (msrpIncrease / target_msrp < 0.3) {
-    // Only suggest if increase is <30% (reasonable)
     redirects.push({
       type: "pricing",
       action: `Raise MSRP to $${Math.ceil(breakEvenMSRP / 5) * 5}`,
@@ -298,64 +320,54 @@ function generateCostRedirects({
     });
   }
 
-  // Sort: material swaps first, then construction, then pricing
-  const sortOrder: Record<string, number> = { material: 0, construction: 1, pricing: 2 };
-  redirects.sort((a, b) => (sortOrder[a.type] ?? 3) - (sortOrder[b.type] ?? 3));
+  const sortOrder: Record<CostRedirect["type"], number> = { material: 0, construction: 1, pricing: 2 };
+  redirects.sort((a, b) => sortOrder[a.type] - sortOrder[b.type]);
 
-  return redirects.slice(0, 3); // Max 3 redirects
+  return redirects.slice(0, 3);
 }
 
-// ─── Cheaper Material Finder ──────────────────────────────────────────────────
-
-/**
- * findCheaperMaterials()
- * Finds materials cheaper than current that still pass the gate.
- * Returns top 2 options sorted by gate_passes, then by savings.
- */
 function findCheaperMaterials(
-  currentMaterial: any,
-  category: any,
+  currentMaterial: MaterialRecord,
+  category: CategoryRecord,
   construction_tier: string,
   maxAllowableCOGS: number
-) {
-  const candidates: any[] = [];
+): CostRedirect[] {
+  const candidates: CostRedirect[] = [];
 
-  for (const [id, mat] of Object.entries(MATERIALS) as [string, any][]) {
+  for (const [id, material] of Object.entries(MATERIALS)) {
     if (id === currentMaterial.id) continue;
-    if (mat.cost_per_yard >= currentMaterial.cost_per_yard) continue;
+    if (material.cost_per_yard >= currentMaterial.cost_per_yard) continue;
 
     const testResult = calculateCOGS({
       material_id: id,
       category_id: category.id,
       construction_tier,
-      target_msrp: 99999, // Dummy — we just need the COGS
+      target_msrp: 99999,
       target_margin: 0,
     });
 
     if (!testResult.success) continue;
-    const result = testResult as any;
 
-    const passes = result.total_cogs <= maxAllowableCOGS;
+    const passes = testResult.total_cogs <= maxAllowableCOGS;
     const costReductionPct = round(
-      ((result.total_cogs - maxAllowableCOGS) / result.total_cogs) * 100 * -1
+      ((testResult.total_cogs - maxAllowableCOGS) / testResult.total_cogs) * 100 * -1
     );
 
     candidates.push({
       type: "material",
-      action: `Switch to ${mat.name}`,
-      detail: `$${mat.cost_per_yard}/yd vs. $${currentMaterial.cost_per_yard}/yd`,
-      new_cogs: result.total_cogs,
+      action: `Switch to ${material.name}`,
+      detail: `$${material.cost_per_yard}/yd vs. $${currentMaterial.cost_per_yard}/yd`,
+      new_cogs: testResult.total_cogs,
       savings: round(
-        (currentMaterial.cost_per_yard - mat.cost_per_yard) * (category.yards_required || 2)
+        (currentMaterial.cost_per_yard - material.cost_per_yard) * (category.yards_required || 2)
       ),
       savings_pct: costReductionPct > 0 ? costReductionPct : 0,
       gate_passes: passes,
-      sustainability_score: mat.sustainability_score,
+      sustainability_score: material.sustainability_score ?? null,
       caution: passes ? null : "This swap reduces cost but may not fully close the margin gap.",
     });
   }
 
-  // Prioritize: passing candidates first, then sorted by savings
   return candidates
     .sort((a, b) => {
       if (a.gate_passes && !b.gate_passes) return -1;
@@ -364,8 +376,6 @@ function findCheaperMaterials(
     })
     .slice(0, 2);
 }
-
-// ─── Validation ───────────────────────────────────────────────────────────────
 
 function validateInputs({
   material_id,
@@ -379,7 +389,7 @@ function validateInputs({
   construction_tier: string;
   target_msrp: number;
   target_margin: number;
-}) {
+}): string[] {
   const errors: string[] = [];
 
   if (!MATERIALS[material_id]) {
@@ -401,18 +411,8 @@ function validateInputs({
   return errors;
 }
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
-
-function round(num: number) {
+function round(num: number): number {
   return Math.round(num * 100) / 100;
 }
 
-// ─── Exports ──────────────────────────────────────────────────────────────────
-
-module.exports = {
-  calculateCOGS,
-  MATERIALS,
-  CATEGORIES,
-  CONSTRUCTION_MULTIPLIERS,
-  OVERHEAD_RATE,
-};
+export { calculateCOGS, MATERIALS, CATEGORIES, CONSTRUCTION_MULTIPLIERS, OVERHEAD_RATE };

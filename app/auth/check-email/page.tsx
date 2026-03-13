@@ -22,7 +22,7 @@ export default function CheckEmailPage() {
         </p>
         
         <p className="text-sm text-gray-500 font-body">
-          Didn't receive it? Check your spam folder.
+          Didn&apos;t receive it? Check your spam folder.
         </p>
       </div>
     </AuthLayout>

@@ -42,6 +42,11 @@ type IntentPayload = {
   };
 };
 
+type BrandPalette = typeof BRAND & {
+  steelBlue?: string;
+  steel?: string;
+};
+
 /* ─── Design tokens — match Concept Studio & Report exactly ─────────────────── */
 const CHARTREUSE = "#A8B475";
 const OLIVE = BRAND.oliveInk; // #43432B
@@ -64,26 +69,26 @@ export default function IntentCalibrationPage() {
   const router = useRouter();
   const { season, setCurrentStep, setIntentGoals, setIntentTradeoff, setCollectionRole: storeSetCollectionRole } = useSessionStore();
 
-  const STEEL = (BRAND as any)?.steelBlue ?? (BRAND as any)?.steel ?? "#7D96AC";
+  const STEEL = (BRAND as BrandPalette).steelBlue ?? (BRAND as BrandPalette).steel ?? "#7D96AC";
 
-  const [headerCollectionName, setHeaderCollectionName] = useState<string>("Collection");
-  const [headerSeasonLabel, setHeaderSeasonLabel] = useState<string>(season || "—");
+  const [headerCollectionName] = useState<string>(() => {
+    try {
+      return window.localStorage.getItem("muko_collectionName") ?? "Collection";
+    } catch {
+      return "Collection";
+    }
+  });
+  const [headerSeasonLabel] = useState<string>(() => {
+    try {
+      return window.localStorage.getItem("muko_seasonLabel") ?? (season || "—");
+    } catch {
+      return season || "—";
+    }
+  });
 
   useEffect(() => {
     setCurrentStep?.(1);
   }, [setCurrentStep]);
-
-  useEffect(() => {
-    try {
-      const n = window.localStorage.getItem("muko_collectionName");
-      const s = window.localStorage.getItem("muko_seasonLabel");
-      if (n) setHeaderCollectionName(n);
-      if (s) setHeaderSeasonLabel(s);
-      else setHeaderSeasonLabel(season || "—");
-    } catch {
-      setHeaderSeasonLabel(season || "—");
-    }
-  }, [season]);
 
   const successOptions = useMemo(
     () =>
@@ -147,7 +152,7 @@ export default function IntentCalibrationPage() {
     return null;
   });
 
-  const [collectionRole, setCollectionRole] = useState<CollectionRoleId | null>(() => {
+  const [collectionRole] = useState<CollectionRoleId | null>(() => {
     try {
       const saved = window.localStorage.getItem("muko_intent");
       if (saved) { const p = JSON.parse(saved); return p.collectionRole ?? null; }
@@ -243,6 +248,9 @@ export default function IntentCalibrationPage() {
       conceptPalette: null,
       chipSelection: null,
       customChips: {},
+      directionInterpretationText: '',
+      directionInterpretationModifiers: [],
+      directionInterpretationChips: [],
     });
     router.push("/concept");
   };
@@ -308,23 +316,6 @@ export default function IntentCalibrationPage() {
   }, [success, tradeoff, tTrend, collectionRole]);
 
   // Pulse on insight update
-  const [insightPulse, setInsightPulse] = useState(false);
-  const prevInsightRef = useRef<string>("");
-
-  useEffect(() => {
-    const prev = prevInsightRef.current;
-    if (prev && prev !== mukoInsight) {
-      setInsightPulse(true);
-      const t = window.setTimeout(() => setInsightPulse(false), 750);
-      return () => window.clearTimeout(t);
-    }
-    prevInsightRef.current = mukoInsight;
-  }, [mukoInsight]);
-
-  useEffect(() => {
-    prevInsightRef.current = mukoInsight;
-  }, []);
-
   /* ─── RENDER ─────────────────────────────────────────────────────────────── */
   return (
     <div
@@ -335,6 +326,7 @@ export default function IntentCalibrationPage() {
         position: "relative",
       }}
     >
+      <style>{`@keyframes intentInsightFade{0%{opacity:0.7}100%{opacity:1}}`}</style>
       {/* ── Fixed header — matches Concept Studio exactly ──────────────────── */}
       <header
         style={{
@@ -814,13 +806,13 @@ export default function IntentCalibrationPage() {
               <div>
                 <div style={{ ...microLabel }}>MUKO INSIGHT</div>
                 <div
+                  key={mukoInsight}
                   style={{
                     fontFamily: inter,
                     fontSize: 12.5,
                     lineHeight: 1.7,
                     color: "rgba(67,67,43,0.64)",
-                    transition: "opacity 300ms ease",
-                    opacity: insightPulse ? 0.7 : 1,
+                    animation: "intentInsightFade 300ms ease",
                   }}
                 >
                   {mukoInsight}

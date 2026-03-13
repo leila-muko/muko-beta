@@ -12,7 +12,7 @@ export interface AskMukoMessage {
 export interface AskMukoProps {
   step: AskMukoStep;
   suggestedQuestions: string[];
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   floating?: boolean;
   brand?: {
     oliveInk?: string;
@@ -62,7 +62,11 @@ function getMockResponse(question: string): string {
   return "Great question. When fully wired, Muko will use your session context \u2014 brand DNA, scores, material choices, and market data \u2014 for a specific answer. Try one of the suggested questions to preview this.";
 }
 
-export default function AskMuko({ step, suggestedQuestions, context, floating = false, brand: brandOverride }: AskMukoProps) {
+export default function AskMuko(props: AskMukoProps) {
+  return <AskMukoInner key={props.step} {...props} />;
+}
+
+function AskMukoInner({ step, suggestedQuestions, context, floating = false, brand: brandOverride }: AskMukoProps) {
   const BRAND = { ...DEFAULT_BRAND, ...brandOverride };
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<AskMukoMessage[]>([]);
@@ -74,8 +78,6 @@ export default function AskMuko({ step, suggestedQuestions, context, floating = 
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isTyping]);
   useEffect(() => { if (isExpanded && inputRef.current) setTimeout(() => inputRef.current?.focus(), 300); }, [isExpanded]);
-  useEffect(() => { setMessages([]); setIsExpanded(false); setInputValue(""); }, [step]);
-
   // Escape key collapses the floating bar
   useEffect(() => {
     if (!floating) return;
@@ -102,10 +104,10 @@ export default function AskMuko({ step, suggestedQuestions, context, floating = 
     setInputValue("");
     setIsTyping(true);
     // TODO Week 5-6: Replace with Claude API. Pass `context` prop as system prompt.
-    setTimeout(() => {
+    window.setTimeout(() => {
       setMessages(prev => [...prev, { role: "muko", content: getMockResponse(text.trim()) }]);
       setIsTyping(false);
-    }, 800 + Math.random() * 600);
+    }, 1100);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

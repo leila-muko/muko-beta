@@ -31,7 +31,17 @@ interface SpecStudioProps {
   brandTargetMargin: number;
   seasonLabel: string;
   collectionName: string;
-  onRunAnalysis: (specState: any) => void;
+  onRunAnalysis: (specState: {
+    categoryId: string;
+    category: string;
+    targetMSRP: number;
+    materialId: string;
+    silhouetteId: string;
+    constructionTier: ConstructionTier;
+    constructionOverride: boolean;
+    lined: boolean;
+    cogs: number | undefined;
+  }) => void;
 }
 
 export default function SpecStudio({

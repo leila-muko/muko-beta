@@ -28,10 +28,10 @@ export default async function DashboardPage() {
         
         <div className="bg-white p-6 rounded-lg border">
           <p className="text-gray-600">
-            🎉 Auth is working! You're logged in.
+            🎉 Auth is working! You&apos;re logged in.
           </p>
           <p className="text-sm text-gray-500 mt-4">
-            This is a placeholder. We'll build the real dashboard later.
+            This is a placeholder. We&apos;ll build the real dashboard later.
           </p>
         </div>
       </div>

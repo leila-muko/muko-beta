@@ -39,86 +39,99 @@ export default async function TestPage() {
     );
   }
 
+  let profiles = null;
+  let profileError: { message: string } | null = null;
+  let analyses = null;
+  let analysesError: { message: string } | null = null;
+  let pageError: string | null = null;
+
   try {
-    // Now queries will work because user is authenticated
-    const { data: profiles, error: profileError } = await supabase
+    const profilesResult = await supabase
       .from('brand_profiles')
       .select('*')
       .eq('user_id', user.id);
+    profiles = profilesResult.data;
+    profileError = profilesResult.error;
 
-    const { data: analyses, error: analysesError } = await supabase
+    const analysesResult = await supabase
       .from('analyses')
       .select('*')
       .eq('user_id', user.id);
-
-    return (
-      <div className="p-8 max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">✅ Day 3 Database Test</h1>
-        
-        <div className="mb-4 p-4 bg-blue-50 rounded">
-          <p className="font-semibold">Logged in as:</p>
-          <p className="text-sm">{user.email}</p>
-          <p className="text-xs font-mono break-all">User ID: {user.id}</p>
-        </div>
-        
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-3">Brand Profiles:</h2>
-          {profileError ? (
-            <div className="p-4 bg-red-50 text-red-600 rounded">
-              Error: {profileError.message}
-            </div>
-          ) : profiles && profiles.length > 0 ? (
-            <div>
-              <p className="text-green-600 mb-2">✅ Found {profiles.length} profile(s)</p>
-              <pre className="bg-gray-100 p-4 rounded overflow-auto text-sm">
-                {JSON.stringify(profiles, null, 2)}
-              </pre>
-            </div>
-          ) : (
-            <p className="text-yellow-600">⚠️ No profiles found for this user</p>
-          )}
-        </div>
-
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-3">Analyses:</h2>
-          {analysesError ? (
-            <div className="p-4 bg-red-50 text-red-600 rounded">
-              Error: {analysesError.message}
-            </div>
-          ) : analyses && analyses.length > 0 ? (
-            <div>
-              <p className="text-green-600 mb-2">✅ Found {analyses.length} analysis(es)</p>
-              <pre className="bg-gray-100 p-4 rounded overflow-auto text-sm">
-                {JSON.stringify(analyses, null, 2)}
-              </pre>
-            </div>
-          ) : (
-            <p className="text-yellow-600">⚠️ No analyses found for this user</p>
-          )}
-        </div>
-
-        <div className="p-6 bg-green-50 rounded">
-          <h3 className="font-bold text-green-800 mb-2">🎉 Day 3 Complete!</h3>
-          <ul className="text-sm text-green-700 space-y-1">
-            <li>✅ Database schema created</li>
-            <li>✅ Tables with relationships</li>
-            <li>✅ RLS policies properly configured</li>
-            <li>✅ Test data inserted</li>
-            <li>✅ TypeScript types defined</li>
-            <li>✅ Helper functions created</li>
-            <li>✅ Supabase connection working</li>
-          </ul>
-        </div>
-      </div>
-    );
+    analyses = analysesResult.data;
+    analysesError = analysesResult.error;
   } catch (error) {
+    pageError = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+  }
+
+  if (pageError) {
     return (
       <div className="p-8">
         <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
         <pre className="bg-red-50 p-4 rounded">
-          {error instanceof Error ? error.message : JSON.stringify(error, null, 2)}
+          {pageError}
         </pre>
       </div>
     );
   }
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h1 className="text-3xl font-bold mb-6">✅ Day 3 Database Test</h1>
+
+      <div className="mb-4 p-4 bg-blue-50 rounded">
+        <p className="font-semibold">Logged in as:</p>
+        <p className="text-sm">{user.email}</p>
+        <p className="text-xs font-mono break-all">User ID: {user.id}</p>
+      </div>
+
+      <div className="mb-8">
+        <h2 className="text-2xl font-semibold mb-3">Brand Profiles:</h2>
+        {profileError ? (
+          <div className="p-4 bg-red-50 text-red-600 rounded">
+            Error: {profileError.message}
+          </div>
+        ) : profiles && profiles.length > 0 ? (
+          <div>
+            <p className="text-green-600 mb-2">✅ Found {profiles.length} profile(s)</p>
+            <pre className="bg-gray-100 p-4 rounded overflow-auto text-sm">
+              {JSON.stringify(profiles, null, 2)}
+            </pre>
+          </div>
+        ) : (
+          <p className="text-yellow-600">⚠️ No profiles found for this user</p>
+        )}
+      </div>
+
+      <div className="mb-8">
+        <h2 className="text-2xl font-semibold mb-3">Analyses:</h2>
+        {analysesError ? (
+          <div className="p-4 bg-red-50 text-red-600 rounded">
+            Error: {analysesError.message}
+          </div>
+        ) : analyses && analyses.length > 0 ? (
+          <div>
+            <p className="text-green-600 mb-2">✅ Found {analyses.length} analysis(es)</p>
+            <pre className="bg-gray-100 p-4 rounded overflow-auto text-sm">
+              {JSON.stringify(analyses, null, 2)}
+            </pre>
+          </div>
+        ) : (
+          <p className="text-yellow-600">⚠️ No analyses found for this user</p>
+        )}
+      </div>
+
+      <div className="p-6 bg-green-50 rounded">
+        <h3 className="font-bold text-green-800 mb-2">🎉 Day 3 Complete!</h3>
+        <ul className="text-sm text-green-700 space-y-1">
+          <li>✅ Database schema created</li>
+          <li>✅ Tables with relationships</li>
+          <li>✅ RLS policies properly configured</li>
+          <li>✅ Test data inserted</li>
+          <li>✅ TypeScript types defined</li>
+          <li>✅ Helper functions created</li>
+          <li>✅ Supabase connection working</li>
+        </ul>
+      </div>
+    </div>
+  );
 }

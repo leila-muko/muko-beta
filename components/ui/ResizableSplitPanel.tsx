@@ -24,20 +24,23 @@ export function ResizableSplitPanel({
   className,
 }: ResizableSplitPanelProps) {
   const [leftPercent, setLeftPercent] = useState(defaultLeftPercent);
+  const [hydrated, setHydrated] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
-  // Read persisted width on mount
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(storageKey);
-      if (stored) {
-        const val = parseFloat(stored);
-        if (!isNaN(val) && val >= minLeftPercent && val <= maxLeftPercent) {
-          setLeftPercent(val);
-        }
+      if (!stored) return;
+      const value = parseFloat(stored);
+      if (!isNaN(value) && value >= minLeftPercent && value <= maxLeftPercent) {
+        setLeftPercent(value);
       }
     } catch {}
   }, [storageKey, minLeftPercent, maxLeftPercent]);
@@ -149,7 +152,7 @@ export function ResizableSplitPanel({
       {/* Left panel */}
       <div
         style={{
-          width: `${leftPercent}%`,
+          width: `${hydrated ? leftPercent : defaultLeftPercent}%`,
           height: "100%",
           overflowY: "auto",
           overflowX: "hidden",

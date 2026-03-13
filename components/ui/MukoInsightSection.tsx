@@ -64,6 +64,19 @@ export interface MukoInsightSectionProps {
   onContinue?: () => void;
   /** Whether the continue action is available (concept mode) */
   canContinue?: boolean;
+  conceptStage?: "direction" | "language" | "product";
+  executionGuidance?: Array<{ title: string; description: string }>;
+  productPieceRead?: { title?: string; body: string } | null;
+  productStrategicImplication?: {
+    summary: string;
+    suggestedRoles: CollectionRoleId[];
+  } | null;
+  productStructure?: {
+    counts: Record<CollectionRoleId, number>;
+    assignedCount: number;
+    notes: string[];
+  } | null;
+  hasSelectedProductPiece?: boolean;
 }
 
 /* ─── Fixed positioning row labels (concept narrative mode) ─────────────── */
@@ -103,6 +116,120 @@ function roleToDisplayName(role: string): string {
   }
 }
 
+function ProductDecisionRail({
+  productPieceRead,
+  productStrategicImplication,
+  productStructure,
+  hasSelectedProductPiece = false,
+}: {
+  productPieceRead?: { title?: string; body: string } | null;
+  productStrategicImplication?: {
+    summary: string;
+    suggestedRoles: CollectionRoleId[];
+  } | null;
+  productStructure?: {
+    counts: Record<CollectionRoleId, number>;
+    assignedCount: number;
+    notes: string[];
+  } | null;
+  hasSelectedProductPiece?: boolean;
+}) {
+  const zoneLabel: React.CSSProperties = {
+    fontFamily: inter,
+    fontSize: 9,
+    fontWeight: 600,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    color: "rgba(67,67,43,0.38)",
+  };
+  const hairline: React.CSSProperties = {
+    height: 1,
+    background: "rgba(67,67,43,0.08)",
+    marginBottom: 16,
+  };
+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      {!productPieceRead ? (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontFamily: sohne, fontSize: 18, fontWeight: 500, color: "#43432B", marginBottom: 8 }}>
+            Build Product Expression
+          </div>
+          <div style={{ fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.48)", lineHeight: 1.6 }}>
+            Select a piece to review Muko&apos;s read and role recommendation.
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ ...zoneLabel, marginBottom: 10 }}>{hasSelectedProductPiece ? "MUKO'S INTERPRETATION" : "MUKO'S READ"}</div>
+            {productPieceRead.title && (
+              <div style={{ fontFamily: sohne, fontSize: 14, fontWeight: 500, lineHeight: 1.45, color: "#43432B", marginBottom: 10 }}>
+                {productPieceRead.title}
+              </div>
+            )}
+            <div style={{ marginLeft: 24, borderLeft: "2px solid #A8B475", paddingLeft: 20 }}>
+              <p style={{ margin: 0, fontFamily: inter, fontSize: 12.5, lineHeight: 1.68, color: "rgba(67,67,43,0.66)" }}>
+                {productPieceRead.body}
+              </p>
+            </div>
+          </div>
+
+          {hasSelectedProductPiece && productStrategicImplication && (
+            <>
+              <div style={hairline} />
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ ...zoneLabel, marginBottom: 10 }}>STRATEGIC IMPLICATION</div>
+                <div style={{ borderRadius: 12, border: "1px solid rgba(67,67,43,0.08)", background: "rgba(255,255,255,0.72)", padding: "14px 15px" }}>
+                  <div style={{ fontFamily: inter, fontSize: 12.5, lineHeight: 1.6, color: "rgba(67,67,43,0.66)", marginBottom: 10 }}>
+                    {productStrategicImplication.summary}
+                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.5)" }}>
+                    Suggested role: {productStrategicImplication.suggestedRoles.map((role) => roleToDisplayName(role)).join(" • ")}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {hasSelectedProductPiece && (
+            <>
+              <div style={hairline} />
+
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ ...zoneLabel, marginBottom: 12 }}>COLLECTION STRUCTURE</div>
+                <div style={{ borderRadius: 12, border: "1px solid rgba(67,67,43,0.08)", background: "rgba(255,255,255,0.72)", padding: "14px 15px" }}>
+                  <div style={{ display: "grid", gap: 8, marginBottom: productStructure?.notes?.length ? 14 : 0 }}>
+                    {(["hero", "directional", "core-evolution", "volume-driver"] as CollectionRoleId[]).map((role) => (
+                      <div key={role} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                        <div style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.56)" }}>
+                          {roleToDisplayName(role)}
+                        </div>
+                        <div style={{ fontFamily: sohne, fontSize: 13, color: "#43432B" }}>
+                          {productStructure?.counts[role] ?? 0}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {(productStructure?.notes ?? []).length > 0 && (
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {(productStructure?.notes ?? []).map((note) => (
+                        <div key={note} style={{ fontFamily: inter, fontSize: 12, lineHeight: 1.6, color: "rgba(67,67,43,0.66)" }}>
+                          {note}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 
 function ConceptDecisionRail({
   headline,
@@ -120,6 +247,12 @@ function ConceptDecisionRail({
   onContinue,
   canContinue,
   nextMove,
+  conceptStage = "product",
+  executionGuidance = [],
+  productPieceRead,
+  productStrategicImplication,
+  productStructure,
+  hasSelectedProductPiece,
 }: {
   headline: string;
   paragraphs: string[];
@@ -136,29 +269,35 @@ function ConceptDecisionRail({
   onContinue?: () => void;
   canContinue?: boolean;
   nextMove?: NextMoveProps;
+  conceptStage?: "direction" | "language" | "product";
+  executionGuidance?: Array<{ title: string; description: string }>;
+  productPieceRead?: { title?: string; body: string } | null;
+  productStrategicImplication?: {
+    summary: string;
+    suggestedRoles: CollectionRoleId[];
+  } | null;
+  productStructure?: {
+    counts: Record<CollectionRoleId, number>;
+    assignedCount: number;
+    notes: string[];
+  } | null;
+  hasSelectedProductPiece?: boolean;
 }) {
-  const mukoRecommendedRole: CollectionRoleId | null = guidance ? signalToRole(guidance.commitment_signal) : null;
   const [analysisExpanded, setAnalysisExpanded] = useState(false);
-  const [localSelectedRole, setLocalSelectedRole] = useState<CollectionRoleId | null>(
-    () => (currentRole as CollectionRoleId | null) ?? mukoRecommendedRole
-  );
 
-  useEffect(() => {
-    if (currentRole) {
-      setLocalSelectedRole(currentRole as CollectionRoleId);
-    } else if (mukoRecommendedRole && !localSelectedRole) {
-      setLocalSelectedRole(mukoRecommendedRole);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentRole, mukoRecommendedRole]);
+  if (conceptStage === "product") {
+    return (
+      <ProductDecisionRail
+        productPieceRead={productPieceRead}
+        productStrategicImplication={productStrategicImplication}
+        productStructure={productStructure}
+        hasSelectedProductPiece={hasSelectedProductPiece}
+      />
+    );
+  }
 
-  const handleRoleSelect = (roleId: CollectionRoleId) => {
-    setLocalSelectedRole(roleId);
-    onRoleSelect?.(roleId);
-  };
-
-  const anchorPiece = selectedAnchorPiece ?? recommendedKeyPieces[0] ?? null;
-  const executionLevers = guidance?.execution_levers ?? [];
+  const showExecutionGuidance = conceptStage === "language";
+  const zoneOneLabel = "Muko's Read";
 
   function getFirstSentence(text: string): string {
     const match = text.match(/^[^.!?]*[.!?]/);
@@ -187,30 +326,7 @@ function ConceptDecisionRail({
 
       {/* ── Zone 1 — Muko's Read ─────────────────────────────────────────── */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ ...zoneLabel, marginBottom: 10 }}>MUKO&apos;S READ</div>
-
-        {/* Role badge */}
-        {guidance && (
-          <div style={{ marginBottom: 12 }}>
-            <span style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 5,
-              padding: "5px 11px",
-              borderRadius: 999,
-              background: "#A8B475",
-              color: "#fff",
-              fontFamily: inter,
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase" as const,
-            }}>
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "rgba(255,255,255,0.80)", flexShrink: 0 }} />
-              {guidance.commitment_signal}
-            </span>
-          </div>
-        )}
+        <div style={{ ...zoneLabel, marginBottom: 10 }}>{zoneOneLabel.toUpperCase()}</div>
 
         {/* Guidance statement */}
         <div style={{ fontFamily: sohne, fontSize: 14, fontWeight: 500, lineHeight: 1.45, color: "#43432B" }}>
@@ -278,6 +394,34 @@ function ConceptDecisionRail({
         </div>
       )}
 
+      {showExecutionGuidance && executionGuidance.length > 0 && (
+        <>
+          <div style={hairline} />
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {executionGuidance.map((item) => (
+                <div
+                  key={`${item.title}-${item.description}`}
+                  style={{
+                    borderRadius: 10,
+                    border: "1px solid rgba(67,67,43,0.08)",
+                    background: "rgba(255,255,255,0.7)",
+                    padding: "12px 13px",
+                  }}
+                >
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "#B8876B", marginBottom: 5 }}>
+                    {item.title}
+                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 12, lineHeight: 1.6, color: "rgba(67,67,43,0.68)" }}>
+                    {item.description}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* ── Spec Next Move (spec mode only) ─────────────────────────────── */}
       {nextMove?.mode === "spec" && nextMove.suggestions.length > 0 && (() => {
         const suggestions = nextMove.suggestions
@@ -297,140 +441,6 @@ function ConceptDecisionRail({
         );
       })()}
 
-      {/* ── Zone 3 — Your Decision ───────────────────────────────────────── */}
-      {(guidance || isLoading) && (
-        <>
-          <div style={hairline} />
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ ...zoneLabel, marginBottom: 12 }}>YOUR DECISION — PIECE ROLE</div>
-
-            {isLoading && !guidance ? (
-              <div style={{ height: 120, borderRadius: 10, background: "rgba(67,67,43,0.05)", animation: "mukoCardPulse 1.5s ease-in-out infinite" }} />
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {ROLE_CARDS.map(card => {
-                  const isSelected = localSelectedRole === card.id;
-                  const isMukoPick = mukoRecommendedRole === card.id;
-                  return (
-                    <div
-                      key={card.id}
-                      onClick={() => handleRoleSelect(card.id)}
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: isSelected ? "1.5px solid #A8B475" : "1.5px solid rgba(67,67,43,0.10)",
-                        background: isSelected ? "#eef1e3" : "transparent",
-                        cursor: "pointer",
-                        transition: "border-color 140ms ease, background 140ms ease",
-                      }}
-                    >
-                      {isMukoPick && (
-                        <div style={{ fontFamily: inter, fontSize: 8, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: "#A8B475", marginBottom: 4 }}>
-                          MUKO&apos;S PICK
-                        </div>
-                      )}
-                      <div style={{ fontFamily: inter, fontSize: 12, fontWeight: 600, color: "#43432B", marginBottom: 4 }}>
-                        {card.name}
-                      </div>
-                      <div style={{ fontFamily: inter, fontSize: 11, lineHeight: 1.5, color: "rgba(67,67,43,0.55)" }}>
-                        {card.description}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* ── Zone 4 — Suggested Pieces ────────────────────────────────────── */}
-      {(anchorPiece || executionLevers.length > 0) && (
-        <>
-          <div style={hairline} />
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ ...zoneLabel, marginBottom: 12 }}>SUGGESTED PIECES</div>
-
-            <div style={{ background: "#FAFAF8", border: "1px solid rgba(67,67,43,0.08)", borderRadius: 10, padding: "14px 16px" }}>
-              {anchorPiece && (
-                <>
-                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", marginBottom: 5 }}>
-                    ANCHOR PIECE
-                  </div>
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 3 }}>
-                    <div style={{ fontFamily: inter, fontSize: 13, fontWeight: 600, color: "#43432B" }}>
-                      {toDisplayChipLabel(anchorPiece)}
-                    </div>
-                    {onSelectAnchorPiece && (
-                      <button
-                        onClick={() => onSelectAnchorPiece(anchorPiece)}
-                        style={{ flexShrink: 0, padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 600, fontFamily: inter, background: "rgba(168,180,117,0.12)", border: "1px solid rgba(168,180,117,0.40)", color: "#6B7A3E", cursor: "pointer", whiteSpace: "nowrap" as const }}
-                      >
-                        Apply
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.50)", marginBottom: executionLevers.length > 0 ? 14 : 0 }}>
-                    Sets the collection&apos;s visual signature
-                  </div>
-                </>
-              )}
-
-              {executionLevers.length > 0 && (
-                <>
-                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.38)", marginBottom: 8 }}>
-                    EXECUTION LEVERS
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {executionLevers.map(lever => (
-                      <span key={lever} style={{ padding: "4px 9px", borderRadius: 20, fontFamily: inter, fontSize: 11, background: "rgba(125,150,172,0.10)", color: "#7D96AC", border: "1px solid rgba(125,150,172,0.20)" }}>
-                        {toDisplayChipLabel(lever)}
-                      </span>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── Zone 5 — CTA ─────────────────────────────────────────────────── */}
-      {onContinue && (
-        <>
-          <div style={hairline} />
-          <div>
-            <button
-              onClick={canContinue ? onContinue : undefined}
-              disabled={!canContinue}
-              style={{
-                width: "100%",
-                padding: 14,
-                borderRadius: 10,
-                fontSize: 12,
-                fontWeight: 700,
-                fontFamily: sohne,
-                letterSpacing: "0.02em",
-                color: canContinue ? "#7D96AC" : "rgba(67,67,43,0.30)",
-                background: canContinue ? "rgba(125,150,172,0.07)" : "rgba(255,255,255,0.46)",
-                border: canContinue ? "1.5px solid #7D96AC" : "1.5px solid rgba(67,67,43,0.10)",
-                cursor: canContinue ? "pointer" : "not-allowed",
-                opacity: canContinue ? 1 : 0.65,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
-                transition: "all 280ms ease",
-              }}
-            >
-              <span>Lock direction &amp; build specs</span>
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{ opacity: canContinue ? 1 : 0.4 }}>
-                <path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
-        </>
-      )}
     </div>
   );
 }
@@ -447,14 +457,16 @@ export function MukoInsightSection({
   pageMode,
   onContinue,
   canContinue,
+  conceptStage,
+  executionGuidance,
+  productPieceRead,
+  productStrategicImplication,
+  productStructure,
+  hasSelectedProductPiece,
 }: MukoInsightSectionProps) {
   const [dlExpanded, setDlExpanded] = useState(true);
   const [bulletsExpanded, setBulletsExpanded] = useState(true);
   const [expandedChips, setExpandedChips] = useState<Set<string>>(new Set());
-  const implKey = constructionImplications?.map(s => s.chip).join('|') ?? '';
-  useEffect(() => {
-    setExpandedChips(new Set());
-  }, [implKey]);
   function toggleChip(label: string) {
     setExpandedChips(prev => {
       const next = new Set(prev);
@@ -493,6 +505,12 @@ export function MukoInsightSection({
         onContinue={onContinue}
         canContinue={canContinue}
         nextMove={nextMove}
+        conceptStage={conceptStage}
+        executionGuidance={executionGuidance}
+        productPieceRead={productPieceRead}
+        productStrategicImplication={productStrategicImplication}
+        productStructure={productStructure}
+        hasSelectedProductPiece={hasSelectedProductPiece}
       />
     );
   }
@@ -1373,16 +1391,7 @@ function SpecNarrativeMoveCard({
   onUndo: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
-  const [flashActive, setFlashActive] = useState(false);
   const tag = { ...SPEC_TAG_STYLES[tagKey], label: suggestion.kind === 'warning' ? 'CONFLICT' : SPEC_TAG_STYLES[tagKey].label };
-
-  useEffect(() => {
-    if (isApplied) {
-      setFlashActive(true);
-      const timer = setTimeout(() => setFlashActive(false), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isApplied]);
 
   return (
     <div
@@ -1394,9 +1403,7 @@ function SpecNarrativeMoveCard({
           : hovered
           ? "1px solid rgba(67,67,43,0.18)"
           : "1px solid rgba(67,67,43,0.10)",
-        background: flashActive
-          ? "rgba(168,180,117,0.10)"
-          : isApplied
+        background: isApplied
           ? "rgba(168,180,117,0.06)"
           : "#FAFAF8",
         transition: "border-color 150ms ease, background 200ms ease",
@@ -1625,15 +1632,6 @@ function SpecNextMoveRow({
   onUndo: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
-  const [flashActive, setFlashActive] = useState(false);
-
-  useEffect(() => {
-    if (isApplied) {
-      setFlashActive(true);
-      const timer = setTimeout(() => setFlashActive(false), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isApplied]);
 
   return (
     <div
@@ -1643,7 +1641,7 @@ function SpecNextMoveRow({
         gap: 10,
         padding: "11px 8px",
         borderRadius: 8,
-        background: flashActive ? "rgba(168,180,117,0.12)" : isApplied ? "rgba(168,180,117,0.07)" : "transparent",
+        background: isApplied ? "rgba(168,180,117,0.07)" : "transparent",
         transition: "background 200ms ease",
       }}
       onMouseEnter={() => setHovered(true)}

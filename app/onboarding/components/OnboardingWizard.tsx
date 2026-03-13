@@ -32,6 +32,8 @@ interface FormData {
   acceptsConflicts: boolean;
 }
 
+type FormFieldValue = FormData[keyof FormData];
+
 export default function OnboardingWizard() {
   const router = useRouter();
   const supabase = createClient();
@@ -65,12 +67,9 @@ export default function OnboardingWizard() {
       setUserId(user.id);
     };
     checkAuth();
-  }, [router]);
+  }, [router, supabase]);
 
-  const updateFormData = (
-    field: keyof FormData,
-    value: string | string[] | number | boolean | null
-  ) => {
+  const updateFormData = (field: keyof FormData, value: FormFieldValue) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -140,9 +139,10 @@ export default function OnboardingWizard() {
 
       console.log('Brand profile created successfully:', data);
       router.push('/entry');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Full error object:', error);
-      alert(`Failed to create brand profile: ${error.message || 'Unknown error'}`);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to create brand profile: ${message}`);
     } finally {
       setLoading(false);
     }
