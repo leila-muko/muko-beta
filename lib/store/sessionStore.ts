@@ -54,6 +54,7 @@ interface SessionState {
   customChips: Record<string, ActivatedChip[]>; // keyed by aesthetic name
   conceptSilhouette: string; // required before lock — 'straight' | 'relaxed' | 'structured' | 'oversized'
   conceptPalette: string | null; // optional palette id from aesthetic's palette_options
+  collectionAesthetic: string | null;
 
   // Step 3: Spec Studio
   category: string;
@@ -97,6 +98,7 @@ interface SessionState {
   setCustomChips: (chips: Record<string, ActivatedChip[]>) => void;
   setConceptSilhouette: (s: string) => void;
   setConceptPalette: (p: string | null) => void;
+  setCollectionAesthetic: (aesthetic: string | null) => void;
   setCategory: (category: string) => void;
   setSubcategory: (subcategory: string) => void;
   setTargetMsrp: (msrp: number) => void;
@@ -141,6 +143,7 @@ export const useSessionStore = create<SessionState>()(
       customChips: {},
       conceptSilhouette: '',
       conceptPalette: null,
+      collectionAesthetic: null,
       category: '',
       subcategory: '',
       targetMsrp: null,
@@ -173,6 +176,7 @@ export const useSessionStore = create<SessionState>()(
       setCustomChips: (customChips) => set({ customChips }),
       setConceptSilhouette: (conceptSilhouette) => set({ conceptSilhouette }),
       setConceptPalette: (conceptPalette) => set({ conceptPalette }),
+      setCollectionAesthetic: (collectionAesthetic) => set({ collectionAesthetic }),
       setCategory: (category) => set({ category, subcategory: '' }),
       setSubcategory: (subcategory) => set({ subcategory }),
       setTargetMsrp: (targetMsrp) => set({ targetMsrp }),
@@ -215,6 +219,7 @@ export const useSessionStore = create<SessionState>()(
         customChips: {},
         conceptSilhouette: '',
         conceptPalette: null,
+        collectionAesthetic: null,
         category: '',
         subcategory: '',
         targetMsrp: null,
@@ -240,7 +245,7 @@ export const useSessionStore = create<SessionState>()(
       name: 'muko-session',
       partialize: (state) => {
         // Persist everything except actions
-        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setCollectionRole, setSelectedKeyPiece, setParentAnalysisId, setSavedAnalysisId, setActiveCollection, setAssortmentInsightCache, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
+        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setCollectionRole, setSelectedKeyPiece, setParentAnalysisId, setSavedAnalysisId, setActiveCollection, setAssortmentInsightCache, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
         return rest;
       },
     }

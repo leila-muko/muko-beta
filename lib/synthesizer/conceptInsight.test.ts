@@ -119,6 +119,34 @@ describe('Decision Guidance collection progression', () => {
     expect(guidance.recommended_direction.toLowerCase()).toMatch(/simplify|hold the line|execution/);
   });
 
+  test('diagnostic stage blocks another hero and can pivot aesthetics when the collection is overbuilt', () => {
+    const bb = makeBlackboard({
+      identity_score: 68,
+      resonance_score: 57,
+      collection_context: {
+        brand: {
+          name: 'Muko Test Brand',
+          keywords: ['architectural', 'refined', 'restraint'],
+        },
+        existing_pieces: [
+          { piece_name: 'Column coat', score: 78, dimensions: { identity: 72, resonance: 58, execution: 66 }, collection_role: 'hero', aesthetic_matched_id: 'quiet-structure' },
+          { piece_name: 'Wrapped dress', score: 76, dimensions: { identity: 67, resonance: 55, execution: 69 }, collection_role: 'hero', aesthetic_matched_id: 'quiet-structure' },
+          { piece_name: 'Tailored pant', score: 74, dimensions: { identity: 65, resonance: 56, execution: 70 }, collection_role: 'hero', aesthetic_matched_id: 'quiet-structure' },
+        ],
+        piece_count: 3,
+      },
+    });
+
+    const summary = summarizeCollectionGuidanceContext(bb);
+    const guidance = buildFallbackDecisionGuidance(bb, 'differentiate');
+
+    expect(summary.repeated_role_issue).toBe(true);
+    expect(summary.requires_aesthetic_pivot).toBe(true);
+    expect(summary.suggested_aesthetic).toBe('Terrain Luxe');
+    expect(guidance.recommended_direction.toLowerCase()).toContain('do not add another hero');
+    expect(guidance.recommended_direction).toContain('Terrain Luxe');
+  });
+
   test('concept prompt includes the derived collection summary for the model', () => {
     const bb = makeBlackboard({
       collection_context: {

@@ -33,6 +33,8 @@ export interface BrandProfile {
     // Aesthetic inputs
     aesthetic_input: string | null;
     aesthetic_matched_id: string | null;
+    collection_aesthetic?: string | null;
+    aesthetic_inflection?: string | null;
     mood_board_images: string[];
     
     // Material specs

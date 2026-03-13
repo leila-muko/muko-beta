@@ -58,6 +58,7 @@ export interface ConceptBlackboard {
   key_pieces?: Array<{ item: string; type?: string; signal?: string }>;
   /** Collection context for collection-aware Decision Guidance */
   collection_context?: {
+    aesthetic_inflection?: string | null;
     brand: {
       name?: string | null;
       keywords?: string[];
@@ -71,6 +72,10 @@ export interface ConceptBlackboard {
       score: number;
       dimensions?: Record<string, number> | null;
       collection_role?: string | null;
+      category?: string | null;
+      silhouette?: string | null;
+      aesthetic_matched_id?: string | null;
+      aesthetic_inflection?: string | null;
     }>;
     piece_count: number;
   };
@@ -89,6 +94,12 @@ export interface CollectionGuidanceSummary {
   missing_role: string | null;
   urgent_gap: string;
   anchor_recommendation: string;
+  repeated_role_issue: boolean;
+  requires_aesthetic_pivot: boolean;
+  suggested_aesthetic: string | null;
+  pivot_reason: string | null;
+  inflection_present: boolean;
+  inflection_text: string | null;
 }
 
 // ─────────────────────────────────────────────
@@ -174,6 +185,11 @@ function inferWeakestDimension(
 export function summarizeCollectionGuidanceContext(bb: ConceptBlackboard): CollectionGuidanceSummary {
   const pieces = bb.collection_context?.existing_pieces ?? [];
   const pieceCount = bb.collection_context?.piece_count ?? pieces.length;
+  const inflectionText =
+    bb.collection_context?.aesthetic_inflection?.trim() ||
+    pieces.find((piece) => piece.aesthetic_inflection?.trim())?.aesthetic_inflection?.trim() ||
+    null;
+  const inflectionPresent = Boolean(inflectionText);
   const roles = pieces.map((piece) => normalizeRole(piece.collection_role));
   const roleCounts = roles.reduce<Record<string, number>>((acc, role) => {
     acc[role] = (acc[role] ?? 0) + 1;
@@ -184,6 +200,23 @@ export function summarizeCollectionGuidanceContext(bb: ConceptBlackboard): Colle
   const missingRole = (['hero', 'core', 'support'] as const).find((role) => !roleCounts[role]) ?? null;
   const anchor = bb.key_pieces?.[0]?.item ?? `${titleCaseToken(bb.aesthetic_matched_id)} anchor piece`;
   const anchorType = bb.key_pieces?.[0]?.type ? titleCaseToken(bb.key_pieces[0].type) : 'hero piece';
+  const repeatedRoleIssue = pieceCount >= 2 && new Set(roles).size === 1;
+  const currentAestheticCount = pieces.filter(
+    (piece) => piece.aesthetic_matched_id && piece.aesthetic_matched_id === bb.aesthetic_matched_id,
+  ).length;
+  const suggestedAesthetic = bb.aesthetic_context.adjacent_directions[0]
+    ? titleCaseToken(bb.aesthetic_context.adjacent_directions[0])
+    : null;
+  const requiresAestheticPivot =
+    pieceCount >= 3 &&
+    repeatedRoleIssue &&
+    overrepresentedRole === 'hero' &&
+    currentAestheticCount >= Math.max(2, Math.ceil(pieceCount * 0.6)) &&
+    (weakestDimension === 'identity' || weakestDimension === 'resonance') &&
+    Boolean(suggestedAesthetic);
+  const pivotReason = requiresAestheticPivot
+    ? `The collection is overbuilt in ${titleCaseToken(bb.aesthetic_matched_id)} hero pieces and needs a contrasting direction to reopen whitespace.`
+    : null;
 
   if (pieceCount === 0) {
     return {
@@ -194,6 +227,12 @@ export function summarizeCollectionGuidanceContext(bb: ConceptBlackboard): Colle
       missing_role: 'hero',
       urgent_gap: `No anchor is set yet; start with a ${anchorType.toLowerCase()} that can define the line.`,
       anchor_recommendation: `Start with ${anchor} as the collection anchor, then build a support layer around it.`,
+      repeated_role_issue: false,
+      requires_aesthetic_pivot: false,
+      suggested_aesthetic: suggestedAesthetic,
+      pivot_reason: null,
+      inflection_present: inflectionPresent,
+      inflection_text: inflectionText,
     };
   }
 
@@ -212,11 +251,21 @@ export function summarizeCollectionGuidanceContext(bb: ConceptBlackboard): Colle
             ? 'The support layer is too thin to make the lead idea read as a range.'
             : 'A stronger core layer is missing between the hero idea and the support pieces.',
       anchor_recommendation: `Close the ${roleGap} gap next so ${anchor} does not sit in isolation.`,
+      repeated_role_issue: repeatedRoleIssue,
+      requires_aesthetic_pivot: false,
+      suggested_aesthetic: suggestedAesthetic,
+      pivot_reason: null,
+      inflection_present: inflectionPresent,
+      inflection_text: inflectionText,
     };
   }
 
   const urgentGap =
-    weakestDimension === 'execution'
+    requiresAestheticPivot
+      ? pivotReason!
+      : repeatedRoleIssue && overrepresentedRole === 'hero'
+        ? 'The collection is stacking hero pieces without the core or support roles that make them readable.'
+        : weakestDimension === 'execution'
       ? 'Complexity is concentrating into too few pieces.'
       : weakestDimension === 'resonance'
         ? 'The collection needs a clearer commercial role mix.'
@@ -232,6 +281,12 @@ export function summarizeCollectionGuidanceContext(bb: ConceptBlackboard): Colle
     missing_role: missingRole,
     urgent_gap: urgentGap,
     anchor_recommendation: `Prioritize the ${weakestDimension ?? 'role-balance'} issue before adding more breadth around ${anchor}.`,
+    repeated_role_issue: repeatedRoleIssue,
+    requires_aesthetic_pivot: requiresAestheticPivot,
+    suggested_aesthetic: suggestedAesthetic,
+    pivot_reason: pivotReason,
+    inflection_present: inflectionPresent,
+    inflection_text: inflectionText,
   };
 }
 
@@ -246,6 +301,9 @@ function buildCollectionAwareFallbackDecisionGuidance(
     .join(' ');
   const topKeyPiece = blackboard.key_pieces?.[0]?.item ?? `${aestheticName} anchor`;
   const roleGapLabel = titleCaseToken(summary.missing_role);
+  const inflectionClause = summary.inflection_present && summary.inflection_text
+    ? ` while holding ${summary.inflection_text}`
+    : '';
 
   let commitmentSignal: CommitmentSignal = 'Controlled Test';
   let recommendedDirection = `Introduce ${aestheticName} through a controlled assortment test.`;
@@ -255,7 +313,7 @@ function buildCollectionAwareFallbackDecisionGuidance(
       blackboard.identity_score >= 78 && blackboard.resonance_score >= 68
         ? 'Hero Expression'
         : 'Controlled Test';
-    recommendedDirection = `Start the collection with ${topKeyPiece} as the hero anchor, then build a ${blackboard.intent?.piece_role === 'volume-driver' ? 'commercially legible' : 'disciplined'} support layer around it.`;
+    recommendedDirection = `Start the collection with ${topKeyPiece} as the hero anchor, then build a ${blackboard.intent?.piece_role === 'volume-driver' ? 'commercially legible' : 'disciplined'} support layer around it${inflectionClause}.`;
   } else if (summary.stage === 'comparative') {
     commitmentSignal =
       blackboard.identity_score >= 74 && blackboard.resonance_score >= 66
@@ -263,21 +321,29 @@ function buildCollectionAwareFallbackDecisionGuidance(
         : 'Controlled Test';
     recommendedDirection =
       summary.missing_role === 'hero'
-        ? `Add a hero anchor next so the current pieces stop reading like fragments of ${aestheticName} without a lead statement.`
+        ? `Add a hero anchor next so the current pieces stop reading like fragments of ${aestheticName} without a lead statement${inflectionClause}.`
         : summary.missing_role === 'support'
-          ? `Add a support-driven companion piece next so ${topKeyPiece} reads as a range instead of a standalone gesture.`
-          : `Add a clearer core piece next to bridge ${topKeyPiece} into a repeatable ${aestheticName} assortment.`;
+          ? `Add a support-driven companion piece next so ${topKeyPiece} reads as a range instead of a standalone gesture${inflectionClause}.`
+          : `Add a clearer core piece next to bridge ${topKeyPiece} into a repeatable ${aestheticName} assortment${inflectionClause}.`;
   } else {
+    if (summary.requires_aesthetic_pivot && summary.suggested_aesthetic) {
+      return {
+        recommended_direction: `Do not add another hero in ${aestheticName}; test ${summary.suggested_aesthetic} through a supporting piece so the collection regains contrast and range${inflectionClause}.`,
+        commitment_signal: 'Controlled Test',
+        execution_levers: fallbackLevers.slice(0, 4),
+      };
+    }
+
     commitmentSignal =
       blackboard.identity_score >= 80 && blackboard.resonance_score >= 70
         ? 'Maintain Exposure'
         : 'Controlled Test';
     recommendedDirection =
       summary.weakest_dimension === 'execution'
-        ? `Hold the line on newness and simplify the most demanding ${summary.overrepresented_role ?? 'hero'} piece before expanding ${aestheticName} further.`
+        ? `Hold the line on newness and simplify the most demanding ${summary.overrepresented_role ?? 'hero'} piece before expanding ${aestheticName} further${inflectionClause}.`
         : summary.weakest_dimension === 'resonance'
-          ? `Add the missing ${roleGapLabel.toLowerCase() || 'commercial'} role now so ${aestheticName} lands as a collection, not only a point of view.`
-          : `Edit the overbuilt ${summary.overrepresented_role ?? 'core'} layer and add one clearer counter-role so ${aestheticName} keeps a sharper point of view.`;
+          ? `Add the missing ${roleGapLabel.toLowerCase() || 'commercial'} role now so ${aestheticName} lands as a collection, not only a point of view${inflectionClause}.`
+          : `Edit the overbuilt ${summary.overrepresented_role ?? 'core'} layer and add one clearer counter-role so ${aestheticName} keeps a sharper point of view${inflectionClause}.`;
   }
 
   return {
@@ -732,6 +798,10 @@ The input may also include collection_context.summary with:
 - missing_role
 - urgent_gap
 - anchor_recommendation
+- repeated_role_issue
+- requires_aesthetic_pivot
+- suggested_aesthetic
+- pivot_reason
 
 Use this summary to sharpen the recommendation. It exists to prevent generic outputs and to force the correct progression stage.
 
@@ -746,6 +816,10 @@ When collection_context.piece_count >= 3: diagnose collection health — which s
 Use brand.keywords and brand.customer_profile (from collection_context.brand) to ensure the guidance is brand-specific, not generic.
 Do not mention collection_context, piece_count, or score field names in any output field.
 If collection_context.summary is present, recommended_direction must explicitly resolve that urgent gap rather than restating the aesthetic generally.
+If collection_context.summary.overrepresented_role = hero and collection_context.summary.repeated_role_issue = true, recommending another hero piece is invalid.
+If collection_context.summary.missing_role = support or core, recommended_direction must name that missing role directly.
+If collection_context.summary.requires_aesthetic_pivot = true, recommended_direction must tell the team to test collection_context.summary.suggested_aesthetic instead of adding another piece in the current aesthetic.
+If aesthetic_inflection is present, treat it as a creative constraint that modifies how you evaluate piece fit and role recommendations. A piece that expresses the inflection through its execution levers or material choice should be rewarded. A piece that contradicts the inflection should be flagged. Name the inflection explicitly in your guidance statement when it is relevant to the recommendation.
 
 BRAND REASONING LAYER
 

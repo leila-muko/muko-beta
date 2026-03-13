@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSessionStore } from '@/lib/store/sessionStore';
+import { createClient } from '@/lib/supabase/client';
 import { BRAND } from '@/lib/concept-studio/constants';
 
 /* ─── Design tokens — match Intent / Concept / Spec / Report ─────────────── */
@@ -11,6 +12,11 @@ const CHARTREUSE = '#A8B475';
 const STEEL = BRAND.steelBlue; // #7D96AC
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
+
+interface RecentCollectionItem {
+  id: string;
+  name: string;
+}
 
 export default function EntryScreen() {
   const router = useRouter();
@@ -36,14 +42,16 @@ export default function EntryScreen() {
   const [touchedName, setTouchedName] = useState(false);
   const [touchedSeason, setTouchedSeason] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
+  const [savedCollections, setSavedCollections] = useState<RecentCollectionItem[]>([]);
 
   const recentCollections = useMemo(() => {
     const names = new Set<string>();
 
     if (collectionName.trim()) names.add(collectionName.trim());
+    savedCollections.forEach((collection) => names.add(collection.name));
 
     return Array.from(names).map((name) => ({ id: name, name }));
-  }, [collectionName]);
+  }, [collectionName, savedCollections]);
 
   const nameError = touchedName && !collectionName.trim() ? 'Please enter a collection name.' : '';
   const seasonError = touchedSeason && !selectedSeason ? 'Please select a season.' : '';
@@ -56,6 +64,21 @@ export default function EntryScreen() {
     setActiveCollection,
   } = store;
 
+  const resetForNewCollection = () => {
+    setCollectionName('');
+    setSelectedSeason('fw26');
+    setTouchedName(false);
+    setTouchedSeason(false);
+    setStoreCollectionName('');
+    setActiveCollection(null);
+    try {
+      window.localStorage.removeItem('muko_collectionName');
+      window.localStorage.removeItem('muko_seasonLabel');
+      window.localStorage.removeItem('muko_collection_aesthetic');
+      window.localStorage.removeItem('muko_aesthetic_inflection');
+    } catch {}
+  };
+
   useEffect(() => {
     try {
       const savedName = window.localStorage.getItem('muko_collectionName')?.trim();
@@ -64,7 +87,6 @@ export default function EntryScreen() {
       if (savedName) {
         setCollectionName(savedName);
         setStoreCollectionName(savedName);
-        setActiveCollection(savedName);
       }
 
       if (savedSeason) {
@@ -76,6 +98,49 @@ export default function EntryScreen() {
       }
     } catch {}
   }, [allSeasons, setActiveCollection, setSeason, setStoreCollectionName]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSavedCollections = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+
+      const { data } = await supabase
+        .from('analyses')
+        .select('collection_name, created_at')
+        .eq('user_id', user.id)
+        .not('collection_name', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (!data || cancelled) return;
+
+      const seen = new Set<string>();
+      const nextCollections: RecentCollectionItem[] = [];
+
+      for (const row of data) {
+        const name = (row.collection_name as string | null)?.trim();
+        if (!name || seen.has(name)) continue;
+        seen.add(name);
+        nextCollections.push({ id: name, name });
+      }
+
+      setSavedCollections(nextCollections);
+    };
+
+    loadSavedCollections();
+
+    const refreshCollections = () => {
+      loadSavedCollections();
+    };
+
+    window.addEventListener('focus', refreshCollections);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refreshCollections);
+    };
+  }, []);
 
   const handleOpenCollection = (name: string) => {
     setCollectionName(name);
@@ -91,10 +156,12 @@ export default function EntryScreen() {
     setTouchedName(true);
     setTouchedSeason(true);
     if (!canContinue) return;
-    window.localStorage.setItem('muko_collectionName', collectionName.trim());
+    const nextCollectionName = collectionName.trim();
+    window.localStorage.setItem('muko_collectionName', nextCollectionName);
     const seasonLabel = allSeasons.find((s) => s.id === selectedSeason)?.label ?? '';
     window.localStorage.setItem('muko_seasonLabel', seasonLabel);
-    setStoreCollectionName(collectionName.trim());
+    setStoreCollectionName(nextCollectionName);
+    setActiveCollection(nextCollectionName);
     setSeason(seasonLabel);
     setCurrentStep(2);
     router.push('/intent');
@@ -152,7 +219,7 @@ export default function EntryScreen() {
         </h1>
 
         {/* New Collection button */}
-        <NewCollectionButton />
+        <NewCollectionButton onClick={resetForNewCollection} />
 
         {/* Recents */}
         <div style={{ marginTop: 8 }}>
@@ -505,11 +572,12 @@ export default function EntryScreen() {
 }
 
 /* ─── NewCollectionButton — matches workspace ghost button pattern ────────── */
-function NewCollectionButton() {
+function NewCollectionButton({ onClick }: { onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
 
   return (
     <button
+      onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{

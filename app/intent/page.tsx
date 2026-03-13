@@ -184,7 +184,7 @@ export default function IntentCalibrationPage() {
     return "center";
   });
 
-  const [touched, setTouched] = useState({ success: false, tradeoff: false });
+  const [touched, setTouched] = useState({ success: false, tradeoff: false, role: false });
 
   const canContinue = success.length > 0 && !!tradeoff;
 

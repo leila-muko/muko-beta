@@ -198,6 +198,9 @@ interface ChipMeta {
 
 type TensionState = 'none' | 'soft' | 'hard';
 
+const COLLECTION_AESTHETIC_STORAGE_KEY = "muko_collection_aesthetic";
+const AESTHETIC_INFLECTION_STORAGE_KEY = "muko_aesthetic_inflection";
+
 function getChipTensionState(chipLabel: string, selectedKeyPiece: KeyPiece | null): TensionState {
   if (!selectedKeyPiece || selectedKeyPiece.custom) return 'none';
   const tensions = (chipTensionsData as unknown as Record<string, { hard: string[]; soft: string[] }>)[selectedKeyPiece.type ?? ''];
@@ -205,6 +208,15 @@ function getChipTensionState(chipLabel: string, selectedKeyPiece: KeyPiece | nul
   if (tensions.hard.includes(chipLabel)) return 'hard';
   if (tensions.soft.includes(chipLabel)) return 'soft';
   return 'none';
+}
+
+function resolveAestheticName(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (AESTHETICS.includes(value as (typeof AESTHETICS)[number])) return value;
+  const entry = (
+    aestheticsData as unknown as Array<{ id: string; name: string }>
+  ).find((aesthetic) => aesthetic.id === value || aesthetic.name.toLowerCase() === value.toLowerCase());
+  return entry?.name ?? null;
 }
 
 /* ─── Free-form aesthetic matcher ─────────────────────────────────────────── */
@@ -499,15 +511,14 @@ export default function ConceptStudioPage() {
     setAestheticInput,
     identityPulse,
     resonancePulse,
-    conceptLocked,
     lockConcept,
     setCurrentStep,
     conceptSilhouette,
     setConceptSilhouette,
     conceptPalette,
     setConceptPalette,
-    chipSelection: storeChipSelection,
-    customChips: storeCustomChips,
+    collectionAesthetic: storeCollectionAesthetic,
+    setCollectionAesthetic,
     setCustomChips: setStoreCustomChips,
     setSelectedKeyPiece,
     decisionGuidanceState,
@@ -520,6 +531,12 @@ export default function ConceptStudioPage() {
 
   const [headerCollectionName, setHeaderCollectionName] = useState<string>("Collection");
   const [headerSeasonLabel, setHeaderSeasonLabel] = useState<string>(season || "—");
+  const [lockedCollectionAesthetic, setLockedCollectionAesthetic] = useState<string | null>(storeCollectionAesthetic);
+  const [isAestheticSelectionUnlocked, setIsAestheticSelectionUnlocked] = useState(false);
+  const [showAestheticChangeModal, setShowAestheticChangeModal] = useState(false);
+  const [aestheticInflection, setAestheticInflection] = useState("");
+  const [inflectionSuggestions, setInflectionSuggestions] = useState<string[]>([]);
+  const [loadingInflectionSuggestions, setLoadingInflectionSuggestions] = useState(false);
 
   useEffect(() => { setCurrentStep(2); }, [setCurrentStep]);
   useEffect(() => {
@@ -531,6 +548,28 @@ export default function ConceptStudioPage() {
       else setHeaderSeasonLabel(season || "—");
     } catch { setHeaderSeasonLabel(season || "—"); }
   }, [season]);
+
+  useEffect(() => {
+    try {
+      const storedCollectionAesthetic = window.localStorage.getItem(COLLECTION_AESTHETIC_STORAGE_KEY);
+      const storedInflection = window.localStorage.getItem(AESTHETIC_INFLECTION_STORAGE_KEY);
+
+      if (storedCollectionAesthetic) {
+        setLockedCollectionAesthetic(storedCollectionAesthetic);
+        setCollectionAesthetic(storedCollectionAesthetic);
+        const lockedAestheticName = resolveAestheticName(storedCollectionAesthetic);
+        if (lockedAestheticName) {
+          setAestheticInput(lockedAestheticName);
+        }
+      }
+
+      if (storedInflection) {
+        setAestheticInflection(storedInflection);
+      }
+    } catch {
+      // Ignore storage access failures in private or restricted contexts.
+    }
+  }, [setAestheticInput, setCollectionAesthetic]);
 
   // Real Critic identity scores for all aesthetics, populated once brandProfileId resolves.
   // Empty until the batch fetch completes — falls back to static scoring in the meantime.
@@ -563,6 +602,11 @@ export default function ConceptStudioPage() {
   }, [allCriticScores, refinementModifiers]);
   const selectedAesthetic = AESTHETICS.includes(aestheticInput as any) ? aestheticInput : null;
   const selectedIsAlternative = Boolean(selectedAesthetic && selectedAesthetic !== recommendedAesthetic);
+  const lockedAestheticName = useMemo(
+    () => resolveAestheticName(lockedCollectionAesthetic),
+    [lockedCollectionAesthetic]
+  );
+  const isAestheticSelectorLocked = Boolean(lockedCollectionAesthetic) && !isAestheticSelectionUnlocked;
 
   // Top-slot card: which aesthetic occupies the hero position
   const topAesthetic = selectedAesthetic ?? recommendedAesthetic;
@@ -641,6 +685,27 @@ export default function ConceptStudioPage() {
     });
   }, []);
 
+  const persistInflectionDraft = useMemo(
+    () =>
+      debounce((value: string) => {
+        try {
+          window.localStorage.setItem(AESTHETIC_INFLECTION_STORAGE_KEY, value);
+        } catch {
+          // Ignore storage failures.
+        }
+      }, 300),
+    []
+  );
+
+  useEffect(() => {
+    persistInflectionDraft(aestheticInflection);
+  }, [aestheticInflection, persistInflectionDraft]);
+
+  useEffect(() => {
+    if (!selectedAesthetic || resonancePulse) return;
+    computeAndSetResonance(selectedAesthetic);
+  }, [computeAndSetResonance, resonancePulse, selectedAesthetic]);
+
   // Sync customChips to store whenever they change
   useEffect(() => {
     setStoreCustomChips(customChips as Record<string, import("@/lib/store/sessionStore").ActivatedChip[]>);
@@ -682,7 +747,37 @@ export default function ConceptStudioPage() {
     score: number;
     dimensions: Record<string, number> | null;
     collection_role: string | null;
+    category: string | null;
+    silhouette: string | null;
+    aesthetic_matched_id: string | null;
+    aesthetic_inflection: string | null;
   }>>([]);
+  useEffect(() => {
+    if (lockedCollectionAesthetic || isAestheticSelectionUnlocked || collectionPieces.length === 0) return;
+    const inferredCollectionAesthetic =
+      storeCollectionAesthetic ??
+      collectionPieces.find((piece) => piece.aesthetic_matched_id)?.aesthetic_matched_id ??
+      null;
+    if (!inferredCollectionAesthetic) return;
+    setLockedCollectionAesthetic(inferredCollectionAesthetic);
+    setCollectionAesthetic(inferredCollectionAesthetic);
+    const inferredAestheticName = resolveAestheticName(inferredCollectionAesthetic);
+    if (inferredAestheticName) {
+      setAestheticInput(inferredAestheticName);
+    }
+  }, [
+    collectionPieces,
+    isAestheticSelectionUnlocked,
+    lockedCollectionAesthetic,
+    setAestheticInput,
+    setCollectionAesthetic,
+    storeCollectionAesthetic,
+  ]);
+  const activeCollectionInflection = useMemo(() => {
+    const trimmed = aestheticInflection.trim();
+    if (trimmed) return trimmed;
+    return collectionPieces.find((piece) => piece.aesthetic_inflection?.trim())?.aesthetic_inflection?.trim() ?? null;
+  }, [aestheticInflection, collectionPieces]);
   const [brandProfile3, setBrandProfile3] = useState<{
     brand_name: string | null;
     keywords: string[] | null;
@@ -749,6 +844,7 @@ export default function ConceptStudioPage() {
         signal: piece.signal ?? undefined,
       })),
       collection_context: {
+        aesthetic_inflection: activeCollectionInflection,
         brand: {
           name: brandProfile3?.brand_name ?? brandProfileName,
           keywords: brandProfile3?.keywords ?? undefined,
@@ -762,6 +858,10 @@ export default function ConceptStudioPage() {
           score: p.score,
           dimensions: p.dimensions,
           collection_role: p.collection_role,
+          category: p.category,
+          silhouette: p.silhouette,
+          aesthetic_matched_id: p.aesthetic_matched_id,
+          aesthetic_inflection: p.aesthetic_inflection,
         })),
         piece_count: collectionPieces.length,
       },
@@ -862,7 +962,48 @@ export default function ConceptStudioPage() {
       controller.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAesthetic, conceptSilhouette, conceptPalette, brandProfileName, customerProfile, referenceBrands, excludedBrands, refinementModifiers, identityPulse?.score, resonancePulse?.score, collectionPieces, brandProfile3]);
+  }, [selectedAesthetic, conceptSilhouette, conceptPalette, brandProfileName, customerProfile, referenceBrands, excludedBrands, refinementModifiers, identityPulse?.score, resonancePulse?.score, collectionPieces, brandProfile3, activeCollectionInflection]);
+
+  useEffect(() => {
+    if (!selectedAesthetic) {
+      setInflectionSuggestions([]);
+      setLoadingInflectionSuggestions(false);
+      return;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      setLoadingInflectionSuggestions(true);
+      try {
+        const res = await fetch("/api/concept-inflections", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            aesthetic_name: selectedAesthetic,
+            brand_keywords: brandProfile3?.keywords ?? refinementModifiers,
+          }),
+        });
+        const data = await res.json().catch(() => ({ suggestions: [] }));
+        if (!cancelled) {
+          setInflectionSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setInflectionSuggestions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingInflectionSuggestions(false);
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [brandProfile3?.keywords, refinementModifiers, selectedAesthetic]);
 
   const [freeFormDraft, setFreeFormDraft] = useState("");
   const [freeFormMatch, setFreeFormMatch] = useState<string | null>(null);
@@ -929,7 +1070,7 @@ export default function ConceptStudioPage() {
       const collectionPiecesPromise = collectionName
         ? supabase
             .from('analyses')
-            .select('id, piece_name, score, dimensions, collection_role')
+            .select('id, piece_name, score, dimensions, collection_role, category, silhouette, aesthetic_matched_id, aesthetic_inflection')
             .eq('collection_name', collectionName)
             .eq('user_id', user.id)
         : Promise.resolve({ data: [], error: null });
@@ -946,6 +1087,10 @@ export default function ConceptStudioPage() {
               score: number;
               dimensions: Record<string, number> | null;
               collection_role: string | null;
+              category: string | null;
+              silhouette: string | null;
+              aesthetic_matched_id: string | null;
+              aesthetic_inflection: string | null;
             }>).filter((p) => p.piece_name);
             setCollectionPieces(filtered);
             console.log('[COLLECTION_CONTEXT_DEBUG] piece_count:', filtered.length, 'first piece_name:', filtered[0]?.piece_name ?? null, 'collection_name used:', collectionName);
@@ -1087,9 +1232,6 @@ export default function ConceptStudioPage() {
 
   const identityScore = identityPulse?.score;
   const resonanceScore = resonancePulse?.score;
-  const selectedAestheticEntry = selectedAesthetic
-    ? (aestheticsData as unknown as AestheticDataEntry[]).find((a) => a.name === selectedAesthetic)
-    : null;
   const selectedAestheticData = selectedAesthetic
     ? (aestheticsData as unknown as AestheticDataEntry[]).find((a) => a.name === selectedAesthetic || a.id === selectedAesthetic.toLowerCase().replace(/\s+/g, "-"))
     : null;
@@ -1152,12 +1294,14 @@ export default function ConceptStudioPage() {
     }
   }, [keyPieces, setDecisionGuidanceState, setSelectedKeyPiece]);
 
-  const handleConfirmDirection = useCallback(() => {
+  const handleConfirmDirection = useCallback(async () => {
     const anchorPieceName = decisionGuidanceState.selected_anchor_piece ?? recommendedKeyPieces[0] ?? null;
     const anchorPiece = anchorPieceName
       ? keyPieces.find((piece) => !piece.custom && piece.item === anchorPieceName) ?? null
       : null;
     const executionLevers = conceptInsightData?.decision_guidance?.execution_levers ?? [];
+    const shouldPersistCollectionAesthetic = collectionPieces.length === 0 || isAestheticSelectionUnlocked;
+    const selectedAestheticSlug = selectedAesthetic ? toAestheticSlug(selectedAesthetic) : null;
 
     setDecisionGuidanceState({
       is_confirmed: true,
@@ -1167,6 +1311,36 @@ export default function ConceptStudioPage() {
     if (anchorPiece) {
       setSelectedKeyPieceLocal(anchorPiece);
       setSelectedKeyPiece(anchorPiece);
+    }
+
+    if (shouldPersistCollectionAesthetic && selectedAestheticSlug) {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        await supabase
+          .from("analyses")
+          .update({
+            collection_aesthetic: selectedAestheticSlug,
+            aesthetic_inflection: aestheticInflection.trim() || null,
+          })
+          .eq("user_id", user?.id ?? "")
+          .eq("collection_name", storeCollectionName);
+      } catch {
+        // Local state remains the source of truth if this best-effort write fails.
+      }
+
+      try {
+        window.localStorage.setItem(COLLECTION_AESTHETIC_STORAGE_KEY, selectedAestheticSlug);
+      } catch {
+        // Ignore storage failures.
+      }
+
+      setCollectionAesthetic(selectedAestheticSlug);
+      setLockedCollectionAesthetic(selectedAestheticSlug);
+      setIsAestheticSelectionUnlocked(false);
     }
 
     if (selectedAesthetic && executionLevers.length > 0) {
@@ -1195,7 +1369,12 @@ export default function ConceptStudioPage() {
     recommendedKeyPieces,
     selectedAesthetic,
     setDecisionGuidanceState,
+    setCollectionAesthetic,
     setSelectedKeyPiece,
+    aestheticInflection,
+    collectionPieces.length,
+    isAestheticSelectionUnlocked,
+    storeCollectionName,
   ]);
 
   // Auto-select implied chips when key piece changes
@@ -1361,6 +1540,7 @@ export default function ConceptStudioPage() {
 
   /* ─── Select handler ──────────────────────────────────────────────────────── */
   const handleSelectAesthetic = (aesthetic: string) => {
+    if (isAestheticSelectorLocked) return;
     setSelectedElements(new Set());
     setCustomChips({});
     setChipMeta(new Map());
@@ -1394,17 +1574,13 @@ export default function ConceptStudioPage() {
     return sb - sa;
   };
 
-  const sortedDirections = useMemo(() => {
-    return [...AESTHETICS].sort(aestheticSorter(recommendedAesthetic));
-  }, [recommendedAesthetic]);
-
   // All aesthetics except the selected one, with Muko's Pick always at the top
   const orderedDirections = useMemo(() => {
     const base = selectedIsAlternative
       ? [...AESTHETICS].filter((a) => a !== selectedAesthetic)
       : [...AESTHETICS];
     return base.sort(aestheticSorter(recommendedAesthetic));
-  }, [sortedDirections, selectedAesthetic, selectedIsAlternative, recommendedAesthetic]);
+  }, [selectedAesthetic, selectedIsAlternative, recommendedAesthetic]);
 
   /* ─── Muko Insight ────────────────────────────────────────────────────────── */
   const insightContent = useMemo(() => {
@@ -1497,41 +1673,64 @@ export default function ConceptStudioPage() {
                 We analyzed your brand DNA against live market data to find your strongest direction. Start with our pick or explore all eight below.
               </p>
             </div>
-            <button
-              onClick={() => handleSelectAesthetic(recommendedAesthetic)}
-              style={{
-                flexShrink: 0,
-                marginTop: 4,
-                padding: "7px 16px 7px 12px",
-                borderRadius: 999,
-                border: "1.5px solid rgba(77,48,47,0.35)",
-                background: "transparent",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                cursor: "pointer",
-                transition: "background 200ms ease, border-color 200ms ease",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "rgba(77,48,47,0.06)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(77,48,47,0.55)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(77,48,47,0.35)";
-              }}
-            >
-              <span
-                className="muko-pick-dot"
-                style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#A8B475", flexShrink: 0 }}
-              />
-              <span style={{ fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "#4D302F", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
-                {mukoPickLabel}
-              </span>
-            </button>
+            {!isAestheticSelectorLocked && (
+              <button
+                onClick={() => handleSelectAesthetic(recommendedAesthetic)}
+                style={{
+                  flexShrink: 0,
+                  marginTop: 4,
+                  padding: "7px 16px 7px 12px",
+                  borderRadius: 999,
+                  border: "1.5px solid rgba(77,48,47,0.35)",
+                  background: "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                  transition: "background 200ms ease, border-color 200ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(77,48,47,0.06)";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(77,48,47,0.55)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(77,48,47,0.35)";
+                }}
+              >
+                <span
+                  className="muko-pick-dot"
+                  style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#A8B475", flexShrink: 0 }}
+                />
+                <span style={{ fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "#4D302F", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
+                  {mukoPickLabel}
+                </span>
+              </button>
+            )}
           </div>
 
           <div style={{ padding: "0 44px 48px" }}>
+
+            {isAestheticSelectorLocked && lockedAestheticName && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-tertiary, rgba(67,67,43,0.40))", marginBottom: 8 }}>
+                  Collection Aesthetic
+                </div>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 12px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "rgba(255,255,255,0.78)", color: OLIVE, fontFamily: inter, fontSize: 12, fontWeight: 600 }}>
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+                    <path d="M3.75 5V3.75a2.25 2.25 0 1 1 4.5 0V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    <rect x="2.25" y="5" width="7.5" height="5.25" rx="1.2" stroke="currentColor" strokeWidth="1.2" />
+                  </svg>
+                  {lockedAestheticName}
+                </div>
+                <button
+                  onClick={() => setShowAestheticChangeModal(true)}
+                  style={{ display: "block", marginTop: 8, padding: 0, border: "none", background: "none", fontFamily: inter, fontSize: 11, color: "var(--text-tertiary, rgba(67,67,43,0.40))", cursor: "pointer" }}
+                >
+                  Change collection aesthetic →
+                </button>
+              </div>
+            )}
 
             {/* ── YOUR CONCEPT (shown after selection) ────────────────────────────── */}
             {selectedAesthetic && (
@@ -1588,6 +1787,46 @@ export default function ConceptStudioPage() {
                   </div>
                   <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "#A8A09A", marginBottom: 16, lineHeight: 1.5 }}>
                     Complete your creative vision before moving to production specs.
+                  </div>
+
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-tertiary, rgba(67,67,43,0.40))", marginBottom: 4 }}>
+                      How are you inflecting this direction?
+                    </div>
+                    <div style={{ fontFamily: inter, fontSize: 11, fontStyle: "italic", color: "var(--text-secondary, rgba(67,67,43,0.58))", marginBottom: 10, lineHeight: 1.5 }}>
+                      Optional. Push the aesthetic in a specific direction.
+                    </div>
+                    <input
+                      type="text"
+                      value={aestheticInflection}
+                      onChange={(e) => setAestheticInflection(e.target.value.slice(0, 100))}
+                      maxLength={100}
+                      placeholder="e.g. with heritage craft tension, with utilitarian edge..."
+                      style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: 13, borderRadius: 10, border: "1px solid rgba(67,67,43,0.12)", background: "rgba(255,255,255,0.88)", color: OLIVE, fontFamily: inter, outline: "none" }}
+                    />
+                    {inflectionSuggestions.length > 0 && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: CHARTREUSE, marginBottom: 7 }}>
+                          Muko Suggests
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          {inflectionSuggestions.map((suggestion) => (
+                            <button
+                              key={suggestion}
+                              onClick={() => setAestheticInflection(suggestion)}
+                              style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(168,180,117,0.45)", background: "rgba(168,180,117,0.14)", color: CHARTREUSE, fontFamily: inter, fontSize: 11, cursor: "pointer" }}
+                            >
+                              {suggestion}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {loadingInflectionSuggestions && inflectionSuggestions.length === 0 && (
+                      <div style={{ marginTop: 8, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.36)" }}>
+                        Generating inflection suggestions…
+                      </div>
+                    )}
                   </div>
 
                   {/* KEY PIECES — swatch-grid */}
@@ -1921,70 +2160,74 @@ export default function ConceptStudioPage() {
               </>
             )}
 
-            {/* ── EXPLORE OTHER DIRECTIONS ───────────────────────────────────────── */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 5 }}>EXPLORE OTHER DIRECTIONS</div>
-              <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 12 }}>Type a direction and we'll match it — or select from below.</div>
-              <div style={{ position: "relative" }}>
-                <input
-                  type="text"
-                  value={freeFormDraft}
-                  onChange={(e) => setFreeFormDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && freeFormMatch) { handleSelectAesthetic(freeFormMatch); setFreeFormDraft(""); } }}
-                  placeholder="e.g. quiet luxury with edge, grunge romance, coastal dark…"
-                  style={{ width: "100%", boxSizing: "border-box", padding: "12px 48px 12px 14px", fontSize: 13, borderRadius: 10, border: "1px solid rgba(67,67,43,0.12)", background: "rgba(255,255,255,0.80)", color: OLIVE, fontFamily: inter, outline: "none" }}
-                />
-                <button
-                  onClick={() => { if (freeFormMatch) { handleSelectAesthetic(freeFormMatch); setFreeFormDraft(""); } }}
-                  disabled={!freeFormMatch || !freeFormDraft.trim()}
-                  style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: 999, border: "1px solid rgba(67,67,43,0.12)", background: "rgba(255,255,255,0.90)", cursor: !freeFormMatch || !freeFormDraft.trim() ? "not-allowed" : "pointer", opacity: !freeFormMatch || !freeFormDraft.trim() ? 0.45 : 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "rgba(67,67,43,0.65)" }}
-                >→</button>
-              </div>
-              {freeFormLoading && freeFormDraft.trim().length > 1 && <div style={{ marginTop: 7, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.36)" }}>Interpreting…</div>}
-              {!freeFormLoading && freeFormMatch && freeFormDraft.trim().length > 1 && (
-                <div style={{ marginTop: 7, display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.40)" }}>Closest match:</span>
-                  <button onClick={() => { handleSelectAesthetic(freeFormMatch); setFreeFormDraft(""); }} style={{ padding: "4px 11px", borderRadius: 999, fontSize: 11.5, fontWeight: 600, background: "rgba(125,150,172,0.08)", border: `1px solid ${STEEL}`, color: STEEL, cursor: "pointer", fontFamily: inter }}>{freeFormMatch} →</button>
-                </div>
-              )}
-            </div>
-
-            {/* ── DIRECTION LIST ─────────────────────────────────────────────────── */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {orderedDirections.map((aesthetic) => {
-                const isHovered = hoveredCard === aesthetic;
-                const content = AESTHETIC_CONTENT[aesthetic];
-                const chips = getAestheticChips(aesthetic).slice(0, 3);
-                const idCol = scoreColor(content?.identityScore ?? 0);
-                const resCol = scoreColor(content?.resonanceScore ?? 0);
-                const cardImages = isHovered ? hoveredImages : [];
-
-                return (
-                  <motion.div key={aesthetic} layout transition={{ duration: 0.22, ease: "easeInOut" }} style={{ borderRadius: 8 }}>
-                    <DirectionCard
-                      aesthetic={aesthetic}
-                      content={content}
-                      chips={chips}
-                      isHovered={isHovered}
-                      moodboardImages={cardImages}
-                      idColor={idCol}
-                      resColor={resCol}
-                      topIdScore={topContent?.identityScore ?? null}
-                      topResScore={topContent?.resonanceScore ?? null}
-                      onHoverEnter={() => setHoveredCard(aesthetic)}
-                      onHoverLeave={() => setHoveredCard(null)}
-                      onSelect={() => handleSelectAesthetic(aesthetic)}
-                      inter={inter}
-                      sohne={sohne}
-                      steelBlue={STEEL}
-                      chartreuse={CHARTREUSE}
-                      isMukoPick={aesthetic === recommendedAesthetic}
-                      mukoPickLabel={mukoPickLabel}
+            {!isAestheticSelectorLocked && (
+              <>
+                {/* ── EXPLORE OTHER DIRECTIONS ───────────────────────────────────────── */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 5 }}>EXPLORE OTHER DIRECTIONS</div>
+                  <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 12 }}>Type a direction and we'll match it — or select from below.</div>
+                  <div style={{ position: "relative" }}>
+                    <input
+                      type="text"
+                      value={freeFormDraft}
+                      onChange={(e) => setFreeFormDraft(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && freeFormMatch) { handleSelectAesthetic(freeFormMatch); setFreeFormDraft(""); } }}
+                      placeholder="e.g. quiet luxury with edge, grunge romance, coastal dark…"
+                      style={{ width: "100%", boxSizing: "border-box", padding: "12px 48px 12px 14px", fontSize: 13, borderRadius: 10, border: "1px solid rgba(67,67,43,0.12)", background: "rgba(255,255,255,0.80)", color: OLIVE, fontFamily: inter, outline: "none" }}
                     />
-                  </motion.div>
-                );
-              })}
-            </div>
+                    <button
+                      onClick={() => { if (freeFormMatch) { handleSelectAesthetic(freeFormMatch); setFreeFormDraft(""); } }}
+                      disabled={!freeFormMatch || !freeFormDraft.trim()}
+                      style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: 999, border: "1px solid rgba(67,67,43,0.12)", background: "rgba(255,255,255,0.90)", cursor: !freeFormMatch || !freeFormDraft.trim() ? "not-allowed" : "pointer", opacity: !freeFormMatch || !freeFormDraft.trim() ? 0.45 : 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "rgba(67,67,43,0.65)" }}
+                    >→</button>
+                  </div>
+                  {freeFormLoading && freeFormDraft.trim().length > 1 && <div style={{ marginTop: 7, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.36)" }}>Interpreting…</div>}
+                  {!freeFormLoading && freeFormMatch && freeFormDraft.trim().length > 1 && (
+                    <div style={{ marginTop: 7, display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.40)" }}>Closest match:</span>
+                      <button onClick={() => { handleSelectAesthetic(freeFormMatch); setFreeFormDraft(""); }} style={{ padding: "4px 11px", borderRadius: 999, fontSize: 11.5, fontWeight: 600, background: "rgba(125,150,172,0.08)", border: `1px solid ${STEEL}`, color: STEEL, cursor: "pointer", fontFamily: inter }}>{freeFormMatch} →</button>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── DIRECTION LIST ─────────────────────────────────────────────────── */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {orderedDirections.map((aesthetic) => {
+                    const isHovered = hoveredCard === aesthetic;
+                    const content = AESTHETIC_CONTENT[aesthetic];
+                    const chips = getAestheticChips(aesthetic).slice(0, 3);
+                    const idCol = scoreColor(content?.identityScore ?? 0);
+                    const resCol = scoreColor(content?.resonanceScore ?? 0);
+                    const cardImages = isHovered ? hoveredImages : [];
+
+                    return (
+                      <motion.div key={aesthetic} layout transition={{ duration: 0.22, ease: "easeInOut" }} style={{ borderRadius: 8 }}>
+                        <DirectionCard
+                          aesthetic={aesthetic}
+                          content={content}
+                          chips={chips}
+                          isHovered={isHovered}
+                          moodboardImages={cardImages}
+                          idColor={idCol}
+                          resColor={resCol}
+                          topIdScore={topContent?.identityScore ?? null}
+                          topResScore={topContent?.resonanceScore ?? null}
+                          onHoverEnter={() => setHoveredCard(aesthetic)}
+                          onHoverLeave={() => setHoveredCard(null)}
+                          onSelect={() => handleSelectAesthetic(aesthetic)}
+                          inter={inter}
+                          sohne={sohne}
+                          steelBlue={STEEL}
+                          chartreuse={CHARTREUSE}
+                          isMukoPick={aesthetic === recommendedAesthetic}
+                          mukoPickLabel={mukoPickLabel}
+                        />
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
           </>
         }
@@ -2101,6 +2344,43 @@ export default function ConceptStudioPage() {
         identityScore={identityPulse?.score}
         resonanceScore={resonancePulse?.score}
       />
+
+      {showAestheticChangeModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(17,17,12,0.28)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }}>
+          <div style={{ width: "min(420px, calc(100vw - 32px))", borderRadius: 16, border: "1px solid rgba(67,67,43,0.10)", background: "#F8F5EF", boxShadow: "0 24px 64px rgba(17,17,12,0.18)", padding: "22px 22px 18px" }}>
+            <div style={{ fontFamily: sohne, fontSize: 18, fontWeight: 500, color: OLIVE, marginBottom: 10 }}>
+              Change collection aesthetic?
+            </div>
+            <p style={{ margin: "0 0 18px", fontFamily: inter, fontSize: 13, lineHeight: 1.6, color: "rgba(67,67,43,0.60)" }}>
+              Changing your collection aesthetic will affect how all future pieces are evaluated. Past pieces will not change.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                onClick={() => setShowAestheticChangeModal(false)}
+                style={{ padding: "8px 14px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", fontFamily: inter, fontSize: 12, fontWeight: 600, color: "rgba(67,67,43,0.62)", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowAestheticChangeModal(false);
+                  setIsAestheticSelectionUnlocked(true);
+                  setLockedCollectionAesthetic(null);
+                  setCollectionAesthetic(null);
+                  try {
+                    window.localStorage.removeItem(COLLECTION_AESTHETIC_STORAGE_KEY);
+                  } catch {
+                    // Ignore storage failures.
+                  }
+                }}
+                style={{ padding: "8px 14px", borderRadius: 999, border: "none", background: OLIVE, fontFamily: inter, fontSize: 12, fontWeight: 600, color: "#F5F0E8", cursor: "pointer" }}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }

@@ -98,7 +98,7 @@ export function ScorecardModal({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [pieceName, setPieceName] = useState("");
   const [pieceNameFocused, setPieceNameFocused] = useState(false);
-  const effectiveCollection = activeCollection || collectionName;
+  const effectiveCollection = collectionName || activeCollection;
 
   /* ─── Scorecard insight state ─── */
   const [scorecardData, setScorecardData] = useState<ScorecardInsight | null>(null);

@@ -81,8 +81,27 @@ export default function CollectionsHubPage() {
     });
   }, [loadCollections, router]);
 
+  useEffect(() => {
+    if (!activeCollection) return;
+    const activeMeta = collections.find((collection) => collection.name === activeCollection);
+    useSessionStore.getState().setCollectionName(activeCollection);
+    try {
+      localStorage.setItem('muko_collectionName', activeCollection);
+      if (activeMeta?.season) {
+        localStorage.setItem('muko_seasonLabel', activeMeta.season);
+      }
+    } catch {}
+  }, [activeCollection, collections]);
+
   const handleStartCollection = useCallback(() => {
     setActiveCollection(null);
+    useSessionStore.getState().setCollectionName('');
+    try {
+      localStorage.removeItem('muko_collectionName');
+      localStorage.removeItem('muko_seasonLabel');
+      localStorage.removeItem('muko_collection_aesthetic');
+      localStorage.removeItem('muko_aesthetic_inflection');
+    } catch {}
     router.push('/entry');
   }, [router, setActiveCollection]);
 
