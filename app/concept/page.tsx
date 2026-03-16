@@ -985,6 +985,10 @@ export default function ConceptStudioPage() {
     setActiveProductPieceId,
     pieceRolesById,
     setPieceRolesById,
+    setConceptInsight,
+    clearConceptInsight,
+    isProxyMatch,
+    setIsProxyMatch,
   } = useSessionStore();
 
   const [headerCollectionName, setHeaderCollectionName] = useState<string>("Collection");
@@ -1269,6 +1273,7 @@ export default function ConceptStudioPage() {
     if (!selectedAesthetic) {
       setConceptInsightData(null);
       setConceptStreamingText('');
+      clearConceptInsight();
       return;
     }
     const slug = toAestheticSlug(selectedAesthetic);
@@ -1334,6 +1339,7 @@ export default function ConceptStudioPage() {
         })),
         piece_count: collectionPieces.length,
       },
+      isProxyMatch,
     });
     console.log('[Muko] blackboard result:', blackboard ? 'valid' : 'null');
     if (!blackboard) return;
@@ -1380,8 +1386,25 @@ export default function ConceptStudioPage() {
               const result = JSON.parse(data) as { data: InsightData; meta: { method: string } };
               console.log('[Muko] Synthesizer setting data:', result?.data?.statements?.[0]);
               if (!controller.signal.aborted) {
-                setConceptInsightData(result.data ?? result);
+                const insightData = result.data ?? result;
+                setConceptInsightData(insightData);
                 setConceptStreamingText('');
+                // Persist insight fields to store for downstream stages
+                try {
+                  const title = insightData.statements?.[0] ?? '';
+                  const description = insightData.statements?.[1] ?? '';
+                  const positioning = insightData.edit?.slice(0, 3) ?? [];
+                  // confidence is not in InsightData; attempt to extract from raw LLM output
+                  let confidence: number | null = null;
+                  try {
+                    const raw = conceptRawJsonRef.current;
+                    if (raw) {
+                      const rawParsed = JSON.parse(raw) as Record<string, unknown>;
+                      if (typeof rawParsed.confidence === 'number') confidence = rawParsed.confidence;
+                    }
+                  } catch { /* leave confidence null */ }
+                  setConceptInsight({ title, description, positioning, confidence });
+                } catch { /* do not block on insight persistence */ }
                 // Fire-and-forget DB log
                 try {
                   const supabase = createClient();
@@ -1479,13 +1502,14 @@ export default function ConceptStudioPage() {
   const [freeFormLoading, setFreeFormLoading] = useState(false);
   useEffect(() => {
     const trimmed = freeFormDraft.trim();
-    if (trimmed.length < 2) { setFreeFormMatch(null); setFreeFormLoading(false); return; }
+    if (trimmed.length < 2) { setFreeFormMatch(null); setIsProxyMatch(false); setFreeFormLoading(false); return; }
     setFreeFormLoading(true);
     const timer = window.setTimeout(async () => {
       try {
         const res = await fetch("/api/match-aesthetic", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: trimmed }) });
         const data = await res.json();
         setFreeFormMatch(data.match ?? null);
+        setIsProxyMatch(data.match !== null && trimmed.toLowerCase() !== data.match.toLowerCase());
       } catch { setFreeFormMatch(matchFreeFormToAesthetic(trimmed)); }
       finally { setFreeFormLoading(false); }
     }, 400);
@@ -2118,9 +2142,10 @@ export default function ConceptStudioPage() {
     setSelectedInterpretationChips([]);
     setAestheticInflection("");
     setDirectionInterpretationModifiers([]);
-    // Clear silhouette/palette when aesthetic changes (affinity recommendations change)
+    // Clear silhouette/palette and concept insight when aesthetic changes
     setConceptSilhouette('');
     setConceptPalette(null);
+    clearConceptInsight();
     setAestheticInput(aesthetic);
     setLockedCollectionAesthetic(aestheticSlug);
     setCollectionAesthetic(aestheticSlug);

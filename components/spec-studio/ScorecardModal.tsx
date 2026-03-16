@@ -6,6 +6,24 @@ import { useSessionStore } from "@/lib/store/sessionStore";
 import { createClient } from "@/lib/supabase/client";
 import type { SpecSuggestion } from "@/lib/types/next-move";
 import type { ScorecardInsight, Consideration } from "@/app/api/synthesizer/scorecard/route";
+import type {
+  ActionSuggestion,
+  ActionSuggestionPayload,
+  AlternativeMaterial,
+  ConflictType,
+} from "@/app/api/synthesizer/scorecard-action/route";
+import materialsData from "@/data/materials.json";
+
+const STATIC_ACTION_FALLBACK: ActionSuggestion = {
+  conflict_label: "No conflicts",
+  directive: "This piece is ready. Add it and keep building.",
+  explanation:
+    "Identity, Resonance, and Execution are working together. The build clears margin and the timeline is comfortable.",
+  show_alternatives: false,
+  alternatives: [],
+  cta_variant: "add",
+  hint_text: "Revise to keep refining · Branch to explore a variation",
+};
 
 /* ─── Brand tokens (match all other pages exactly) ─── */
 const OLIVE      = "#43432B";
@@ -31,6 +49,127 @@ function scoreColor(score: number): string {
   return PULSE_RED;
 }
 
+/* ─── Action suggestion helpers ─── */
+
+interface MaterialEntry {
+  id: string;
+  name: string;
+  cost_per_yard: number;
+  lead_time_weeks: number;
+  redirect_compatible?: string[];
+  typical_aesthetics?: string[];
+}
+
+const DELIVERY_WINDOW_FW = 20;
+const DELIVERY_WINDOW_SS = 26;
+const COMPLEXITY_WEEKS: Record<string, number> = { low: 6, moderate: 10, high: 16 };
+
+function deriveConflictType(
+  identityScore: number,
+  executionScore: number,
+  marginGatePassed: boolean,
+  material: MaterialEntry | undefined,
+  constructionTier: string,
+  season: string
+): ConflictType {
+  if (!marginGatePassed) return "cost_gate";
+  if (executionScore < 70) {
+    if (material) {
+      const isFW = /fw|fall|autumn/i.test(season);
+      const deliveryWindow = isFW ? DELIVERY_WINDOW_FW : DELIVERY_WINDOW_SS;
+      const required = (COMPLEXITY_WEEKS[constructionTier] ?? 10) + material.lead_time_weeks;
+      if (required > deliveryWindow - 4) return "execution_timeline";
+    }
+    return "execution_complexity";
+  }
+  if (identityScore < 65) return "identity_misalignment";
+  return "none";
+}
+
+// Estimated yardage used to approximate COGS saving for cost_gate filtering.
+// Actual yardage isn't available in modal context; 3yd is a reasonable mid-garment default.
+const ESTIMATED_YARDAGE = 3;
+
+function buildAlternatives(
+  currentMaterial: MaterialEntry | undefined,
+  allMaterials: MaterialEntry[],
+  conflictType: ConflictType,
+  constructionTier: string,
+  season: string,
+  cogsGap: number  // positive = amount over ceiling; 0 if not a cost conflict
+): AlternativeMaterial[] {
+  // No material alternatives for these conflict types — fix is conceptual or tier-based
+  if (conflictType === "identity_misalignment" || conflictType === "execution_complexity" || conflictType === "none") {
+    return [];
+  }
+  if (!currentMaterial?.redirect_compatible) return [];
+
+  const isFW = /fw|fall|autumn/i.test(season);
+  const deliveryWindow = isFW ? DELIVERY_WINDOW_FW : DELIVERY_WINDOW_SS;
+  const complexityW = COMPLEXITY_WEEKS[constructionTier] ?? 10;
+
+  const candidates = currentMaterial.redirect_compatible
+    .map((id) => allMaterials.find((mat) => mat.id === id))
+    .filter((m): m is MaterialEntry => m !== null);
+
+  const filtered = candidates.filter((m) => {
+    if (conflictType === "execution_timeline") {
+      // Must fully fit within the delivery window — no partial fixes
+      return complexityW + m.lead_time_weeks <= deliveryWindow;
+    }
+    if (conflictType === "cost_gate") {
+      // Saving must fully close the COGS gap
+      const saving = (currentMaterial.cost_per_yard - m.cost_per_yard) * ESTIMATED_YARDAGE;
+      return saving >= cogsGap && m.cost_per_yard < currentMaterial.cost_per_yard;
+    }
+    return false;
+  });
+
+  // Sort: timeline → shortest lead first; cost → cheapest first. Cap at 2.
+  if (conflictType === "execution_timeline") {
+    filtered.sort((a, b) => a.lead_time_weeks - b.lead_time_weeks);
+  } else {
+    filtered.sort((a, b) => a.cost_per_yard - b.cost_per_yard);
+  }
+
+  return filtered.slice(0, 2).map((m) => ({
+    material_name: m.name,
+    cost_per_yard: m.cost_per_yard,
+    lead_time_weeks: m.lead_time_weeks,
+    saving_vs_selected: Math.round(currentMaterial.cost_per_yard - m.cost_per_yard),
+    lead_reduction_weeks: currentMaterial.lead_time_weeks - m.lead_time_weeks,
+    aesthetic_note: m.typical_aesthetics?.slice(0, 2).join(", ") ?? "",
+  }));
+}
+
+function buildExecutionReason(
+  constructionTier: string,
+  material: MaterialEntry | undefined,
+  season: string
+): string {
+  if (!material) return "Execution constraints from construction and timeline";
+  const isFW = /fw|fall|autumn/i.test(season);
+  const deliveryWindow = isFW ? DELIVERY_WINDOW_FW : DELIVERY_WINDOW_SS;
+  const required = (COMPLEXITY_WEEKS[constructionTier] ?? 10) + material.lead_time_weeks;
+  const gap = deliveryWindow - required;
+  if (gap < 0) {
+    return `${material.lead_time_weeks}-week ${material.name} lead time exceeds ${season} delivery window by ${Math.abs(gap)} weeks`;
+  }
+  if (gap < 4) {
+    return `${required}-week total timeline is tight against the ${season} delivery window`;
+  }
+  return `Timeline feasible — ${gap}-week buffer against ${season} delivery window`;
+}
+
+function buildComplexityLoad(
+  constructionTier: string,
+  executionScore: number
+): { label: "healthy" | "moderate" | "strained"; score: number } {
+  if (constructionTier === "high" || executionScore < 50) return { label: "strained", score: 25 };
+  if (constructionTier === "moderate" || executionScore < 70) return { label: "moderate", score: 55 };
+  return { label: "healthy", score: 80 };
+}
+
 /* ─── Count-up hook ─── */
 function useCountUp(target: number, duration = 1200): number {
   const [current, setCurrent] = useState(0);
@@ -50,7 +189,7 @@ function useCountUp(target: number, duration = 1200): number {
   return current;
 }
 
-/* ─── Props (unchanged) ─── */
+/* ─── Props ─── */
 export interface ScorecardModalProps {
   identityScore: number;
   resonanceScore: number;
@@ -62,6 +201,7 @@ export interface ScorecardModalProps {
   mukoInsight: string | null;
   suggestions: SpecSuggestion[];
   onRevise: () => void;
+  brandName?: string | null;
 }
 
 export function ScorecardModal({
@@ -74,6 +214,7 @@ export function ScorecardModal({
   targetMsrp,
   mukoInsight,
   onRevise,
+  brandName,
 }: ScorecardModalProps) {
   const router = useRouter();
   const {
@@ -92,6 +233,9 @@ export function ScorecardModal({
     constructionTier,
     constructionTierOverride,
     collectionRole,
+    selectedKeyPiece,
+    refinementModifiers,
+    intentGoals,
   } = useSessionStore();
 
   /* ─── Existing logic state ─── */
@@ -105,13 +249,23 @@ export function ScorecardModal({
   const [scorecardLoading, setScorecardLoading] = useState(true);
   const [fallbackText, setFallbackText] = useState<string | null>(null);
 
+  /* ─── Action suggestion state ─── */
+  const [actionSuggestion, setActionSuggestion] = useState<ActionSuggestion | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [hasConflict, setHasConflict] = useState(false);
+
   const animatedScore = useCountUp(mukoScore);
 
-  /* ─── Fetch scorecard insight on mount ─── */
+  /* ─── Fetch scorecard insight + action suggestion on mount (parallel) ─── */
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    // ── Scorecard insight ──
     fetch("/api/synthesizer/scorecard", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal,
       body: JSON.stringify({
         scores: { identity: identityScore, resonance: resonanceScore, execution: executionScore, overall: mukoScore },
         margin: { passed: marginGatePassed, cogs: insight?.cogs ?? 0, ceiling: insight?.ceiling ?? 0, msrp: targetMsrp },
@@ -122,15 +276,95 @@ export function ScorecardModal({
           collection: effectiveCollection || "Unknown",
           season: season || "Unknown",
         },
+        ...(refinementModifiers.length > 0 && { brand_keywords: refinementModifiers }),
+        ...(intentGoals.length > 0 && { intent_primary_goals: intentGoals }),
       }),
     })
       .then((r) => r.json())
       .then((json: ScorecardInsight & { error?: string }) => {
+        if (signal.aborted) return;
         if (json.error || !json.insight) setFallbackText(mukoInsight ?? null);
         else setScorecardData(json);
       })
-      .catch(() => setFallbackText(mukoInsight ?? null))
-      .finally(() => setScorecardLoading(false));
+      .catch((err) => {
+        if (err?.name === "AbortError") return;
+        setFallbackText(mukoInsight ?? null);
+      })
+      .finally(() => { if (!signal.aborted) setScorecardLoading(false); });
+
+    // ── Action suggestion ──
+    const allMaterials = materialsData as MaterialEntry[];
+    const material = allMaterials.find((m) => m.id === materialId);
+    const conflictType = deriveConflictType(
+      identityScore,
+      executionScore,
+      marginGatePassed,
+      material,
+      constructionTier,
+      season || ""
+    );
+
+    if (conflictType === "none") {
+      // Clean piece — use static fallback, no LLM call
+      setActionSuggestion(STATIC_ACTION_FALLBACK);
+      setActionLoading(false);
+    } else {
+      setHasConflict(true);
+      setActionLoading(true);
+
+      const cogsGap = insight ? Math.max(0, Math.round(insight.cogs - insight.ceiling)) : 0;
+      const alternatives = buildAlternatives(material, allMaterials, conflictType, constructionTier, season || "", cogsGap);
+      const executionReason = buildExecutionReason(constructionTier, material, season || "");
+      const complexityLoad = buildComplexityLoad(constructionTier, executionScore);
+      const contextPieceName =
+        selectedKeyPiece?.item || category || "Piece Concept";
+      const roleLabel = collectionRole?.replace(/-/g, " ") ?? "core";
+      const marginBuffer = insight
+        ? Math.max(0, Math.round(insight.ceiling - insight.cogs))
+        : 0;
+
+      const payload: ActionSuggestionPayload = {
+        conflict_type: conflictType,
+        brand_name: brandName || "Brand",
+        piece_name: contextPieceName,
+        category: category || "Unknown",
+        piece_role: roleLabel,
+        collection_name: effectiveCollection || "Collection",
+        season: season || "Current Season",
+        identity_score: identityScore,
+        resonance_score: resonanceScore,
+        execution_score: executionScore,
+        cost_gate_passed: marginGatePassed,
+        cogs: insight?.cogs ?? 0,
+        margin_buffer: marginBuffer,
+        msrp: targetMsrp,
+        material_name: material?.name ?? materialId ?? "Unknown",
+        material_cost_per_yard: material?.cost_per_yard ?? 0,
+        material_lead_time_weeks: material?.lead_time_weeks ?? 0,
+        construction_tier: constructionTier,
+        execution_reason: executionReason,
+        complexity_load_label: complexityLoad.label,
+        complexity_load_score: complexityLoad.score,
+        role_distribution_summary: `1 ${roleLabel.charAt(0).toUpperCase() + roleLabel.slice(1)}`,
+        alternatives,
+      };
+
+      fetch("/api/synthesizer/scorecard-action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal,
+        body: JSON.stringify(payload),
+      })
+        .then((r) => r.json())
+        .then((json: ActionSuggestion & { error?: string }) => {
+          if (signal.aborted) return;
+          if (!json.error && json.directive) setActionSuggestion(json);
+        })
+        .catch((err) => { if (err?.name !== "AbortError") { /* swallow — action suggestion is non-critical */ } })
+        .finally(() => { if (!signal.aborted) setActionLoading(false); });
+    }
+
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -253,33 +487,98 @@ export function ScorecardModal({
         }}
       >
 
-        {/* ── SCORE BLOCK ── */}
+        {/* ── MODAL TOP ── */}
         <div
           style={{
             background: "rgba(255,255,255,0.80)",
-            padding: "36px 32px 28px",
-            textAlign: "center",
+            padding: "28px 32px 20px",
             borderBottom: "1px solid rgba(67,67,43,0.09)",
           }}
         >
-          {/* Big score */}
+
+          {/* 1. PIECE CONTEXT ROW */}
           <div
             style={{
-              fontFamily: sohne,
-              fontSize: 80,
-              fontWeight: 700,
-              letterSpacing: "-0.03em",
-              lineHeight: 1,
-              color: mainScoreColor,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 20,
             }}
           >
-            {animatedScore}
-          </div>
-          <div style={{ ...microLabel, marginTop: 8, marginBottom: 26 }}>
-            Muko Score
+            {/* Left: category + piece name / direction + silhouette */}
+            <div>
+              <div
+                style={{
+                  fontFamily: inter,
+                  fontSize: 11,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  color: "rgba(67,67,43,0.38)",
+                }}
+              >
+                {[category, selectedKeyPiece?.item].filter(Boolean).join(" · ") || "—"}
+              </div>
+              <div
+                style={{
+                  fontFamily: inter,
+                  fontSize: 13,
+                  color: "rgba(67,67,43,0.64)",
+                  marginTop: 2,
+                }}
+              >
+                {[aestheticInput, silhouette].filter(Boolean).join(" · ") || "—"}
+              </div>
+            </div>
+
+            {/* Right: role badge */}
+            {collectionRole && (
+              <div
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  border: "0.5px solid rgba(168,180,117,0.35)",
+                  background: "rgba(168,180,117,0.15)",
+                  fontFamily: inter,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: "#6b7843",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {collectionRole.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+              </div>
+            )}
           </div>
 
-          {/* Sub-scores — 3-col grid with 1px gap as divider */}
+          {/* 2. MUKO'S READ */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ ...microLabel, marginBottom: 7 }}>Muko&rsquo;s read</div>
+            {scorecardLoading ? (
+              <div
+                style={{
+                  height: 20,
+                  width: "70%",
+                  background: "rgba(67,67,43,0.07)",
+                  borderRadius: 4,
+                  animation: "pulse 1.4s ease-in-out infinite",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  fontFamily: sohne,
+                  fontSize: 17,
+                  fontWeight: 600,
+                  color: OLIVE,
+                  lineHeight: 1.35,
+                }}
+              >
+                {scorecardData?.insight ?? mukoInsight ?? "Reviewing your piece for creative and commercial fit."}
+              </div>
+            )}
+          </div>
+
+          {/* 3. THREE-CARD SCORE ROW */}
           <div
             style={{
               display: "grid",
@@ -319,7 +618,7 @@ export function ScorecardModal({
             ))}
           </div>
 
-          {/* Margin gate */}
+          {/* 4. GATE STRIP */}
           <div
             style={{
               marginTop: 16,
@@ -345,95 +644,124 @@ export function ScorecardModal({
           </div>
         </div>
 
-        {/* ── INSIGHT + CONSIDERATIONS ── */}
-        <div style={{ padding: "24px 32px 20px", borderBottom: "1px solid rgba(67,67,43,0.09)" }}>
-          {scorecardLoading ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-              {[92, 78, 60].map((w, i) => (
+        {/* ── CONSIDERATIONS ── */}
+        {scorecardData && scorecardData.considerations?.length > 0 && (
+          <div style={{ padding: "24px 32px 20px", borderBottom: "1px solid rgba(67,67,43,0.09)" }}>
+            <div style={{ ...microLabel, marginBottom: 12 }}>Considerations</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {scorecardData.considerations.map((c: Consideration, i: number) => (
                 <div
                   key={i}
                   style={{
-                    height: 11,
-                    borderRadius: 4,
-                    width: `${w}%`,
-                    background: "rgba(67,67,43,0.07)",
-                    animation: "pulse 1.4s ease-in-out infinite",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    paddingTop: i === 0 ? 0 : 10,
+                    paddingBottom: i < scorecardData.considerations.length - 1 ? 10 : 0,
+                    borderBottom: i < scorecardData.considerations.length - 1
+                      ? "1px solid rgba(67,67,43,0.07)"
+                      : "none",
                   }}
-                />
+                >
+                  <div
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                      marginTop: 6,
+                      background: c.type === "risk" ? CAMEL : CHARTREUSE,
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 12.5,
+                      lineHeight: 1.6,
+                      color: "rgba(67,67,43,0.64)",
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, color: OLIVE }}>{c.label}</span>
+                    {". "}
+                    {c.text}
+                  </span>
+                </div>
               ))}
             </div>
-          ) : (fallbackText || scorecardData) ? (
-            <>
-              {/* Insight text */}
-              <p
-                style={{
-                  fontFamily: inter,
-                  fontSize: 13,
-                  lineHeight: 1.72,
-                  color: "rgba(67,67,43,0.72)",
-                  margin: "0 0 20px",
-                }}
-              >
-                {scorecardData?.insight ?? fallbackText}
-              </p>
+          </div>
+        )}
 
-              {/* Considerations — only when we have structured data */}
-              {scorecardData && scorecardData.considerations?.length > 0 && (
-                <>
-                  <div style={{ ...microLabel, marginBottom: 12 }}>Considerations</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                    {scorecardData.considerations.map((c: Consideration, i: number) => (
-                      <div
-                        key={i}
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 10,
-                          paddingTop: i === 0 ? 0 : 10,
-                          paddingBottom: i < scorecardData.considerations.length - 1 ? 10 : 0,
-                          borderBottom: i < scorecardData.considerations.length - 1
-                            ? "1px solid rgba(67,67,43,0.07)"
-                            : "none",
+        {/* ── ACTION SUGGESTION ── */}
+        {hasConflict && (actionLoading || actionSuggestion) && (
+          <div style={{ padding: "20px 32px", borderBottom: "1px solid rgba(67,67,43,0.09)" }}>
+            {actionLoading ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {[32, 80, 65].map((w, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      height: i === 0 ? 9 : i === 1 ? 13 : 11,
+                      borderRadius: 4,
+                      width: `${w}%`,
+                      background: "rgba(67,67,43,0.07)",
+                      animation: "pulse 1.4s ease-in-out infinite",
+                    }}
+                  />
+                ))}
+              </div>
+            ) : actionSuggestion ? (
+              <>
+                {/* Conflict label */}
+                <div style={{ ...microLabel, marginBottom: 10 }}>
+                  {actionSuggestion.conflict_label}
+                </div>
+
+                {/* Directive */}
+                <p
+                  style={{
+                    fontFamily: sohne,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    letterSpacing: "-0.01em",
+                    color: OLIVE,
+                    lineHeight: 1.5,
+                    margin: "0 0 8px",
+                  }}
+                >
+                  {actionSuggestion.directive}
+                </p>
+
+                {/* Explanation */}
+                <p
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 12.5,
+                    lineHeight: 1.65,
+                    color: "rgba(67,67,43,0.60)",
+                    margin: actionSuggestion.show_alternatives && actionSuggestion.alternatives.length > 0 ? "0 0 14px" : "0",
+                  }}
+                >
+                  {actionSuggestion.explanation}
+                </p>
+
+                {/* Alternative material chips */}
+                {actionSuggestion.show_alternatives && actionSuggestion.alternatives.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {actionSuggestion.alternatives.map((alt) => (
+                      <ActionChip
+                        key={alt.material_id}
+                        label={alt.label}
+                        onClick={() => {
+                          // TODO: pre-load Spec Studio with this material
                         }}
-                      >
-                        {/* Colored dot */}
-                        <div
-                          style={{
-                            width: 5,
-                            height: 5,
-                            borderRadius: "50%",
-                            flexShrink: 0,
-                            marginTop: 6,
-                            background: c.type === "risk" ? CAMEL : CHARTREUSE,
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontFamily: inter,
-                            fontSize: 12.5,
-                            lineHeight: 1.6,
-                            color: "rgba(67,67,43,0.64)",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontWeight: 600,
-                              color: OLIVE,
-                            }}
-                          >
-                            {c.label}
-                          </span>
-                          {". "}
-                          {c.text}
-                        </span>
-                      </div>
+                      />
                     ))}
                   </div>
-                </>
-              )}
-            </>
-          ) : null}
-        </div>
+                )}
+              </>
+            ) : null}
+          </div>
+        )}
 
         {/* ── PIECE NAME INPUT ── */}
         <div
@@ -492,51 +820,134 @@ export function ScorecardModal({
         </div>
 
         {/* ── ACTIONS ── */}
-        <div
-          style={{
-            padding: "16px 32px 20px",
-            display: "flex",
-            gap: 8,
-            background: "#FAFAF7",
-          }}
-        >
-          {/* Revise */}
-          <GhostButton onClick={onRevise}>Revise</GhostButton>
+        {(() => {
+          // Map legacy add_with_risk to revise_recommended
+          const rawVariant = actionSuggestion?.cta_variant ?? "add";
+          const isRevise = rawVariant === "revise_recommended" || (rawVariant as string) === "add_with_risk";
 
-          {/* Branch */}
-          <GhostButton onClick={handleBranch}>Branch</GhostButton>
+          return (
+            <>
+              <div
+                style={{
+                  padding: "16px 32px 20px",
+                  display: "flex",
+                  gap: 8,
+                  background: "#FAFAF7",
+                }}
+              >
+                {/* Revise — primary fill when conflict present, ghost when clean */}
+                <button
+                  onClick={onRevise}
+                  style={{
+                    flex: 1.5,
+                    padding: "9px 14px",
+                    borderRadius: 999,
+                    border: "none",
+                    background: isRevise ? CHARTREUSE : "transparent",
+                    fontFamily: sohne,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.02em",
+                    color: isRevise ? "#3d4225" : "rgba(67,67,43,0.70)",
+                    cursor: "pointer",
+                    transition: "background 120ms ease",
+                    whiteSpace: "nowrap",
+                    ...(isRevise ? {} : { border: "1px solid rgba(67,67,43,0.14)" }),
+                  }}
+                >
+                  {isRevise ? "← Revise specs" : "Revise"}
+                </button>
 
-          {/* Add to Collection — primary fill */}
-          <button
-            onClick={handleAddToCollection}
-            disabled={saveState !== "idle" || !effectiveCollection}
-            style={{
-              flex: 1.5,
-              padding: "9px 14px",
-              borderRadius: 999,
-              border: "none",
-              background: !effectiveCollection
-                ? "rgba(168,180,117,0.40)"
-                : saveState === "saved"
-                ? "#6B8F3E"
-                : CHARTREUSE,
-              fontFamily: sohne,
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "0.02em",
-              color: "#FFFFFF",
-              cursor: saveState !== "idle" || !effectiveCollection ? "default" : "pointer",
-              opacity: saveState === "saving" ? 0.7 : 1,
-              transition: "background 150ms ease, opacity 150ms ease",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {saveState === "saved" ? "Saved ✓" : "Add to Collection"}
-          </button>
-        </div>
+                {/* Branch — always ghost */}
+                <GhostButton onClick={handleBranch}>Branch</GhostButton>
+
+                {/* Add to Collection — primary fill when clean, ghost when conflict */}
+                <button
+                  onClick={handleAddToCollection}
+                  disabled={saveState !== "idle" || !effectiveCollection}
+                  style={{
+                    flex: 1.5,
+                    padding: "9px 14px",
+                    borderRadius: 999,
+                    border: isRevise ? "0.5px solid rgba(67,67,43,0.20)" : "none",
+                    background: !effectiveCollection
+                      ? "rgba(168,180,117,0.40)"
+                      : saveState === "saved"
+                      ? "#6B8F3E"
+                      : isRevise
+                      ? "transparent"
+                      : CHARTREUSE,
+                    fontFamily: sohne,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.02em",
+                    color: saveState === "saved"
+                      ? "#FFFFFF"
+                      : isRevise
+                      ? "rgba(67,67,43,0.64)"
+                      : "#FFFFFF",
+                    cursor: saveState !== "idle" || !effectiveCollection ? "default" : "pointer",
+                    opacity: saveState === "saving" ? 0.7 : 1,
+                    transition: "background 150ms ease, opacity 150ms ease",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {saveState === "saved" ? "Saved ✓" : "Add to Collection"}
+                </button>
+              </div>
+
+              {/* Hint text */}
+              {actionSuggestion?.hint_text && !actionLoading && (
+                <p
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 11,
+                    color: "rgba(67,67,43,0.38)",
+                    margin: "-10px 32px 16px",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {actionSuggestion.hint_text}
+                </p>
+              )}
+            </>
+          );
+        })()}
 
       </div>
     </div>
+  );
+}
+
+/* ─── Action chip — clickable material/action suggestion pill ─── */
+function ActionChip({ label, onClick }: { label: string; onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "6px 12px 6px 11px",
+        borderRadius: 999,
+        border: `1.5px solid ${hovered ? "rgba(67,67,43,0.38)" : "rgba(67,67,43,0.22)"}`,
+        background: hovered ? "rgba(67,67,43,0.06)" : "rgba(255,255,255,0.90)",
+        fontFamily: "var(--font-inter), system-ui, sans-serif",
+        fontSize: 12,
+        fontWeight: 600,
+        color: "#43432B",
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        boxShadow: hovered ? "0 1px 4px rgba(67,67,43,0.10)" : "0 1px 2px rgba(67,67,43,0.06)",
+        transition: "border-color 120ms ease, background 120ms ease, box-shadow 120ms ease",
+      }}
+    >
+      {label}
+      <span style={{ fontSize: 11, opacity: hovered ? 1 : 0.55, transition: "opacity 120ms ease" }}>→</span>
+    </button>
   );
 }
 

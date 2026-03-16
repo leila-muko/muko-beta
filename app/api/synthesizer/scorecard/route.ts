@@ -27,6 +27,9 @@ export interface ScorecardPayload {
     collection: string;
     season: string;
   };
+  brand_keywords?: string[];
+  customer_profile?: string;
+  intent_primary_goals?: string[];
 }
 
 export interface Consideration {
@@ -45,9 +48,21 @@ function buildPrompt(p: ScorecardPayload): string {
     ? `Margin gate: PASSED at $${p.margin.msrp} MSRP (COGS $${Math.round(p.margin.cogs)}, ceiling $${Math.round(p.margin.ceiling)})`
     : `Margin gate: FAILED — COGS $${Math.round(p.margin.cogs)} exceeds ceiling $${Math.round(p.margin.ceiling)} at $${p.margin.msrp} MSRP`;
 
+  const brandLines: string[] = [];
+  if (p.brand_keywords && p.brand_keywords.length > 0) {
+    brandLines.push(`Brand: ${p.brand_keywords.slice(0, 5).join(', ')}`);
+  }
+  if (p.customer_profile && p.customer_profile.trim().length > 0) {
+    brandLines.push(`Customer: ${p.customer_profile.substring(0, 80)}`);
+  }
+  if (p.intent_primary_goals && p.intent_primary_goals.length > 0) {
+    brandLines.push(`Collection intent: ${p.intent_primary_goals.join(', ')}`);
+  }
+  const brandContext = brandLines.length > 0 ? brandLines.join('\n') + '\n' : '';
+
   return `You are a fashion strategy advisor reviewing a piece analysis scorecard.
 
-Scores — Identity: ${p.scores.identity}, Resonance: ${p.scores.resonance}, Execution: ${p.scores.execution}, Overall: ${p.scores.overall}
+${brandContext}Scores — Identity: ${p.scores.identity}, Resonance: ${p.scores.resonance}, Execution: ${p.scores.execution}, Overall: ${p.scores.overall}
 ${marginLine}
 Aesthetic: ${p.context.aesthetic || 'Unknown'}, Material: ${p.context.material || 'Unknown'}, Category: ${p.context.category || 'Unknown'}, Collection: ${p.context.collection || 'Unknown'}, Season: ${p.context.season || 'Unknown'}
 
@@ -74,8 +89,9 @@ export async function POST(req: NextRequest) {
   let payload: ScorecardPayload;
   try {
     payload = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  } catch (err) {
+    console.error('[scorecard synthesizer error]', err);
+    return NextResponse.json({ error: 'Synthesis failed', detail: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 
   try {
@@ -93,7 +109,8 @@ export async function POST(req: NextRequest) {
 
     const parsed = JSON.parse(cleaned) as ScorecardInsight;
     return NextResponse.json(parsed);
-  } catch {
-    return NextResponse.json({ error: 'Synthesis failed' }, { status: 500 });
+  } catch (err) {
+    console.error('[scorecard synthesizer error]', err);
+    return NextResponse.json({ error: 'Synthesis failed', detail: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

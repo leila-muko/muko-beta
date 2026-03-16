@@ -58,9 +58,17 @@ interface SessionState {
   conceptSilhouette: string; // required before lock — 'straight' | 'relaxed' | 'structured' | 'oversized'
   conceptPalette: string | null; // optional palette id from aesthetic's palette_options
   collectionAesthetic: string | null;
+  aestheticInflection: string | null; // alias of directionInterpretationText — used by orchestrator
   directionInterpretationText: string;
   directionInterpretationModifiers: string[];
   directionInterpretationChips: string[];
+  // Concept insight — persisted after SSE stream completes
+  conceptInsightTitle: string | null;
+  conceptInsightDescription: string | null;
+  conceptInsightPositioning: string[] | null; // 3 positioning bullets
+  conceptInsightConfidence: number | null;
+  /** True when the aesthetic was matched via LLM proxy rather than exact name */
+  isProxyMatch: boolean;
 
   // Step 3: Spec Studio
   category: string;
@@ -92,6 +100,7 @@ interface SessionState {
   // Branch tracking
   parentAnalysisId: string | null;
   savedAnalysisId: string | null;
+  // (parentAnalysisId and collectionAesthetic are accessed directly by the orchestrator)
 
   // Collections hub
   activeCollection: string | null;
@@ -107,6 +116,7 @@ interface SessionState {
   setConceptSilhouette: (s: string) => void;
   setConceptPalette: (p: string | null) => void;
   setCollectionAesthetic: (aesthetic: string | null) => void;
+  setAestheticInflection: (inflection: string | null) => void;
   setDirectionInterpretationText: (text: string) => void;
   setDirectionInterpretationModifiers: (modifiers: string[]) => void;
   setDirectionInterpretationChips: (chips: string[]) => void;
@@ -128,6 +138,9 @@ interface SessionState {
   setDecisionGuidanceState: (state: DecisionGuidanceState) => void;
   setActiveProductPieceId: (pieceId: string | null) => void;
   setPieceRolesById: (roles: PieceRolesById) => void;
+  setConceptInsight: (insight: { title: string; description: string; positioning: string[]; confidence: number | null }) => void;
+  clearConceptInsight: () => void;
+  setIsProxyMatch: (value: boolean) => void;
   setParentAnalysisId: (id: string | null) => void;
   setSavedAnalysisId: (id: string | null) => void;
   setActiveCollection: (name: string | null) => void;
@@ -157,9 +170,15 @@ export const useSessionStore = create<SessionState>()(
       conceptSilhouette: '',
       conceptPalette: null,
       collectionAesthetic: null,
+      aestheticInflection: null,
       directionInterpretationText: '',
       directionInterpretationModifiers: [],
       directionInterpretationChips: [],
+      conceptInsightTitle: null,
+      conceptInsightDescription: null,
+      conceptInsightPositioning: null,
+      conceptInsightConfidence: null,
+      isProxyMatch: false,
       category: '',
       subcategory: '',
       targetMsrp: null,
@@ -195,6 +214,7 @@ export const useSessionStore = create<SessionState>()(
       setConceptSilhouette: (conceptSilhouette) => set({ conceptSilhouette }),
       setConceptPalette: (conceptPalette) => set({ conceptPalette }),
       setCollectionAesthetic: (collectionAesthetic) => set({ collectionAesthetic }),
+      setAestheticInflection: (aestheticInflection) => set({ aestheticInflection }),
       setDirectionInterpretationText: (directionInterpretationText) => set({ directionInterpretationText }),
       setDirectionInterpretationModifiers: (directionInterpretationModifiers) => set({ directionInterpretationModifiers }),
       setDirectionInterpretationChips: (directionInterpretationChips) => set({ directionInterpretationChips }),
@@ -217,6 +237,21 @@ export const useSessionStore = create<SessionState>()(
       setDecisionGuidanceState: (decisionGuidanceState) => set({ decisionGuidanceState }),
       setActiveProductPieceId: (activeProductPieceId) => set({ activeProductPieceId }),
       setPieceRolesById: (pieceRolesById) => set({ pieceRolesById }),
+      setConceptInsight: ({ title, description, positioning, confidence }) =>
+        set({
+          conceptInsightTitle: title,
+          conceptInsightDescription: description,
+          conceptInsightPositioning: positioning,
+          conceptInsightConfidence: confidence,
+        }),
+      clearConceptInsight: () =>
+        set({
+          conceptInsightTitle: null,
+          conceptInsightDescription: null,
+          conceptInsightPositioning: null,
+          conceptInsightConfidence: null,
+        }),
+      setIsProxyMatch: (isProxyMatch) => set({ isProxyMatch }),
       setParentAnalysisId: (parentAnalysisId) => set({ parentAnalysisId }),
       setSavedAnalysisId: (savedAnalysisId) => set({ savedAnalysisId }),
       setActiveCollection: (activeCollection) => set({ activeCollection }),
@@ -243,9 +278,15 @@ export const useSessionStore = create<SessionState>()(
         conceptSilhouette: '',
         conceptPalette: null,
         collectionAesthetic: null,
+        aestheticInflection: null,
         directionInterpretationText: '',
         directionInterpretationModifiers: [],
         directionInterpretationChips: [],
+        conceptInsightTitle: null,
+        conceptInsightDescription: null,
+        conceptInsightPositioning: null,
+        conceptInsightConfidence: null,
+        isProxyMatch: false,
         category: '',
         subcategory: '',
         targetMsrp: null,
@@ -273,7 +314,7 @@ export const useSessionStore = create<SessionState>()(
       name: 'muko-session',
       partialize: (state) => {
         // Persist everything except actions
-        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setCollectionRole, setSelectedKeyPiece, setParentAnalysisId, setSavedAnalysisId, setActiveCollection, setAssortmentInsightCache, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
+        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setCollectionRole, setSelectedKeyPiece, setParentAnalysisId, setSavedAnalysisId, setActiveCollection, setAssortmentInsightCache, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
         return rest;
       },
     }

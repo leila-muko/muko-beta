@@ -1,7 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { callClaude } from "@/lib/claude/client";
 import { NextRequest, NextResponse } from "next/server";
-
-const client = new Anthropic();
 
 // All valid modifier names — union of display modifiers and score-delta modifiers
 const VALID_MODIFIERS = [
@@ -39,13 +37,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ modifiers: [], confidence: "high" });
     }
 
-    const message = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 120,
-      messages: [
-        {
-          role: "user",
-          content: `You are a fashion concept interpreter for a design tool. A designer has selected the aesthetic "${base}" and is refining it with their own words.
+    const raw = (await callClaude(
+      `You are a fashion concept interpreter for a design tool. A designer has selected the aesthetic "${base}" and is refining it with their own words.
 
 Their refinement: "${text.trim()}"
 
@@ -61,12 +54,11 @@ Confidence guide:
 
 Return format (JSON only, nothing else):
 {"modifiers": ["Modifier1", "Modifier2"], "confidence": "high"}`,
-        },
-      ],
-    });
-
-    const raw =
-      message.content[0].type === "text" ? message.content[0].text.trim() : "";
+      {
+        model: "claude-haiku-4-5-20251001",
+        maxTokens: 120,
+      }
+    )).trim();
 
     // Parse the JSON response
     const parsed = JSON.parse(raw);

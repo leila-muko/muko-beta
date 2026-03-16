@@ -128,6 +128,12 @@ export interface CollectionReportInputPiece {
     execution?: number | null;
   } | null;
   margin_passed?: boolean | null;
+  // Extended fields for synthesizer prompt
+  cogs?: number | null;
+  msrp?: number | null;
+  construction?: 'low' | 'moderate' | 'high' | null;
+  flagged_conflicts?: string[] | null;
+  execution_reason?: string | null;
 }
 
 export interface CollectionReportInput {
@@ -139,4 +145,8 @@ export interface CollectionReportInput {
   pieces: CollectionReportInputPiece[];
   brand?: CollectionReportBrandInput | null;
   intent?: CollectionReportIntentInput | null;
+  // Extended fields for synthesizer prompt
+  collection_aesthetic?: string | null;
+  aesthetic_inflection?: string | null;
+  collection_brief?: string | null;
 }

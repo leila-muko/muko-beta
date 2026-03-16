@@ -1,7 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { callClaude } from "@/lib/claude/client";
 import { NextRequest, NextResponse } from "next/server";
-
-const client = new Anthropic();
 
 export async function POST(req: NextRequest) {
   let body: { chipLabels: string[]; synthEdit: string[]; keyPiece?: string | null };
@@ -33,16 +31,12 @@ Return a JSON array of the indices that CONTRADICT or undermine the constraints.
 Example: { "contradicted": [1, 3] }`;
 
   try {
-    const message = await client.messages.create({
+    const text = await callClaude(userPrompt, {
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 200,
+      maxTokens: 200,
       temperature: 0,
-      system: "You are a filter. Return only valid JSON.",
-      messages: [{ role: "user", content: userPrompt }],
+      systemPrompt: "You are a filter. Return only valid JSON.",
     });
-
-    const text =
-      message.content[0]?.type === "text" ? message.content[0].text : "";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return NextResponse.json({ contradicted: [] });
 

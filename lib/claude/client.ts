@@ -66,6 +66,39 @@ export async function callClaude(
 }
 
 /**
+ * Streaming variant — yields raw text deltas from Claude as an async generator.
+ * Use in API routes that return SSE or ReadableStream responses.
+ */
+export async function* streamClaude(
+  userMessage: string,
+  options: ClaudeCallOptions = {}
+): AsyncGenerator<string> {
+  const {
+    model = 'claude-haiku-4-5-20251001',
+    maxTokens = 500,
+    systemPrompt,
+    temperature = 0.3,
+  } = options;
+
+  const stream = anthropic.messages.stream({
+    model,
+    max_tokens: maxTokens,
+    temperature,
+    ...(systemPrompt && { system: systemPrompt }),
+    messages: [{ role: 'user', content: userMessage }],
+  });
+
+  for await (const event of stream) {
+    if (
+      event.type === 'content_block_delta' &&
+      event.delta.type === 'text_delta'
+    ) {
+      yield event.delta.text;
+    }
+  }
+}
+
+/**
  * Safely parse JSON from LLM response.
  * Strips markdown code fences if present before parsing.
  */

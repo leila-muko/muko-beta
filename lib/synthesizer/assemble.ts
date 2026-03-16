@@ -28,6 +28,7 @@ import type { InsightMode } from '@/lib/types/insight';
 
 interface AestheticEntry {
   id: string;
+  name?: string;
   consumer_insight?: string;
   risk_factors?: string[];
   seen_in?: string[];
@@ -205,6 +206,8 @@ export interface ConceptBlackboardInput {
   keyPieces?: Array<{ item: string; type?: string; signal?: string }>;
   /** Collection context for collection-aware Decision Guidance */
   collection_context?: ConceptBlackboard['collection_context'];
+  /** Whether the aesthetic was a proxy/fallback match rather than exact. */
+  isProxyMatch?: boolean;
 }
 
 /** Returns null when aestheticSlug is missing — callers must guard. */
@@ -220,7 +223,7 @@ export function buildConceptBlackboard(
   return {
     aesthetic_input: input.aestheticInput || input.aestheticSlug,
     aesthetic_matched_id: input.aestheticSlug,
-    is_proxy_match: false, // No Critic agent in session layer
+    is_proxy_match: input.isProxyMatch ?? false,
     brand_keywords: input.brandKeywords,
     identity_score: input.identity_score,
     resonance_score: input.resonance_score,
@@ -255,6 +258,8 @@ export interface SpecBlackboardInput {
   timeline_weeks: number;
   season: string;
   collectionName: string;
+  /** Brand name from brand profile — distinct from collectionName */
+  brandName?: string;
   /** Concept-stage silhouette (straight / relaxed / structured / oversized) */
   silhouette?: string;
   /** Product category (e.g. "Tops", "Outerwear") */
@@ -274,14 +279,20 @@ export function buildSpecBlackboard(
   const aestheticContext = resolveAestheticContext(input.aestheticSlug, input.season);
   const seasonKey = input.season ? input.season.toLowerCase() : undefined;
 
+  const aestheticEntry = (aesthetics as AestheticEntry[]).find(a => a.id === input.aestheticSlug);
+  const aestheticName = aestheticEntry?.name ?? null;
+  const aestheticConsumerInsight = aestheticEntry?.consumer_insight ?? null;
+
   return {
     aesthetic_matched_id: input.aestheticSlug,
+    aesthetic_name: aestheticName,
+    aesthetic_consumer_insight: aestheticConsumerInsight,
     brand_keywords: input.brandKeywords,
     identity_score: input.identity_score,
     resonance_score: input.resonance_score,
     execution_score: input.execution_score,
     season: seasonKey,
-    brand_name: input.collectionName || undefined,
+    brand_name: (input.brandName && input.brandName.trim()) ? input.brandName : (input.collectionName || undefined),
     aesthetic_context: aestheticContext,
     material_id: input.materialId,
     material_name: getMaterialName(input.materialId),
@@ -319,6 +330,8 @@ export interface ReportBlackboardInput {
   timeline_weeks: number;
   season: string;
   collectionName: string;
+  /** Brand name from brand profile — distinct from collectionName */
+  brandName?: string;
   collection_role?: 'hero' | 'directional' | 'core-evolution' | 'volume-driver' | null;
   intent_mode?: InsightMode;
   customerProfile?: string | null;
@@ -327,6 +340,14 @@ export interface ReportBlackboardInput {
   priceTier?: string;
   /** Key piece selected in Concept Studio */
   keyPiece?: { item: string; type: string; signal: string };
+  /** Brand target margin as a decimal (e.g. 0.60), from session or brand profile */
+  targetMargin?: number | null;
+  /** Concept insight title from session (conceptInsightTitle) */
+  conceptInsightTitle?: string | null;
+  /** Concept insight positioning bullets from session (conceptInsightPositioning) */
+  conceptInsightPositioning?: string[] | null;
+  /** Whether the aesthetic was a proxy/fallback match rather than exact. */
+  isProxyMatch?: boolean;
 }
 
 /** Returns null when aestheticSlug or materialId is missing. */
@@ -341,14 +362,14 @@ export function buildReportBlackboard(
 
   return {
     aesthetic_matched_id: input.aestheticSlug,
-    is_proxy_match: false,
+    is_proxy_match: input.isProxyMatch ?? false,
     brand_keywords: input.brandKeywords,
     identity_score: input.identity_score,
     resonance_score: input.resonance_score,
     execution_score: input.execution_score,
     overall_score: input.overall_score,
     season: seasonKey,
-    brand_name: input.collectionName || undefined,
+    brand_name: (input.brandName && input.brandName.trim()) ? input.brandName : undefined,
     aesthetic_context: aestheticContext,
     material_id: input.materialId,
     cogs_usd: input.cogs_usd,
@@ -364,6 +385,10 @@ export function buildReportBlackboard(
     excluded_brands: input.excludedBrands ?? [],
     price_tier: input.priceTier ?? 'unspecified',
     keyPiece: input.keyPiece,
+    target_margin: input.targetMargin ?? null,
+    concept_thread: (input.conceptInsightTitle && input.conceptInsightPositioning?.[0])
+      ? { title: input.conceptInsightTitle, market_gap: input.conceptInsightPositioning[0] }
+      : null,
     resolved_redirects: {
       brand_mismatch: resolveBrandMismatch(input.aestheticSlug, input.brandKeywords),
       cost_reduction: costReduction,

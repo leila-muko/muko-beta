@@ -235,8 +235,21 @@ function ReportPageContent() {
   const identityPulse = useSessionStore((state) => state.identityPulse);
   const resonancePulse = useSessionStore((state) => state.resonancePulse);
   const executionPulse = useSessionStore((state) => state.executionPulse);
+  const savedAnalysisId = useSessionStore((state) => state.savedAnalysisId);
+  const setSavedAnalysisId = useSessionStore((state) => state.setSavedAnalysisId);
+  const setParentAnalysisId = useSessionStore((state) => state.setParentAnalysisId);
   const collectionFromUrl = searchParams.get('collection');
   const seasonFromUrl = searchParams.get('season');
+
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Auto-clear toast after 2400ms
+  useEffect(() => {
+    if (!toastMessage) return undefined;
+    const t = window.setTimeout(() => setToastMessage(null), 2400);
+    return () => window.clearTimeout(t);
+  }, [toastMessage]);
 
   const sessionFallbackInput = useMemo<CollectionReportInput | null>(() => {
     const resolvedCollectionName =
@@ -415,8 +428,57 @@ function ReportPageContent() {
           });
 
           if (!response.ok) throw new Error('Report request failed');
-          const json = (await response.json()) as { collection_report: CollectionReportPayload };
-          nextReport = json.collection_report;
+
+          const contentType = response.headers.get('content-type') ?? '';
+
+          if (contentType.includes('text/event-stream') && response.body) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let sseReport: CollectionReportPayload | undefined;
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              if (cancelled) { reader.cancel(); break; }
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() ?? '';
+
+              for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const raw = line.slice(6).trim();
+                if (!raw) continue;
+
+                try {
+                  const event = JSON.parse(raw) as {
+                    type: 'fallback' | 'delta' | 'done';
+                    payload?: CollectionReportPayload;
+                  };
+
+                  if (event.type === 'fallback' && event.payload && !cancelled) {
+                    // Deterministic fields — render immediately
+                    setReport(event.payload);
+                  }
+
+                  if (event.type === 'done' && event.payload && !cancelled) {
+                    // Fully merged result — swap in final narrative
+                    sseReport = event.payload;
+                  }
+                } catch {
+                  // Malformed event line — skip
+                }
+              }
+            }
+            // Always assign nextReport — if cancelled before done, the !cancelled guard
+            // at line 474 prevents setReport from being called with this value.
+            nextReport = sseReport ?? buildCollectionReport(input).collection_report;
+          } else {
+            // Non-streaming fallback (handles local dev or if endpoint reverts)
+            const json = (await response.json()) as { collection_report: CollectionReportPayload };
+            nextReport = json.collection_report;
+          }
         } catch {
           nextReport = buildCollectionReport(input).collection_report;
         }
@@ -509,6 +571,136 @@ function ReportPageContent() {
           >
             Back to Collections
           </button>
+
+          {/* Branch Design — secondary/ghost style */}
+          <button
+            onClick={async () => {
+              if (!savedAnalysisId) {
+                setToastMessage('Please save this analysis first');
+                return;
+              }
+              setParentAnalysisId(savedAnalysisId);
+              useSessionStore.setState({
+                aestheticInput: '',
+                aestheticMatchedId: null,
+                materialId: '',
+                silhouette: '',
+                constructionTier: 'moderate',
+                constructionTierOverride: false,
+                identityPulse: null,
+                resonancePulse: null,
+                executionPulse: null,
+                conceptLocked: false,
+                chipSelection: null,
+                conceptSilhouette: '',
+                conceptPalette: null,
+              });
+              router.push('/concept');
+            }}
+            style={{
+              padding: '12px 16px',
+              borderRadius: 999,
+              border: `1px solid rgba(67,67,43,0.18)`,
+              background: 'transparent',
+              color: `rgba(67,67,43,0.72)`,
+              fontFamily: fonts.body,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            Branch Design
+          </button>
+
+          {/* Save to Collection — chartreuse primary style */}
+          <button
+            disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+            onClick={async () => {
+              if (saveStatus !== 'idle') return;
+
+              // If already saved by ScorecardModal, just confirm
+              if (savedAnalysisId) {
+                setSaveStatus('saved');
+                setToastMessage('Analysis saved to your collection');
+                return;
+              }
+
+              // No prior save — attempt upsert with available store data
+              setSaveStatus('saving');
+              try {
+                const supabase = createClient();
+                const { data: authData } = await supabase.auth.getUser();
+                const userId = authData.user?.id ?? null;
+                const resolvedCollectionName =
+                  collectionFromUrl || activeCollection || collectionName || null;
+                const resolvedSeason = seasonFromUrl || season || null;
+                const avgScore = Math.round(
+                  ((identityPulse?.score ?? 0) +
+                    (resonancePulse?.score ?? 0) +
+                    (executionPulse?.score ?? 0)) /
+                    3
+                );
+                const { data: upsertData, error: upsertError } = await supabase
+                  .from('analyses')
+                  .upsert({
+                    user_id:          userId,
+                    collection_name:  resolvedCollectionName,
+                    season:           resolvedSeason,
+                    category:         category || null,
+                    aesthetic_input:  aestheticInput || null,
+                    material_id:      materialId || null,
+                    silhouette:       silhouette || null,
+                    construction_tier: constructionTier ?? null,
+                    score:            avgScore,
+                    dimensions: {
+                      identity:  identityPulse?.score ?? null,
+                      resonance: resonancePulse?.score ?? null,
+                      execution: executionPulse?.score ?? null,
+                    },
+                    gates_passed: {
+                      cost: (executionPulse?.score ?? 0) >= 65,
+                    },
+                  }, { onConflict: 'id' })
+                  .select('id')
+                  .single();
+
+                if (upsertError) {
+                  console.error('[Report] Save to collection failed:', upsertError);
+                  setSaveStatus('error');
+                  setToastMessage('Save failed — please try again');
+                  setTimeout(() => setSaveStatus('idle'), 2000);
+                  return;
+                }
+                if (upsertData?.id) setSavedAnalysisId(upsertData.id as string);
+                setSaveStatus('saved');
+                setToastMessage('Analysis saved to your collection');
+              } catch (err) {
+                console.error('[Report] Save to collection threw:', err);
+                setSaveStatus('error');
+                setToastMessage('Save failed — please try again');
+                setTimeout(() => setSaveStatus('idle'), 2000);
+              }
+            }}
+            style={{
+              padding: '12px 16px',
+              borderRadius: 999,
+              border: 'none',
+              background:
+                saveStatus === 'saved'
+                  ? '#6B8F3E'
+                  : saveStatus === 'saving'
+                  ? 'rgba(168,180,117,0.6)'
+                  : '#A8B475',
+              color: '#F8F4EC',
+              fontFamily: fonts.body,
+              fontSize: 13,
+              cursor: saveStatus === 'idle' ? 'pointer' : 'default',
+              opacity: saveStatus === 'saving' ? 0.75 : 1,
+              transition: 'background 150ms ease, opacity 150ms ease',
+            }}
+          >
+            {saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'saving' ? 'Saving…' : 'Save to Collection'}
+          </button>
+
           <button
             onClick={() => window.location.reload()}
             style={{
@@ -525,6 +717,27 @@ function ReportPageContent() {
             Refresh Report
           </button>
         </div>
+
+        {/* Toast */}
+        {toastMessage ? (
+          <div
+            style={{
+              position: 'fixed',
+              right: 36,
+              bottom: 88,
+              background: '#191919',
+              color: '#FFFFFF',
+              borderRadius: 8,
+              padding: '10px 14px',
+              fontFamily: fonts.body,
+              fontSize: 12,
+              zIndex: 30,
+              boxShadow: '0 8px 24px rgba(25,25,25,0.16)',
+            }}
+          >
+            {toastMessage}
+          </div>
+        ) : null}
       </div>
 
       {loading ? <LoadingState /> : null}

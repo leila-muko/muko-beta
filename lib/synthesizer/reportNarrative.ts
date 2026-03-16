@@ -66,11 +66,13 @@ export interface ReportBlackboard {
   /** Human-readable material name */
   material_name?: string;
   /** Brand target margin as a decimal (e.g. 0.60) */
-  target_margin?: number;
+  target_margin: number | null;
   /** Key piece context from Concept Studio */
   keyPiece?: { item: string; type: string; signal: string };
   /** Both resolved redirects */
   resolved_redirects: ResolvedRedirects;
+  /** Concept insight thread — title and market gap bullet from Concept Studio */
+  concept_thread?: { title: string; market_gap: string } | null;
   /** Customer profile description from brand onboarding */
   customer_profile: string | null;
   /** Reference brands from brand onboarding — used as competitive positioning anchors */
@@ -396,7 +398,10 @@ export const STANDARD_REPORT_PROMPT_V4 = `PROMPT VERSION: 4.1 — ${new Date().t
 
 You are the final strategic voice in a fashion decision intelligence pipeline — a senior creative strategist, merchandiser, and production lead writing with the precision of a Vogue Business analysis opener and the authority of an internal brand strategy memo.
 
-The designer has read the Concept Studio and Spec Studio insights. Do not recap them. Build on them. Your job is the compound story — what all signals mean together — and one clear directive.
+The designer has moved through Concept Studio and Spec Studio.
+When concept_thread is present in the input, your headline and strategic_frame must advance from the position already established there — not restate it, not contradict it. The concept_thread is the premise; your report is the resolution.
+
+If concept_thread is absent, establish the position yourself from the available signals.
 
 BRAND REASONING LAYER
 Apply these rules before writing a single word of output:
@@ -411,12 +416,15 @@ Apply these rules before writing a single word of output:
 
 5. BRAND NAME IN OUTPUT — brand.name must appear by its actual name in either the headline or strategic_frame. Never use "YOUR brand" or "the brand" as a placeholder in the final output. Replace the placeholder with the actual brand name from brand.name before returning.
 
+6. CONCEPT THREAD — If concept_thread.established_position is present, your headline must resolve or advance that position. If concept_thread.market_gap_identified is present, your whats_working or recommendation must reference or close that gap.
+
 HIDDEN REASONING (DO NOT PRINT)
 Before writing, internally derive:
 1. Strategic Tension — which of these tensions defines this opportunity: Identity vs Trend, Signal vs Saturation, Craft vs Margin, Intentional Imperfection vs Poor Execution, Cultural Edge vs Commercial Safety, Longevity vs Moment
 2. Cultural Shift — what changed in consumer desire that makes this direction relevant now
 3. Brand Permission — why YOUR brand specifically can claim this position given their keywords and scores
 4. Commercial Constraint — the binding margin, timeline, or construction limit
+   target_margin: the brand's margin floor (use this when referencing whether cost pressure is severe or marginal)
 5. Primary Risk — the single dimension most likely to collapse this opportunity
 6. Opposition Pass — draft the counter-argument a skeptical merchant would make; refine the output to remove weak claims
 
@@ -467,6 +475,7 @@ FIELD RULES
 headline
 One sentence. Strategic verdict only.
 Format exactly: "[Aesthetic] is [trajectory] for [brand.name] — [one specific implication]."
+If concept_thread is present: the implication must directly answer or advance the established_position.
 HARD PROHIBITION: No numbers, no scores, no dimension names (Identity/Resonance/Execution) in the headline. If your headline contains a number or a dimension name, rewrite it.
 
 strategic_frame: MAXIMUM 40 WORDS. One or two sentences only. If you write more than 40 words, you have failed. Count your words before outputting.
@@ -601,6 +610,12 @@ function buildReportPrompt(bb: ReportBlackboard): string {
       construction_tier: bb.construction_tier,
       timeline_weeks: bb.timeline_weeks,
     },
+    ...(bb.concept_thread ? {
+      concept_thread: {
+        established_position: bb.concept_thread.title,
+        market_gap_identified: bb.concept_thread.market_gap,
+      },
+    } : {}),
     scores: {
       identity: bb.identity_score,
       resonance: bb.resonance_score,
@@ -612,6 +627,7 @@ function buildReportPrompt(bb: ReportBlackboard): string {
       cogs_actual: bb.cogs_usd,
       cogs_target: Math.round(cogsTarget * 100) / 100,
       margin_gap: marginGap,
+      target_margin: bb.target_margin != null ? `${Math.round(bb.target_margin * 100)}%` : null,
     },
     market_data: {
       saturation_score: bb.aesthetic_context.saturation_score ?? null,

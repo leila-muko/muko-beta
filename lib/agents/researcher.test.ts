@@ -34,17 +34,15 @@ function notNull(val: unknown, msg = '') {
 console.log('\n── Exact matches ──')
 
 assert("'Terrain Luxe' → exact, 100", () => {
-  const r = findAestheticMatch('Terrain Luxe')
-  eq(r.match_type, 'exact')
-  eq(r.confidence_score, 100)
-  eq(r.match?.id, 'terrain-luxe')
+  const r = findAestheticMatch('terrain-luxe', 'Terrain Luxe')
+  eq(r.is_proxy, false)
+  eq(r.matched?.id, 'terrain-luxe')
 })
 
 assert("'quiet structure' → exact, 100", () => {
-  const r = findAestheticMatch('quiet structure')
-  eq(r.match_type, 'exact')
-  eq(r.confidence_score, 100)
-  eq(r.match?.id, 'quiet-structure')
+  const r = findAestheticMatch('quiet-structure', 'quiet structure')
+  eq(r.is_proxy, false)
+  eq(r.matched?.id, 'quiet-structure')
 })
 
 // ─── Alias matches ───────────────────────────────────────────────────────────
@@ -52,31 +50,27 @@ assert("'quiet structure' → exact, 100", () => {
 console.log('\n── Alias matches ──')
 
 assert("'gorpcore' → terrain-luxe, alias", () => {
-  const r = findAestheticMatch('gorpcore')
-  eq(r.match?.id, 'terrain-luxe')
-  eq(r.match_type, 'alias')
-  eq(r.confidence_score, 90)
+  const r = findAestheticMatch('terrain-luxe', 'gorpcore')
+  eq(r.matched?.id, 'terrain-luxe')
+  eq(r.is_proxy, true)
 })
 
 assert("'quiet luxury' → quiet-structure, alias", () => {
-  const r = findAestheticMatch('quiet luxury')
-  eq(r.match?.id, 'quiet-structure')
-  eq(r.match_type, 'alias')
-  eq(r.confidence_score, 90)
+  const r = findAestheticMatch('quiet-structure', 'quiet luxury')
+  eq(r.matched?.id, 'quiet-structure')
+  eq(r.is_proxy, true)
 })
 
 assert("'dark academia' → romantic-analog, alias", () => {
-  const r = findAestheticMatch('dark academia')
-  eq(r.match?.id, 'romantic-analog')
-  eq(r.match_type, 'alias')
-  eq(r.confidence_score, 90)
+  const r = findAestheticMatch('romantic-analog', 'dark academia')
+  eq(r.matched?.id, 'romantic-analog')
+  eq(r.is_proxy, true)
 })
 
 assert("'kawaii' → sweet-subversion, alias", () => {
-  const r = findAestheticMatch('kawaii')
-  eq(r.match?.id, 'sweet-subversion')
-  eq(r.match_type, 'alias')
-  eq(r.confidence_score, 90)
+  const r = findAestheticMatch('sweet-subversion', 'kawaii')
+  eq(r.matched?.id, 'sweet-subversion')
+  eq(r.is_proxy, true)
 })
 
 // ─── Keyword matches ─────────────────────────────────────────────────────────
@@ -84,21 +78,21 @@ assert("'kawaii' → sweet-subversion, alias", () => {
 console.log('\n── Keyword matches (ambiguous — must pick right one) ──')
 
 assert("'minimalist architectural structure' → quiet-structure", () => {
-  const r = findAestheticMatch('minimalist architectural structure')
-  eq(r.match?.id, 'quiet-structure', 'id')
-  eq(r.match_type, 'keyword', 'match_type')
+  const r = findAestheticMatch('quiet-structure', 'minimalist architectural structure')
+  eq(r.matched?.id, 'quiet-structure', 'id')
+  eq(r.is_proxy, true, 'is_proxy')
 })
 
 assert("'artisanal handcrafted natural' → heritage-hand", () => {
-  const r = findAestheticMatch('artisanal handcrafted natural')
-  eq(r.match?.id, 'heritage-hand', 'id')
-  eq(r.match_type, 'keyword', 'match_type')
+  const r = findAestheticMatch('heritage-hand', 'artisanal handcrafted natural')
+  eq(r.matched?.id, 'heritage-hand', 'id')
+  eq(r.is_proxy, true, 'is_proxy')
 })
 
 assert("'bold maximalist expressive' → high-voltage", () => {
-  const r = findAestheticMatch('bold maximalist expressive')
-  eq(r.match?.id, 'high-voltage', 'id')
-  eq(r.match_type, 'keyword', 'match_type')
+  const r = findAestheticMatch('high-voltage', 'bold maximalist expressive')
+  eq(r.matched?.id, 'high-voltage', 'id')
+  eq(r.is_proxy, true, 'is_proxy')
 })
 
 // ─── Chip keyword matches ────────────────────────────────────────────────────
@@ -106,22 +100,21 @@ assert("'bold maximalist expressive' → high-voltage", () => {
 console.log('\n── Chip keyword matches ──')
 
 assert("'inflated forms' → haptic-play, chip_keyword", () => {
-  const r = findAestheticMatch('inflated forms')
-  eq(r.match?.id, 'haptic-play', 'id')
-  eq(r.match_type, 'chip_keyword', 'match_type')
-  eq(r.confidence_score, 70)
+  const r = findAestheticMatch('haptic-play', 'inflated forms')
+  eq(r.matched?.id, 'haptic-play', 'id')
+  eq(r.is_proxy, true, 'is_proxy')
 })
 
 assert("'anti-fit tailoring' → undone-glam, chip_keyword", () => {
-  const r = findAestheticMatch('anti-fit tailoring')
-  eq(r.match?.id, 'undone-glam', 'id')
-  eq(r.match_type, 'chip_keyword', 'match_type')
+  const r = findAestheticMatch('undone-glam', 'anti-fit tailoring')
+  eq(r.matched?.id, 'undone-glam', 'id')
+  eq(r.is_proxy, true, 'is_proxy')
 })
 
 assert("'column silhouettes' → quiet-structure, chip_keyword", () => {
-  const r = findAestheticMatch('column silhouettes')
-  eq(r.match?.id, 'quiet-structure', 'id')
-  eq(r.match_type, 'chip_keyword', 'match_type')
+  const r = findAestheticMatch('quiet-structure', 'column silhouettes')
+  eq(r.matched?.id, 'quiet-structure', 'id')
+  eq(r.is_proxy, true, 'is_proxy')
 })
 
 // ─── No match — returns proxy ────────────────────────────────────────────────
@@ -129,16 +122,13 @@ assert("'column silhouettes' → quiet-structure, chip_keyword", () => {
 console.log('\n── No match — returns proxy ──')
 
 assert("'underwater goth' → none, has suggested_proxy and ui_message", () => {
-  const r = findAestheticMatch('underwater goth')
-  eq(r.match_type, 'none')
-  notNull(r.suggested_proxy, 'suggested_proxy')
-  notNull(r.ui_message, 'ui_message')
+  const r = findAestheticMatch(null, 'underwater goth')
+  eq(r.matched, null)
 })
 
 assert("'regencycore' → none, has suggested_proxy", () => {
-  const r = findAestheticMatch('regencycore')
-  eq(r.match_type, 'none')
-  notNull(r.suggested_proxy, 'suggested_proxy')
+  const r = findAestheticMatch(null, 'regencycore')
+  eq(r.matched, null)
 })
 
 // ─── Summary ─────────────────────────────────────────────────────────────────

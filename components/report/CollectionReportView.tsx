@@ -24,6 +24,7 @@ export function CollectionReportView({ report }: { report: CollectionReportPaylo
       }}
     >
       <CollectionReportHeader header={report.header} />
+      <OverallReadCallout value={report.overall_read} detail={report.overall_read_detail} />
       <CollectionThesis thesis={report.collection_thesis} />
       <CollectionOverview overview={report.overview} />
 
@@ -48,7 +49,6 @@ export function CollectionReportView({ report }: { report: CollectionReportPaylo
       <PieceSummaryTable pieces={report.piece_summary} />
       <KeyRisksSection risks={report.key_risks} />
       <NextStepsSection nextSteps={report.next_steps} />
-      <OverallReadCallout value={report.overall_read} detail={report.overall_read_detail} />
 
       <div
         style={{

@@ -32,6 +32,8 @@ import { PulseScoreRow } from "@/components/ui/PulseScoreRow";
 import type { PulseChipProps } from "@/components/ui/PulseChip";
 import type { InsightData, SpecInsightMode } from "@/lib/types/insight";
 import { buildSpecBlackboard } from "@/lib/synthesizer/assemble";
+import { buildAnalysisRow, AGENT_VERSIONS } from "@/lib/agents/orchestrator";
+import type { PipelineBlackboard, AnalysisResult as AnalysisResultOrch } from "@/lib/agents/orchestrator";
 import { createClient } from "@/lib/supabase/client";
 import type { SpecSuggestion } from "@/lib/types/next-move";
 import { ScorecardModal } from "@/components/spec-studio/ScorecardModal";
@@ -911,17 +913,19 @@ export default function SpecStudioPage() {
   const refinementModifiers = useSessionStore((s) => s.refinementModifiers);
 
   const [brandProfileName, setBrandProfileName] = useState<string | null>(null);
+  const [brandProfileId, setBrandProfileId] = useState<string | null>(null);
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
       supabase
         .from('brand_profiles')
-        .select('brand_name')
+        .select('brand_name, id')
         .eq('user_id', user.id)
         .single()
         .then(({ data }) => {
           if (data?.brand_name) setBrandProfileName(data.brand_name);
+          if (data?.id) setBrandProfileId(data.id as string);
         });
     });
   }, []);
@@ -1699,14 +1703,115 @@ export default function SpecStudioPage() {
               if (!controller.signal.aborted) {
                 setSpecSynthInsightData(result.data);
                 setSpecStreamingText('');
-                // Fire-and-forget DB log
-                try {
-                  const supabase = createClient();
-                  supabase.from('analyses').insert({
-                    narrative: result.data.statements?.join(' ') ?? '',
-                    agent_versions: { synthesizer: result.meta?.method ?? 'unknown' },
-                  }).then(() => {});
-                } catch { /* fire-and-forget */ }
+                // Persist analysis — awaited inside async IIFE so the stream loop is not blocked
+                void (async () => {
+                  try {
+                    const supabase = createClient();
+                    const { data: authData } = await supabase.auth.getUser();
+                    const userId = authData.user?.id ?? null;
+
+                    const session = useSessionStore.getState();
+                    const finalScore = Math.round(
+                      (dynamicIdentityScore + dynamicResonanceScore + executionScore) / 3
+                    );
+
+                    const bb: PipelineBlackboard = {
+                      input: {
+                        aesthetic_input:   conceptContext.aestheticName || '',
+                        material_id:       materialId || '',
+                        silhouette:        conceptSilhouette || '',
+                        construction_tier: constructionTier ?? 'moderate',
+                        category:          categoryId || '',
+                        target_msrp:       targetMSRP,
+                        season:            storeSeason || '',
+                        collection_name:   storeCollectionName || brandProfileName || '',
+                        timeline_weeks:    timelineWeeks,
+                      },
+                      brand: {
+                        id:               brandProfileId,
+                        brand_name:       brandProfileName ?? '',
+                        keywords:         [],
+                        customer_profile: null,
+                        price_tier:       'Contemporary',
+                        target_margin:    brandTargetMargin,
+                        tension_context:  null,
+                      },
+                      session: {
+                        collectionName:    storeCollectionName || '',
+                        season:            storeSeason || '',
+                        selectedAesthetic: conceptContext.aestheticMatchedId || null,
+                        selectedElements:  [],
+                        category:          categoryId || null,
+                        targetMSRP:        targetMSRP,
+                        materialId:        materialId || null,
+                        silhouette:        conceptSilhouette || null,
+                        constructionTier:  constructionTier ?? null,
+                        timelineWeeks:     timelineWeeks,
+                        collectionRole:    storeCollectionRole ?? null,
+                        // Extra fields read by buildAnalysisRow via [key: string]: unknown
+                        savedAnalysisId:             session.savedAnalysisId,
+                        parentAnalysisId:            session.parentAnalysisId,
+                        collectionAesthetic:         session.collectionAesthetic,
+                        aestheticInflection:         session.aestheticInflection,
+                        directionInterpretationText: session.directionInterpretationText,
+                        intent:                      intentPayload,
+                      },
+                      aesthetic_matched_id:     conceptContext.aestheticMatchedId || null,
+                      is_proxy_match:           false,
+                      aesthetic_keywords:       [],
+                      saturation_score:         50,
+                      trend_velocity:           'stable',
+                      category_saturation:      50,
+                      category_velocity:        'stable',
+                      identity_score:           dynamicIdentityScore,
+                      tension_flags:            [],
+                      critic_conflict_detected: false,
+                      critic_conflict_ids:      [],
+                      critic_llm_used:          false,
+                      critic_reasoning:         '',
+                      resonance_score:          dynamicResonanceScore,
+                      execution_score:          executionScore,
+                      timeline_buffer:          timelineBuffer,
+                      cogs:                     insight?.cogs ?? 0,
+                      gate_passed:              marginGatePassed,
+                      cogs_delta:               0,
+                      final_score:              finalScore,
+                      redirect:                 null,
+                      narrative:                result.data.statements?.join('\n\n') ?? '',
+                    };
+
+                    const analysisResult: AnalysisResultOrch = {
+                      score:      finalScore,
+                      dimensions: {
+                        identity:  dynamicIdentityScore,
+                        resonance: dynamicResonanceScore,
+                        execution: executionScore,
+                      },
+                      gates_passed: { cost: marginGatePassed, sustainability: null },
+                      narrative:            bb.narrative,
+                      redirect:             null,
+                      agent_versions:       AGENT_VERSIONS,
+                      aesthetic_matched_id: bb.aesthetic_matched_id,
+                      errors:               [],
+                      analysis_id:          null,
+                    };
+
+                    const row = buildAnalysisRow(bb, analysisResult, userId);
+                    const { data: upsertData, error: upsertError } = await supabase
+                      .from('analyses')
+                      .upsert(row, { onConflict: 'id' })
+                      .select('id')
+                      .single();
+
+                    if (upsertError) {
+                      console.error('[Spec] Analysis persist failed:', upsertError);
+                    } else if (upsertData?.id) {
+                      setSavedAnalysisId(upsertData.id as string);
+                    }
+                  } catch (err) {
+                    console.error('[Spec] Analysis persist threw:', err);
+                  }
+                })();
               }
             } catch { /* ignore */ }
           }
@@ -3453,6 +3558,7 @@ export default function SpecStudioPage() {
             mukoInsight={specSynthInsightData?.statements?.[0] ?? null}
             suggestions={mukoSynthesis?.suggestions ?? []}
             onRevise={() => setShowScorecardModal(false)}
+            brandName={brandProfileName}
           />
         );
       })()}

@@ -4,7 +4,7 @@
 // Runs in parallel with /api/synthesizer/report; never blocks the main narrative.
 
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { callClaude } from '@/lib/claude/client';
 
 interface SubscoresRequest {
   aesthetic: string;
@@ -62,21 +62,12 @@ Return ONLY valid JSON, no markdown, no backticks:
   "execution": "one sentence here"
 }`;
 
-    const client = new Anthropic();
-    const response = await client.messages.create({
+    const text = (await callClaude(userPrompt, {
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
+      maxTokens: 400,
       temperature: 0.5,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
-
-    const raw = response.content[0];
-    if (!raw || raw.type !== 'text') {
-      return NextResponse.json(getFallbacks(scores));
-    }
-
-    const text = raw.text.trim();
+      systemPrompt: SYSTEM_PROMPT,
+    })).trim();
     console.log('[subscores] raw Claude response:', text);
     try {
       const cleaned = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();

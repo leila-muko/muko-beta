@@ -20,6 +20,10 @@ import type { NarrativeAestheticContext } from '@/lib/agents/synthesizer';
 export interface SpecBlackboard {
   /** Resolved aesthetic ID (e.g. "terrain-luxe") */
   aesthetic_matched_id: string;
+  /** Human-readable aesthetic name (e.g. "Terrain Luxe") */
+  aesthetic_name: string | null;
+  /** Consumer insight for the matched aesthetic */
+  aesthetic_consumer_insight: string | null;
   /** Brand DNA keywords from the designer's brief */
   brand_keywords: string[];
   /** Brand price tier (e.g. "Contemporary", "Bridge", "Luxury") */
@@ -91,11 +95,36 @@ export interface SynthesizerResult {
 
 export function determineSpecMode(
   margin_pass: boolean,
-  execution_score: number
+  execution_score: number,
+  identity_score?: number | null,
+  resonance_score?: number | null,
 ): { mode: InsightMode; editLabel: string } {
+  // Null/undefined score inputs default to 'invest' (preserves prior behavior)
+  if (execution_score == null || isNaN(execution_score)) {
+    return { mode: 'invest', editLabel: 'WHY THIS WORKS NOW' };
+  }
+
+  // amplify: margin_pass AND execution_score >= 85 AND identity_score >= 80
+  if (margin_pass && execution_score >= 85 && identity_score != null && identity_score >= 80) {
+    return { mode: 'amplify', editLabel: 'WHY THIS WORKS NOW' };
+  }
+
+  // invest: margin_pass AND execution_score >= 70
   if (margin_pass && execution_score >= 70) {
     return { mode: 'invest', editLabel: 'WHY THIS WORKS NOW' };
   }
+
+  // differentiate: margin_pass AND 50 <= execution_score < 70
+  if (margin_pass && execution_score >= 50) {
+    return { mode: 'differentiate', editLabel: 'WHY THIS WORKS NOW' };
+  }
+
+  // reconsider: NOT margin_pass AND execution_score >= 70
+  if (!margin_pass && execution_score >= 70) {
+    return { mode: 'reconsider', editLabel: 'WHY THIS WORKS NOW' };
+  }
+
+  // constrain: NOT margin_pass OR execution_score < 50
   return { mode: 'constrain', editLabel: 'WHY THIS WORKS NOW' };
 }
 
@@ -652,6 +681,21 @@ export const SPEC_SYSTEM_PROMPT = SPEC_STUDIO_PROMPT_V6_2;
 // USER MESSAGE ASSEMBLY
 // ─────────────────────────────────────────────
 
+export function buildSpecSystemPrompt(bb: SpecBlackboard): string {
+  const hasContext = bb.aesthetic_name != null && bb.identity_score != null && bb.resonance_score != null;
+  if (!hasContext) return SPEC_STUDIO_PROMPT_V6_2;
+
+  const lockedLine =
+    `Concept direction is already locked: ${bb.aesthetic_name} for ${bb.brand_name ?? 'YOUR brand'}. ` +
+    `Identity scored ${bb.identity_score}, Resonance scored ${bb.resonance_score}. ` +
+    `Do not re-evaluate the aesthetic. Evaluate whether the physical spec can successfully execute it.`;
+
+  return SPEC_STUDIO_PROMPT_V6_2.replace(
+    'Concept is locked. Do not re-evaluate aesthetic positioning.',
+    lockedLine
+  );
+}
+
 export function buildSpecPrompt(bb: SpecBlackboard): string {
   const targetMargin = bb.target_margin ?? 0.60;
   const cogsTarget = bb.target_msrp > 0 ? bb.target_msrp * (1 - targetMargin) : 0;
@@ -659,6 +703,17 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
   const bufferWeeks = bb.season_window_weeks != null
     ? bb.season_window_weeks - bb.timeline_weeks
     : null;
+
+  const conceptContext = (bb.aesthetic_name != null || bb.brand_name != null || bb.brand_keywords.length > 0)
+    ? {
+        aesthetic: bb.aesthetic_name ?? null,
+        consumer_insight: bb.aesthetic_consumer_insight ?? null,
+        identity_score: bb.identity_score ?? null,
+        resonance_score: bb.resonance_score ?? null,
+        brand_name: bb.brand_name ?? null,
+        brand_keywords: bb.brand_keywords,
+      }
+    : undefined;
 
   const raw = {
     brand: {
@@ -668,6 +723,7 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
     key_piece: bb.keyPiece
       ? `${bb.keyPiece.item} (${bb.keyPiece.type}) — signal: ${bb.keyPiece.signal}`
       : undefined,
+    concept_context: conceptContext,
     spec: {
       material_id: bb.material_id,
       material_name: bb.material_name ?? bb.material_id,
@@ -785,7 +841,12 @@ export async function generateSpecInsight(
   blackboard: SpecBlackboard
 ): Promise<SynthesizerResult> {
   const start = Date.now();
-  const { mode, editLabel } = determineSpecMode(blackboard.margin_pass, blackboard.execution_score);
+  const { mode, editLabel } = determineSpecMode(
+    blackboard.margin_pass,
+    blackboard.execution_score,
+    blackboard.identity_score,
+    blackboard.resonance_score,
+  );
 
   try {
     const client = new Anthropic();
@@ -795,7 +856,7 @@ export async function generateSpecInsight(
       model: 'claude-sonnet-4-6',
       max_tokens: 650,
       temperature: 0.35,
-      system: SPEC_STUDIO_PROMPT_V6_2,
+      system: buildSpecSystemPrompt(blackboard),
       messages: [{ role: 'user', content: userPrompt }],
     });
 

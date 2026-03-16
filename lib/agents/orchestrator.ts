@@ -28,7 +28,8 @@ import { findAestheticMatch, getResonanceScore } from '@/lib/agents/researcher';
 import type { Aesthetic } from '@/lib/agents/researcher';
 import { checkBrandAlignment } from '@/lib/agents/critic';
 import { selectRedirect } from '@/lib/agents/redirects';
-import { calculateCOGS, checkExecutionFeasibility } from '@/lib/spec-studio/calculator';
+import { calculateCOGS, checkExecutionFeasibility, applyRoleModifiers } from '@/lib/spec-studio/calculator';
+import { calculateMukoScore } from '@/lib/scoring/calculateMukoScore';
 import materialsRaw from '@/data/materials.json';
 import categoriesRaw from '@/data/categories.json';
 
@@ -55,10 +56,11 @@ export interface AnalysisInput {
   season:            string;
   collection_name:   string;
   timeline_weeks:    number;
+  lined?:            boolean;
 }
 
 export interface BrandProfile {
-  id:               string;
+  id:               string | null;
   brand_name:       string;
   keywords:         string[];
   customer_profile: string | null;
@@ -105,6 +107,8 @@ export interface AnalysisResult {
   agent_versions:     typeof AGENT_VERSIONS;
   aesthetic_matched_id: string | null;
   errors:             AgentError[];
+  /** Supabase row id set after a successful persist; null if persist failed or was skipped. */
+  analysis_id:        string | null;
 }
 
 export interface RedirectObject {
@@ -121,13 +125,14 @@ export interface AgentError {
 // ─── Internal pipeline blackboard ─────────────────────────────────────────────
 // Accumulated as each stage completes.  Passed to synthesizer at the end.
 
-interface PipelineBlackboard {
+export interface PipelineBlackboard {
   input:                AnalysisInput;
   brand:                BrandProfile;
   session:              SessionState;
 
   // Step 1 — aesthetic match
   aesthetic_matched_id: string | null;
+  is_proxy_match:       boolean;
   aesthetic_keywords:   string[];
   saturation_score:     number;
   trend_velocity:       string;
@@ -243,17 +248,85 @@ const redirects = {
 };
 
 
-// ─── Score blend ──────────────────────────────────────────────────────────────
+// ─── Row builder (exported) ───────────────────────────────────────────────────
+// Pure data transformation — no Supabase calls. Can be imported by client
+// components that handle their own DB connection.
 
-function computeFinalScore(
-  identity:    number,
-  resonance:   number,
-  execution:   number,
-  gate_passed: boolean
-): number {
-  const raw = identity * 0.35 + resonance * 0.35 + execution * 0.30;
-  const penalised = gate_passed ? raw : raw * 0.70;
-  return Math.round(penalised);
+export function buildAnalysisRow(
+  bb:     PipelineBlackboard,
+  result: AnalysisResult,
+  userId: string | null,
+): Record<string, unknown> {
+  const intent        = bb.session.intent as IntentCalibration | undefined;
+  const existingId    = (bb.session.savedAnalysisId as string | null | undefined) ?? null;
+  const parentId      = (bb.session.parentAnalysisId as string | null | undefined) ?? null;
+  const collAesthetic = (bb.session.collectionAesthetic as string | null | undefined) ?? null;
+  const aestheticInfl = (bb.session.aestheticInflection as string | null | undefined)
+    ?? (bb.session.directionInterpretationText as string | null | undefined)
+    ?? null;
+
+  const row: Record<string, unknown> = {
+    // identity
+    user_id:          userId,
+    brand_profile_id: bb.brand.id,
+
+    // collection context
+    season:          bb.input.season,
+    collection_name: bb.input.collection_name,
+    collection_role: bb.session.collectionRole ?? null,
+
+    // product specs
+    category:    bb.input.category,
+    target_msrp: bb.input.target_msrp,
+
+    // aesthetic inputs
+    aesthetic_input:      bb.input.aesthetic_input,
+    aesthetic_matched_id: result.aesthetic_matched_id,
+    collection_aesthetic: collAesthetic,
+    aesthetic_inflection: aestheticInfl,
+    mood_board_images:    [],
+
+    // material specs
+    material_id:                bb.input.material_id,
+    silhouette:                 bb.input.silhouette,
+    construction_tier:          bb.input.construction_tier,
+    construction_tier_override: false,
+    timeline_weeks:             bb.input.timeline_weeks,
+
+    // results
+    score: result.score,
+    dimensions: {
+      identity:  result.dimensions.identity,
+      resonance: result.dimensions.resonance,
+      execution: result.dimensions.execution,
+    },
+    gates_passed: {
+      cost:           result.gates_passed.cost,
+      sustainability: null,
+    },
+    narrative: result.narrative,
+    redirects: result.redirect ? [result.redirect] : [],
+
+    // versioning
+    data_version:   process.env.NEXT_PUBLIC_DATA_VERSION ?? 'unknown',
+    agent_versions: result.agent_versions,
+
+    // intent calibration
+    intent_success_goals:    intent?.primary_goals ?? [],
+    intent_tradeoff:         intent?.tradeoff ?? null,
+    intent_tension_trend:    intent?.tension_sliders?.trend_forward ?? null,
+    intent_tension_creative: intent?.tension_sliders?.creative_expression ?? null,
+    intent_tension_elevated: intent?.tension_sliders?.elevated_design ?? null,
+    intent_tension_novelty:  intent?.tension_sliders?.novelty ?? null,
+
+    // branching
+    parent_analysis_id: parentId,
+  };
+
+  // Include id only when updating an existing row — lets upsert update instead of insert
+  if (existingId) row.id = existingId;
+
+  return row;
 }
 
 // ─── Persist to Supabase ──────────────────────────────────────────────────────
@@ -265,68 +338,26 @@ async function persistAnalysis(
 ): Promise<string | null> {
   try {
     const supabase = await createClient();
-    const intent = bb.session.intent as IntentCalibration | undefined;
 
-    const row = {
-      // brand
-      brand_profile_id:    bb.brand.id,
+    // Authenticated user — required for RLS; gracefully null if unavailable
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id ?? null;
 
-      // session context
-      season:              bb.input.season,
-      collection_name:     bb.input.collection_name,
-      collection_role:     bb.session.collectionRole ?? null,
-
-      // product specs
-      category:            bb.input.category,
-      target_msrp:         bb.input.target_msrp,
-
-      // aesthetic inputs
-      aesthetic_input:     bb.input.aesthetic_input,
-      aesthetic_matched_id: result.aesthetic_matched_id,
-      mood_board_images:   [],
-
-      // material specs
-      material_id:         bb.input.material_id,
-      silhouette:          bb.input.silhouette,
-      construction_tier:   bb.input.construction_tier,
-      construction_tier_override: false,
-      timeline_weeks:      bb.input.timeline_weeks,
-
-      // results
-      score:               result.score,
-      dimensions: {
-        identity:   result.dimensions.identity,
-        resonance:  result.dimensions.resonance,
-        execution:  result.dimensions.execution,
-      },
-      gates_passed: {
-        cost:           result.gates_passed.cost,
-        sustainability: null,
-      },
-      narrative:    result.narrative,
-      redirects:    result.redirect ? [result.redirect] : [],
-
-      // versioning
-      data_version:   '1.0.0',
-      agent_versions: result.agent_versions,
-
-      // intent calibration
-      intent_goals:            intent?.primary_goals ?? [],
-      intent_tradeoff:         intent?.tradeoff ?? null,
-      intent_tension_trend:    intent?.tension_sliders?.trend_forward ?? null,
-      intent_tension_creative: intent?.tension_sliders?.creative_expression ?? null,
-      intent_tension_elevated: intent?.tension_sliders?.elevated_design ?? null,
-      intent_tension_novelty:  intent?.tension_sliders?.novelty ?? null,
-    };
+    const row = buildAnalysisRow(bb, result, userId);
 
     const { data, error } = await supabase
       .from('analyses')
-      .insert(row)
+      .upsert(row, { onConflict: 'id' })
       .select('id')
       .single();
 
     if (error) {
-      console.error('[Orchestrator] Supabase persist failed:', error.message);
+      console.error('[Orchestrator] Supabase persist failed:', {
+        code:    error.code,
+        message: error.message,
+        details: error.details,
+        hint:    error.hint,
+      });
       return null;
     }
 
@@ -369,6 +400,7 @@ export async function runAnalysis(
     session,
 
     aesthetic_matched_id: null,
+    is_proxy_match:       false,
     aesthetic_keywords:   [],
     saturation_score:     50,
     trend_velocity:       'stable',
@@ -405,6 +437,7 @@ export async function runAnalysis(
     const matchResult = findAestheticMatch(llm_matched_id, input.aesthetic_input);
     matchedAesthetic            = matchResult.matched;
     bb.aesthetic_matched_id     = matchResult.matched?.id ?? null;
+    bb.is_proxy_match           = matchResult.is_proxy;
     bb.aesthetic_keywords       = matchResult.matched?.keywords ?? [];
     bb.saturation_score         = matchResult.matched?.saturation_score ?? 50;
     bb.trend_velocity           = matchResult.matched?.trend_velocity ?? 'stable';
@@ -430,7 +463,7 @@ export async function runAnalysis(
       aesthetic_keywords: bb.aesthetic_keywords,
       aesthetic_name:     matchedAesthetic?.name ?? input.aesthetic_input,
       brand: {
-        id:                  brandProfile.id,
+        id:                  brandProfile.id ?? '',
         keywords:            brandProfile.keywords,
         tension_context:     brandProfile.tension_context,
         accepts_conflicts:   brandProfile.accepts_conflicts ?? false,
@@ -496,7 +529,7 @@ export async function runAnalysis(
         resolvedMaterial as unknown as Parameters<typeof calculateCOGS>[0],
         yardage,
         input.construction_tier,
-        false, // lined: not tracked in AnalysisInput — defaults to unlined
+        input.lined ?? false,
         input.target_msrp,
         brandProfile.target_margin,
       );
@@ -524,16 +557,27 @@ export async function runAnalysis(
   // ── Step 8: Final score ──────────────────────────────────────────────────────
   // (identity × 0.35) + (resonance × 0.35) + (execution × 0.30)
   // If gate_passed is false → multiply by 0.70, then round.
+  // Then apply collection-role modifiers if a role is set.
   try {
-    bb.final_score = computeFinalScore(
-      bb.identity_score,
-      bb.resonance_score,
-      bb.execution_score,
-      bb.gate_passed
+    const blended = calculateMukoScore(
+      {
+        identity_score:  bb.identity_score,
+        resonance_score: bb.resonance_score,
+        execution_score: bb.execution_score,
+      },
+      { margin_gate_passed: bb.gate_passed }
     );
+    bb.final_score = session.collectionRole
+      ? applyRoleModifiers(
+          blended,
+          session.collectionRole,
+          { cost: bb.gate_passed },
+          input.construction_tier
+        )
+      : blended;
   } catch (err) {
-    errors.push({ agent: 'orchestrator.computeFinalScore', message: String(err) });
-    console.error('[Orchestrator] computeFinalScore failed:', err);
+    errors.push({ agent: 'orchestrator.calculateMukoScore', message: String(err) });
+    console.error('[Orchestrator] calculateMukoScore failed:', err);
   }
 
   // ── Step 9: Redirect selection ───────────────────────────────────────────────
@@ -559,7 +603,7 @@ export async function runAnalysis(
     );
     const reportBlackboard: ReportBlackboard = {
       aesthetic_matched_id: bb.aesthetic_matched_id ?? '',
-      is_proxy_match: false,
+      is_proxy_match: bb.is_proxy_match,
       brand_keywords: brandProfile.keywords,
       identity_score: bb.identity_score,
       resonance_score: bb.resonance_score,
@@ -617,10 +661,12 @@ export async function runAnalysis(
     agent_versions:       AGENT_VERSIONS,
     aesthetic_matched_id: bb.aesthetic_matched_id,
     errors,
+    analysis_id:          null, // set below after persist
   };
 
   // ── Persist (non-fatal) ──────────────────────────────────────────────────────
-  await persistAnalysis(bb, result, errors);
+  const persistedId = await persistAnalysis(bb, result, errors);
+  result.analysis_id = persistedId;
 
   return result;
 }
