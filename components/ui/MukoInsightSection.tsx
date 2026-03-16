@@ -145,49 +145,94 @@ function ProductDecisionRail({
   const hairline: React.CSSProperties = {
     height: 1,
     background: "rgba(67,67,43,0.08)",
-    marginBottom: 16,
+    margin: "30px 0 24px",
+  };
+  const bodyText: React.CSSProperties = {
+    margin: 0,
+    fontFamily: inter,
+    fontSize: 12.5,
+    lineHeight: 1.76,
+    color: "rgba(67,67,43,0.66)",
   };
 
   return (
-    <div style={{ marginBottom: 28 }}>
+    <div style={{ marginBottom: 36 }}>
       {!productPieceRead ? (
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontFamily: sohne, fontSize: 18, fontWeight: 500, color: "#43432B", marginBottom: 8 }}>
-            Build Product Expression
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ ...zoneLabel, marginBottom: 10 }}>MUKO&apos;S INTERPRETATION</div>
+          <div style={{ fontFamily: sohne, fontSize: 19, fontWeight: 500, lineHeight: 1.32, color: "#43432B", marginBottom: 8 }}>
+            Begin with the piece carrying the clearest expression.
           </div>
-          <div style={{ fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.48)", lineHeight: 1.6 }}>
-            Select a piece to review Muko&apos;s read and role recommendation.
-          </div>
+          <p style={bodyText}>
+            Review the assortment from the piece that most clearly holds the collection DNA, then assign roles as the structure starts to emerge.
+          </p>
+          {productStructure && (
+            <>
+              <div style={hairline} />
+              <div>
+                <div style={{ ...zoneLabel, marginBottom: 14 }}>COLLECTION STRUCTURE</div>
+                <div style={{ display: "grid", gap: 12, marginBottom: (productStructure.notes ?? []).length ? 18 : 0 }}>
+                  {(["hero", "directional", "core-evolution", "volume-driver"] as CollectionRoleId[]).map((role) => {
+                    const count = productStructure.counts[role] ?? 0;
+                    return (
+                      <div key={role} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            {Array.from({ length: 4 }).map((_, index) => (
+                              <span
+                                key={index}
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: "50%",
+                                  background: index < count ? "#A8B475" : "rgba(67,67,43,0.12)",
+                                }}
+                              />
+                            ))}
+                          </div>
+                          <div style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.58)" }}>
+                            {roleToDisplayName(role)}
+                          </div>
+                        </div>
+                        <div style={{ fontFamily: sohne, fontSize: 16, color: "#43432B" }}>{count}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {(productStructure.notes ?? []).length > 0 && (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {(productStructure.notes ?? []).map((note) => (
+                      <p key={note} style={{ ...bodyText, color: "rgba(67,67,43,0.54)" }}>
+                        {note}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <>
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 28 }}>
             <div style={{ ...zoneLabel, marginBottom: 10 }}>{hasSelectedProductPiece ? "MUKO'S INTERPRETATION" : "MUKO'S READ"}</div>
             {productPieceRead.title && (
-              <div style={{ fontFamily: sohne, fontSize: 14, fontWeight: 500, lineHeight: 1.45, color: "#43432B", marginBottom: 10 }}>
+              <div style={{ fontFamily: sohne, fontSize: 21, fontWeight: 500, lineHeight: 1.24, color: "#43432B", marginBottom: 12 }}>
                 {productPieceRead.title}
               </div>
             )}
-            <div style={{ marginLeft: 24, borderLeft: "2px solid #A8B475", paddingLeft: 20 }}>
-              <p style={{ margin: 0, fontFamily: inter, fontSize: 12.5, lineHeight: 1.68, color: "rgba(67,67,43,0.66)" }}>
-                {productPieceRead.body}
-              </p>
-            </div>
+            <p style={bodyText}>{productPieceRead.body}</p>
           </div>
 
           {hasSelectedProductPiece && productStrategicImplication && (
             <>
               <div style={hairline} />
-              <div style={{ marginBottom: 20 }}>
+              <div style={{ marginBottom: 26 }}>
                 <div style={{ ...zoneLabel, marginBottom: 10 }}>STRATEGIC IMPLICATION</div>
-                <div style={{ borderRadius: 12, border: "1px solid rgba(67,67,43,0.08)", background: "rgba(255,255,255,0.72)", padding: "14px 15px" }}>
-                  <div style={{ fontFamily: inter, fontSize: 12.5, lineHeight: 1.6, color: "rgba(67,67,43,0.66)", marginBottom: 10 }}>
-                    {productStrategicImplication.summary}
-                  </div>
-                  <div style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.5)" }}>
-                    Suggested role: {productStrategicImplication.suggestedRoles.map((role) => roleToDisplayName(role)).join(" • ")}
-                  </div>
+                <div style={{ fontFamily: sohne, fontSize: 19, fontWeight: 500, lineHeight: 1.28, color: "#43432B", marginBottom: 10 }}>
+                  {productStrategicImplication.suggestedRoles.map((role) => roleToDisplayName(role)).join(" / ")}
                 </div>
+                <p style={bodyText}>{productStrategicImplication.summary}</p>
               </div>
             </>
           )}
@@ -196,31 +241,45 @@ function ProductDecisionRail({
             <>
               <div style={hairline} />
 
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ ...zoneLabel, marginBottom: 12 }}>COLLECTION STRUCTURE</div>
-                <div style={{ borderRadius: 12, border: "1px solid rgba(67,67,43,0.08)", background: "rgba(255,255,255,0.72)", padding: "14px 15px" }}>
-                  <div style={{ display: "grid", gap: 8, marginBottom: productStructure?.notes?.length ? 14 : 0 }}>
-                    {(["hero", "directional", "core-evolution", "volume-driver"] as CollectionRoleId[]).map((role) => (
-                      <div key={role} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                        <div style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.56)" }}>
-                          {roleToDisplayName(role)}
+              <div style={{ marginBottom: 26 }}>
+                <div style={{ ...zoneLabel, marginBottom: 14 }}>COLLECTION STRUCTURE</div>
+                <div style={{ display: "grid", gap: 12, marginBottom: productStructure?.notes?.length ? 18 : 0 }}>
+                  {(["hero", "directional", "core-evolution", "volume-driver"] as CollectionRoleId[]).map((role) => {
+                    const count = productStructure?.counts[role] ?? 0;
+                    return (
+                      <div key={role} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            {Array.from({ length: 4 }).map((_, index) => (
+                              <span
+                                key={index}
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: "50%",
+                                  background: index < count ? "#A8B475" : "rgba(67,67,43,0.12)",
+                                }}
+                              />
+                            ))}
+                          </div>
+                          <div style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.58)" }}>
+                            {roleToDisplayName(role)}
+                          </div>
                         </div>
-                        <div style={{ fontFamily: sohne, fontSize: 13, color: "#43432B" }}>
-                          {productStructure?.counts[role] ?? 0}
-                        </div>
+                        <div style={{ fontFamily: sohne, fontSize: 16, color: "#43432B" }}>{count}</div>
                       </div>
+                    );
+                  })}
+                </div>
+                {(productStructure?.notes ?? []).length > 0 && (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {(productStructure?.notes ?? []).map((note) => (
+                      <p key={note} style={{ ...bodyText, color: "rgba(67,67,43,0.54)" }}>
+                        {note}
+                      </p>
                     ))}
                   </div>
-                  {(productStructure?.notes ?? []).length > 0 && (
-                    <div style={{ display: "grid", gap: 8 }}>
-                      {(productStructure?.notes ?? []).map((note) => (
-                        <div key={note} style={{ fontFamily: inter, fontSize: 12, lineHeight: 1.6, color: "rgba(67,67,43,0.66)" }}>
-                          {note}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             </>
           )}
@@ -303,6 +362,10 @@ function ConceptDecisionRail({
     const match = text.match(/^[^.!?]*[.!?]/);
     return match ? match[0] : text;
   }
+  function removeFirstSentence(text: string): string {
+    const firstSentence = getFirstSentence(text);
+    return text.slice(firstSentence.length).trim();
+  }
 
   const zoneLabel: React.CSSProperties = {
     fontFamily: inter,
@@ -315,21 +378,23 @@ function ConceptDecisionRail({
   const hairline: React.CSSProperties = {
     height: 1,
     background: "rgba(67,67,43,0.08)",
-    marginBottom: 16,
+    margin: "40px 0 30px",
   };
+  const leadInsight = !isStreaming && paragraphs[0] ? getFirstSentence(paragraphs[0]).trim() : headline;
+  const leadBody = !isStreaming && paragraphs[0] ? removeFirstSentence(paragraphs[0]) : "";
 
   return (
-    <div style={{ marginBottom: 28 }}>
+    <div style={{ marginBottom: 52 }}>
       {isStreaming && (
         <style>{`@keyframes mukoCursorBlink{0%,100%{opacity:1}50%{opacity:0}}@keyframes mukoCardPulse{0%,100%{opacity:0.5}50%{opacity:0.8}}`}</style>
       )}
 
       {/* ── Zone 1 — Muko's Read ─────────────────────────────────────────── */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 34 }}>
         <div style={{ ...zoneLabel, marginBottom: 10 }}>{zoneOneLabel.toUpperCase()}</div>
 
         {/* Guidance statement */}
-        <div style={{ fontFamily: sohne, fontSize: 14, fontWeight: 500, lineHeight: 1.45, color: "#43432B" }}>
+        <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, lineHeight: 1.18, color: "#43432B", width: "100%" }}>
           {isStreaming && streamingText ? (
             <>
               {streamingText}
@@ -338,40 +403,44 @@ function ConceptDecisionRail({
           ) : isStreaming ? (
             <span style={{ opacity: 0.35, animation: "mukoCardPulse 1.2s ease-in-out infinite" }}>{headline}</span>
           ) : (
-            headline
+            leadInsight
           )}
         </div>
       </div>
 
       {/* ── Zone 2 — Insight Paragraph ───────────────────────────────────── */}
       {!isStreaming && paragraphs.length > 0 && (
-        <div style={{ marginLeft: 24, marginBottom: 20, borderLeft: "2px solid #A8B475", paddingLeft: 20 }}>
-          {paragraphs[0] && (() => {
-            const text = paragraphs[0];
-            const firstSentence = getFirstSentence(text);
-            const rest = text.slice(firstSentence.length);
-            return (
-              <p style={{ margin: 0, fontFamily: inter, fontSize: 12.5, lineHeight: 1.65, color: "rgba(67,67,43,0.65)" }}>
-                <span style={{ fontWeight: 500, color: "#43432B" }}>{firstSentence}</span>
-                {rest}
-              </p>
-            );
-          })()}
+        <div style={{ marginBottom: 32 }}>
+          {headline && headline !== leadInsight && (
+            <div style={{ marginBottom: 12, fontFamily: inter, fontSize: 11, fontWeight: 500, color: "rgba(67,67,43,0.46)", lineHeight: 1.55 }}>
+              {headline}
+            </div>
+          )}
+          {leadBody && (
+            <p style={{ margin: 0, fontFamily: inter, fontSize: 12.5, lineHeight: 1.8, color: "rgba(67,67,43,0.65)" }}>
+              {leadBody}
+            </p>
+          )}
+          {paragraphs.slice(1).map((paragraph) => (
+            <p key={paragraph} style={{ margin: "12px 0 0", fontFamily: inter, fontSize: 12.5, lineHeight: 1.8, color: "rgba(67,67,43,0.65)" }}>
+              {paragraph}
+            </p>
+          ))}
 
           {bullets.items.length > 0 && (
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 18 }}>
               <button
                 onClick={() => setAnalysisExpanded(e => !e)}
-                style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: inter, fontSize: 11, fontWeight: 600, color: "#A8B475" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: inter, fontSize: 11, fontWeight: 600, color: "#6B7A40" }}
               >
-                See full analysis
+                {analysisExpanded ? "Hide analysis" : "See analysis"}
                 <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ transform: analysisExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 180ms ease", flexShrink: 0 }}>
-                  <path d="M2 4.5L6 8L10 4.5" stroke="#A8B475" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M2 4.5L6 8L10 4.5" stroke="#6B7A40" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
 
               {analysisExpanded && (
-                <div style={{ marginTop: 10, borderTop: "1px solid rgba(67,67,43,0.08)", paddingTop: 8 }}>
+                <div style={{ marginTop: 18, borderTop: "1px solid rgba(67,67,43,0.08)", paddingTop: 14 }}>
                   {bullets.items.slice(0, 3).map((item, i) => {
                     const parsedLabel = item.match(/^(.+?)(?:[—–]|\s{2,})/)?.[1]?.trim();
                     const label = parsedLabel ?? ANALYSIS_LABELS[i] ?? "";
@@ -397,22 +466,21 @@ function ConceptDecisionRail({
       {showExecutionGuidance && executionGuidance.length > 0 && (
         <>
           <div style={hairline} />
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ marginBottom: 34 }}>
+            <div style={{ ...zoneLabel, marginBottom: 12 }}>EXECUTION READ</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {executionGuidance.map((item) => (
                 <div
                   key={`${item.title}-${item.description}`}
                   style={{
-                    borderRadius: 10,
-                    border: "1px solid rgba(67,67,43,0.08)",
-                    background: "rgba(255,255,255,0.7)",
-                    padding: "12px 13px",
+                    paddingBottom: 12,
+                    borderBottom: "1px solid rgba(67,67,43,0.08)",
                   }}
                 >
-                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "#B8876B", marginBottom: 5 }}>
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "#B8876B", marginBottom: 6 }}>
                     {item.title}
                   </div>
-                  <div style={{ fontFamily: inter, fontSize: 12, lineHeight: 1.6, color: "rgba(67,67,43,0.68)" }}>
+                  <div style={{ fontFamily: inter, fontSize: 12.5, lineHeight: 1.74, color: "rgba(67,67,43,0.68)" }}>
                     {item.description}
                   </div>
                 </div>

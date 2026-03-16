@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import type { ActivatedChip } from "@/lib/store/sessionStore";
 import type {
@@ -24,20 +25,17 @@ import materialsData from "@/data/materials.json";
 import subcategoriesData from "@/data/subcategories.json";
 import aestheticsData from "@/data/aesthetics.json";
 import designLanguageData from "@/data/design-language.json";
+import materialConstructionImplications from "@/data/material_construction_implications.json";
 import FloatingMukoOrb from "@/components/FloatingMukoOrb";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
-import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
 import { PulseScoreRow } from "@/components/ui/PulseScoreRow";
-import { MukoInsightSection } from "@/components/ui/MukoInsightSection";
-import { PulseChip } from "@/components/ui/PulseChip";
 import type { PulseChipProps } from "@/components/ui/PulseChip";
-import { InsightPanel } from "@/components/ui/InsightPanel";
-import { SuggestionCard } from "@/components/ui/SuggestionCard";
 import type { InsightData, SpecInsightMode } from "@/lib/types/insight";
 import { buildSpecBlackboard } from "@/lib/synthesizer/assemble";
 import { createClient } from "@/lib/supabase/client";
 import type { SpecSuggestion } from "@/lib/types/next-move";
 import { ScorecardModal } from "@/components/spec-studio/ScorecardModal";
+import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
 
 /* ─── Icons: matched to Concept Studio (star, users, cog) ─── */
 function IconIdentity({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
@@ -106,11 +104,9 @@ const BRAND = {
 const CHARTREUSE = "#A8B475";
 const STEEL = "#7D96AC";
 const OLIVE = "#43432B";
-const ROSE = "#A97B8F";
-const CAMEL_COL = "#B8876B";
 const PULSE_GREEN = "#4D7A56";
-const PULSE_YELLOW = "#9B7A3A";
 const PULSE_RED = "#8A3A3A";
+const PULSE_YELLOW = "#B8876B";
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
 
@@ -136,33 +132,7 @@ function IconExecution({ size = 16, color = "currentColor" }: { size?: number; c
   );
 }
 
-const MATERIAL_ICONS: Record<string, string> = {
-  "organic-cotton": "○",
-  tencel: "◎",
-  linen: "▽",
-  "recycled-poly": "◇",
-  "cotton-twill": "□",
-  modal: "◈",
-  wool: "●",
-  "merino-wool": "◉",
-  silk: "✦",
-  "silk-blend": "✧",
-  denim: "▪",
-  leather: "◆",
-  "vegan-leather": "◇",
-  cashmere: "✧",
-  nylon: "△",
-};
-
 /* ─── Reusable styles ─── */
-const scoreTextStyle: React.CSSProperties = {
-  fontSize: 12,
-  fontWeight: 650,
-  color: "rgba(67, 67, 43, 0.62)",
-  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-};
-
-
 const sectionHeading: React.CSSProperties = {
   fontSize: 18,
   fontWeight: 650,
@@ -209,18 +179,18 @@ const COMPLEXITY_CONTEXT: Record<
 > = {
   low: {
     label: "Low",
-    description: "Clean build, minimal detailing",
-    note: "Simple seaming, no hardware",
+    description: "Clean build with minimal seam complexity.",
+    note: "Stable for cost and production timelines.",
   },
   moderate: {
     label: "Moderate",
-    description: "Standard seaming + some detail",
-    note: "Category standard",
+    description: "Balanced seam work and detailing.",
+    note: "Maintains design clarity while preserving production flexibility.",
   },
   high: {
     label: "High",
-    description: "Tailoring, hardware, structural detail",
-    note: "Complex construction",
+    description: "Elevated construction with structural detail.",
+    note: "Increases sampling sensitivity and production complexity.",
   },
 };
 
@@ -518,7 +488,11 @@ function getSpecInsightData(
 
 /* ─── Design Language helpers ─── */
 function chipToKey(label: string): string {
-  return label.toLowerCase().replace(/\s+/g, "-").replace(/[\/&]/g, "-");
+  return label
+    .toLowerCase()
+    .replace(/\s*&\s*/g, "-and-")
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
 }
 
 interface DesignLanguageSuggestion {
@@ -553,6 +527,15 @@ function getDesignLanguageSuggestions(
 function getFirstSentence(text: string): string {
   const match = text.match(/^[^.!?]*[.!?]/);
   return match ? match[0] : text;
+}
+
+function getCompactGuidance(text: string): string {
+  const firstSentence = getFirstSentence(text).replace(/[.!?]\s*$/, "");
+  return firstSentence
+    .replace(/^For\s+[^,]+,\s*/i, "")
+    .replace(/^To\s+[^,]+,\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function parseCostBadge(costNote: string): { label: string; variant: 'neutral' | 'added' } {
@@ -601,8 +584,224 @@ function RemoveSignalButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+function formatConceptPhrase(value: string | null | undefined) {
+  if (!value) return null;
+  return value
+    .replace(/[_-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildConstructionImplication(options: {
+  materialName: string;
+  constructionTier: "low" | "moderate" | "high";
+  topChips: string[];
+  complexityChipCount: number;
+  leadTimeWeeks: number;
+  deliveryWindowWeeks: number;
+}): string {
+  const { materialName, constructionTier, topChips, complexityChipCount, leadTimeWeeks, deliveryWindowWeeks } = options;
+  const chipText = topChips.length > 0
+    ? `${topChips.slice(0, 2).join(" and ")} stay legible`
+    : "the design language stays legible";
+  const buffer = deliveryWindowWeeks - leadTimeWeeks;
+  const timeNote = buffer >= 4
+    ? `${leadTimeWeeks}-week lead time leaves a ${buffer}-week development buffer.`
+    : buffer >= 0
+    ? `${leadTimeWeeks}-week lead time is workable but leaves no room for sampling revision.`
+    : `${leadTimeWeeks}-week lead time exceeds the ${deliveryWindowWeeks}-week delivery window — this needs immediate action.`;
+  const chipPressure = complexityChipCount >= 3
+    ? ` ${complexityChipCount} active signals are adding construction demand.`
+    : complexityChipCount === 2
+    ? ` 2 active signals are pushing complexity upward.`
+    : complexityChipCount === 1
+    ? ` 1 active signal is adding construction demand.`
+    : "";
+
+  if (constructionTier === "low") {
+    return `Low construction keeps ${materialName} costs and timelines stable.${chipPressure ? ` Note:${chipPressure}` : ""} ${chipText} at this complexity tier without forcing unnecessary production strain. ${timeNote}`;
+  }
+  if (constructionTier === "moderate") {
+    return `Moderate construction introduces structured seam work with ${materialName}.${chipPressure ? `${chipPressure}` : ""} Assembly demand is present but stays within a workable production window — ${chipText} without overcommitting the build. ${timeNote}`;
+  }
+  return `High construction pushes ${materialName} into hero-piece territory.${chipPressure ? `${chipPressure}` : ""} Structured seam work and finishing intensity become part of the build expectation — ${chipText} but production feasibility becomes an active decision. ${timeNote}`;
+}
+
+function getConstructionImplicationCopy(options: {
+  tier: ConstructionTier | null;
+  material: Material | null;
+  silhouette: string | null;
+  timelineStatus: "green" | "yellow" | "red" | null;
+  selectedSignals: string[];
+}) {
+  const { tier, material, silhouette, timelineStatus, selectedSignals } = options;
+  if (!tier) return null;
+
+  const silhouetteText = silhouette ? `${silhouette.toLowerCase()} silhouette` : "piece language";
+  const signalLead = selectedSignals.length > 0
+    ? `${selectedSignals.slice(0, 2).join(" and ")}`
+    : "the concept language";
+
+  if (tier === "low") {
+    return `Low construction keeps seam work disciplined and finishing demand minimal. That protects assembly speed and cost control, but it leaves ${signalLead} carrying most of the definition in the ${silhouetteText}.`;
+  }
+
+  if (tier === "high") {
+    const hardwareLine = material?.id === "leather" || material?.id === "vegan-leather"
+      ? "Hardware and reinforced finishing become part of the build expectation"
+      : "Structured seam work and finishing detail become part of the build expectation";
+    const feasibilityLine = timelineStatus === "red"
+      ? "and the current delivery window is unlikely to absorb that assembly load cleanly."
+      : timelineStatus === "yellow"
+        ? "and the current delivery window leaves limited recovery room if sampling slips."
+        : "while still remaining viable if approvals stay tight.";
+    return `High construction pushes seam complexity and finishing intensity into hero-piece territory. ${hardwareLine}, ${feasibilityLine} This sharpens ${signalLead} but turns production feasibility into an active decision, not a background assumption.`;
+  }
+
+  const materialLine = material?.id === "deadstock-fabric"
+    ? "Deadstock keeps the calendar fast, but it reduces reorder flexibility and raises the importance of early commitment."
+    : material
+      ? `${material.name} can support this level without forcing unnecessary construction inflation.`
+      : "This level keeps the build balanced across craft and feasibility.";
+  const timelineLine = timelineStatus === "red"
+    ? "The current delivery window is under pressure, so moderation is doing real protective work."
+    : timelineStatus === "yellow"
+      ? "Assembly demand stays present, but still within a workable production window."
+      : "Assembly demand stays intentional without pushing the piece beyond the current delivery window.";
+
+  return `Moderate construction introduces structured seam work and light finishing demand. ${materialLine} ${timelineLine} It keeps ${signalLead} legible in the ${silhouetteText} without overcommitting the build.`;
+}
+
+function PieceFlatPreview({
+  pieceType,
+  signal,
+}: {
+  pieceType: string | null | undefined;
+  signal?: string | null;
+}) {
+  const normalizedType = pieceType?.toLowerCase() ?? "";
+  const isTailored = /blazer|jacket|coat|trench|outerwear|parka|cape/.test(normalizedType);
+  const isDress = /dress|slip|column/.test(normalizedType);
+  const isBottom = /pant|trouser|skirt/.test(normalizedType);
+  const isSoftTop = /blouse|shirt|top|tunic|tank|cardigan|sweater|vest/.test(normalizedType);
+
+  const fill = signal === "high-volume"
+    ? "#C5BAAB"
+    : signal === "emerging"
+      ? "#C7CDC3"
+      : "#D4CCC0";
+
+  return (
+    <div
+      style={{
+        height: 238,
+        borderRadius: 28,
+        background: "radial-gradient(circle at 50% 18%, rgba(255,255,255,0.94) 0%, rgba(245,242,235,0.92) 42%, rgba(237,232,223,0.82) 100%)",
+        border: "1px solid rgba(67,67,43,0.06)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        position: "relative",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.78)",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: "auto 20% 18px",
+          height: 28,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(67,67,43,0.14) 0%, rgba(67,67,43,0.06) 48%, rgba(67,67,43,0) 76%)",
+          filter: "blur(10px)",
+        }}
+      />
+      <svg width="164" height="200" viewBox="0 0 164 200" fill="none" aria-hidden style={{ position: "relative", zIndex: 1 }}>
+        <defs>
+          <linearGradient id="specGarmentFill" x1="82" y1="20" x2="82" y2="186" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#EEE7DD" />
+            <stop offset="1" stopColor={fill} />
+          </linearGradient>
+          <linearGradient id="specGarmentShade" x1="44" y1="42" x2="126" y2="182" gradientUnits="userSpaceOnUse">
+            <stop stopColor="rgba(255,255,255,0.42)" />
+            <stop offset="1" stopColor="rgba(67,67,43,0.08)" />
+          </linearGradient>
+        </defs>
+
+        {isTailored && (
+          <>
+            <path d="M49 42C57 31 68 24 82 24C96 24 107 31 115 42L130 58L124 176C123 182 118 186 111 186H53C46 186 41 182 40 176L34 58L49 42Z" fill="url(#specGarmentFill)" />
+            <path d="M62 38C68 31 75 28 82 28C89 28 96 31 102 38L97 60C92 56 87 54 82 54C77 54 72 56 67 60L62 38Z" fill="rgba(255,255,255,0.42)" />
+            <path d="M49 44L25 61L30 122L43 120L48 84L49 44Z" fill="url(#specGarmentFill)" />
+            <path d="M115 44L139 61L134 122L121 120L116 84L115 44Z" fill="url(#specGarmentFill)" />
+            <path d="M59 41C65 34 73 31 82 31C91 31 99 34 105 41" stroke="rgba(67,67,43,0.18)" strokeWidth="1.25" strokeLinecap="round" />
+            <path d="M82 63V186" stroke="rgba(67,67,43,0.10)" strokeWidth="1.25" strokeLinecap="round" />
+            <path d="M44 42C54 33 66 28 82 28C98 28 110 33 120 42" stroke="rgba(67,67,43,0.22)" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M34 58L40 176C41 182 46 186 53 186H111C118 186 123 182 124 176L130 58" stroke="rgba(67,67,43,0.18)" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M49 44L25 61L30 122" stroke="rgba(67,67,43,0.16)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M115 44L139 61L134 122" stroke="rgba(67,67,43,0.16)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M54 140C71 145 93 145 110 140" stroke="rgba(255,255,255,0.26)" strokeWidth="10" strokeLinecap="round" />
+          </>
+        )}
+
+        {isDress && (
+          <>
+            <path d="M60 29C67 25 74 23 82 23C90 23 97 25 104 29L119 48L130 179C116 184 100 187 82 187C64 187 48 184 34 179L45 48L60 29Z" fill="url(#specGarmentFill)" />
+            <path d="M62 30C66 36 73 40 82 40C91 40 98 36 102 30" stroke="rgba(67,67,43,0.16)" strokeWidth="1.25" strokeLinecap="round" />
+            <path d="M45 48L30 75L35 123" stroke="rgba(67,67,43,0.14)" strokeWidth="1.15" strokeLinecap="round" />
+            <path d="M119 48L134 75L129 123" stroke="rgba(67,67,43,0.14)" strokeWidth="1.15" strokeLinecap="round" />
+            <path d="M60 29C67 25 74 23 82 23C90 23 97 25 104 29L119 48L130 179C116 184 100 187 82 187C64 187 48 184 34 179L45 48L60 29Z" stroke="rgba(67,67,43,0.18)" strokeWidth="1.35" strokeLinejoin="round" />
+          </>
+        )}
+
+        {isBottom && (
+          <>
+            <path d="M52 28H112L123 184H90L83 92L74 184H41L52 28Z" fill="url(#specGarmentFill)" />
+            <path d="M60 28C66 24 73 22 82 22C91 22 98 24 104 28" stroke="rgba(67,67,43,0.16)" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M82 54L83 92" stroke="rgba(67,67,43,0.10)" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M52 28H112L123 184H90L83 92L74 184H41L52 28Z" stroke="rgba(67,67,43,0.18)" strokeWidth="1.35" strokeLinejoin="round" />
+          </>
+        )}
+
+        {isSoftTop && (
+          <>
+            <path d="M54 34C62 27 71 23 82 23C93 23 102 27 110 34L122 49L116 158C115 165 110 170 103 170H61C54 170 49 165 48 158L42 49L54 34Z" fill="url(#specGarmentFill)" />
+            <path d="M54 36L31 53L34 111L46 109L51 72L54 36Z" fill="url(#specGarmentFill)" />
+            <path d="M110 36L133 53L130 111L118 109L113 72L110 36Z" fill="url(#specGarmentFill)" />
+            <path d="M62 34C68 29 75 27 82 27C89 27 96 29 102 34" stroke="rgba(67,67,43,0.14)" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M54 34C62 27 71 23 82 23C93 23 102 27 110 34L122 49L116 158C115 165 110 170 103 170H61C54 170 49 165 48 158L42 49L54 34Z" stroke="rgba(67,67,43,0.18)" strokeWidth="1.35" strokeLinejoin="round" />
+          </>
+        )}
+
+        {!isTailored && !isDress && !isBottom && !isSoftTop && (
+          <>
+            <path d="M50 34C58 27 69 23 82 23C95 23 106 27 114 34L127 52L121 171C120 178 115 183 108 183H56C49 183 44 178 43 171L37 52L50 34Z" fill="url(#specGarmentFill)" />
+            <path d="M50 34L28 50L31 114L44 111L49 74L50 34Z" fill="url(#specGarmentFill)" />
+            <path d="M114 34L136 50L133 114L120 111L115 74L114 34Z" fill="url(#specGarmentFill)" />
+            <path d="M50 34C58 27 69 23 82 23C95 23 106 27 114 34L127 52L121 171C120 178 115 183 108 183H56C49 183 44 178 43 171L37 52L50 34Z" stroke="rgba(67,67,43,0.18)" strokeWidth="1.35" strokeLinejoin="round" />
+          </>
+        )}
+
+        <path d="M52 34C64 28 75 25 82 25C89 25 100 28 112 34" stroke="rgba(255,255,255,0.36)" strokeWidth="6" strokeLinecap="round" />
+      </svg>
+    </div>
+  );
+}
+
+function getMaterialConstructionImplication(
+  materialId: string | null | undefined,
+  constructionTier: string | null | undefined
+): string | null {
+  if (!materialId || !constructionTier) return null;
+  const tierKey = constructionTier.toLowerCase() as "low" | "moderate" | "high";
+  const entry = (materialConstructionImplications as Record<string, Record<string, string>>)[materialId];
+  return entry?.[tierKey] ?? null;
+}
+
 export default function SpecStudioPage() {
   const router = useRouter();
+  const previousMaterialIdRef = useRef<string | null>(null);
+  const materialDeltaTimeoutRef = useRef<number | null>(null);
   const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setParentAnalysisId } = useSessionStore();
   const categories: Category[] = categoriesData.categories as unknown as Category[];
   const materials: Material[] = materialsData as unknown as Material[];
@@ -653,9 +852,32 @@ export default function SpecStudioPage() {
   const [materialCategory, setMaterialCategory] = useState<string>("all");
   const [hoveredComplexity, setHoveredComplexity] = useState<ConstructionTier | null>(null);
   const [pulseExpandedRow, setPulseExpandedRow] = useState<string | null>(null);
-  const [dismissingChips, setDismissingChips] = useState<Set<string>>(new Set());
-  const [expandedSignal, setExpandedSignal] = useState<string | null>(null);
-  const [removedSignals, setRemovedSignals] = useState<import("@/lib/store/sessionStore").ActivatedChip[]>([]);
+  const [constructionConfirmed, setConstructionConfirmed] = useState(false);
+  const [showAllMaterials, setShowAllMaterials] = useState(false);
+  const [specAnalysisExpanded, setSpecAnalysisExpanded] = useState(false);
+  const [specStep, setSpecStep] = useState<"material" | "construction">("material");
+  const [specStepDirection, setSpecStepDirection] = useState<1 | -1>(1);
+  const [materialSelectionDelta, setMaterialSelectionDelta] = useState<{
+    cogs: number;
+    leadTime: number;
+  } | null>(null);
+
+  const stageTransitionProps = {
+    initial: (direction: 1 | -1) => ({ opacity: 0, y: direction > 0 ? 24 : -18 }),
+    animate: { opacity: 1, y: 0 },
+    exit: (direction: 1 | -1) => ({ opacity: 0, y: direction > 0 ? -20 : 18 }),
+    transition: { duration: 0.28, ease: [0.22, 0.8, 0.2, 1] },
+  };
+
+  const advanceToConstruction = useCallback(() => {
+    setSpecStepDirection(1);
+    setSpecStep("construction");
+  }, []);
+
+  const backToMaterial = useCallback(() => {
+    setSpecStepDirection(-1);
+    setSpecStep("material");
+  }, []);
 
   const storeAesthetic = useSessionStore((s) => s.aestheticMatchedId);
   const storeModifiers = useSessionStore((s) => s.refinementModifiers);
@@ -742,6 +964,22 @@ export default function SpecStudioPage() {
     () => categorySubcategories.find((s) => s.id === subcategoryId) || null,
     [subcategoryId, categorySubcategories]
   );
+  const pieceAnchorName = useMemo(() => {
+    if (selectedKeyPiece?.item) return selectedKeyPiece.item;
+    if (selectedSubcategory?.name) return selectedSubcategory.name;
+    return selectedCategory.name;
+  }, [selectedKeyPiece, selectedSubcategory, selectedCategory]);
+  const pieceTypeForFlat = useMemo(
+    () => selectedKeyPiece?.type || selectedSubcategory?.id || categoryId,
+    [selectedKeyPiece, selectedSubcategory, categoryId]
+  );
+  const piecePaletteName = useMemo(() => {
+    if (!conceptPalette) return null;
+    const entry = (aestheticsData as unknown as Array<{ id: string; palette_options?: Array<{ id: string; name: string }> }>).find(
+      (a) => a.id === conceptContext.aestheticMatchedId
+    );
+    return entry?.palette_options?.find((p) => p.id === conceptPalette)?.name ?? conceptPalette;
+  }, [conceptPalette, conceptContext.aestheticMatchedId]);
   // Compute yardage from subcategory base_yardage + silhouette modifier (falls back to category base)
   const conceptYardage = useMemo(() => {
     const base = selectedSubcategory
@@ -750,6 +988,11 @@ export default function SpecStudioPage() {
     const mod = SILHOUETTE_YARDAGE_MODIFIERS[conceptSilhouette] ?? 0;
     return Math.round((base + mod) * 10) / 10;
   }, [categoryId, conceptSilhouette, selectedSubcategory]);
+  const formattedSilhouette = useMemo(
+    () => formatConceptPhrase(conceptSilhouette),
+    [conceptSilhouette]
+  );
+
 
   const hasUserSelection = userManuallySelected && (materialId !== "" || constructionTier !== null);
 
@@ -906,6 +1149,7 @@ export default function SpecStudioPage() {
     setSubcategoryId(""); // reset type when category changes
     setStoreSubcategory("");
     setConstructionTier(getSmartDefault(newId, conceptSilhouette || undefined));
+    setConstructionConfirmed(false);
     setOverrideWarning(null);
     setUserManuallySelected(false);
   };
@@ -918,13 +1162,21 @@ export default function SpecStudioPage() {
     if (sub) {
       const smartTier = getSmartDefault(categoryId, conceptSilhouette || undefined, sub.complexity_affinity as 'low' | 'moderate' | 'high');
       setConstructionTier(smartTier);
+      setConstructionConfirmed(false);
       setOverrideWarning(null);
     }
+  };
+
+  const handleMaterialSelection = (nextMaterialId: string) => {
+    setMaterialId(nextMaterialId);
+    setUserManuallySelected(true);
+    setConstructionConfirmed(false);
   };
 
   const handleComplexityChange = (tier: ConstructionTier) => {
     setConstructionTier(tier);
     setUserManuallySelected(true);
+    setConstructionConfirmed(true);
     setOverrideWarning(
       getOverrideWarning(
         categoryId,
@@ -941,37 +1193,34 @@ export default function SpecStudioPage() {
     const aestheticId = storeAesthetic.toLowerCase().replace(/\s+/g, "-");
     return getDesignLanguageSuggestions(aestheticId, activeChips, categoryId);
   }, [chipSelection, storeAesthetic, categoryId]);
+  const buildInsightContent = useMemo(() => {
+    if (activeImplications.length === 0) return null;
+    const primary = activeImplications[0];
+    const secondary = activeImplications[1] ?? null;
+    const primaryGuidance = getCompactGuidance(primary.detail).replace(/[.!?]\s*$/, "");
+    const secondaryGuidance = secondary ? getCompactGuidance(secondary.detail).replace(/[.!?]\s*$/, "") : null;
+    const primaryRisk = parseRiskLevel(primary.complexity_flag);
+    const primaryCost = parseCostBadge(primary.cost_note);
 
-  const removeChipSignal = (chipLabel: string) => {
-    if (expandedSignal === chipLabel) setExpandedSignal(null);
-    setDismissingChips(prev => new Set(prev).add(chipLabel));
-    setTimeout(() => {
-      if (chipSelection) {
-        const removed = chipSelection.activatedChips.find(c => c.label === chipLabel);
-        if (removed) setRemovedSignals(prev => [...prev, removed]);
-        setChipSelection({
-          ...chipSelection,
-          activatedChips: chipSelection.activatedChips.filter(c => c.label !== chipLabel),
-        });
-      }
-      setDismissingChips(prev => {
-        const next = new Set(prev);
-        next.delete(chipLabel);
-        return next;
-      });
-    }, 250);
-  };
+    const signalLead = secondary
+      ? `${primary.chip} and ${secondary.chip} push this piece toward higher construction complexity.`
+      : `${primary.chip.charAt(0).toUpperCase() + primary.chip.slice(1)} pushes this piece toward higher construction complexity.`;
 
-  const restoreAllSignals = () => {
-    if (!chipSelection || removedSignals.length === 0) return;
-    const existing = new Set(chipSelection.activatedChips.map(c => c.label));
-    const toRestore = removedSignals.filter(c => !existing.has(c.label));
-    setChipSelection({
-      ...chipSelection,
-      activatedChips: [...chipSelection.activatedChips, ...toRestore],
-    });
-    setRemovedSignals([]);
-  };
+    const text = [signalLead, `${primaryGuidance}.`, secondaryGuidance ? `${secondaryGuidance}.` : null]
+      .filter(Boolean)
+      .join(" ");
+    const parts = text.match(/[^.!?]+[.!?]?/g)?.map((part) => part.trim()).filter(Boolean) ?? [text];
+    const lead = parts[0] ?? text;
+    const body = parts.slice(1).join(" ").trim();
+
+    const tags = [
+      primaryCost.label,
+      `${primaryRisk} production risk`,
+      timelineStatus === "red" ? "Timeline risk" : timelineStatus === "yellow" ? "Tight timeline" : null,
+    ].filter(Boolean) as string[];
+
+    return { text, lead, body, tags };
+  }, [activeImplications, timelineStatus]);
 
   const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
   const [undoStack, setUndoStack] = useState<Map<string, () => void>>(new Map());
@@ -983,6 +1232,10 @@ export default function SpecStudioPage() {
     setAppliedSuggestions(new Set());
     setUndoStack(new Map());
   }, [materialId, constructionTier]);
+
+  useEffect(() => {
+    setSpecAnalysisExpanded(false);
+  }, [materialId]);
 
   const applySuggestion = (id: string, suggestions: SpecSuggestion[]) => {
     const suggestion = suggestions.find((s) => s.id === id);
@@ -1027,10 +1280,57 @@ export default function SpecStudioPage() {
     return base;
   }, [categoryId, conceptSilhouette, chipSelection, selectedSubcategory]);
 
+  useEffect(() => {
+    const previousMaterialId = previousMaterialIdRef.current;
+    previousMaterialIdRef.current = materialId || null;
+
+    if (!previousMaterialId || !materialId || previousMaterialId === materialId) {
+      return;
+    }
+
+    const previousMaterial = materials.find((material) => material.id === previousMaterialId);
+    const nextMaterial = materials.find((material) => material.id === materialId);
+    const comparisonTier = constructionTier ?? baselineComplexity ?? "moderate";
+
+    if (!previousMaterial || !nextMaterial) return;
+
+    const previousBreakdown = calculateCOGS(
+      previousMaterial,
+      conceptYardage,
+      comparisonTier,
+      false,
+      targetMSRP,
+      brandTargetMargin
+    );
+    const nextBreakdown = calculateCOGS(
+      nextMaterial,
+      conceptYardage,
+      comparisonTier,
+      false,
+      targetMSRP,
+      brandTargetMargin
+    );
+
+    setMaterialSelectionDelta({
+      cogs: Math.round(nextBreakdown.totalCOGS - previousBreakdown.totalCOGS),
+      leadTime: (nextMaterial.lead_time_weeks ?? 0) - (previousMaterial.lead_time_weeks ?? 0),
+    });
+
+    if (materialDeltaTimeoutRef.current) {
+      window.clearTimeout(materialDeltaTimeoutRef.current);
+    }
+
+    materialDeltaTimeoutRef.current = window.setTimeout(() => {
+      setMaterialSelectionDelta(null);
+      materialDeltaTimeoutRef.current = null;
+    }, 1800);
+  }, [materialId, materials, constructionTier, baselineComplexity, conceptYardage, targetMSRP, brandTargetMargin]);
+
   const baselineMaterial = useMemo(() => {
     const id = recommendedMaterialId || materialId || "";
     return materials.find((m) => m.id === id) || null;
   }, [materials, recommendedMaterialId, materialId]);
+  const selectedMaterialIsRecommended = materialId === recommendedMaterialId;
 
   // Set step indicator and pre-select Muko's recommended values on first mount
   useEffect(() => { setCurrentStep(3); }, [setCurrentStep]);
@@ -1061,6 +1361,8 @@ export default function SpecStudioPage() {
 
   // Auto-populate from selected key piece when it changes
   useEffect(() => {
+    setSpecStep("material");
+    setSpecStepDirection(1);
     if (selectedKeyPiece && !selectedKeyPiece.custom) {
       if (selectedKeyPiece.category) {
         const matchedCat = categories.find(
@@ -1309,6 +1611,7 @@ export default function SpecStudioPage() {
   const [specInsightLoading, setSpecInsightLoading] = useState(false);
   const [specStreamingText, setSpecStreamingText] = useState('');
 
+
   useEffect(() => {
     if (!userManuallySelected || !materialId || !conceptContext.aestheticMatchedId) return;
 
@@ -1444,6 +1747,7 @@ export default function SpecStudioPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [materialId, constructionTier, categoryId, targetMSRP, userManuallySelected]);
 
+
   // ─── Fix #1: Write execution state to store so report page gets real data ──
   useEffect(() => {
     if (!executionStatus) return;
@@ -1453,6 +1757,11 @@ export default function SpecStudioPage() {
       message: executionChipData?.consequence ?? '',
     });
   }, [executionStatus, executionScore, executionChipData?.consequence]);
+  useEffect(() => () => {
+    if (materialDeltaTimeoutRef.current) {
+      window.clearTimeout(materialDeltaTimeoutRef.current);
+    }
+  }, []);
   // ──────────────────────────────────────────────────────────────────────────
 
   const selectedImpact: Deltas = useMemo(() => {
@@ -1788,6 +2097,157 @@ export default function SpecStudioPage() {
     return qs.slice(0, 3);
   }, [insight, selectedMaterial, constructionTier]);
 
+  const displayConstruction = constructionConfirmed && constructionTier
+    ? CONSTRUCTION_INFO[constructionTier].label
+    : "—";
+  const displayLeadTime = selectedMaterial ? `${selectedMaterial.lead_time_weeks} weeks` : "—";
+  const displayEstimatedCogs = insight ? `$${insight.cogs}` : "—";
+  const marginBuffer = insight ? insight.ceiling - insight.cogs : null;
+  const hasMaterialSelection = Boolean(selectedMaterial);
+  const hasConstructionSelection = Boolean(selectedMaterial && constructionConfirmed && constructionTier);
+  const showInterpretationLayer = hasConstructionSelection;
+  const activeSignalLabels = useMemo(
+    () => (chipSelection?.activatedChips ?? []).map((chip) => chip.label),
+    [chipSelection]
+  );
+  const constructionImplication = useMemo(
+    () =>
+      getConstructionImplicationCopy({
+        tier: constructionConfirmed ? constructionTier : null,
+        material: selectedMaterial,
+        silhouette: formattedSilhouette,
+        timelineStatus,
+        selectedSignals: activeSignalLabels,
+      }),
+    [constructionConfirmed, constructionTier, selectedMaterial, formattedSilhouette, timelineStatus, activeSignalLabels]
+  );
+  const structuredReadouts = useMemo(() => {
+    const trendWindow = selectedKeyPiece?.signal === "ascending"
+      ? "Anti-fit tailoring still has forward movement, but speed matters more than novelty now."
+      : selectedKeyPiece?.signal === "high-volume"
+        ? "The market already understands this shape, so execution quality is the differentiator."
+        : "The concept still has room, but weak delivery timing will compress the opportunity quickly.";
+
+    return [
+      {
+        label: "Execution Risk",
+        body: !selectedMaterial
+          ? "Material selection unlocks the real execution read on delivery and feasibility."
+          : timelineStatus === "red"
+            ? `${selectedMaterial.lead_time_weeks}-week lead time is the binding constraint against the current delivery window.`
+            : timelineStatus === "yellow"
+              ? `${selectedMaterial.lead_time_weeks}-week lead time is workable, but development drift will use the remaining buffer quickly.`
+              : `${selectedMaterial.lead_time_weeks}-week lead time keeps the delivery window intact if approvals stay disciplined.`,
+      },
+      {
+        label: "Margin Buffer",
+        body: marginBuffer == null
+          ? `Margin ceiling is $${marginCeiling} once the build is defined.`
+          : marginBuffer < 0
+            ? `$${Math.abs(marginBuffer)} over the margin ceiling, so the current build has no recovery room without adjustment.`
+            : marginBuffer === 0
+              ? "At the ceiling now, so any added complexity needs a compensating trade-off elsewhere."
+              : `$${marginBuffer} of headroom absorbs one measured iteration, but not repeated development drift.`,
+      },
+      {
+        label: "Production Sensitivity",
+        body: constructionImplication ?? "Construction selection will determine how much sampling sensitivity and QA intensity the piece can absorb.",
+      },
+      {
+        label: "Trend Window",
+        body: trendWindow,
+      },
+    ];
+  }, [selectedMaterial, timelineStatus, marginBuffer, marginCeiling, constructionImplication, selectedKeyPiece]);
+
+  const displayExecutionStatus = executionChipData?.status ?? "Pending";
+  const displayCogs = insight ? `$${insight.cogs}` : "—";
+  const executionSubLabel = selectedMaterial
+    ? [
+        timelineStatus === "red"
+          ? "Timeline Risk"
+          : timelineStatus === "yellow"
+            ? "Timeline Tight"
+            : "Timeline Stable",
+        `Score ${executionScore}`,
+        `COGS ${displayCogs}`,
+      ].join(" · ")
+    : "Select a material to activate execution.";
+
+  const stageSummaries = useMemo(() => ({
+    "material-reality": selectedMaterial?.name ?? "Choose material",
+    "construction-discipline": constructionConfirmed && constructionTier
+      ? CONSTRUCTION_INFO[constructionTier].label
+      : "Choose construction",
+  }), [selectedMaterial, constructionConfirmed, constructionTier]);
+
+  const buildOutcomeRows = useMemo(() => [
+    { label: "Material", value: selectedMaterial?.name ?? "—" },
+    { label: "Construction", value: displayConstruction },
+    { label: "Estimated COGS", value: displayEstimatedCogs },
+    { label: "Lead Time", value: displayLeadTime },
+    {
+      label: "Margin Buffer",
+      value: marginBuffer == null ? "—" : marginBuffer >= 0 ? `$${marginBuffer}` : `-$${Math.abs(marginBuffer)}`,
+    },
+  ], [selectedMaterial, displayConstruction, displayEstimatedCogs, displayLeadTime, marginBuffer]);
+
+  const mukoRead = useMemo(() => {
+    const signalNames = (chipSelection?.activatedChips ?? []).slice(0, 3).map((chip) => chip.label);
+    const signalClause = signalNames.length > 0 ? `Signals like ${signalNames.join(", ")} still read clearly in the build.` : "";
+
+    if (!selectedMaterial) {
+      return {
+        headline: "Material choice will determine whether this piece holds its concept under production pressure.",
+        body: `${pieceAnchorName} already has a defined identity through ${[piecePaletteName, formattedSilhouette].filter(Boolean).join(" and ") || "its concept framing"}. Choose a material to see where cost and delivery start to reshape that expression. ${signalClause}`.trim(),
+      };
+    }
+
+    if (selectedMaterial.id === "deadstock-fabric") {
+      return {
+        headline: "Deadstock accelerates delivery but removes reorder flexibility, placing pressure on early commitment decisions.",
+        body: `${selectedMaterial.name} shortens the calendar to ${selectedMaterial.lead_time_weeks} weeks, but the lot-based supply means commitment timing matters as much as the fabric itself. ${insight ? `Current COGS land at $${insight.cogs} against a $${insight.ceiling} ceiling.` : ""} ${signalClause}`.trim(),
+      };
+    }
+
+    if (insight && insight.cogs > insight.ceiling) {
+      return {
+        headline: `${selectedMaterial.name} supports the direction, but the current build is overrunning the margin gate.`,
+        body: `At $${insight.cogs} COGS against a $${insight.ceiling} ceiling, this material-construction pairing needs a tighter decision before the concept reaches production. ${timelineStatus === "red" ? "Delivery is also under visible pressure." : "Delivery is still recoverable if the build stays disciplined."} ${signalClause}`.trim(),
+      };
+    }
+
+    if (timelineStatus === "red") {
+      return {
+        headline: `${selectedMaterial.name} keeps the concept intact, but the build is colliding with the delivery window.`,
+        body: `${selectedMaterial.lead_time_weeks} weeks of material lead time leaves limited recovery room once construction is locked. ${constructionTier ? `${CONSTRUCTION_INFO[constructionTier].label} construction currently ${executionStatus === "green" ? "remains feasible" : "needs a tighter execution plan"}.` : "Construction discipline will decide whether the window can hold."} ${signalClause}`.trim(),
+      };
+    }
+
+    if (constructionConfirmed && constructionTier === "high") {
+      return {
+        headline: `${selectedMaterial.name} and high construction sharpen the piece, but they narrow your margin recovery room.`,
+        body: `${insight ? `COGS are currently $${insight.cogs}, which ${insight.type === "strong" ? "stays controlled" : "sits close to the ceiling"}.` : ""} The concept remains legible, but this is no longer a forgiving build. ${signalClause}`.trim(),
+      };
+    }
+
+    return {
+      headline: `${selectedMaterial.name} preserves the concept while keeping execution in a controlled range.`,
+      body: `${constructionConfirmed && constructionTier ? `${CONSTRUCTION_INFO[constructionTier].label} construction` : "This build"} keeps the piece readable without forcing unnecessary production strain. ${insight ? `COGS are $${insight.cogs} against a $${insight.ceiling} ceiling, and material lead time is ${selectedMaterial.lead_time_weeks} weeks.` : ""} ${signalClause}`.trim(),
+    };
+  }, [
+    chipSelection,
+    pieceAnchorName,
+    piecePaletteName,
+    formattedSilhouette,
+    selectedMaterial,
+    insight,
+    timelineStatus,
+    constructionConfirmed,
+    constructionTier,
+    executionStatus,
+  ]);
+
   /* ─── RENDER ───────────────────────────────────────────────────────────── */
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#FAF9F6", overflow: "hidden" }}>
@@ -1869,1287 +2329,1063 @@ export default function SpecStudioPage() {
         </div>
       </header>
 
-      {/* ── Two-column body ────────────────────────────────────────────────── */}
-      <ResizableSplitPanel
-        defaultLeftPercent={60}
-        storageKey="muko_spec_splitPanel"
-        topOffset={72}
-        leftContent={
-          <>
+      <div className="specStudioLayout">
+        <aside className="specStudioColumn specStudioLeft" style={{ paddingTop: 72 }}>
+          <div className="specStudioSticky" style={{ padding: "0 24px 44px" }}>
 
-          {/* Title */}
-          <div style={{ padding: "36px 44px 24px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
-            <div>
-              <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 28, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1 }}>
-                Spec Studio
-              </h1>
-              <p style={{ margin: "10px 0 0", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.52)", lineHeight: 1.55, maxWidth: 460 }}>
-                We translated your concept into a recommended spec. Select your garment type, explore materials and construction — Muko scores every combination in real time.
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                setMaterialId(recommendedMaterialId);
-                setConstructionTier(baselineComplexity);
-                setUserManuallySelected(true);
-              }}
+            {/* ── Section A: Piece Identity ──────────────────────────────── */}
+            <div
               style={{
-                flexShrink: 0,
-                marginTop: 4,
-                padding: "7px 16px 7px 12px",
-                borderRadius: 999,
-                border: "1.5px solid rgba(77,48,47,0.35)",
-                background: "transparent",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                cursor: "pointer",
-                transition: "background 200ms ease, border-color 200ms ease",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "rgba(77,48,47,0.06)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(77,48,47,0.55)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(77,48,47,0.35)";
+                background: "rgba(245,242,235,0.72)",
+                borderRadius: 16,
+                padding: 20,
+                width: "100%",
+                boxSizing: "border-box",
               }}
             >
-              <span
-                className="muko-pick-dot"
-                style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#A8B475", flexShrink: 0 }}
+              <PieceFlatPreview
+                pieceType={pieceTypeForFlat}
+                signal={selectedKeyPiece?.signal ?? null}
               />
-              <span style={{ fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "#4D302F", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
-                Muko&apos;s Pick
-              </span>
-            </button>
-          </div>
-
-          <div style={{ padding: "0 44px 48px" }}>
-
-          {/* ─── Locked Concept Bar ─── */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              padding: "12px 18px",
-              borderRadius: 14,
-              background: "rgba(255,255,255,0.80)",
-              border: "1px solid rgba(67,67,43,0.10)",
-              boxShadow: "0 2px 12px rgba(67,67,43,0.05)",
-              marginBottom: 16,
-              gap: 10,
-              flexWrap: "wrap" as const,
-            }}
-          >
-            {/* Direction name + key piece + silhouette + palette */}
-            <span style={{ fontFamily: sohne, fontSize: 13.5, fontWeight: 500, color: OLIVE, letterSpacing: "-0.01em", flexShrink: 0 }}>
-              {refinement.base}
-            </span>
-            {selectedKeyPiece && (
-              <>
-                <span style={{ color: "rgba(67,67,43,0.65)", fontSize: 18, fontWeight: 700, lineHeight: 1, letterSpacing: 0 }}>&middot;</span>
-                <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 400, color: "rgba(67,67,43,0.52)" }}>
-                  {selectedKeyPiece.item}
-                </span>
-              </>
-            )}
-            {conceptSilhouette && (
-              <>
-                <span style={{ color: "rgba(67,67,43,0.65)", fontSize: 18, fontWeight: 700, lineHeight: 1, letterSpacing: 0 }}>&middot;</span>
-                <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 400, color: "rgba(67,67,43,0.52)" }}>
-                  {conceptSilhouette.charAt(0).toUpperCase() + conceptSilhouette.slice(1)}
-                </span>
-              </>
-            )}
-            {conceptPalette && (() => {
-              const entry = (aestheticsData as unknown as Array<{ id: string; palette_options?: Array<{ id: string; name: string }> }>).find(
-                (a) => a.id === conceptContext.aestheticMatchedId
-              );
-              const palName = entry?.palette_options?.find((p) => p.id === conceptPalette)?.name ?? conceptPalette;
-              return (
-                <>
-                  <span style={{ color: "rgba(67,67,43,0.65)", fontSize: 18, fontWeight: 700, lineHeight: 1, letterSpacing: 0 }}>&middot;</span>
-                  <span style={{ fontFamily: inter, fontSize: 13, fontWeight: 400, color: "rgba(67,67,43,0.52)" }}>
-                    {palName}
-                  </span>
-                </>
-              );
-            })()}
-
-            {/* Chips — unified style */}
-            {chipSelection && chipSelection.activatedChips.length > 0 && (
-              <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" as const }}>
-                {chipSelection.activatedChips.map((chip) => (
-                  <span
-                    key={chip.label}
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: 999,
-                      fontSize: 11,
-                      fontWeight: 500,
-                      color: STEEL,
-                      background: "rgba(125,150,172,0.10)",
-                      border: "1px solid rgba(125,150,172,0.28)",
-                      fontFamily: inter,
-                    }}
-                  >
-                    {chip.label}
-                  </span>
-                ))}
+              <div style={{ marginTop: 14, fontFamily: sohne, fontSize: 22, fontWeight: 500, color: OLIVE, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
+                {pieceAnchorName}
               </div>
-            )}
-          </div>
-
-          {/* ─── Top Rail ─── */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 20,
-              padding: "14px 0",
-              marginBottom: 32,
-              borderBottom: "1px solid rgba(67, 67, 43, 0.08)",
-              overflow: "visible",
-            }}
-          >
-            {/* State 1: Non-custom key piece — no dropdowns needed, context bar above carries it */}
-            {selectedKeyPiece && !selectedKeyPiece.custom ? null : selectedKeyPiece && selectedKeyPiece.custom ? (
-              /* State 2: Custom piece — Category dropdown only */
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={microLabel}>Category</span>
-                <select
-                  value={categoryId}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                  style={{
-                    padding: "8px 28px 8px 12px",
-                    borderRadius: 12,
-                    width: 130,
-                    border: "1px solid rgba(67, 67, 43, 0.12)",
-                    background: "rgba(255,255,255,0.78)",
-                    fontFamily: inter,
-                    fontSize: 14,
-                    fontWeight: 500,
-                    color: BRAND.oliveInk,
-                    cursor: "pointer",
-                    outline: "none",
-                    boxShadow: "0 10px 26px rgba(67, 67, 43, 0.06)",
-                    appearance: "none" as const,
-                    backgroundImage:
-                      `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2343432B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.4'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "right 14px center",
-                  }}
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              /* State 3: No key piece — original dropdowns */
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={microLabel}>Category</span>
-                  <select
-                    value={categoryId}
-                    onChange={(e) => handleCategoryChange(e.target.value)}
-                    style={{
-                      padding: "8px 28px 8px 12px",
-                      borderRadius: 12,
-                      width: 130,
-                      border: "1px solid rgba(67, 67, 43, 0.12)",
-                      background: "rgba(255,255,255,0.78)",
-                      fontFamily: "var(--font-inter), system-ui, sans-serif",
-                      fontSize: 14,
-                      fontWeight: 500,
-                      color: BRAND.oliveInk,
-                      cursor: "pointer",
-                      outline: "none",
-                      boxShadow: "0 10px 26px rgba(67, 67, 43, 0.06)",
-                      appearance: "none" as const,
-                      backgroundImage:
-                        `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2343432B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.4'/%3E%3C/svg%3E")`,
-                      backgroundRepeat: "no-repeat",
-                      backgroundPosition: "right 14px center",
-                    }}
-                  >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {categorySubcategories.length > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={microLabel}>Type</span>
-                    <select
-                      value={subcategoryId}
-                      onChange={(e) => handleSubcategoryChange(e.target.value)}
-                      style={{
-                        padding: "8px 28px 8px 12px",
-                        borderRadius: 12,
-                        width: 170,
-                        border: "1px solid rgba(67, 67, 43, 0.12)",
-                        background: "rgba(255,255,255,0.78)",
-                        fontFamily: "var(--font-inter), system-ui, sans-serif",
-                        fontSize: 14,
-                        fontWeight: 500,
-                        color: subcategoryId ? BRAND.oliveInk : "rgba(67, 67, 43, 0.40)",
-                        cursor: "pointer",
-                        outline: "none",
-                        boxShadow: "0 10px 26px rgba(67, 67, 43, 0.06)",
-                        appearance: "none" as const,
-                        backgroundImage:
-                          `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2343432B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.4'/%3E%3C/svg%3E")`,
-                        backgroundRepeat: "no-repeat",
-                        backgroundPosition: "right 14px center",
-                      }}
-                    >
-                      <option value="" disabled>Select type...</option>
-                      {categorySubcategories.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </>
-            )}
-
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {/* MSRP label + ceiling subtitle */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <span style={microLabel}>MSRP</span>
-                <span style={{ fontSize: 9, color: "rgba(67,67,43,0.32)", fontFamily: "var(--font-inter), system-ui, sans-serif", letterSpacing: "0.02em" }}>
-                  Ceiling: ${marginCeiling}
-                </span>
-              </div>
-              <div style={{ position: "relative" }}>
-                <span
-                  style={{
-                    position: "absolute",
-                    left: 14,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    fontSize: 14,
-                    color: "rgba(67, 67, 43, 0.45)",
-                  }}
-                >
-                  $
-                </span>
-                <input
-                  type="number"
-                  value={targetMSRP}
-                  onChange={(e) => setTargetMSRP(Number(e.target.value))}
-                  style={{
-                    padding: "8px 12px 8px 26px",
-                    borderRadius: 12,
-                    width: 105,
-                    border: "1px solid rgba(67, 67, 43, 0.12)",
-                    background: "rgba(255,255,255,0.78)",
-                    fontFamily: "var(--font-inter), system-ui, sans-serif",
-                    fontSize: 14,
-                    fontWeight: 500,
-                    color: BRAND.oliveInk,
-                    outline: "none",
-                    boxShadow: "0 10px 26px rgba(67, 67, 43, 0.06)",
-                  }}
-                />
-              </div>
-
-              {/* Delivery label + required subtitle */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 1, marginLeft: 8 }}>
-                <span style={microLabel}>Delivery</span>
-                <span suppressHydrationWarning style={{ fontSize: 9, fontFamily: "var(--font-inter), system-ui, sans-serif", letterSpacing: "0.02em", color: timelineFeasibility ? (timelineStatus === 'red' ? '#8A3A3A' : timelineStatus === 'yellow' ? BRAND.camel : "rgba(67,67,43,0.32)") : "rgba(67,67,43,0.32)" }}>
-                  {timelineFeasibility ? `${timelineFeasibility.required_weeks}wk required` : "\u00a0"}
-                </span>
-              </div>
-              <div style={{ position: "relative" }}>
-                <input
-                  type="number"
-                  min={4}
-                  max={52}
-                  value={timelineWeeks}
-                  onChange={(e) => setTimelineWeeks(Math.max(4, Number(e.target.value)))}
-                  style={{
-                    padding: "8px 36px 8px 12px",
-                    borderRadius: 12,
-                    width: 88,
-                    border: `1px solid ${
-                      timelineStatus === 'red' ? 'rgba(138, 58, 58, 0.35)' :
-                      timelineStatus === 'yellow' ? 'rgba(184, 135, 107, 0.35)' :
-                      'rgba(67, 67, 43, 0.12)'
-                    }`,
-                    background: "rgba(255,255,255,0.78)",
-                    fontFamily: "var(--font-inter), system-ui, sans-serif",
-                    fontSize: 14,
-                    fontWeight: 500,
-                    color: BRAND.oliveInk,
-                    outline: "none",
-                    boxShadow: "0 10px 26px rgba(67, 67, 43, 0.06)",
-                  }}
-                />
-                <span
-                  style={{
-                    position: "absolute",
-                    right: 12,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    fontSize: 11,
-                    color: "rgba(67, 67, 43, 0.4)",
-                    fontFamily: "var(--font-inter), system-ui, sans-serif",
-                    pointerEvents: "none",
-                  }}
-                >
-                  wks
-                </span>
+              <div style={{ marginTop: 4, fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.52)", lineHeight: 1.45 }}>
+                {[formattedSilhouette, selectedCategory?.name].filter(Boolean).join(" · ")}
               </div>
             </div>
 
-          </div>
+            {/* Divider */}
+            <div style={{ height: 1, background: "rgba(67,67,43,0.08)", margin: "18px 0" }} />
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
-              {/* Material */}
-              <div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 12,
-                  }}
-                >
-                  <div style={sectionHeading}>Material</div>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: "rgba(67, 67, 43, 0.35)",
-                      fontFamily: "var(--font-inter), system-ui, sans-serif",
-                    }}
-                  >
-                    Industry benchmark pricing
-                  </span>
-                </div>
-
-                {/* Category filter strip */}
-                <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-                  {(["all", "natural", "luxury", "synthetic", "deadstock"] as const).map((cat) => {
-                    const isActive = materialCategory === cat;
-                    const label = cat === "all" ? "All" : cat.charAt(0).toUpperCase() + cat.slice(1);
-                    const meta = cat !== "all" ? CATEGORY_META[cat] : null;
-                    return (
-                      <button
-                        key={cat}
-                        onClick={() => setMaterialCategory(cat)}
-                        style={{
-                          padding: "4px 11px",
-                          borderRadius: 999,
-                          fontSize: 11,
-                          fontWeight: isActive ? 600 : 400,
-                          fontFamily: inter,
-                          cursor: "pointer",
-                          outline: "none",
-                          transition: "all 150ms ease",
-                          border: isActive
-                            ? cat === "all"
-                              ? "1.5px solid #D4CFC8"
-                              : `1.5px solid ${meta!.badgeBorder}`
-                            : "1.5px solid #E8E3D6",
-                          background: isActive
-                            ? cat === "all"
-                              ? "#F0EDE8"
-                              : meta!.badgeBg
-                            : "transparent",
-                          color: isActive
-                            ? cat === "all"
-                              ? "#4D302F"
-                              : meta!.badgeColor
-                            : "#A8A09A",
-                        }}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Selected material detail panel */}
-                {selectedMaterial && (
-                  <div
-                    style={{
-                      marginBottom: 12,
-                      padding: "12px 14px",
-                      background: "#FFFFFF",
-                      border: "1px solid #E8E3D6",
-                      borderRadius: 10,
-                      display: "flex",
-                      gap: 12,
-                      alignItems: "flex-start",
-                    }}
-                  >
-                    {/* Mini swatch */}
-                    <div
-                      style={{
-                        flexShrink: 0,
-                        width: 40,
-                        height: 40,
-                        borderRadius: 8,
-                        background: MATERIAL_SWATCH_BG[selectedMaterial.id] || "#D0C8B8",
-                        border: "1px solid rgba(0,0,0,0.06)",
-                      }}
-                    />
-                    {/* Info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                        <span style={{ fontSize: 13.5, fontWeight: 700, color: "#191919", fontFamily: inter }}>
-                          {selectedMaterial.name}
-                        </span>
-                        {(() => {
-                          const c = MATERIAL_CATEGORY_MAP[selectedMaterial.id] || "natural";
-                          const m = CATEGORY_META[c];
-                          return (
-                            <span
-                              style={{
-                                fontSize: 9.5,
-                                fontWeight: 700,
-                                letterSpacing: "0.06em",
-                                textTransform: "uppercase" as const,
-                                color: m.badgeColor,
-                                background: m.badgeBg,
-                                border: `1px solid ${m.badgeBorder}`,
-                                borderRadius: 4,
-                                padding: "1px 5px",
-                                fontFamily: inter,
-                              }}
-                            >
-                              {c}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12.5,
-                          color: "#6B6560",
-                          lineHeight: 1.65,
-                          fontFamily: inter,
-                          marginBottom: 4,
-                        }}
-                      >
-                        {MATERIAL_DESCRIPTIONS[selectedMaterial.id] ||
-                          "Shifts weight, drape, and finish — this choice will quietly define the piece's tone."}
-                      </div>
-                      <div style={{ fontFamily: inter }}>
-                        <span style={{ fontSize: 12, color: "#4D302F", fontWeight: 600 }}>
-                          ${selectedMaterial.cost_per_yard}/yd
-                        </span>
-                        <span style={{ color: "#D4CFC8", margin: "0 5px" }}>·</span>
-                        <span style={{ fontSize: 12, color: "#A8A09A" }}>{selectedMaterial.lead_time_weeks}wk lead</span>
-                      </div>
-                    </div>
+            {/* ── Section B: Collection Direction ───────────────────────── */}
+            <div>
+              <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.36)", marginBottom: 8 }}>
+                Collection Direction
+              </div>
+              {storeAesthetic ? (
+                <>
+                  <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 500, color: OLIVE }}>
+                    {conceptContext.aestheticName}
                   </div>
-                )}
-
-                {/* Swatch grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-                  {materials
-                    .filter((mat) => materialCategory === "all" || MATERIAL_CATEGORY_MAP[mat.id] === materialCategory)
-                    .map((mat) => {
-                      const isSel = materialId === mat.id;
-                      const isRedirectMat = selectedKeyPiece?.redirect_material_id === mat.id && insight?.type === "warning";
-                      const cat = MATERIAL_CATEGORY_MAP[mat.id] || "natural";
-                      const meta = CATEGORY_META[cat];
-                      const swatchBg = MATERIAL_SWATCH_BG[mat.id] || "#D0C8B8";
-                      return (
-                        <button
-                          key={mat.id}
-                          onClick={() => { if (!isSel) { setMaterialId(mat.id); setUserManuallySelected(true); } }}
+                  {formattedSilhouette && (
+                    <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.52)", marginTop: 3 }}>
+                      {formattedSilhouette} silhouette
+                    </div>
+                  )}
+                  {(chipSelection?.activatedChips ?? []).length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
+                      {(chipSelection?.activatedChips ?? []).slice(0, 2).map((chip) => (
+                        <span
+                          key={chip.label}
                           style={{
-                            padding: 0,
-                            border: isSel ? "2px solid #A8B475" : "2px solid transparent",
-                            borderRadius: 10,
-                            overflow: "hidden",
-                            boxShadow: isSel ? "0 0 0 3px rgba(168,180,117,0.13)" : "none",
-                            cursor: "pointer",
-                            outline: "none",
-                            textAlign: "left",
-                            background: "none",
-                            transition: "all 150ms ease",
+                            display: "inline-block",
+                            padding: "3px 9px",
+                            borderRadius: 999,
+                            background: "rgba(168,180,117,0.10)",
+                            border: "1px solid rgba(168,180,117,0.28)",
+                            fontFamily: inter,
+                            fontSize: 10.5,
+                            fontWeight: 500,
+                            color: "#6B7A40",
                           }}
                         >
-                          {/* Texture swatch */}
-                          <div
-                            style={{
-                              position: "relative",
-                              height: 72,
-                              background: swatchBg,
-                              borderRadius: "8px 8px 0 0",
-                            }}
-                          >
-                            {/* Category dot */}
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: 6,
-                                right: 6,
-                                width: 7,
-                                height: 7,
-                                borderRadius: "50%",
-                                background: meta.dotColor,
-                                opacity: 0.7,
-                              }}
-                            />
-                            {/* Selected overlay + checkmark */}
-                            {isSel && (
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  inset: 0,
-                                  background: "rgba(168,180,117,0.15)",
-                                  borderRadius: "8px 8px 0 0",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: 22,
-                                    height: 22,
-                                    borderRadius: "50%",
-                                    background: "#A8B475",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                  }}
-                                >
-                                  <span style={{ color: "#fff", fontSize: 11, fontWeight: 800, lineHeight: 1 }}>✓</span>
-                                </div>
-                              </div>
-                            )}
-                            {/* Cost alternative badge */}
-                            {isRedirectMat && (
-                              <div style={{ position: "absolute", bottom: 4, left: 4 }}>
-                                <span
-                                  style={{
-                                    padding: "1px 5px",
-                                    borderRadius: 3,
-                                    fontSize: 8,
-                                    fontWeight: 700,
-                                    letterSpacing: "0.10em",
-                                    textTransform: "uppercase" as const,
-                                    background: "rgba(67,67,43,0.08)",
-                                    color: "rgba(67,67,43,0.5)",
-                                    fontFamily: inter,
-                                  }}
-                                >
-                                  ALT
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          {/* Label area */}
-                          <div
-                            style={{
-                              padding: "7px 8px 8px",
-                              background: isSel ? "rgba(168,180,117,0.031)" : "#FFFFFF",
-                              borderTop: isSel ? "1px solid rgba(168,180,117,0.188)" : "1px solid #F0EDE8",
-                              borderRadius: "0 0 8px 8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: "#191919",
-                                lineHeight: 1.3,
-                                fontFamily: inter,
-                              }}
-                            >
-                              {mat.name}
-                            </div>
-                            <div style={{ marginTop: 2, fontFamily: inter }}>
-                              <span style={{ fontSize: 11, color: "#6B6560" }}>${mat.cost_per_yard}/yd</span>
-                              <span style={{ color: "#D4CFC8", margin: "0 3px" }}>·</span>
-                              <span style={{ fontSize: 10.5, color: "#A8A09A" }}>{mat.lead_time_weeks}wk</span>
-                            </div>
-                          </div>
+                          {chip.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.32)", fontStyle: "italic" }}>
+                  Direction locked in Concept Studio
+                </div>
+              )}
+            </div>
+
+            {/* Divider — only if material selected */}
+            {selectedMaterial && (
+              <div style={{ height: 1, background: "rgba(67,67,43,0.08)", margin: "18px 0" }} />
+            )}
+
+            {/* ── Section C: Material ────────────────────────────────────── */}
+            {selectedMaterial && (
+              <div style={{ animation: "fadeIn 220ms ease both" }}>
+                <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.36)", marginBottom: 8 }}>
+                  Material
+                </div>
+                <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 500, color: OLIVE }}>
+                  {selectedMaterial.name}
+                </div>
+                <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.52)", marginTop: 3 }}>
+                  ${selectedMaterial.cost_per_yard}/yd · {selectedMaterial.lead_time_weeks}wk lead
+                </div>
+              </div>
+            )}
+
+            {/* Divider — only if construction confirmed */}
+            {constructionConfirmed && constructionTier && (
+              <div style={{ height: 1, background: "rgba(67,67,43,0.08)", margin: "18px 0" }} />
+            )}
+
+            {/* ── Section D: Construction ────────────────────────────────── */}
+            {constructionConfirmed && constructionTier && (
+              <div style={{ animation: "fadeIn 220ms ease both" }}>
+                <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.36)", marginBottom: 8 }}>
+                  Construction
+                </div>
+                <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 500, color: OLIVE }}>
+                  {CONSTRUCTION_INFO[constructionTier].label}
+                </div>
+              </div>
+            )}
+
+            {/* Divider — only if both selected */}
+            {selectedMaterial && constructionConfirmed && constructionTier && insight && (
+              <div style={{ height: 1, background: "rgba(67,67,43,0.08)", margin: "18px 0" }} />
+            )}
+
+            {/* ── Section E: Build Numbers ───────────────────────────────── */}
+            {selectedMaterial && constructionConfirmed && constructionTier && insight && (
+              <div style={{ animation: "fadeIn 220ms ease both" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  <div>
+                    <div style={{ fontFamily: inter, fontSize: 8, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.36)", marginBottom: 3 }}>
+                      COGS
+                    </div>
+                    <div style={{ fontFamily: sohne, fontSize: 15, color: OLIVE }}>
+                      ${insight.cogs}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: inter, fontSize: 8, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.36)", marginBottom: 3 }}>
+                      Lead
+                    </div>
+                    <div style={{ fontFamily: sohne, fontSize: 15, color: OLIVE }}>
+                      {selectedMaterial.lead_time_weeks}wks
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: inter, fontSize: 8, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.36)", marginBottom: 3 }}>
+                      Buffer
+                    </div>
+                    <div style={{ fontFamily: sohne, fontSize: 15, color: marginBuffer != null && marginBuffer < 0 ? BRAND.camel : OLIVE }}>
+                      {marginBuffer == null ? "—" : marginBuffer >= 0 ? `$${marginBuffer}` : `-$${Math.abs(marginBuffer)}`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </aside>
+
+        <ResizableSplitPanel
+          defaultLeftPercent={50}
+          storageKey="muko_spec_splitPanel"
+          topOffset={72}
+          leftContent={
+            <main className="specStudioColumn specStudioCenter">
+          <div style={{ padding: "36px 32px 56px" }}>
+            <div style={{ maxWidth: 920, margin: "0 auto" }}>
+              <div style={{ marginBottom: 26 }}>
+                <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 28, color: OLIVE, letterSpacing: "-0.01em", lineHeight: 1.1 }}>
+                  Spec Studio
+                </h1>
+              </div>
+
+              {/* ── Step tracker ──────────────────────────────────────────── */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
+                  gap: 14,
+                  marginBottom: 32,
+                  paddingTop: 18,
+                  borderTop: "1px solid rgba(67,67,43,0.08)",
+                  alignItems: "start",
+                }}
+              >
+                {/* Step 1: Material */}
+                <button
+                  onClick={() => backToMaterial()}
+                  style={{
+                    textAlign: "left",
+                    border: "none",
+                    borderTop: specStep === "material" ? "2px solid rgba(168,180,117,0.55)" : "2px solid rgba(67,67,43,0.08)",
+                    background: "transparent",
+                    padding: "14px 0 0",
+                    cursor: "pointer",
+                    opacity: 1,
+                  }}
+                >
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: specStep === "material" ? "#6B7A40" : (selectedMaterial ? "#6B7A40" : "rgba(67,67,43,0.36)"), marginBottom: 6 }}>
+                    {selectedMaterial ? "Complete" : specStep === "material" ? "Current" : "Upcoming"}
+                  </div>
+                  <div style={{ fontFamily: sohne, fontSize: 16, fontWeight: 500, color: OLIVE, lineHeight: 1.15, marginBottom: 6 }}>
+                    Material
+                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.48)" }}>
+                    Choose the fabric that anchors the build.
+                  </div>
+                </button>
+                {/* Arrow */}
+                <div
+                  style={{
+                    alignSelf: "center",
+                    paddingTop: 28,
+                    fontFamily: sohne,
+                    fontSize: 16,
+                    color: "rgba(67,67,43,0.24)",
+                    lineHeight: 1,
+                  }}
+                  aria-hidden
+                >
+                  →
+                </div>
+                {/* Step 2: Construction */}
+                <button
+                  onClick={() => { if (selectedMaterial) advanceToConstruction(); }}
+                  style={{
+                    textAlign: "left",
+                    border: "none",
+                    borderTop: specStep === "construction" ? "2px solid rgba(168,180,117,0.55)" : "2px solid rgba(67,67,43,0.08)",
+                    background: "transparent",
+                    padding: "14px 0 0",
+                    cursor: selectedMaterial ? "pointer" : "default",
+                    opacity: !selectedMaterial ? 0.72 : 1,
+                  }}
+                >
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: specStep === "construction" ? "#6B7A40" : (constructionConfirmed ? "#6B7A40" : "rgba(67,67,43,0.36)"), marginBottom: 6 }}>
+                    {constructionConfirmed ? "Complete" : specStep === "construction" ? "Current" : "Upcoming"}
+                  </div>
+                  <div style={{ fontFamily: sohne, fontSize: 16, fontWeight: 500, color: OLIVE, lineHeight: 1.15, marginBottom: 6 }}>
+                    Construction
+                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.48)" }}>
+                    Lock the operational intensity of the build.
+                  </div>
+                </button>
+              </div>
+
+              <div style={{ position: "relative", minHeight: 760 }}>
+                <AnimatePresence mode="wait" custom={specStepDirection}>
+                  <motion.div
+                    key={specStep}
+                    custom={specStepDirection}
+                    variants={stageTransitionProps}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    style={{ padding: "8px 0 28px" }}
+                  >
+                    {specStep === "material" && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
+                <section id="material-section" style={{ animation: "fadeIn 240ms ease-out" }}>
+                  <div style={{ paddingTop: 12, borderTop: "1px solid rgba(67,67,43,0.08)", marginBottom: 34 }}>
+                    <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#6B7A40", marginBottom: 8 }}>
+                      Step 1
+                    </div>
+                    <div style={{ fontFamily: sohne, fontSize: 28, fontWeight: 500, color: OLIVE, marginBottom: 8, letterSpacing: "-0.03em" }}>
+                      Material Reality
+                    </div>
+                  </div>
+
+                  {(!selectedKeyPiece || selectedKeyPiece.custom) && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16 }}>
+                      <span style={{ ...microLabel, color: "rgba(67,67,43,0.32)", marginRight: 4 }}>Piece</span>
+                      <select
+                        value={categoryId}
+                        onChange={(e) => handleCategoryChange(e.target.value)}
+                        style={{
+                          minWidth: 140,
+                          padding: "7px 28px 7px 12px",
+                          borderRadius: 999,
+                          border: "1px solid rgba(67,67,43,0.10)",
+                          background: "rgba(255,255,255,0.68)",
+                          fontFamily: inter,
+                          fontSize: 12.5,
+                          fontWeight: 500,
+                          color: OLIVE,
+                          appearance: "none",
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2343432B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.4'/%3E%3C/svg%3E")`,
+                          backgroundRepeat: "no-repeat",
+                          backgroundPosition: "right 12px center",
+                        }}
+                      >
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                      {categorySubcategories.length > 0 && (
+                        <select
+                          value={subcategoryId}
+                          onChange={(e) => handleSubcategoryChange(e.target.value)}
+                          style={{
+                            minWidth: 160,
+                            padding: "7px 28px 7px 12px",
+                            borderRadius: 999,
+                            border: "1px solid rgba(67,67,43,0.10)",
+                            background: "rgba(255,255,255,0.68)",
+                            fontFamily: inter,
+                            fontSize: 12.5,
+                            fontWeight: 500,
+                            color: subcategoryId ? OLIVE : "rgba(67,67,43,0.40)",
+                            appearance: "none",
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2343432B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.4'/%3E%3C/svg%3E")`,
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "right 12px center",
+                          }}
+                        >
+                          <option value="" disabled>Select type</option>
+                          {categorySubcategories.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ paddingBottom: 22, marginBottom: 28, borderBottom: "1px solid rgba(67,67,43,0.08)" }}>
+                    <div style={{ ...microLabel, marginBottom: 10, color: "rgba(67,67,43,0.34)" }}>Constraints</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontFamily: inter, fontSize: 15, color: "rgba(67,67,43,0.66)", lineHeight: 1.5 }}>
+                      <span>MSRP Target</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, minWidth: 118 }}>
+                        <span style={{ color: "rgba(67,67,43,0.58)" }}>$</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={targetMSRP}
+                          onChange={(e) => {
+                            const next = e.target.value.replace(/[^\d]/g, "");
+                            setTargetMSRP(next ? Number(next) : 0);
+                          }}
+                          aria-label="MSRP target"
+                          style={{
+                            width: 88,
+                            border: "none",
+                            background: "transparent",
+                            padding: 0,
+                            fontFamily: sohne,
+                            fontSize: 22,
+                            color: OLIVE,
+                            outline: "none",
+                            letterSpacing: "-0.02em",
+                            lineHeight: 1.1,
+                            appearance: "textfield",
+                            WebkitAppearance: "none",
+                            MozAppearance: "textfield",
+                          }}
+                        />
+                      </span>
+                      <span style={{ opacity: 0.42 }}>·</span>
+                      <span>Delivery Window</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={timelineWeeks}
+                        onChange={(e) => {
+                          const next = e.target.value.replace(/[^\d]/g, "");
+                          setTimelineWeeks(Math.max(4, next ? Number(next) : 4));
+                        }}
+                        aria-label="Delivery window in weeks"
+                        style={{
+                          width: 46,
+                          border: "none",
+                          background: "transparent",
+                          padding: 0,
+                          fontFamily: sohne,
+                          fontSize: 22,
+                          color: OLIVE,
+                          outline: "none",
+                          textAlign: "right",
+                          letterSpacing: "-0.02em",
+                          lineHeight: 1.1,
+                          appearance: "textfield",
+                          WebkitAppearance: "none",
+                          MozAppearance: "textfield",
+                        }}
+                      />
+                      <span>weeks</span>
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 11.5, color: "rgba(67,67,43,0.42)", fontFamily: inter, lineHeight: 1.5 }}>
+                      Ceiling ${marginCeiling}{timelineFeasibility ? ` · ${timelineFeasibility.required_weeks} weeks required at current build` : ""}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                    {(["all", "natural", "luxury", "synthetic", "deadstock"] as const).map((cat) => {
+                      const isActive = materialCategory === cat;
+                      const label = cat === "all" ? "All" : cat.charAt(0).toUpperCase() + cat.slice(1);
+                      return (
+                        <button
+                          key={cat}
+                          onClick={() => { setMaterialCategory(cat); setShowAllMaterials(false); }}
+                          style={{ padding: "4px 10px", borderRadius: 999, fontSize: 10.5, fontWeight: isActive ? 600 : 500, fontFamily: inter, cursor: "pointer", border: "1px solid rgba(67,67,43,0.07)", background: isActive ? "rgba(245,242,235,0.9)" : "transparent", color: isActive ? "rgba(67,67,43,0.72)" : "rgba(67,67,43,0.44)" }}
+                        >
+                          {label}
                         </button>
                       );
                     })}
-                </div>
-
-              </div>
-
-              {/* Complexity */}
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                  <span style={sectionHeading}>Complexity</span>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 650,
-                      color: CHARTREUSE,
-                      background: "rgba(171,171,99,0.10)",
-                      border: "1px solid rgba(171,171,99,0.18)",
-                      borderRadius: 999,
-                      padding: "4px 10px",
-                      fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-                    }}
-                  >
-                    Default: {CONSTRUCTION_INFO[getSmartDefault(categoryId, conceptSilhouette || undefined)].label}
-                  </span>
-                </div>
-
-                <div style={{ display: "flex", gap: 10 }}>
-                  {(["low", "moderate", "high"] as ConstructionTier[]).map((tier) => {
-                    const info = COMPLEXITY_CONTEXT[tier];
-                    const isSel = constructionTier === tier;
-                    const isRec = tier === baselineComplexity;
-                    const isHover = hoveredComplexity === tier;
-                    const deltas = scoreComplexityDeltas(tier);
-                    const matchingChips = tier === "high" ? chipsForHighComplexity : [];
-
-                    return (
-                      <button
-                        key={tier}
-                        onClick={() => handleComplexityChange(tier)}
-                        onMouseEnter={() => setHoveredComplexity(tier)}
-                        onMouseLeave={() => setHoveredComplexity(null)}
-                        style={{
-                          flex: 1,
-                          textAlign: "left",
-                          borderRadius: 14,
-                          padding: "16px 14px 14px",
-                          background: isSel ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.55)",
-                          border: isSel
-                            ? `1.5px solid ${CHARTREUSE}`
-                            : isRec && !isSel
-                              ? "1.5px solid rgba(169,123,143,0.35)"
-                              : "1px solid rgba(67,67,43,0.10)",
-                          boxShadow: isSel
-                            ? "0 14px 40px rgba(67,67,43,0.10)"
-                            : "0 8px 24px rgba(67,67,43,0.05)",
-                          cursor: "pointer",
-                          outline: "none",
-                          transition: "all 200ms ease",
-                          position: "relative",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "flex-start",
-                            gap: 10,
-                          }}
-                        >
-                          <div>
-                            <div
-                              style={{
-                                fontSize: 14,
-                                fontWeight: 650,
-                                color: OLIVE,
-                                fontFamily: sohne,
-                              }}
-                            >
-                              {info.label}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: "rgba(67,67,43,0.38)",
-                                fontFamily: inter,
-                                marginTop: 4,
-                                lineHeight: 1.4,
-                              }}
-                            >
-                              {info.description}
-                            </div>
-                          </div>
-
-                          {isHover && !isSel ? (
-                            compactDeltaCluster({
-                              deltas: { ...deltas, identity: 0 },
-                              isHoverOrActive: true,
-                              isRecommended: isRec,
-                            })
-                          ) : !isSel ? (
-                            aggregateDeltaDot({ deltas: { ...deltas, identity: 0 } })
-                          ) : null}
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: 10,
-                            marginTop: 10,
-                            padding: "3px 8px",
-                            borderRadius: 999,
-                            display: "inline-block",
-                            color: "rgba(67,67,43,0.45)",
-                            background: "rgba(67,67,43,0.04)",
-                            fontFamily: "var(--font-inter), system-ui, sans-serif",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {info.note}
-                        </div>
-
-                        {matchingChips.length > 0 && (
-                          <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                            {matchingChips.map((chip) => (
-                              <span
-                                key={chip.label}
-                                style={{
-                                  padding: "3px 8px",
-                                  borderRadius: 999,
-                                  fontSize: 10,
-                                  fontWeight: 550,
-                                  color: STEEL,
-                                  background: "rgba(125,150,172,0.10)",
-                                  border: "1px solid rgba(125,150,172,0.28)",
-                                  fontFamily: inter,
-                                }}
-                              >
-                                {chip.label}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {(isHover || isSel) && (
-                          <div style={{ marginTop: 10 }}>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                lineHeight: 1.5,
-                                color: "rgba(67,67,43,0.70)",
-                                fontFamily: "var(--font-inter), system-ui, sans-serif",
-                              }}
-                            >
-                              {COMPLEXITY_DESCRIPTIONS[tier].hover}
-                            </div>
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-
-                {overrideWarning && (
-                  <div
-                    style={{
-                      marginTop: 10,
-                      padding: "10px 14px",
-                      borderRadius: 12,
-                      background: "rgba(184,135,107,0.08)",
-                      border: "1px solid rgba(184,135,107,0.22)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      animation: "fadeIn 300ms ease-out",
-                    }}
-                  >
-                    <span style={{ fontSize: 13, color: BRAND.camel }}>⚠</span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        color: "rgba(67,67,43,0.65)",
-                        fontFamily: "var(--font-inter), system-ui, sans-serif",
-                      }}
-                    >
-                      {overrideWarning}
-                    </span>
                   </div>
-                )}
-              </div>
 
-              {/* Construction Implications — inline sub-section of Complexity */}
-              <div id="construction-section">
-                {/* Section heading */}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                  <span style={{ ...sectionHeading, color: "rgba(67,67,43,0.35)", fontWeight: 500 }}>Complexity</span>
-                  <span style={{ ...sectionHeading, color: "rgba(67,67,43,0.22)", fontSize: 14, fontWeight: 400 }}>|</span>
-                  <span style={sectionHeading}>Construction Implications</span>
-                </div>
-                <div style={{
-                  fontFamily: inter,
-                  fontSize: 12,
-                  fontStyle: "italic",
-                  color: "rgba(67,67,43,0.42)",
-                  marginBottom: 16,
-                }}>
-                  Construction implications for your active signals. Click a row to expand.
-                </div>
-
-                {/* Strip container */}
-                <div style={{
-                  background: "rgba(255,255,255,0.55)",
-                  border: "1px solid rgba(67,67,43,0.08)",
-                  borderRadius: 12,
-                  backdropFilter: "blur(4px)",
-                  overflow: "hidden",
-                }}>
-                  {activeImplications.length === 0 ? (
-                    <div style={{
-                      padding: "28px 24px",
-                      textAlign: "center",
-                      fontFamily: inter,
-                      fontSize: 13,
-                      color: "#b0a898",
-                      fontStyle: "italic",
-                    }}>
-                      No active signals. Add aesthetic chips above to see construction implications.
-                    </div>
-                  ) : (
-                    activeImplications.map((s, i) => {
-                      const isDismissing = dismissingChips.has(s.chip);
-                      const isExpanded = expandedSignal === s.chip;
-                      const costBadge = parseCostBadge(s.cost_note);
-                      const risk = parseRiskLevel(s.complexity_flag);
-                      const instruction = getFirstSentence(s.detail);
-
-                      const riskStyle: React.CSSProperties =
-                        risk === 'High'
-                          ? { color: "#9a4a2a", background: "rgba(184,135,107,0.12)", border: "1px solid rgba(184,135,107,0.3)" }
-                          : risk === 'Med'
-                          ? { color: "#9a7820", background: "rgba(230,192,104,0.12)", border: "1px solid rgba(230,192,104,0.3)" }
-                          : { color: "#6b7a35", background: "rgba(168,180,117,0.12)", border: "1px solid rgba(168,180,117,0.3)" };
-
-                      const costStyle: React.CSSProperties =
-                        costBadge.variant === 'neutral'
-                          ? { color: "#8a8478", background: "rgba(180,172,160,0.1)", border: "1px solid rgba(180,172,160,0.2)" }
-                          : { color: "#9a6845", background: "rgba(184,135,107,0.1)", border: "1px solid rgba(184,135,107,0.25)" };
-
-                      return (
-                        <div
-                          key={s.chip}
+                  <div className="specMaterialGrid">
+                    {materials
+                      .filter((mat) => materialCategory === "all" || MATERIAL_CATEGORY_MAP[mat.id] === materialCategory)
+                      .slice(0, showAllMaterials ? undefined : 6)
+                      .map((mat) => {
+                        const isSel = materialId === mat.id;
+                        const isRecommended = mat.id === recommendedMaterialId;
+                        return (
+                          <button
+                            key={mat.id}
+                            onClick={() => handleMaterialSelection(mat.id)}
+                            onMouseEnter={() => setHoveredMaterialId(mat.id)}
+                            onMouseLeave={() => setHoveredMaterialId(null)}
                           style={{
-                            opacity: isDismissing ? 0 : 1,
-                            transform: isDismissing ? "translateY(-4px)" : "translateY(0)",
-                            transition: "opacity 250ms ease, transform 250ms ease",
-                            borderTop: i > 0 ? "1px solid rgba(200,194,182,0.3)" : undefined,
-                          }}
-                        >
-                          {/* Collapsed row */}
-                          <div
-                            onClick={() => setExpandedSignal(isExpanded ? null : s.chip)}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                              padding: "14px 20px",
+                              padding: 0,
+                              textAlign: "left",
+                              borderRadius: 16,
+                              border: isSel ? "1px solid rgba(168,180,117,0.42)" : "1px solid rgba(67,67,43,0.05)",
+                              background: hoveredMaterialId === mat.id ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.72)",
+                              overflow: "hidden",
                               cursor: "pointer",
-                              background: isExpanded ? "rgba(168,180,117,0.04)" : "transparent",
-                              transition: "background 150ms ease",
+                              transition: "background 180ms ease, border-color 180ms ease, transform 180ms ease",
+                              transform: hoveredMaterialId === mat.id ? "translateY(-1px)" : "translateY(0)",
                             }}
                           >
-                            {/* Expand arrow */}
-                            <span style={{
-                              fontSize: 14,
-                              color: isExpanded ? CHARTREUSE : "rgba(200,192,182,0.8)",
-                              flexShrink: 0,
-                              transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                              transition: "transform 180ms ease, color 150ms ease",
-                              display: "inline-block",
-                              lineHeight: 1,
-                              fontWeight: 300,
-                            }}>
-                              ›
-                            </span>
-
-                            {/* Chip pill */}
-                            <span style={{
-                              padding: "3px 10px",
-                              borderRadius: 20,
-                              fontSize: 11,
-                              fontWeight: 500,
-                              fontFamily: inter,
-                              background: "rgba(125,150,172,0.1)",
-                              border: "1px solid rgba(125,150,172,0.2)",
-                              color: "#7D96AC",
-                              flexShrink: 0,
-                              whiteSpace: "nowrap" as const,
-                            }}>
-                              {s.chip}
-                            </span>
-
-                            {/* Instruction text */}
-                            <span style={{
-                              fontFamily: inter,
-                              fontSize: 13,
-                              color: "#3a3830",
-                              flex: 1,
-                              lineHeight: 1.4,
-                              minWidth: 0,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: isExpanded ? "normal" : "nowrap" as const,
-                            }}>
-                              {instruction}
-                            </span>
-
-                            {/* Cost badge */}
-                            <span style={{
-                              fontFamily: inter,
-                              fontSize: 11,
-                              fontWeight: 500,
-                              borderRadius: 4,
-                              padding: "2px 7px",
-                              flexShrink: 0,
-                              whiteSpace: "nowrap" as const,
-                              ...costStyle,
-                            }}>
-                              {costBadge.label}
-                            </span>
-
-                            {/* Risk badge */}
-                            <span style={{
-                              fontFamily: inter,
-                              fontSize: 11,
-                              fontWeight: 500,
-                              borderRadius: 4,
-                              padding: "2px 7px",
-                              flexShrink: 0,
-                              whiteSpace: "nowrap" as const,
-                              ...riskStyle,
-                            }}>
-                              {risk} risk
-                            </span>
-
-                            {/* Remove × */}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); removeChipSignal(s.chip); }}
-                              style={{
-                                fontSize: 12,
-                                color: "#c8c0b4",
-                                background: "transparent",
-                                border: "1px solid rgba(200,194,182,0.5)",
-                                borderRadius: "50%",
-                                cursor: "pointer",
-                                flexShrink: 0,
-                                width: 18,
-                                height: 18,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                lineHeight: "1",
-                                padding: "0 0 1px 0",
-                                transition: "color 150ms ease, border-color 150ms ease",
-                              }}
-                              onMouseEnter={e => {
-                                e.currentTarget.style.color = CAMEL_COL;
-                                e.currentTarget.style.borderColor = "rgba(184,135,107,0.5)";
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.color = "#c8c0b4";
-                                e.currentTarget.style.borderColor = "rgba(200,194,182,0.5)";
-                              }}
-                              aria-label={`Remove ${s.chip} signal`}
-                            >
-                              ×
-                            </button>
-                          </div>
-
-                          {/* Expanded detail */}
-                          {isExpanded && (
-                            <div style={{
-                              paddingLeft: 44,
-                              paddingRight: 24,
-                              paddingBottom: 18,
-                              paddingTop: 14,
-                              background: "rgba(168,180,117,0.03)",
-                              borderTop: "1px solid rgba(200,194,182,0.2)",
-                            }}>
-                              {/* Full spec paragraph */}
-                              <div style={{
-                                fontFamily: inter,
-                                fontSize: 13,
-                                color: "#5a5650",
-                                lineHeight: 1.7,
-                                marginBottom: 14,
-                              }}>
-                                {s.detail}
-                              </div>
-
-                              {(s.cost_note || s.avoid) && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                  {s.cost_note && (
-                                    <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
-                                      <span style={{
-                                        fontFamily: inter, fontSize: 9, fontWeight: 700,
-                                        letterSpacing: "0.10em", textTransform: "uppercase" as const,
-                                        color: CHARTREUSE, flexShrink: 0, lineHeight: 1.8,
-                                        width: 44,
-                                      }}>COST</span>
-                                      <span style={{ fontFamily: inter, fontSize: 12, color: "#8a8478", lineHeight: 1.7 }}>
-                                        {s.cost_note}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {s.avoid && (
-                                    <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
-                                      <span style={{
-                                        fontFamily: inter, fontSize: 9, fontWeight: 700,
-                                        letterSpacing: "0.10em", textTransform: "uppercase" as const,
-                                        color: CAMEL_COL, flexShrink: 0, lineHeight: 1.8,
-                                        width: 44,
-                                      }}>AVOID</span>
-                                      <span style={{ fontFamily: inter, fontSize: 12, color: "#8a8478", lineHeight: 1.7 }}>
-                                        {s.avoid}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
+                            <div style={{ height: 34, position: "relative", background: MATERIAL_SWATCH_BG[mat.id] || "#D0C8B8" }}>
+                              {isSel && <div style={{ position: "absolute", top: 8, right: 8, width: 7, height: 7, borderRadius: "50%", background: CHARTREUSE }} />}
+                              {isRecommended && (
+                                <span
+                                  style={{
+                                    position: "absolute",
+                                    top: 8,
+                                    left: 8,
+                                    padding: "2px 7px",
+                                    borderRadius: 999,
+                                    border: "1px solid rgba(168,180,117,0.28)",
+                                    background: "rgba(255,255,255,0.72)",
+                                    color: "#6B7A40",
+                                    fontFamily: inter,
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    letterSpacing: "0.06em",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  Muko Pick
+                                </span>
                               )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* Restore bar */}
-                {removedSignals.length > 0 && (
-                  <div style={{
-                    marginTop: 8,
-                    fontFamily: inter,
-                    fontSize: 11,
-                    color: "rgba(67,67,43,0.45)",
-                  }}>
-                    {removedSignals.length} signal{removedSignals.length !== 1 ? "s" : ""} removed
-                    {" · "}
+                            <div style={{ padding: "8px 10px" }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: OLIVE, fontFamily: inter, lineHeight: 1.35 }}>{mat.name}</div>
+                              <div style={{ marginTop: 5, display: "grid", gap: 3, fontSize: 10.5, color: "rgba(67,67,43,0.46)", fontFamily: inter }}>
+                                <span>Cost per yard: ${mat.cost_per_yard}</span>
+                                <span>Lead time: {mat.lead_time_weeks} weeks</span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                  {!showAllMaterials && materials.filter((mat) => materialCategory === "all" || MATERIAL_CATEGORY_MAP[mat.id] === materialCategory).length > 6 && (
                     <button
-                      onClick={restoreAllSignals}
+                      onClick={() => setShowAllMaterials(true)}
+                      style={{ marginTop: 10, background: "none", border: "none", padding: 0, fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.48)", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
+                    >
+                      Show all materials
+                    </button>
+                  )}
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+                    <button
+                      onClick={() => { if (selectedMaterial) advanceToConstruction(); }}
+                      disabled={!selectedMaterial}
                       style={{
-                        fontFamily: inter,
-                        fontSize: 11,
-                        color: STEEL,
-                        background: "none",
-                        border: "none",
-                        padding: 0,
-                        cursor: "pointer",
-                        textDecoration: "underline",
+                        padding: "12px 18px",
+                        borderRadius: 999,
+                        border: selectedMaterial ? "1.5px solid #7D96AC" : "1px solid rgba(67,67,43,0.10)",
+                        background: selectedMaterial ? "rgba(125,150,172,0.08)" : "rgba(255,255,255,0.6)",
+                        color: selectedMaterial ? "#7D96AC" : "rgba(67,67,43,0.30)",
+                        fontFamily: sohne,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: selectedMaterial ? "pointer" : "not-allowed",
                       }}
                     >
-                      Restore all
+                      Continue to Construction →
                     </button>
                   </div>
-                )}
+                </section>
+                      </div>
+                    )}
+
+                    {specStep === "construction" && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
+                      <section id="complexity-section" style={{ }}>
+                    <div style={{ paddingTop: 12, borderTop: "1px solid rgba(67,67,43,0.08)", marginBottom: 34 }}>
+                      <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#6B7A40", marginBottom: 8 }}>
+                        Step 2
+                      </div>
+                      <div style={{ fontFamily: sohne, fontSize: 28, fontWeight: 500, color: OLIVE, marginBottom: 8, letterSpacing: "-0.03em" }}>
+                        Construction Discipline
+                      </div>
+                    </div>
+                    <div className="specConstructionGrid">
+                      {(["low", "moderate", "high"] as ConstructionTier[]).map((tier) => {
+                        const info = COMPLEXITY_CONTEXT[tier];
+                        const isSel = constructionConfirmed && constructionTier === tier;
+                        const isRec = tier === baselineComplexity;
+                        return (
+                          <button
+                            key={tier}
+                            onClick={() => handleComplexityChange(tier)}
+                            onMouseEnter={() => setHoveredComplexity(tier)}
+                            onMouseLeave={() => setHoveredComplexity(null)}
+                            style={{
+                              textAlign: "left",
+                              borderRadius: 18,
+                              padding: "16px 16px 17px",
+                              background: hoveredComplexity === tier ? "rgba(255,255,255,0.84)" : "rgba(255,255,255,0.72)",
+                              border: isSel ? "1px solid rgba(168,180,117,0.46)" : "1px solid rgba(67,67,43,0.06)",
+                              cursor: "pointer",
+                              transition: "background 180ms ease, border-color 180ms ease, transform 180ms ease",
+                              transform: hoveredComplexity === tier ? "translateY(-1px)" : "translateY(0)",
+                              boxShadow: isSel ? "0 16px 28px rgba(67,67,43,0.06)" : "none",
+                            }}
+                          >
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                              <div style={{ fontFamily: sohne, fontSize: 17, fontWeight: 600, color: OLIVE }}>{info.label}</div>
+                              {(isRec || isSel) && (
+                                <span className="specSelectionChip">
+                                  {isSel ? "Selected" : "Default"}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontFamily: inter, fontSize: 12.1, color: "rgba(67,67,43,0.66)", lineHeight: 1.58, marginBottom: 7 }}>{info.description}</div>
+                            <div style={{ fontFamily: inter, fontSize: 11.4, color: "rgba(67,67,43,0.48)", lineHeight: 1.58 }}>
+                              {info.note}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {overrideWarning && <div style={{ marginTop: 12, fontSize: 12, color: "rgba(67,67,43,0.56)", fontFamily: inter }}>{overrideWarning}</div>}
+                    {constructionTier && constructionConfirmed && selectedMaterial && (
+                      <div style={{ marginTop: 24 }}>
+                        <div style={{
+                          fontFamily: inter,
+                          fontSize: 9,
+                          fontWeight: 700,
+                          letterSpacing: "0.12em",
+                          textTransform: "uppercase" as const,
+                          color: "rgba(67,67,43,0.36)",
+                          marginBottom: 10,
+                        }}>
+                          Construction Implications
+                        </div>
+
+                        {/* LAYER 1: Material × construction tier — deterministic, instant */}
+                        {(() => {
+                          const implication = getMaterialConstructionImplication(
+                            selectedMaterial?.id,
+                            constructionTier
+                          );
+                          return implication ? (
+                            <div style={{
+                              fontFamily: sohne,
+                              fontSize: 15,
+                              fontWeight: 500,
+                              color: OLIVE,
+                              lineHeight: 1.35,
+                              marginBottom: 10,
+                            }}>
+                              {implication}
+                            </div>
+                          ) : null;
+                        })()}
+
+                        {/* LAYER 2: Chip × aesthetic × category guidance from design-language.json */}
+                        {buildInsightContent?.text && (
+                          <div style={{
+                            fontFamily: inter,
+                            fontSize: 13,
+                            color: "rgba(67,67,43,0.62)",
+                            lineHeight: 1.6,
+                            marginBottom: ((buildInsightContent?.tags?.length ?? 0) > 0 || chipsForHighComplexity.length > 0) ? 10 : 0,
+                          }}>
+                            {buildInsightContent?.text}
+                          </div>
+                        )}
+
+                        {/* LAYER 3: Risk tags + complexity chip count */}
+                        {((buildInsightContent?.tags?.length ?? 0) > 0 || chipsForHighComplexity.length > 0) && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            {buildInsightContent?.tags?.map((tag: string) => (
+                              <span key={tag} style={{
+                                padding: "3px 9px",
+                                borderRadius: 999,
+                                fontFamily: inter,
+                                fontSize: 10,
+                                fontWeight: 600,
+                                letterSpacing: "0.04em",
+                                background: tag.toLowerCase().includes("high")
+                                  ? "rgba(169,123,143,0.10)"
+                                  : tag.toLowerCase().includes("mod")
+                                  ? "rgba(184,135,107,0.10)"
+                                  : "rgba(168,180,117,0.10)",
+                                color: tag.toLowerCase().includes("high")
+                                  ? "#A97B8F"
+                                  : tag.toLowerCase().includes("mod")
+                                  ? "#B8876B"
+                                  : "#6B7A40",
+                                border: tag.toLowerCase().includes("high")
+                                  ? "1px solid rgba(169,123,143,0.24)"
+                                  : tag.toLowerCase().includes("mod")
+                                  ? "1px solid rgba(184,135,107,0.24)"
+                                  : "1px solid rgba(168,180,117,0.24)",
+                              }}>
+                                {tag}
+                              </span>
+                            ))}
+                            {chipsForHighComplexity.length > 0 && (
+                              <span style={{
+                                fontFamily: inter,
+                                fontSize: 11,
+                                color: "rgba(67,67,43,0.42)",
+                              }}>
+                                {chipsForHighComplexity.length} high-complexity signal{chipsForHighComplexity.length > 1 ? "s" : ""} active
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* FALLBACK: if both layers are empty */}
+                        {!getMaterialConstructionImplication(selectedMaterial?.id, constructionTier) &&
+                         !buildInsightContent?.text && (
+                          <div style={{
+                            fontFamily: inter,
+                            fontSize: 13,
+                            color: "rgba(67,67,43,0.62)",
+                            lineHeight: 1.6,
+                          }}>
+                            {buildConstructionImplication({
+                              materialName: selectedMaterial?.name ?? "",
+                              constructionTier: constructionTier ?? "moderate",
+                              topChips: (chipSelection?.activatedChips ?? []).slice(0, 2).map((c) => c.label),
+                              complexityChipCount: chipsForHighComplexity.length,
+                              leadTimeWeeks: selectedMaterial?.lead_time_weeks ?? 12,
+                              deliveryWindowWeeks: timelineWeeks ?? 24,
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </section>
+
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                          <button
+                            onClick={backToMaterial}
+                            style={{ padding: "12px 18px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", color: "rgba(67,67,43,0.62)", fontFamily: sohne, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                          >
+                            ← Back to Material
+                          </button>
+                          <button
+                            onClick={() => {
+                              const cat = categories.find(c => c.id === categoryId);
+                              setCategory(cat?.name ?? categoryId);
+                              setTargetMsrp(targetMSRP);
+                              setMaterial(materialId);
+                              setSilhouette(conceptSilhouette ? conceptSilhouette.charAt(0).toUpperCase() + conceptSilhouette.slice(1) : "");
+                              setStoreTier(constructionTier!);
+                              if (conceptPalette) {
+                                const entry = (aestheticsData as unknown as Array<{ id: string; palette_options?: Array<{ id: string; name: string; swatches: string[] }> }>).find(
+                                  (a) => a.id === conceptContext.aestheticMatchedId
+                                );
+                                const palOption = entry?.palette_options?.find((p) => p.id === conceptPalette);
+                                if (palOption) {
+                                  setColorPalette(palOption.swatches, palOption.name);
+                                }
+                              }
+                              setIsRunningAnalysis(true);
+                              setLoadingPhase(0);
+                              const phaseDelays = [650, 1300, 1950, 2500];
+                              phaseDelays.forEach((delay, i) => {
+                                setTimeout(() => setLoadingPhase(i + 1), delay);
+                              });
+                              setTimeout(() => {
+                                setIsRunningAnalysis(false);
+                                setShowScorecardModal(true);
+                              }, 2900);
+                            }}
+                            disabled={!selectedMaterial || !constructionConfirmed}
+                            style={{
+                              padding: "12px 18px",
+                              borderRadius: 999,
+                              border: (selectedMaterial && constructionConfirmed) ? "1px solid rgba(125,150,172,0.34)" : "1px solid rgba(67,67,43,0.10)",
+                              background: (selectedMaterial && constructionConfirmed) ? "rgba(125,150,172,0.04)" : "rgba(255,255,255,0.6)",
+                              color: (selectedMaterial && constructionConfirmed) ? "rgba(89,112,133,0.92)" : "rgba(67,67,43,0.30)",
+                              fontFamily: sohne,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: (selectedMaterial && constructionConfirmed) ? "pointer" : "not-allowed",
+                            }}
+                          >
+                            Continue to Report →
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
               </div>
-
-          </div>{/* end sections */}
-
-          <style>{`
-            @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-            @keyframes continueReady { 0% { transform: translateY(4px); opacity: 0.6; } 100% { transform: translateY(0); opacity: 1; } }
-            @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
-          `}</style>
-
-        </div>{/* end left content padding */}
-          </>
-        }
-        rightContent={
-        <>
-        <div style={{ padding: "36px 36px 0" }}>
-          {/* Pulse Rail — slim strip */}
-          <div style={{ marginBottom: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#A8A09A", fontFamily: inter, marginBottom: 14 }}>Pulse</div>
-            <PulseScoreRow
-              dimensionKey="identity"
-              label="Identity"
-              icon={<IconIdentity size={14} />}
-              displayScore={`${dynamicIdentityScore}`}
-              numericPercent={dynamicIdentityScore}
-              scoreColor={identityColor}
-              pill={identityChipData ? { variant: identityChipData.variant, label: identityChipData.status } : null}
-              subLabel="Locked from Concept"
-              whatItMeans="Identity measures how well your material, silhouette, palette, and construction choices reinforce the locked direction's brand signals."
-              howCalculated="Delta scoring against your locked aesthetic — each spec choice adds or subtracts from the base concept identity score."
-              isPending={false}
-              variant="strip"
-            />
-            <PulseScoreRow
-              dimensionKey="resonance"
-              label="Resonance"
-              icon={<IconResonance size={14} />}
-              displayScore={`${dynamicResonanceScore}`}
-              numericPercent={dynamicResonanceScore}
-              scoreColor={resonanceColor}
-              pill={resonanceChipData ? { variant: resonanceChipData.variant, label: resonanceChipData.status } : null}
-              subLabel="Locked from Concept"
-              whatItMeans="Resonance measures whether your choices are commercially timed — does the market appetite exist for this spec combination right now?"
-              howCalculated="Material trend alignment + silhouette saturation score, weighted against your direction's velocity data."
-              isPending={false}
-              variant="strip"
-            />
-            <PulseScoreRow
-              dimensionKey="execution"
-              label="Execution"
-              icon={<IconExecution size={14} />}
-              displayScore={!insight ? "—" : `$${insight.cogs}`}
-              numericPercent={!insight ? 0 : Math.min((insight.cogs / insight.ceiling) * 100, 100)}
-              scoreColor={executionColor}
-              pill={executionChipData ? { variant: executionChipData.variant, label: executionChipData.status } : null}
-              subLabel={executionChipData?.consequence ?? null}
-              whatItMeans="Execution measures cost feasibility — whether your build is viable at the target margin. COGS is calculated from material cost × yardage + complexity multiplier."
-              howCalculated="COGS vs margin ceiling: green if under, amber within 5%, red if over. Lead time scored separately against season deadline."
-              isPending={!insight}
-              variant="strip"
-            />
-            {activeImplications.length > 0 && (
-              <button
-                onClick={() => document.getElementById("construction-section")?.scrollIntoView({ behavior: "smooth" })}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  width: "100%",
-                  marginTop: 10,
-                  padding: "10px 14px",
-                  background: "rgba(184,135,107,0.08)",
-                  border: "1px solid rgba(184,135,107,0.25)",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  textAlign: "left",
-                }}
-              >
-                <span style={{ fontFamily: inter, fontSize: 12, fontWeight: 500, color: "#9a6845" }}>
-                  ⚠ {activeImplications.length} construction signal{activeImplications.length !== 1 ? "s" : ""} flagged
-                </span>
-                <span style={{ fontFamily: inter, fontSize: 11, color: CAMEL_COL, flexShrink: 0 }}>
-                  See below ↓
-                </span>
-              </button>
-            )}
+            </div>
           </div>
+            </main>
+          }
+          rightContent={
+            <aside className="specStudioColumn specStudioRight">
+          <div className="specStudioSticky" style={{ padding: "36px 28px 44px" }}>
+            <section style={{ marginBottom: 30 }}>
+              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>Pulse</div>
+              <PulseScoreRow
+                dimensionKey="identity"
+                label="Identity"
+                icon={<IconIdentity color={identityColor} />}
+                displayScore={String(dynamicIdentityScore)}
+                numericPercent={dynamicIdentityScore}
+                scoreColor={identityColor}
+                pill={{ variant: identityChipData.variant, label: identityChipData.status }}
+                subLabel={identityChipData.consequence}
+                whatItMeans="How clearly the piece carries the collection identity."
+                howCalculated="Derived from concept alignment, product anchor, and spec continuity."
+                isPending={false}
+                isExpanded={pulseExpandedRow === "identity"}
+                onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === "identity" ? null : "identity")}
+              />
+              <PulseScoreRow
+                dimensionKey="resonance"
+                label="Resonance"
+                icon={<IconResonance color={resonanceColor} />}
+                displayScore={String(dynamicResonanceScore)}
+                numericPercent={dynamicResonanceScore}
+                scoreColor={resonanceColor}
+                pill={{ variant: resonanceChipData.variant, label: resonanceChipData.status }}
+                subLabel={resonanceChipData.consequence}
+                whatItMeans="How commercially alive the concept feels in the market."
+                howCalculated="Weighted by signal trajectory, concept framing, and product relevance."
+                isPending={false}
+                isExpanded={pulseExpandedRow === "resonance"}
+                onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === "resonance" ? null : "resonance")}
+              />
+              <PulseScoreRow
+                dimensionKey="execution"
+                label="Execution"
+                icon={<IconExecution color={executionColor} />}
+                displayScore={String(executionScore)}
+                numericPercent={executionScore}
+                scoreColor={executionColor}
+                pill={executionChipData ? { variant: executionChipData.variant, label: executionChipData.status } : null}
+                subLabel={executionSubLabel}
+                whatItMeans="Whether the concept still holds together under production pressure."
+                howCalculated="Based on material, construction, cost, margin pressure, and delivery feasibility."
+                isPending={!selectedMaterial}
+                isExpanded={pulseExpandedRow === "execution"}
+                onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === "execution" ? null : "execution")}
+              />
+              {!selectedMaterial && (
+                <div style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.42)", lineHeight: 1.5, marginTop: 2, marginBottom: 4 }}>
+                  Select a material to begin execution analysis.
+                </div>
+              )}
+              {materialSelectionDelta && (
+                <div
+                  style={{
+                    marginTop: 6,
+                    marginBottom: 10,
+                    paddingTop: 10,
+                    borderTop: "1px solid rgba(67,67,43,0.08)",
+                    borderBottom: "1px solid rgba(67,67,43,0.05)",
+                    animation: "fadeIn 240ms cubic-bezier(0.22,0.8,0.2,1)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 9 }}>
+                    <span style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(168,180,117,0.9)", display: "inline-block", flexShrink: 0 }} />
+                    <span style={{ fontFamily: inter, fontSize: 8, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.34)" }}>
+                      Material Switch Impact
+                    </span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 14 }}>
+                    <div style={{ padding: "0 0 10px" }}>
+                      <div style={{ fontFamily: inter, fontSize: 7.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.3)", marginBottom: 5 }}>
+                        Cost / Garment
+                      </div>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                        <span style={{ fontFamily: sohne, fontSize: 16, fontWeight: 500, letterSpacing: "-0.025em", lineHeight: 1, color: materialSelectionDelta.cogs > 0 ? PULSE_RED : materialSelectionDelta.cogs < 0 ? PULSE_GREEN : OLIVE }}>
+                          {materialSelectionDelta.cogs === 0 ? "—" : `${materialSelectionDelta.cogs > 0 ? "+" : "−"}$${Math.abs(materialSelectionDelta.cogs)}`}
+                        </span>
+                        <span style={{ fontFamily: inter, fontSize: 8, color: "rgba(67,67,43,0.3)", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                          cogs
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ padding: "0 0 10px" }}>
+                      <div style={{ fontFamily: inter, fontSize: 7.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.3)", marginBottom: 5 }}>
+                        Lead Time
+                      </div>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                        <span style={{ fontFamily: sohne, fontSize: 16, fontWeight: 500, letterSpacing: "-0.025em", lineHeight: 1, color: materialSelectionDelta.leadTime > 0 ? PULSE_RED : materialSelectionDelta.leadTime < 0 ? PULSE_GREEN : OLIVE }}>
+                          {materialSelectionDelta.leadTime === 0 ? "—" : `${materialSelectionDelta.leadTime > 0 ? "+" : ""}${materialSelectionDelta.leadTime}`}
+                        </span>
+                        <span style={{ fontFamily: inter, fontSize: 8, color: "rgba(67,67,43,0.3)", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                          wks
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
 
-          {/* Major section divider */}
-          <div style={{ height: 1, background: "#E8E3D6", margin: "20px 0 24px" }} />
+            {/* Muko's Read — 3-state progressive disclosure */}
+            <section style={{ paddingTop: 24, marginBottom: 30, borderTop: "1px solid rgba(67,67,43,0.08)" }}>
+              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>Muko&apos;s Read</div>
 
-          {/* Muko Insight */}
-          {!userManuallySelected ? (
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>
-                Insight
-              </div>
-              <p style={{ margin: 0, fontFamily: inter, fontSize: 13.5, color: "rgba(67,67,43,0.42)", fontStyle: "italic", lineHeight: 1.6 }}>
-                Select a material to see Muko&apos;s insight
-              </p>
-            </div>
-          ) : specInsightLoading && !specSynthInsightData && !specStreamingText ? (
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>
-                Insight
-              </div>
-              {/* Skeleton — shown only before first streaming chunk arrives */}
-              {[80, 60, 90, 55].map((w, i) => (
-                <div key={i} style={{ height: i === 0 ? 18 : 12, borderRadius: 6, background: "rgba(67,67,43,0.07)", marginBottom: i === 0 ? 14 : 8, width: `${w}%`, animation: "pulse 1.4s ease-in-out infinite" }} />
-              ))}
-            </div>
-          ) : (
-            <MukoInsightSection
-              headline={specSynthInsightData?.statements[0] ?? specInsightContent.headline}
-              paragraphs={
-                specSynthInsightData
-                  ? [specSynthInsightData.statements[1] ?? '', specSynthInsightData.statements[2] ?? ''].filter(Boolean)
-                  : [specInsightContent.p1, specInsightContent.p2, specInsightContent.p3]
-              }
-              bullets={{
-                label: specSynthInsightData?.editLabel ?? 'BUILD REALITY',
-                items: specSynthInsightData?.edit ?? specInsightContent.opportunity,
-              }}
-              mode={specSynthInsightData?.mode}
-              isStreaming={specInsightLoading && !!specStreamingText}
-              streamingText={specStreamingText}
-              pageMode="concept"
-              nextMove={{
-                mode: "spec",
-                suggestions: mukoSynthesis?.suggestions ?? [],
-                subtitle: insight && insight.cogs > insight.ceiling
-                  ? "Adjustments that improve feasibility without changing your direction."
-                  : "Ways to invest your margin headroom and elevate the piece.",
-                appliedIds: appliedSuggestions,
-                onApply: (id) => applySuggestion(id, mukoSynthesis?.suggestions ?? []),
-                onUndo: undoSuggestion,
-              }}
-            />
-          )}
+              {/* State 0: no material selected */}
+              {!selectedMaterial && (
+                <>
+                  <div style={{ fontFamily: sohne, fontSize: 21, fontWeight: 600, lineHeight: 1.22, color: OLIVE, marginBottom: 0 }}>
+                    {mukoRead.headline}
+                  </div>
+                </>
+              )}
 
-          {/* Spacer for sticky footer */}
-          <div style={{ height: 72 }} />
-        </div>
+              {/* State 1: material selected, construction not confirmed */}
+              {selectedMaterial && !hasConstructionSelection && (
+                <>
+                  {specInsightLoading && !specSynthInsightData && !specStreamingText ? (
+                    <>
+                      {[84, 68, 92, 58].map((width, index) => (
+                        <div key={index} style={{ height: index === 0 ? 18 : 12, borderRadius: 6, background: "rgba(67,67,43,0.07)", marginBottom: index === 0 ? 14 : 8, width: `${width}%`, animation: "pulse 1.4s ease-in-out infinite" }} />
+                      ))}
+                    </>
+                  ) : (
+                    <div style={{ fontFamily: sohne, fontSize: 21, fontWeight: 600, lineHeight: 1.22, color: OLIVE, marginBottom: 10 }}>
+                      {specStreamingText || mukoRead.headline}
+                    </div>
+                  )}
+                  {!(specInsightLoading && !specSynthInsightData && !specStreamingText) && (
+                    <>
+                      <div style={{ fontFamily: inter, fontSize: 12.75, color: "rgba(67,67,43,0.58)", lineHeight: 1.72, marginBottom: 16 }}>
+                        {(() => {
+                          const text = specSynthInsightData?.statements?.slice(0, 2).join(" ") || mukoRead.body;
+                          return text.split(/(?<=[.!?])\s+/).slice(0, 2).join(" ");
+                        })()}
+                      </div>
+                      <button
+                        onClick={() => setSpecAnalysisExpanded(e => !e)}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: inter, fontSize: 11, fontWeight: 600, color: "#6B7A40" }}
+                      >
+                        {specAnalysisExpanded ? "Hide analysis" : "See analysis"}
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ transform: specAnalysisExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 180ms ease", flexShrink: 0 }}>
+                          <path d="M2 4.5L6 8L10 4.5" stroke="#6B7A40" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                      {specAnalysisExpanded && (
+                        <div style={{ marginTop: 18, borderTop: "1px solid rgba(67,67,43,0.08)", paddingTop: 14 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 8, padding: "7px 0" }}>
+                            <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "#B8876B", paddingTop: 1, lineHeight: 1.5 }}>
+                              Execution Risk
+                            </div>
+                            <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.65)", lineHeight: 1.55 }}>
+                              {getFirstSentence(structuredReadouts[0]?.body ?? "")}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.38)", marginTop: 12, lineHeight: 1.55 }}>
+                        Select construction discipline to unlock the full build analysis.
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
 
-        {/* Sticky CTA */}
-        <div style={{ position: "sticky", bottom: 0, padding: "0 36px 24px", background: "linear-gradient(to bottom, rgba(250,249,246,0) 0%, rgba(250,249,246,0.92) 16%, rgba(250,249,246,1) 100%)", paddingTop: 20, zIndex: 10 }}>
-          <button
-            disabled={!isComplete}
-            onClick={() => {
-              if (!isComplete) return;
-              const cat = categories.find(c => c.id === categoryId);
-              setCategory(cat?.name ?? categoryId);
-              setTargetMsrp(targetMSRP);
-              setMaterial(materialId);
-              setSilhouette(conceptSilhouette ? conceptSilhouette.charAt(0).toUpperCase() + conceptSilhouette.slice(1) : '');
-              setStoreTier(constructionTier!);
-              // Palette from concept or spec selection
-              if (conceptPalette) {
-                const entry = (aestheticsData as unknown as Array<{ id: string; palette_options?: Array<{ id: string; name: string; swatches: string[] }> }>).find(
-                  (a) => a.id === conceptContext.aestheticMatchedId
-                );
-                const palOption = entry?.palette_options?.find((p) => p.id === conceptPalette);
-                if (palOption) {
-                  setColorPalette(palOption.swatches, palOption.name);
-                }
-              }
-              // Start loading animation, then open scorecard modal
-              setIsRunningAnalysis(true);
-              setLoadingPhase(0);
-              const phaseDelays = [650, 1300, 1950, 2500];
-              phaseDelays.forEach((delay, i) => {
-                setTimeout(() => setLoadingPhase(i + 1), delay);
-              });
-              setTimeout(() => {
-                setIsRunningAnalysis(false);
-                setShowScorecardModal(true);
-              }, 2900);
-            }}
-            style={{
-              width: "100%",
-              padding: "14px 16px",
-              borderRadius: 10,
-              fontSize: 12,
-              fontWeight: 700,
-              fontFamily: sohne,
-              letterSpacing: "0.02em",
-              color: isComplete ? STEEL : "rgba(67,67,43,0.30)",
-              background: isComplete ? "rgba(125,150,172,0.07)" : "rgba(255,255,255,0.46)",
-              border: isComplete ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)",
-              cursor: isComplete ? "pointer" : "not-allowed",
-              transition: "all 280ms ease",
-              opacity: isComplete ? 1 : 0.65,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              animation: isComplete ? "continueReady 600ms ease-out 1" : "none",
-            }}
-          >
-            <span>Run Muko Analysis</span>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ transition: "transform 280ms ease", transform: isComplete ? "translateX(0)" : "translateX(-2px)", opacity: isComplete ? 1 : 0.4 }}>
-              <path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </div>
-        </>
+              {/* State 2: both selected */}
+              {hasConstructionSelection && (
+                <>
+                  {specInsightLoading && !specSynthInsightData && !specStreamingText ? (
+                    <>
+                      {[84, 68, 92, 58].map((width, index) => (
+                        <div key={index} style={{ height: index === 0 ? 18 : 12, borderRadius: 6, background: "rgba(67,67,43,0.07)", marginBottom: index === 0 ? 14 : 8, width: `${width}%`, animation: "pulse 1.4s ease-in-out infinite" }} />
+                      ))}
+                    </>
+                  ) : (
+                    <div style={{ fontFamily: sohne, fontSize: 21, fontWeight: 600, lineHeight: 1.22, color: OLIVE, marginBottom: 10 }}>
+                      {specStreamingText || mukoRead.headline}
+                    </div>
+                  )}
+                  {!(specInsightLoading && !specSynthInsightData && !specStreamingText) && (
+                    <>
+                      <div style={{ fontFamily: inter, fontSize: 12.75, color: "rgba(67,67,43,0.58)", lineHeight: 1.72, marginBottom: 16 }}>
+                        {(() => {
+                          const text = specSynthInsightData?.statements?.slice(0, 2).join(" ") || mukoRead.body;
+                          return text.split(/(?<=[.!?])\s+/).slice(0, 2).join(" ");
+                        })()}
+                      </div>
+                      <div style={{ marginTop: 18, borderTop: "1px solid rgba(67,67,43,0.08)", paddingTop: 14 }}>
+                        {structuredReadouts.map((item) => (
+                          <div key={item.label} style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 8, padding: "7px 0" }}>
+                            <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "#B8876B", paddingTop: 1, lineHeight: 1.5 }}>
+                              {item.label}
+                            </div>
+                            <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.65)", lineHeight: 1.55 }}>
+                              {getFirstSentence(item.body)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </section>
+
+          </div>
+            </aside>
+          }
+        />
+      </div>
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes specReveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes continueReady { 0% { transform: translateY(4px); opacity: 0.6; } 100% { transform: translateY(0); opacity: 1; } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+        @keyframes railShift { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .specStudioLayout {
+          display: flex;
+          height: 100vh;
         }
-      />
+        .specStudioColumn {
+          overflow-y: auto;
+        }
+        .specStudioLeft {
+          width: 320px;
+          flex-shrink: 0;
+          border-right: 1px solid rgba(67,67,43,0.07);
+          min-height: 100vh;
+        }
+        .specStudioRight {
+          background:
+            radial-gradient(circle at top left, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0) 34%),
+            linear-gradient(180deg, rgba(250,249,246,0.9) 0%, rgba(245,242,235,0.96) 100%);
+          position: relative;
+          height: 100%;
+        }
+        .specStudioSticky {
+          position: sticky;
+          top: 72px;
+        }
+        .specMaterialGrid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          column-gap: 10px;
+          row-gap: 7px;
+        }
+        .specRevealSection {
+          animation: specReveal 260ms ease-out;
+        }
+        .specStagePill {
+          display: inline-flex;
+          align-items: center;
+          padding: 5px 11px;
+          border-radius: 999px;
+          border: 1px solid rgba(67,67,43,0.07);
+          background: rgba(255,255,255,0.56);
+          color: rgba(67,67,43,0.52);
+          font-family: ${inter};
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          animation: specReveal 240ms ease-out;
+        }
+        .specStagePillActive {
+          background: rgba(245,242,235,0.9);
+          color: rgba(67,67,43,0.74);
+        }
+        .specStagePillComplete {
+          color: #6B7A40;
+          border-color: rgba(168,180,117,0.24);
+          background: rgba(255,255,255,0.72);
+        }
+        .specStageArrow {
+          color: rgba(67,67,43,0.28);
+          font-size: 13px;
+          line-height: 1;
+          animation: specReveal 240ms ease-out;
+        }
+        .specConstructionGrid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+        }
+        .specSelectionChip {
+          font-size: 9.5px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #6B7A40;
+          background: rgba(255,255,255,0.72);
+          border: 1px solid rgba(168,180,117,0.26);
+          border-radius: 999px;
+          padding: 3px 7px;
+          font-family: ${inter};
+        }
+        .specRevealPrompt {
+          padding: 14px 16px;
+          border-radius: 16px;
+          background: rgba(255,255,255,0.56);
+          border: 1px solid rgba(67,67,43,0.06);
+          color: rgba(67,67,43,0.54);
+          font-family: ${inter};
+          font-size: 12.2px;
+          line-height: 1.6;
+          animation: specReveal 220ms ease-out;
+        }
+        .specNextMoveRow:hover {
+          background: rgba(255,255,255,0.72);
+        }
+        @media (max-width: 1180px) {
+          .specStudioLayout {
+            grid-template-columns: 1fr;
+          }
+          .specStudioLeft,
+          .specStudioRight {
+            border: 0;
+            width: auto !important;
+          }
+          .specStudioColumn {
+            min-height: auto;
+            overflow: visible;
+          }
+          .specStudioSticky {
+            position: static;
+          }
+          .specRailDivider {
+            display: none;
+          }
+        }
+        @media (max-width: 860px) {
+          .specMaterialGrid,
+          .specConstructionGrid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
 
       {/* ═══ FLOATING MUKO ORB ═══ */}
       <FloatingMukoOrb

@@ -1,0 +1,87 @@
+{
+  "organic-cotton": {
+    "low": "Organic cotton at low construction stays clean and cost-stable — minimal seam work lets the fabric breathe and keeps lead time predictable.",
+    "moderate": "Organic cotton handles moderate construction well — structured seaming is achievable without inflating assembly time or risking drape loss.",
+    "high": "Organic cotton at high construction risks seam distortion under heavy finishing detail — sampling must validate that the hand doesn't fight the structure."
+  },
+  "conventional-cotton": {
+    "low": "Conventional cotton at low construction is the most reliable execution path — stable, repeatable, and forgiving on timeline.",
+    "moderate": "Conventional cotton supports moderate construction cleanly — it holds seam work without special handling and keeps SMV in a predictable range.",
+    "high": "Conventional cotton at high construction introduces finishing sensitivity — the fabric holds structure but detailed seam work requires disciplined pressing and QC."
+  },
+  "tencel": {
+    "low": "Tencel at low construction lets the drape do the work — minimal seaming preserves the fluid hand and keeps assembly demand low.",
+    "moderate": "Tencel at moderate construction requires careful seam allowance — the fabric's drape can be disrupted by aggressive finishing, so construction detail must be intentional.",
+    "high": "Tencel at high construction is technically demanding — the fluid hand fights structured seam work, and finishing intensity risks permanently altering the drape behavior."
+  },
+  "linen": {
+    "low": "Linen at low construction is straightforward — the fabric's natural texture carries the aesthetic without needing construction complexity.",
+    "moderate": "Linen at moderate construction works well for structured pieces — it holds seam lines cleanly and tolerates finishing detail without significant handling risk.",
+    "high": "Linen at high construfraying at seam edges under heavy finishing detail is the primary risk, and sampling must validate edge treatment."
+  },
+  "silk": {
+    "low": "Silk at low construction is the correct pairing — minimal seaming protects the hand and keeps slippage and handling time manageable.",
+    "moderate": "Silk at moderate construction is achievable but requires specialist handling — seam allowances must be generous and finishing must be minimal to protect the surface.",
+    "high": "Silk at high construction is a high-risk combination — the fabric's handling sensitivity compounds with complex seam work, driving SMV and sampling cycles significantly."
+  },
+  "wool-merino": {
+    "low": "Merino at low construction under-uses the fabric's structure potential — it works, but the material supports more complexity without significant cost penalty.",
+    "moderate": "Merino at moderate construction is the optimal pairing — the fabric holds seam work cleanly, finishing detail reads well, and the hand stays intact tembly.",
+    "high": "Merino at high construction is technically viable but weight-sensitive — structured seam work is achievable, but finishing intensity must account for the fabric's natural loft and recovery."
+  },
+  "cashmere-blend": {
+    "low": "Cashmere blend at low construction protects the hand and keeps assembly cost aligned with the material investment.",
+    "moderate": "Cashmere blend handles moderate construction well when seam work is clean — the blend's structure supports finishing detail without compromising softness.",
+    "high": "Cashmere blend at high construction is a premium commitment — assembly SMV climbs significantly and any finishing error is costly to correct given the material's price point."
+  },
+  "recycled-polyester": {
+    "low": "Recycled polyester at low construction is cost-efficient and timeline-stable — the right call when margin and delivery are the binding constraints.",
+    "moderate": "Recycled polyester handles moderate construction without issue — it's lly stable, holds seam work cleanly, and tolerates finishing detail well.",
+    "high": "Recycled polyester at high construction is technically clean but aesthetically limiting — the fabric holds structure, but the synthetic hand under heavy finishing can read as over-engineered."
+  },
+  "virgin-polyester": {
+    "low": "Virgin polyester at low construction is the most efficient execution path — stable, fast, and predictable across all handling stages.",
+    "moderate": "Virgin polyester supports moderate construction reliably — dimensional stability makes seam work consistent and finishing detail holds without special handling.",
+    "high": "Virgin polyester at high construction delivers structural precision — the fabric's stability is an asset at this complexity tier, though surface finish under heavy pressing needs QC attention."
+  },
+  "nylon": {
+    "low": "Nylon at low construction keeps the build fast and abrasion-resistant — appropriate when durability and timeline are the priority.",
+    "moderate": "Nylon handles moderate construction well — the fabric's strength supports seam work without handling risk, and lead time stays predictable.",
+    "high": "Nylon at high construction introduces heat sensitivity at finishing stages — structured seam work is achievable, but pressing and finishing protocols must be tightly controlled."
+  },
+  "leather": {
+    "low": "Genuine leather at low construction is the correct approach for most applications — minimal seaming protects the surface and keeps assembly time aligned with the material cost.",
+    "moderate": "Genuine leather at moderate construction requires specialist assembly — seam allowances must be glued before stitching and finishing detail demands experienced handlers.",
+    "high": "Genuine leather at high construction is a significant production commitment — SMV is high, rework is costly, and the sampling cycle must be longer than standard to validate every seam treatment."
+  },
+  "vegan-leather": {
+    "low": "PU leather at lotion is straightforward — it handles like woven fabric at this complexity tier and keeps assembly cost low.",
+    "moderate": "PU leather supports moderate construction cleanly — it holds seam work without specialist handling and tolerates standard finishing protocols.",
+    "high": "PU leather at high construction risks delamination at seam edges under heavy finishing pressure — sampling must validate edge treatment and pressing protocols before committing."
+  },
+  "rayon-viscose": {
+    "low": "Rayon at low construction lets the drape lead — minimal seaming preserves the fluid hand and keeps handling time low.",
+    "moderate": "Rayon at moderate construction requires careful handling — the fabric's drape and slippage sensitivity mean seam allowances need to be generous and finishing controlled.",
+    "high": "Rayon at high construction is a high-handling combination — slippage under complex seam work and sensitivity to finishing intensity make this a demanding production path."
+  },
+  "deadstock-fabric": {
+    "low": "Deadstock at low construction is the right call — it maximises yardage efficiency and minimises cutting waste on a fixed-quantity material.",
+    "moderate": "Deadstock at moderate construction is workable if yardage allows — seam allowance planning must account for the fixed lot size with no reorder option.",
+    "high": "Deadstock at high construction is a risk — complex seam work increases cutting waste and any sampling error cannot be recovered with additional yardage."
+  },
+  "hemp": {
+    "low": "Hemp at low construction is straightforward — the fabric's natural texture carries the aesthetic without requiring construction complexity.",
+    "moderate": "Hemp handles moderate construction well — it's dimensionally stable, holds seam lines cleanly, and softens through assembly without losing structure.",
+    "high": "Hemp at high construction is technically viable — the fabric's strength supports finishing detail, but surface texture under heavy pressing needs QC validation."
+  },
+  "denim-raw-selvedge": {
+    "low": "Raw selvedge denim at low construction under-uses the fabric — the material's character calls for construction detail that reads against its structure.",
+    "moderate": "Raw selvedge denim at moderate construction is the optimal pairing — structured seam work complements the fabric's character without overwhelming it.",
+    "high": "Raw selvedge denim at high construction is technically demanding — the fabric's weight and stiffness drive SMV significantly and require industrial equipment at finishing stages."
+  },
+  "denim-conventional": {
+    "low": "Conventional denim at low construction keeps the build fast and cost-stable — appropriate when volume and timeline are the primary constraints.",
+    "moderate": "Conventional denim supports moderate construction reliably — it holds seam work cleanly and tolerates finishing detail without handling risk.",
+    "high": "Conventional denim at high construction introduces weight and stiffness challenges at complex seam ins — pressing and topstitching protocols must be tightly controlled."
+  }
+}

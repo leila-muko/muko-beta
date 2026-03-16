@@ -142,7 +142,7 @@ export function combineDirection(options: {
   const normalizedFreeText = normalize(options.freeText ?? "");
 
   const activeModifiers = DIRECTION_MODIFIERS.filter((modifier) => {
-    if (selectedChipLabels.some((chip) => normalize(chip) === modifier.label)) return true;
+    if (selectedChipLabels.some((chip) => normalize(chip) === normalize(modifier.label))) return true;
     if (modifier.keywords.some((keyword) => normalizedFreeText.includes(keyword))) return true;
     return modifier.relatedConcepts.some((concept) => parsed.modifiers.includes(concept));
   });
