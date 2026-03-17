@@ -19,26 +19,35 @@ export function GoogleButton() {
     <button
       type="button"
       onClick={handleGoogleSignIn}
-      className="w-full flex items-center justify-center gap-3 font-body font-medium transition-all duration-200"
       style={{
-        padding: '0.75rem 1.5rem',
-        backgroundColor: 'rgba(255, 255, 255, 0.5)',
-        border: '1px solid rgba(229, 231, 235, 0.5)',
-        borderRadius: '12px',
-        fontSize: '0.9375rem',
-        color: '#374151',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        width: '100%',
+        height: 48,
+        borderRadius: 100,
+        background: 'transparent',
+        border: '1px solid rgba(73,66,53,0.2)',
+        color: '#4D302F',
+        fontFamily: 'var(--font-inter)',
+        fontSize: 13,
+        fontWeight: 600,
+        letterSpacing: '0.15em',
+        textTransform: 'uppercase',
+        cursor: 'pointer',
+        transition: 'border-color 0.2s, background 0.2s',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
-        e.currentTarget.style.borderColor = 'rgba(229, 231, 235, 0.8)';
+        e.currentTarget.style.borderColor = 'rgba(73,66,53,0.4)'
+        e.currentTarget.style.background = 'rgba(73,66,53,0.03)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
-        e.currentTarget.style.borderColor = 'rgba(229, 231, 235, 0.5)';
+        e.currentTarget.style.borderColor = 'rgba(73,66,53,0.2)'
+        e.currentTarget.style.background = 'transparent'
       }}
     >
-      <svg className="w-5 h-5" viewBox="0 0 24 24">
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: 0 }}>
         <path
           fill="#4285F4"
           d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"

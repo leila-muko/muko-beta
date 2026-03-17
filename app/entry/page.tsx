@@ -76,6 +76,7 @@ export default function EntryScreen() {
       window.localStorage.removeItem('muko_seasonLabel');
       window.localStorage.removeItem('muko_collection_aesthetic');
       window.localStorage.removeItem('muko_aesthetic_inflection');
+      window.localStorage.removeItem('muko_intent');
     } catch {}
   };
 
@@ -153,6 +154,7 @@ export default function EntryScreen() {
   };
 
   const handleContinue = () => {
+    window.localStorage.removeItem('muko_intent');
     setTouchedName(true);
     setTouchedSeason(true);
     if (!canContinue) return;

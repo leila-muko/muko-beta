@@ -1,135 +1,102 @@
-// app/auth/signin/page.tsx
-import { SignInForm } from '@/components/auth/signin-form'
-import { GoogleButton } from '@/components/auth/google-button'
 import Link from 'next/link'
+import { GoogleButton } from '@/components/auth/google-button'
+import { SignInForm } from '@/components/auth/signin-form'
 
 export default function SignInPage() {
   return (
-    <div 
-      className="min-h-screen flex items-center justify-center px-4 py-12 relative overflow-hidden"
+    <main
       style={{
-        background: 'linear-gradient(135deg, #FFFEF9 0%, #F5F0E8 40%, #EBE1D1 100%)',
+        background: 'linear-gradient(150deg, #F9F7F4 0%, #F7F3F5 60%, #F3EDF0 100%)',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px 16px',
       }}
     >
-      {/* Floating blobs */}
-      <div 
-        className="absolute animate-float pointer-events-none"
-        style={{
-          top: '-10%',
-          right: '-5%',
-          width: '500px',
-          height: '500px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(169, 123, 143, 0.25) 0%, transparent 70%)',
-          filter: 'blur(80px)',
-        }}
-      />
-      <div 
-        className="absolute animate-float-reverse pointer-events-none"
-        style={{
-          bottom: '-10%',
-          left: '-5%',
-          width: '600px',
-          height: '600px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(184, 135, 107, 0.25) 0%, transparent 70%)',
-          filter: 'blur(80px)',
-        }}
-      />
-      
-      {/* Content */}
-      <div style={{ width: '100%', maxWidth: '28rem', position: 'relative', zIndex: 10 }}>
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <h1 
-            className="font-heading"
-            style={{ 
-              fontSize: '3.5rem',
-              fontWeight: 700,
-              marginBottom: '1rem',
-              color: '#4D302F',
-              letterSpacing: '-0.03em',
-            }}
-          >
-            Welcome back
-          </h1>
-          <p 
-            className="font-body"
-            style={{
-              fontSize: '1rem',
-              color: '#4D302F',
-              fontWeight: 400,
-            }}
-          >
-            Sign in to continue
-          </p>
-        </div>
-
-        {/* Glassy Card */}
-        <div 
+      <div style={{ maxWidth: 480, width: '100%' }}>
+        {/* Logo */}
+        <h1
+          className="font-heading"
           style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.7)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: '32px',
-            boxShadow: '0 8px 32px 0 rgba(77, 48, 47, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.6)',
-            padding: '3.5rem 3rem',
+            fontWeight: 600,
+            fontSize: 52,
+            color: '#4D302F',
+            letterSpacing: '-0.02em',
+            lineHeight: 1,
+            textAlign: 'center',
+            margin: '0 0 12px',
           }}
         >
+          muko.
+        </h1>
+
+        {/* Eyebrow */}
+        <p
+          style={{
+            fontFamily: 'var(--font-inter)',
+            fontSize: 11,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            color: '#999',
+            textAlign: 'center',
+            marginBottom: 28,
+          }}
+        >
+          Creative Intelligence · Private Beta
+        </p>
+
+        {/* Form card */}
+        <div>
+          {/* Google OAuth */}
           <GoogleButton />
-          
-         {/* Divider - Fixed */}
-<div style={{ position: 'relative', margin: '2.5rem 0' }}>
-  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center' }}>
-    <div style={{ 
-      width: '100%', 
-      height: '1px', 
-      background: 'linear-gradient(90deg, transparent 0%, rgba(125, 150, 172, 0.2) 15%, rgba(125, 150, 172, 0.2) 35%, transparent 50%, rgba(125, 150, 172, 0.2) 65%, rgba(125, 150, 172, 0.2) 85%, transparent 100%)' 
-    }}></div>
-  </div>
-  <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
-    <span 
-      className="font-body"
-      style={{ 
-        padding: '0 1.25rem',
-        backgroundColor: 'rgba(255, 255, 255, 0.7)',
-        color: '#9CA3AF',
-        fontSize: '0.875rem',
-        fontWeight: 500,
-      }}
-    >
-      Or with email
-    </span>
-  </div>
-</div>
 
-          <SignInForm />
-
-          <p 
-            className="font-body"
-            style={{ 
-              marginTop: '2.5rem', 
-              textAlign: 'center', 
-              fontSize: '0.875rem', 
-              color: '#6B7280',
-              fontWeight: 400,
+          {/* Divider */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              margin: '16px 0',
             }}
           >
-            Don&apos;t have an account?{' '}
-            <Link 
-              href="/auth/signup" 
-              className="hover:underline transition-all"
-              style={{ 
-                color: '#7D96AC', 
-                fontWeight: 500,
+            <div style={{ flex: 1, height: 1, background: 'rgba(73,66,53,0.15)' }} />
+            <span
+              style={{
+                fontFamily: 'var(--font-inter)',
+                fontSize: 11,
+                color: '#ccc',
               }}
+            >
+              or
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(73,66,53,0.15)' }} />
+          </div>
+
+          {/* Email / password form */}
+          <SignInForm />
+
+          {/* Footer */}
+          <p
+            style={{
+              fontFamily: 'var(--font-inter)',
+              fontSize: 12,
+              color: '#999',
+              textAlign: 'center',
+              marginTop: 16,
+            }}
+          >
+            New to muko?{' '}
+            <Link
+              href="/auth/signup"
+              className="hover:underline"
+              style={{ color: '#B8876B' }}
             >
               Sign up
             </Link>
           </p>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

@@ -38,7 +38,7 @@ export function SignUpForm() {
 
   return (
     <form onSubmit={handleSignUp}>
-      <div style={{ marginBottom: '1.5rem' }}>
+      <div style={{ marginBottom: 12 }}>
         <Input
           id="email"
           type="email"
@@ -50,7 +50,7 @@ export function SignUpForm() {
         />
       </div>
 
-      <div style={{ marginBottom: '2rem' }}>
+      <div style={{ marginBottom: 20 }}>
         <Input
           id="password"
           type="password"
@@ -64,8 +64,16 @@ export function SignUpForm() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4" style={{ marginBottom: '2rem' }}>
-          <p className="text-sm text-red-600 font-body">
+        <div
+          style={{
+            marginBottom: 16,
+            backgroundColor: 'rgba(188,82,74,0.06)',
+            border: '1px solid rgba(188,82,74,0.2)',
+            borderRadius: 8,
+            padding: '10px 14px',
+          }}
+        >
+          <p style={{ fontSize: 13, color: '#9A4039', fontFamily: 'var(--font-inter)' }}>
             {error}
           </p>
         </div>

@@ -101,6 +101,7 @@ export default function CollectionsHubPage() {
       localStorage.removeItem('muko_seasonLabel');
       localStorage.removeItem('muko_collection_aesthetic');
       localStorage.removeItem('muko_aesthetic_inflection');
+      localStorage.removeItem('muko_intent');
     } catch {}
     router.push('/entry');
   }, [router, setActiveCollection]);
@@ -189,7 +190,7 @@ export default function CollectionsHubPage() {
             Recents
           </h2>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto', paddingRight: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto', paddingRight: 4, flex: 1, minHeight: 0 }}>
             {loading ? (
               <div
                 style={{

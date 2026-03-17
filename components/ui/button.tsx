@@ -8,54 +8,45 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', className = '', children, ...props }, ref) => {
-    const getPrimaryStyles = () => ({
-      backgroundColor: '#7D96AC',
-      color: 'white',
+  ({ variant = 'primary', className = '', children, style, ...props }, ref) => {
+    const baseStyle: React.CSSProperties = {
+      width: '100%',
+      height: 48,
+      borderRadius: 100,
+      fontFamily: 'var(--font-inter)',
+      fontSize: 13,
+      fontWeight: 600,
+      letterSpacing: '0.15em',
+      textTransform: 'uppercase',
+      cursor: props.disabled ? 'not-allowed' : 'pointer',
+      opacity: props.disabled ? 0.5 : 1,
+      transition: 'opacity 0.2s, background 0.2s',
       border: 'none',
-    })
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }
 
-    const getSecondaryStyles = () => ({
-      backgroundColor: 'rgba(255, 255, 255, 0.5)',
-      color: '#374151',
-      border: '1px solid rgba(229, 231, 235, 0.5)',
-    })
-
-    const styles = variant === 'primary' ? getPrimaryStyles() : variant === 'secondary' ? getSecondaryStyles() : {}
+    const variantStyle: React.CSSProperties =
+      variant === 'primary'
+        ? { background: '#43432B', color: '#F9F7F4' }
+        : variant === 'secondary'
+        ? { background: 'transparent', color: '#4D302F', border: '1px solid rgba(73,66,53,0.2)' }
+        : { background: 'transparent', color: '#4D302F' }
 
     return (
       <button
         ref={ref}
-        className={`
-          w-full font-body font-medium
-          transition-all duration-200
-          disabled:opacity-50 
-          disabled:cursor-not-allowed
-          ${className}
-        `}
-        style={{
-          padding: '0.75rem 1.5rem',
-          borderRadius: '12px',
-          fontSize: '0.9375rem',
-          boxShadow: variant === 'primary' ? '0 2px 8px rgba(125, 150, 172, 0.2)' : '0 1px 3px rgba(0, 0, 0, 0.05)',
-          ...styles,
-        }}
+        className={className}
+        style={{ ...baseStyle, ...variantStyle, ...style }}
         onMouseEnter={(e) => {
-          if (!props.disabled) {
-            if (variant === 'primary') {
-              e.currentTarget.style.backgroundColor = '#677E91';
-            } else {
-              e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.8)';
-            }
+          if (!props.disabled && variant === 'primary') {
+            e.currentTarget.style.background = '#555540'
           }
         }}
         onMouseLeave={(e) => {
-          if (!props.disabled) {
-            if (variant === 'primary') {
-              e.currentTarget.style.backgroundColor = '#7D96AC';
-            } else {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
-            }
+          if (!props.disabled && variant === 'primary') {
+            e.currentTarget.style.background = '#43432B'
           }
         }}
         {...props}
