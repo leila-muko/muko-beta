@@ -349,17 +349,24 @@ export default function IntentCalibrationPage() {
       >
         {/* Left: logo + step pills */}
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <span
+          <button
+            type="button"
+            onClick={() => router.push("/entry")}
+            aria-label="Go to entry page"
             style={{
               fontFamily: sohne,
               fontWeight: 700,
               fontSize: 18,
               letterSpacing: "-0.02em",
               color: OLIVE,
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
             }}
           >
             muko
-          </span>
+          </button>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {(

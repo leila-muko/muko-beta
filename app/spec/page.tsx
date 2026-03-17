@@ -26,7 +26,8 @@ import subcategoriesData from "@/data/subcategories.json";
 import aestheticsData from "@/data/aesthetics.json";
 import designLanguageData from "@/data/design-language.json";
 import materialConstructionImplications from "@/data/material_construction_implications.json";
-import FloatingMukoOrb from "@/components/FloatingMukoOrb";
+import AskMuko from "@/components/AskMuko";
+import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
 import { PulseScoreRow } from "@/components/ui/PulseScoreRow";
 import type { PulseChipProps } from "@/components/ui/PulseChip";
@@ -2354,6 +2355,43 @@ export default function SpecStudioPage() {
   ]);
 
   /* ─── RENDER ───────────────────────────────────────────────────────────── */
+  const overallScore = Math.round((dynamicIdentityScore + dynamicResonanceScore + executionScore) / 3);
+
+  const askMukoContext: AskMukoContext = {
+    step: "spec",
+    brand: {
+      brandName: brandProfileName ?? undefined,
+    },
+    intent: {
+      season: storeSeason,
+      collectionName: storeCollectionName,
+      collectionRole: storeCollectionRole ?? undefined,
+    },
+    aesthetic: {
+      matchedId: storeAesthetic ?? undefined,
+    },
+    scores: {
+      identity: dynamicIdentityScore ?? undefined,
+      resonance: dynamicResonanceScore ?? undefined,
+      execution: executionScore ?? undefined,
+      overall: overallScore,
+    },
+    material: {
+      name: selectedMaterial?.name ?? undefined,
+      costPerYard: selectedMaterial?.cost_per_yard ?? undefined,
+      leadTimeWeeks: selectedMaterial?.lead_time_weeks ?? undefined,
+      complexityTier: constructionTier ?? undefined,
+    },
+    gates: {
+      costPassed: marginGatePassed ?? undefined,
+      cogs: insight?.cogs ?? undefined,
+      msrp: targetMSRP ?? undefined,
+    },
+    pieceRole: selectedKeyPiece?.item ?? undefined,
+    silhouette: conceptSilhouette ?? undefined,
+    constructionTier: constructionTier ?? undefined,
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#FAF9F6", overflow: "hidden" }}>
       {/* ── Fixed Header ──────────────────────────────────────────────────── */}
@@ -2376,7 +2414,14 @@ export default function SpecStudioPage() {
       >
         {/* Left: logo + stepper */}
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <span style={{ fontFamily: sohne, fontWeight: 700, fontSize: 18, letterSpacing: "-0.02em", color: OLIVE }}>muko</span>
+          <button
+            type="button"
+            onClick={() => router.push("/entry")}
+            aria-label="Go to entry page"
+            style={{ fontFamily: sohne, fontWeight: 700, fontSize: 18, letterSpacing: "-0.02em", color: OLIVE, padding: 0, border: "none", background: "transparent", cursor: "pointer" }}
+          >
+            muko
+          </button>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {[
               { label: "Intent", done: true, active: false },
@@ -3151,7 +3196,8 @@ export default function SpecStudioPage() {
             </main>
           }
           rightContent={
-            <aside className="specStudioColumn specStudioRight">
+            <div style={{ display: "flex", flexDirection: "row", height: "100%", minHeight: 0 }}>
+            <aside className="specStudioColumn specStudioRight" style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
           <div className="specStudioSticky" style={{ padding: "36px 28px 44px" }}>
             <section style={{ marginBottom: 30 }}>
               <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>Pulse</div>
@@ -3360,6 +3406,11 @@ export default function SpecStudioPage() {
 
           </div>
             </aside>
+            <AskMuko
+              step="spec"
+              context={askMukoContext}
+            />
+            </div>
           }
         />
       </div>
@@ -3492,22 +3543,6 @@ export default function SpecStudioPage() {
         }
       `}</style>
 
-      {/* ═══ FLOATING MUKO ORB ═══ */}
-      <FloatingMukoOrb
-        step="spec"
-        context={{
-          aesthetic: conceptContext.aestheticMatchedId,
-          refinement,
-          identityScore: conceptContext.identityScore,
-          resonanceScore: conceptContext.resonanceScore,
-          material: selectedMaterial?.name,
-          silhouette: conceptSilhouette ? conceptSilhouette.charAt(0).toUpperCase() + conceptSilhouette.slice(1) : undefined,
-          category: categoryId,
-        }}
-        conceptName={conceptContext.aestheticName || undefined}
-        identityScore={conceptContext.identityScore}
-        resonanceScore={conceptContext.resonanceScore}
-      />
 
       {/* ═══ ANALYSIS LOADING OVERLAY ═══ */}
       {isRunningAnalysis && (() => {

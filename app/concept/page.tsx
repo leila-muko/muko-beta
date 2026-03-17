@@ -16,7 +16,8 @@ import {
   seededShuffle,
   matchAestheticToFolder,
 } from "../../lib/concept-studio/utils";
-import FloatingMukoOrb from "@/components/FloatingMukoOrb";
+import AskMuko from "@/components/AskMuko";
+import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 import aestheticsData from "@/data/aesthetics.json";
 import chipTensionsData from "@/data/chip_tensions.json";
 import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
@@ -2494,13 +2495,45 @@ export default function ConceptStudioPage() {
     topMoodboardImages,
   ]);
   /* ─── RENDER ──────────────────────────────────────────────────────────────── */
+  const askMukoContext: AskMukoContext = {
+    step: "concept",
+    brand: {
+      brandName: brandProfile3?.brand_name ?? undefined,
+      keywords: brandProfile3?.keywords ?? undefined,
+      priceTier: brandProfile3?.price_tier ?? undefined,
+      targetMargin: brandProfile3?.target_margin ?? undefined,
+      tensionContext: brandProfile3?.tension_context ?? undefined,
+    },
+    intent: {
+      season,
+      collectionName: storeCollectionName,
+      collectionRole: storeCollectionRole ?? undefined,
+    },
+    aesthetic: {
+      input: aestheticInput,
+      matchedId: storeCollectionAesthetic ?? undefined,
+      inflection: aestheticInflection ?? undefined,
+    },
+    scores: {
+      identity: identityPulse?.score ?? undefined,
+      resonance: resonancePulse?.score ?? undefined,
+    },
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#FAF9F6", overflow: "hidden" }}>
 
       {/* ── Fixed Header ─────────────────────────────────────────────────────── */}
       <header style={{ position: "fixed", top: 0, left: 0, right: 0, height: 72, background: "rgba(250,249,246,0.92)", backdropFilter: "blur(24px) saturate(160%)", WebkitBackdropFilter: "blur(24px) saturate(160%)", borderBottom: "1px solid rgba(67,67,43,0.09)", zIndex: 200, display: "flex", alignItems: "center", padding: "0 40px", justifyContent: "space-between", gap: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <span style={{ fontFamily: sohne, fontWeight: 700, fontSize: 18, letterSpacing: "-0.02em", color: OLIVE }}>muko</span>
+          <button
+            type="button"
+            onClick={() => router.push("/entry")}
+            aria-label="Go to entry page"
+            style={{ fontFamily: sohne, fontWeight: 700, fontSize: 18, letterSpacing: "-0.02em", color: OLIVE, padding: 0, border: "none", background: "transparent", cursor: "pointer" }}
+          >
+            muko
+          </button>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {[{ label: "Intent", done: true, active: false }, { label: "Concept", done: false, active: true }, { label: "Spec", done: false, active: false }, { label: "Report", done: false, active: false }].map((s) => (
               <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: s.done ? `1.5px solid ${CHARTREUSE}` : s.active ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)", background: s.done ? "rgba(168,180,117,0.08)" : s.active ? "rgba(125,150,172,0.07)" : "rgba(67,67,43,0.03)", fontFamily: sohne, fontSize: 11, fontWeight: 600, letterSpacing: "0.01em", color: s.done ? "rgba(67,67,43,0.70)" : s.active ? OLIVE : "rgba(67,67,43,0.35)" }}>
@@ -3184,8 +3217,8 @@ export default function ConceptStudioPage() {
           </>
         }
         rightContent={
-          <>
-          <div style={{ padding: "36px 44px 0" }}>
+          <div style={{ display: "flex", flexDirection: "row", height: "100%", minHeight: 0 }}>
+          <div style={{ flex: 1, padding: "36px 44px 0", minWidth: 0, overflowY: "auto" }}>
 
             {/* PULSE RAIL — slim strip */}
             <div style={{ marginBottom: 0 }}>
@@ -3284,22 +3317,14 @@ export default function ConceptStudioPage() {
             )}
 
           </div>
-          </>
+            <AskMuko
+              step="concept"
+              context={askMukoContext}
+            />
+          </div>
         }
       />
 
-      {/* ═══ FLOATING MUKO ORB ═══ */}
-      <FloatingMukoOrb
-        step="concept"
-        context={{ aesthetic: selectedAesthetic, refineText: interpretationSummary, identityScore: identityPulse?.score, resonanceScore: resonancePulse?.score }}
-        conceptName={(() => {
-          if (!selectedAesthetic) return undefined;
-          const entry = (aestheticsData as Array<{ id: string; name: string }>).find(a => a.id === selectedAesthetic);
-          return entry?.name ?? selectedAesthetic;
-        })()}
-        identityScore={identityPulse?.score}
-        resonanceScore={resonancePulse?.score}
-      />
 
       {showAestheticChangeModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(17,17,12,0.28)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }}>

@@ -204,7 +204,10 @@ export default function EntryScreen() {
         }}
       >
         {/* Logo */}
-        <h1
+        <button
+          type="button"
+          onClick={() => router.push('/entry')}
+          aria-label="Go to entry page"
           style={{
             fontSize: 18,
             fontWeight: 700,
@@ -213,10 +216,15 @@ export default function EntryScreen() {
             fontFamily: sohne,
             letterSpacing: '-0.02em',
             margin: '0 0 44px 0',
+            padding: 0,
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            width: 'fit-content',
           }}
         >
           muko
-        </h1>
+        </button>
 
         {/* New Collection button */}
         <NewCollectionButton onClick={resetForNewCollection} />
