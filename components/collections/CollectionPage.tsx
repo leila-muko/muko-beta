@@ -49,7 +49,6 @@ interface CollectionPageProps {
   collectionName: string;
   season: string | null;
   userId: string;
-  sidebarWidth: number;
   onNewPiece: () => void;
 }
 
@@ -241,195 +240,148 @@ function getCollectionHealthMetrics(analyses: AnalysisRow[]): CollectionHealthSt
   };
 }
 
-function getRoleChipStyles(role: PieceRole): React.CSSProperties {
-  if (role === 'hero') {
-    return { color: '#6B8F3E', background: '#F0F4E8' };
-  }
-
-  if (role === 'core') {
-    return { color: '#7D96AC', background: '#EEF3F7' };
-  }
-
-  return { color: '#A8A09A', background: '#F5F1EA' };
-}
-
-function CollectionHealthMeter({ metric }: { metric: CollectionHealthMetric }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        flex: 1,
-        minWidth: 0,
-      }}
-    >
-      <span
-        style={{
-          fontFamily: inter,
-          fontSize: 11,
-          color: '#4A4540',
-          width: 96,
-          minWidth: 96,
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {metric.label}
-      </span>
-
-      <div
-        style={{
-          flex: 1,
-          height: 5,
-          background: '#E8E3D6',
-          borderRadius: 999,
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          style={{
-            width: `${metric.value}%`,
-            height: '100%',
-            background: metric.tone,
-            borderRadius: 999,
-          }}
-        />
-      </div>
-
-      <span
-        style={{
-          fontFamily: inter,
-          fontSize: 10,
-          fontWeight: 700,
-          color: metric.statusColor,
-          minWidth: 64,
-          textAlign: 'right',
-        }}
-      >
-        {metric.status}
-      </span>
-    </div>
-  );
+function getRoleBadgeStyles(role: PieceRole): React.CSSProperties {
+  if (role === 'hero') return { background: '#eef2e6', color: '#5a6e2a' };
+  if (role === 'core') return { background: '#e8eef2', color: '#2e4a5a' };
+  return { background: '#f0eeee', color: '#5a4a4a' };
 }
 
 function CollectionHealthFooter({
   health,
   analysesCount,
-  sidebarWidth,
   onGenerateReport,
 }: {
   health: CollectionHealthState;
   analysesCount: number;
-  sidebarWidth: number;
   onGenerateReport: () => void;
 }) {
   const canGenerateReport = analysesCount >= 2;
 
+  const flagged = health.metrics
+    .filter((metric) => metric.variant !== 'green')
+    .slice(0, 2);
+
+  const flaggedNames =
+    flagged.length === 0
+      ? null
+      : flagged.length === 1
+      ? flagged[0].label
+      : `${flagged[0].label} · ${flagged[1].label}`;
+
+  const needsWord = flagged.length === 1 ? 'needs' : 'need';
+
   return (
     <div
       style={{
-        position: 'fixed',
-        bottom: 20,
-        left: `calc(${sidebarWidth}px + 56px)`,
-        right: 20,
-        padding: '16px 24px',
-        background: '#FFFFFF',
-        border: '1px solid #E8E3D6',
-        borderRadius: 16,
-        boxShadow: '0 10px 24px rgba(25,25,25,0.08)',
-        zIndex: 6,
+        position: 'sticky',
+        bottom: 0,
+        padding: '14px 36px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 16,
         boxSizing: 'border-box',
+        borderTop: '1px solid rgba(67,67,43,0.08)',
+        background: 'rgba(250,249,246,0.98)',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 24,
-        }}
-      >
+      {flaggedNames ? (
         <div
           style={{
-            minWidth: 132,
-            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            minWidth: 0,
+            padding: '6px 10px',
+            borderRadius: 999,
+            border: '1px solid rgba(67,67,43,0.08)',
+            background: 'rgba(255,255,255,0.72)',
           }}
         >
           <div
             style={{
-              fontFamily: inter,
-              fontSize: 9,
-              fontWeight: 600,
-              letterSpacing: '0.13em',
-              textTransform: 'uppercase',
-              color: '#A8A09A',
-              marginBottom: 0,
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: '#B8876B',
+              flexShrink: 0,
             }}
-          >
-            Collection Health
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 18,
-            flex: 1,
-            minWidth: 0,
-            flexWrap: 'nowrap',
-          }}
-        >
-          {health.metrics.map((metric) => (
-            <CollectionHealthMeter key={metric.label} metric={metric} />
-          ))}
-        </div>
-
-        <button
-          onClick={onGenerateReport}
-          disabled={!canGenerateReport}
-          style={{
-            padding: '14px 16px',
-            borderRadius: 10,
-            fontSize: 12,
-            fontWeight: 700,
-            fontFamily: sohne,
-            letterSpacing: '0.02em',
-            color: canGenerateReport ? '#7D96AC' : 'rgba(67,67,43,0.30)',
-            background: canGenerateReport ? 'rgba(125,150,172,0.07)' : 'rgba(255,255,255,0.46)',
-            border: canGenerateReport ? '1.5px solid #7D96AC' : '1.5px solid rgba(67,67,43,0.10)',
-            cursor: canGenerateReport ? 'pointer' : 'not-allowed',
-            transition: 'all 280ms ease',
-            opacity: canGenerateReport ? 1 : 0.65,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 10,
-            flexShrink: 0,
-            minWidth: 180,
-          }}
-        >
-          <span>Generate Report</span>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
+          />
+          <span
             style={{
-              transition: 'transform 280ms ease',
-              transform: canGenerateReport ? 'translateX(0)' : 'translateX(-2px)',
-              opacity: canGenerateReport ? 1 : 0.4,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 4,
+              flexWrap: 'wrap',
+              fontFamily: inter,
+              fontSize: 12,
+              lineHeight: 1.2,
             }}
           >
-            <path
-              d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      </div>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color: '#8D7668',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Watchlist
+            </span>
+            <span style={{ fontWeight: 500, color: '#5B524D' }}>{flaggedNames}</span>
+            <span style={{ fontWeight: 400, color: '#A8A09A' }}>{needsWord} attention</span>
+          </span>
+        </div>
+      ) : <div />}
+
+      <button
+        onClick={onGenerateReport}
+        disabled={!canGenerateReport}
+        style={{
+          padding: '14px 16px',
+          borderRadius: 10,
+          fontSize: 12,
+          fontWeight: 700,
+          fontFamily: sohne,
+          letterSpacing: '0.02em',
+          color: canGenerateReport ? '#7D96AC' : 'rgba(67,67,43,0.30)',
+          background: canGenerateReport ? 'rgba(125,150,172,0.07)' : 'rgba(255,255,255,0.46)',
+          border: canGenerateReport ? '1.5px solid #7D96AC' : '1.5px solid rgba(67,67,43,0.10)',
+          cursor: canGenerateReport ? 'pointer' : 'not-allowed',
+          transition: 'all 280ms ease',
+          opacity: canGenerateReport ? 1 : 0.65,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 10,
+          flexShrink: 0,
+          minWidth: 180,
+        }}
+      >
+        <span>Generate Report</span>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          style={{
+            transition: 'transform 280ms ease',
+            transform: canGenerateReport ? 'translateX(0)' : 'translateX(-2px)',
+            opacity: canGenerateReport ? 1 : 0.4,
+          }}
+        >
+          <path
+            d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
     </div>
   );
 }
@@ -537,23 +489,23 @@ function Toast({ message }: { message: string }) {
 function PieceCard({ analysis, onClick }: { analysis: AnalysisRow; onClick: () => void }) {
   const pieceName = analysis.agent_versions?.saved_piece_name?.trim() ?? '';
   const score = getScore(analysis);
-  const scorePill = getScorePillStyle(score);
   const flat = getFlatMatch(analysis.category, analysis.silhouette);
   const materialLabel = titleCase(analysis.material_id) || 'Unknown material';
   const complexityLabel = titleCase(analysis.construction_tier) || 'Unknown';
   const role = getPieceRole(analysis);
   const roleLabel = getRoleLabel(role);
-  const chips = [
-    analysis.aesthetic_input?.trim() || 'No aesthetic',
-    materialLabel,
-    complexityLabel,
-  ];
+  const aestheticLabel = analysis.aesthetic_input?.trim() || 'No aesthetic';
+  const scoreColor = score >= 80 ? '#A8B475' : '#B8876B';
 
   return (
     <button
       onClick={onClick}
       style={{
-        background: '#FFFFFF',
+        appearance: 'none',
+        WebkitAppearance: 'none',
+        display: 'block',
+        width: '100%',
+        background: 'transparent',
         border: '1px solid #E8E3D6',
         borderRadius: 10,
         overflow: 'hidden',
@@ -571,42 +523,72 @@ function PieceCard({ analysis, onClick }: { analysis: AnalysisRow; onClick: () =
         event.currentTarget.style.boxShadow = 'none';
       }}
     >
+      {/* Visual zone */}
       <div
         style={{
-          height: 160,
+          width: '100%',
+          height: 120,
           background: '#F9F7F4',
+          borderTopLeftRadius: 9,
+          borderTopRightRadius: 9,
+          position: 'relative',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 20,
         }}
       >
         {flat ? (
-          <div style={{ height: 120, width: 'auto' }}>
+          <div style={{ height: '100%', width: 'auto' }}>
             <flat.Flat color={flat.color} />
           </div>
         ) : (
           <PlaceholderFlat />
         )}
+
+        <span
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            background: '#FFFFFF',
+            border: '0.5px solid #E8E3D6',
+            borderRadius: 20,
+            padding: '3px 10px',
+            fontSize: 12,
+            fontWeight: 500,
+            color: scoreColor,
+            lineHeight: 1,
+          }}
+        >
+          {score}
+        </span>
       </div>
 
-      <div style={{ padding: '14px 16px 16px' }}>
+      {/* Body zone */}
+      <div
+        style={{
+          padding: '10px 12px 14px',
+          background: '#FFFFFF',
+          borderBottomLeftRadius: 9,
+          borderBottomRightRadius: 9,
+        }}
+      >
         <div
           style={{
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'space-between',
-            gap: 12,
-            marginBottom: 10,
+            gap: 8,
+            marginBottom: 8,
           }}
         >
           <div
             style={{
-              fontSize: 14,
-              fontWeight: 600,
+              fontSize: 13,
+              fontWeight: 500,
               color: pieceName ? '#191919' : '#A8A09A',
               fontStyle: pieceName ? 'normal' : 'italic',
-              lineHeight: 1.35,
+              lineHeight: 1.4,
             }}
           >
             {pieceName || 'Unnamed Piece'}
@@ -614,78 +596,53 @@ function PieceCard({ analysis, onClick }: { analysis: AnalysisRow; onClick: () =
 
           <span
             style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.08em',
+              ...getRoleBadgeStyles(role),
+              fontSize: 9,
+              fontWeight: 500,
+              letterSpacing: '0.07em',
               textTransform: 'uppercase',
-              ...getRoleChipStyles(role),
-              borderRadius: 999,
-              padding: '4px 8px',
+              borderRadius: 20,
+              padding: '2px 8px',
               whiteSpace: 'nowrap',
               flexShrink: 0,
+              lineHeight: 1.6,
             }}
           >
             {roleLabel}
           </span>
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 6,
-            marginBottom: 14,
-          }}
-        >
-          {chips.map((chip) => (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 500,
+              background: '#F5F1EA',
+              color: '#A8A09A',
+              borderRadius: 20,
+              padding: '2px 7px',
+              lineHeight: 1.5,
+            }}
+          >
+            {aestheticLabel}
+          </span>
+
+          {[materialLabel, complexityLabel].map((tag) => (
             <span
-              key={chip}
+              key={tag}
               style={{
                 fontSize: 10,
-                fontWeight: 600,
-                color: '#4A4540',
-                background: '#F5F1EA',
-                border: '1px solid #E8E3D6',
-                borderRadius: 999,
-                padding: '4px 8px',
-                lineHeight: 1,
+                fontWeight: 400,
+                border: '0.5px solid #E8E3D6',
+                color: '#C8BFB8',
+                borderRadius: 20,
+                padding: '2px 7px',
+                lineHeight: 1.5,
               }}
             >
-              {chip}
+              {tag}
             </span>
           ))}
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-          }}
-        >
-          <span
-            style={{
-              ...scorePill,
-              padding: '3px 9px',
-              borderRadius: 100,
-              fontSize: 11,
-              fontWeight: 600,
-            }}
-          >
-            Score {score}
-          </span>
-
-          <span
-            aria-hidden
-            style={{
-              fontSize: 13,
-              color: getMarginPassed(analysis) ? '#A8B475' : '#C47B6B',
-              lineHeight: 1,
-            }}
-          >
-            {getMarginPassed(analysis) ? '✓' : '✗'}
-          </span>
         </div>
       </div>
     </button>
@@ -696,7 +653,6 @@ export default function CollectionPage({
   collectionName,
   season,
   userId,
-  sidebarWidth,
   onNewPiece,
 }: CollectionPageProps) {
   const router = useRouter();
@@ -779,155 +735,170 @@ export default function CollectionPage({
     <>
       <div
         style={{
-          padding: '32px 36px 100px',
-          minHeight: '100vh',
+          minHeight: '100%',
+          display: 'flex',
+          flexDirection: 'column',
           boxSizing: 'border-box',
         }}
       >
         <div
           style={{
-            padding: '0 0 24px',
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: 24,
+            flex: 1,
+            padding: '32px 36px 0',
+            boxSizing: 'border-box',
           }}
         >
-          <div>
-            <h1
-              style={{
-                margin: 0,
-                fontFamily: sohne,
-                fontSize: 22,
-                fontWeight: 700,
-                letterSpacing: '-0.02em',
-                color: '#191919',
-              }}
-            >
-              {collectionName}
-            </h1>
-
-            <div
-              style={{
-                marginTop: 4,
-                fontFamily: inter,
-                fontSize: 12,
-                color: '#A8A09A',
-              }}
-            >
-              {seasonLabel || 'Season not set'}
-            </div>
-          </div>
-
-          <button
-            onClick={onNewPiece}
+          <div
             style={{
-              padding: '14px 16px',
-              borderRadius: 10,
-              fontSize: 12,
-              fontWeight: 700,
-              fontFamily: sohne,
-              letterSpacing: '0.02em',
-              color: '#A8B475',
-              background: 'rgba(168,180,117,0.08)',
-              border: '1.5px solid #A8B475',
-              cursor: 'pointer',
-              transition: 'all 280ms ease',
+              padding: '0 0 24px',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 24,
             }}
           >
-            <span>Add Piece</span>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              style={{
-                transition: 'transform 280ms ease',
-                transform: 'translateX(0)',
-                opacity: 1,
-              }}
-            >
-              <path
-                d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </div>
+            <div>
+              <h1
+                style={{
+                  margin: 0,
+                  fontFamily: sohne,
+                  fontSize: 22,
+                  fontWeight: 700,
+                  letterSpacing: '-0.02em',
+                  color: '#191919',
+                }}
+              >
+                {collectionName}
+              </h1>
 
-        <div
-          style={{
-            padding: '0 0 100px',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-            gap: 16,
-          }}
-        >
-          {loading ? (
-            <div style={{ gridColumn: '1 / -1' }}>
-              <LoadingCards />
-            </div>
-          ) : analyses.length === 0 ? (
-            <div
-              style={{
-                gridColumn: '1 / -1',
-                minHeight: 260,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-              }}
-            >
               <div
                 style={{
+                  marginTop: 4,
                   fontFamily: inter,
-                  fontSize: 14,
+                  fontSize: 12,
                   color: '#A8A09A',
                 }}
               >
-                No pieces yet.
-              </div>
-              <div
-                style={{
-                  marginTop: 6,
-                  fontFamily: inter,
-                  fontSize: 12,
-                  color: '#C8BFB8',
-                }}
-              >
-                Run an analysis and add it to this collection.
+                {seasonLabel || 'Season not set'}
               </div>
             </div>
-          ) : (
-            analyses.map((analysis) => (
-              <PieceCard
-                key={analysis.id}
-                analysis={analysis}
-                onClick={() => router.push('/spec')}
-              />
-            ))
-          )}
+
+            <button
+              onClick={onNewPiece}
+              style={{
+                padding: '14px 16px',
+                borderRadius: 10,
+                fontSize: 12,
+                fontFamily: sohne,
+                fontWeight: 700,
+                letterSpacing: '0.02em',
+                color: '#A8B475',
+                background: 'rgba(168,180,117,0.08)',
+                border: '1.5px solid #A8B475',
+                cursor: 'pointer',
+                transition: 'all 280ms ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+              }}
+            >
+              <span>Add Piece</span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                style={{
+                  transition: 'transform 280ms ease',
+                  transform: 'translateX(0)',
+                  opacity: 1,
+                }}
+              >
+                <path
+                  d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+
+          <div
+            style={{
+              padding: '0 0 100px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              gap: 16,
+            }}
+          >
+            {loading ? (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <LoadingCards />
+              </div>
+            ) : analyses.length === 0 ? (
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  minHeight: 260,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 14,
+                    color: '#A8A09A',
+                  }}
+                >
+                  No pieces yet.
+                </div>
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontFamily: inter,
+                    fontSize: 12,
+                    color: '#C8BFB8',
+                  }}
+                >
+                  Run an analysis and add it to this collection.
+                </div>
+              </div>
+            ) : (
+              analyses.map((analysis) => (
+                <PieceCard
+                  key={analysis.id}
+                  analysis={analysis}
+                  onClick={() => router.push('/spec')}
+                />
+              ))
+            )}
+          </div>
         </div>
+
+        {!loading && analyses.length > 0 && (
+          <CollectionHealthFooter
+            health={collectionHealth}
+            analysesCount={analyses.length}
+            onGenerateReport={handleGenerateReport}
+          />
+        )}
       </div>
 
-      {!loading && analyses.length > 0 && (
-        <CollectionHealthFooter
-          health={collectionHealth}
-          analysesCount={analyses.length}
-          sidebarWidth={sidebarWidth}
-          onGenerateReport={handleGenerateReport}
-        />
-      )}
-
       {toastMessage ? <Toast message={toastMessage} /> : null}
+
+      <style>{`
+        @keyframes camelPulse {
+          0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(184,135,107,0.55); }
+          50%       { opacity: 0.75; box-shadow: 0 0 0 5px rgba(184,135,107,0); }
+        }
+      `}</style>
     </>
   );
 }

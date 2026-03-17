@@ -258,9 +258,10 @@ export default function CollectionsHubPage() {
       <main
         style={{
           flex: 1,
-          minHeight: '100vh',
+          height: '100vh',
           position: 'relative',
           background: '#FAF9F6',
+          overflowY: 'auto',
         }}
       >
         {activeCollection && userId ? (
@@ -268,7 +269,6 @@ export default function CollectionsHubPage() {
             collectionName={activeCollection}
             season={activeCollectionMeta?.season ?? null}
             userId={userId}
-            sidebarWidth={SIDEBAR_WIDTH}
             onNewPiece={handleNewPiece}
           />
         ) : (
