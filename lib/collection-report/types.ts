@@ -48,6 +48,7 @@ export interface CollectionReportPayload {
     version_label?: string | null;
   };
   collection_thesis: string;
+  narrative?: string | null;
   overview: {
     total_pieces: number;
     role_distribution: CollectionDistributionItem[];
@@ -142,6 +143,7 @@ export interface CollectionReportInput {
   generated_at?: string;
   version_label?: string | null;
   snapshot_id?: string | null;
+  narrative?: string | null;
   pieces: CollectionReportInputPiece[];
   brand?: CollectionReportBrandInput | null;
   intent?: CollectionReportIntentInput | null;

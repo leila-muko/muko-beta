@@ -76,7 +76,21 @@ export function SignInForm() {
         </div>
       )}
 
-      <Button type="submit" disabled={loading}>
+      <Button
+        type="submit"
+        disabled={loading}
+        style={{ background: '#4D302F', color: '#F9F7F4' }}
+        onMouseEnter={(e) => {
+          if (!loading) {
+            e.currentTarget.style.background = '#3F2726'
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!loading) {
+            e.currentTarget.style.background = '#4D302F'
+          }
+        }}
+      >
         {loading ? 'Signing in...' : 'Sign in'}
       </Button>
     </form>

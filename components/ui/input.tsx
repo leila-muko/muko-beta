@@ -1,6 +1,8 @@
 // components/ui/input.tsx
 import { forwardRef, InputHTMLAttributes } from 'react'
 
+const AUTH_MUTED_TEXT = '#92736E'
+
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string
   error?: string
@@ -17,10 +19,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               display: 'block',
               fontFamily: 'var(--font-inter)',
               fontSize: 11,
-              fontWeight: 700,
+              fontWeight: 500,
               letterSpacing: '0.15em',
               textTransform: 'uppercase',
-              color: '#999',
+              color: AUTH_MUTED_TEXT,
               marginBottom: 6,
             }}
           >

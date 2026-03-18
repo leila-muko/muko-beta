@@ -97,18 +97,113 @@ function getSeasonKey(season: string): string {
   return season.toUpperCase().includes("FW") || season.toLowerCase().includes("fall") ? "fw26" : "ss27";
 }
 
+const VALID_FLAT_REGISTRY_KEYS = [
+  "puffer",
+  "parka",
+  "jacket",
+  "raincoat",
+  "trench",
+  "coat",
+  "cape",
+  "shell",
+  "boilersuit",
+  "knit-sweater",
+  "cardigan",
+  "blazer",
+  "blouse",
+  "corset-top",
+  "tank",
+  "top",
+  "tunic",
+  "mid-layer",
+  "vest",
+  "trouser",
+  "straight-pant",
+  "skirt",
+  "mini-skirt",
+  "midi-dress",
+  "maxi-dress",
+  "slip-dress",
+  "shirt-dress",
+  "sundress",
+  "babydoll-dress",
+  "column-dress",
+] as const;
+
+type FlatRegistryKey = (typeof VALID_FLAT_REGISTRY_KEYS)[number];
+
+const CATEGORY_TYPE_FALLBACKS: Record<string, FlatRegistryKey> = {
+  outerwear: "jacket",
+  tops: "top",
+  bottoms: "trouser",
+  dresses: "column-dress",
+};
+
+const PIECE_TYPE_INFERENCE_RULES: Array<{
+  match: string[];
+  category: string;
+  type: FlatRegistryKey;
+}> = [
+  { match: ["shirt dress", "shirt-dress"], category: "dresses", type: "shirt-dress" },
+  { match: ["slip dress", "slip-dress"], category: "dresses", type: "slip-dress" },
+  { match: ["baby doll dress", "babydoll dress", "babydoll-dress"], category: "dresses", type: "babydoll-dress" },
+  { match: ["sun dress", "sundress"], category: "dresses", type: "sundress" },
+  { match: ["maxi dress", "maxi-dress"], category: "dresses", type: "maxi-dress" },
+  { match: ["midi dress", "midi-dress"], category: "dresses", type: "midi-dress" },
+  { match: ["column dress", "column-dress"], category: "dresses", type: "column-dress" },
+  { match: ["dress"], category: "dresses", type: "column-dress" },
+  { match: ["mini skirt", "mini-skirt"], category: "bottoms", type: "mini-skirt" },
+  { match: ["skirt"], category: "bottoms", type: "skirt" },
+  { match: ["straight pant", "straight-pant", "straight leg pant", "straight-leg pant"], category: "bottoms", type: "straight-pant" },
+  { match: ["pant", "trouser"], category: "bottoms", type: "trouser" },
+  { match: ["corset top", "corset-top"], category: "tops", type: "corset-top" },
+  { match: ["tank"], category: "tops", type: "tank" },
+  { match: ["cardigan"], category: "tops", type: "cardigan" },
+  { match: ["blouse"], category: "tops", type: "blouse" },
+  { match: ["blazer"], category: "outerwear", type: "blazer" },
+  { match: ["waistcoat"], category: "tops", type: "vest" },
+  { match: ["vest"], category: "tops", type: "vest" },
+  { match: ["tunic"], category: "tops", type: "tunic" },
+  { match: ["mid layer", "mid-layer"], category: "tops", type: "mid-layer" },
+  { match: ["shell layer", "shell-layer"], category: "tops", type: "shell" },
+  { match: ["shell"], category: "tops", type: "shell" },
+  { match: ["knit sweater", "knit-sweater"], category: "tops", type: "knit-sweater" },
+  { match: ["sweater"], category: "tops", type: "knit-sweater" },
+  { match: ["knit top", "knit-top", "knit"], category: "tops", type: "knit-sweater" },
+  { match: ["top"], category: "tops", type: "top" },
+  { match: ["blouson", "bomber", "jacket"], category: "outerwear", type: "jacket" },
+  { match: ["trench"], category: "outerwear", type: "trench" },
+  { match: ["raincoat"], category: "outerwear", type: "raincoat" },
+  { match: ["parka"], category: "outerwear", type: "parka" },
+  { match: ["puffer"], category: "outerwear", type: "puffer" },
+  { match: ["cape"], category: "outerwear", type: "cape" },
+  { match: ["coat"], category: "outerwear", type: "coat" },
+  { match: ["boilersuit"], category: "dresses", type: "boilersuit" },
+];
+
 function inferPieceCategory(pieceName: string): { category: string | null; type: string | null } {
   const normalized = pieceName.toLowerCase();
-  if (normalized.includes("coat")) return { category: "outerwear", type: "coat" };
-  if (normalized.includes("jacket") || normalized.includes("blazer")) return { category: "outerwear", type: "jacket" };
-  if (normalized.includes("dress")) return { category: "dresses", type: "dress" };
-  if (normalized.includes("skirt")) return { category: "bottoms", type: "skirt" };
-  if (normalized.includes("pant") || normalized.includes("trouser")) return { category: "bottoms", type: "trouser" };
-  if (normalized.includes("knit") || normalized.includes("sweater")) return { category: "tops", type: "knit" };
-  if (normalized.includes("shirt") || normalized.includes("blouse") || normalized.includes("shell") || normalized.includes("top")) {
-    return { category: "tops", type: "top" };
+
+  for (const rule of PIECE_TYPE_INFERENCE_RULES) {
+    if (rule.match.some((term) => normalized.includes(term))) {
+      return { category: rule.category, type: rule.type };
+    }
   }
-  if (normalized.includes("vest") || normalized.includes("waistcoat")) return { category: "tops", type: "vest" };
+
+  const fallbackCategory = normalized.includes("outerwear")
+    ? "outerwear"
+    : normalized.includes("dress")
+    ? "dresses"
+    : normalized.includes("skirt") || normalized.includes("pant") || normalized.includes("trouser")
+    ? "bottoms"
+    : normalized.includes("top") || normalized.includes("shirt") || normalized.includes("blouse") || normalized.includes("knit")
+    ? "tops"
+    : null;
+
+  if (fallbackCategory) {
+    return { category: fallbackCategory, type: CATEGORY_TYPE_FALLBACKS[fallbackCategory] };
+  }
+
   return { category: null, type: null };
 }
 

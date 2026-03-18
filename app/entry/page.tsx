@@ -71,6 +71,23 @@ export default function EntryScreen() {
     setTouchedSeason(false);
     setStoreCollectionName('');
     setActiveCollection(null);
+    useSessionStore.setState({
+      aestheticInput: '',
+      aestheticMatchedId: null,
+      collectionAesthetic: null,
+      aestheticInflection: null,
+      directionInterpretationText: '',
+      directionInterpretationModifiers: [],
+      directionInterpretationChips: [],
+      identityPulse: null,
+      resonancePulse: null,
+      conceptLocked: false,
+      chipSelection: null,
+      customChips: {},
+      conceptSilhouette: '',
+      conceptPalette: null,
+      isProxyMatch: false,
+    });
     try {
       window.localStorage.removeItem('muko_collectionName');
       window.localStorage.removeItem('muko_seasonLabel');
@@ -213,7 +230,7 @@ export default function EntryScreen() {
           style={{
             fontSize: 18,
             fontWeight: 700,
-            color: OLIVE,
+            color: '#4D302F',
             marginBottom: 44,
             fontFamily: sohne,
             letterSpacing: '-0.02em',
@@ -322,45 +339,42 @@ export default function EntryScreen() {
           <div style={{ animation: 'fadeIn 450ms ease both' }}>
             <div
               style={{
-                fontSize: 10,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
-                color: 'rgba(67,67,43,0.38)',
-                fontFamily: inter,
-                fontWeight: 700,
-                marginBottom: 14,
-              }}
-            >
-              Creative Intelligence Workspace
-            </div>
-
-            <h1
-              style={{
-                fontSize: 'clamp(32px, 4vw, 44px)',
-                fontWeight: 500,
-                color: OLIVE,
-                lineHeight: 1.1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
                 marginBottom: 12,
-                letterSpacing: '-0.015em',
-                fontFamily: sohne,
-                margin: '0 0 12px 0',
               }}
             >
-              Let&apos;s shape your next drop.
-            </h1>
-
-            <p
-              style={{
-                fontSize: 13,
-                color: 'rgba(67,67,43,0.52)',
-                fontFamily: inter,
-                lineHeight: 1.55,
-                maxWidth: 420,
-                margin: 0,
-              }}
-            >
-              Direction in, clarity out.
-            </p>
+              <img
+                src="/mlogo.svg"
+                alt="Muko logo"
+                style={{
+                  width: 48,
+                  height: 48,
+                  flexShrink: 0,
+                }}
+              />
+              <h1
+                style={{
+                  fontSize: 'clamp(32px, 4vw, 44px)',
+                  fontWeight: 500,
+                  color: '#4D302F',
+                  lineHeight: 1.1,
+                  letterSpacing: '-0.015em',
+                  fontFamily: '"Söhne Breit", var(--font-sohne-breit), system-ui, sans-serif',
+                  margin: 0,
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-block',
+                  width: '26ch',
+                  maxWidth: '100%',
+                  borderRight: '1.5px solid rgba(67,67,43,0.55)',
+                  animation: 'typeLoop 5.2s steps(26, end) infinite, caretBlink 850ms step-end infinite',
+                }}
+              >
+                Let&apos;s shape your next drop.
+              </h1>
+            </div>
           </div>
 
           {/* Form */}
@@ -408,7 +422,7 @@ export default function EntryScreen() {
                   border: inputFocused
                     ? `1.5px solid ${STEEL}`
                     : '1.5px solid rgba(67,67,43,0.10)',
-                  borderRadius: 10,
+                  borderRadius: 999,
                   outline: 'none',
                   fontFamily: sohne,
                   letterSpacing: '-0.01em',
@@ -575,6 +589,19 @@ export default function EntryScreen() {
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(5px); }
           to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes typeLoop {
+          0%,
+          12% { width: 0; }
+          52%,
+          82% { width: 26ch; }
+          100% { width: 0; }
+        }
+
+        @keyframes caretBlink {
+          0%, 100% { border-right-color: rgba(67,67,43,0.55); }
+          50% { border-right-color: transparent; }
         }
       `}</style>
     </div>

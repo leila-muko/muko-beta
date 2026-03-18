@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import type { CollectionRoleId, KeyPiece, PieceRolesById } from "@/lib/store/sessionStore";
+import { useShallow } from "zustand/react/shallow";
 import {
   BRAND,
   AESTHETICS,
@@ -23,6 +24,7 @@ import chipTensionsData from "@/data/chip_tensions.json";
 import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
 import { PulseScoreRow } from "@/components/ui/PulseScoreRow";
 import { MukoInsightSection } from "@/components/ui/MukoInsightSection";
+import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
 import { buildConceptBlackboard, toAestheticSlug } from "@/lib/synthesizer/assemble";
 import type { InsightData } from "@/lib/types/insight";
 import { createClient } from "@/lib/supabase/client";
@@ -35,6 +37,7 @@ import {
 import { getFlatForPiece } from "@/components/flats";
 import { combineDirection } from "@/lib/concept-studio/combineDirection";
 import { SUGGESTED_INTERPRETATION_CHIPS } from "@/lib/concept-studio/interpretations";
+import { buildSelectedPieceImage } from "@/lib/piece-image";
 
 /* ─── Pulse icons ─────────────────────────────────────────────────────────── */
 function IconIdentity({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
@@ -90,6 +93,16 @@ function getAestheticChips(aestheticName: string): AestheticChip[] {
     aestheticsData as unknown as Array<{ id: string; name: string; chips: AestheticChip[] }>
   ).find((a) => a.id === slug || a.name === aestheticName);
   return entry?.chips ?? [];
+}
+
+function extractPartialJsonString(raw: string, key: string): string {
+  const match = raw.match(new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)`));
+  if (!match) return "";
+
+  return match[1]
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, " ")
+    .trim();
 }
 
 /* ─── Universal silhouettes ──────────────────────────────────────────────── */
@@ -186,6 +199,13 @@ interface AestheticDataEntry {
 interface ChipMeta {
   source: 'manual' | 'key-piece';
   userConfirmed: boolean;
+}
+
+interface ConceptLanguageRead {
+  headline: string;
+  silhouette_steer: string;
+  palette_steer: string;
+  signals_note: string;
 }
 
 type TensionState = 'none' | 'soft' | 'hard';
@@ -517,11 +537,6 @@ function KeyPiecePlaceholder({ category }: { category: string | null }) {
 
 type ConceptStageId = "direction" | "language" | "product";
 
-type ExecutionGuidancePoint = {
-  title: string;
-  description: string;
-};
-
 type PieceRecommendationEntry = {
   piece: KeyPiece;
   recommendation: { bucket: "core" | "interpretation"; reason: string } | null;
@@ -566,55 +581,27 @@ type ProductStrategicImplication = {
   suggestedRoles: CollectionRoleId[];
 };
 
+const PRODUCT_PIECE_READ_FALLBACK_BODY =
+  "This piece carries the clearest expression of the collection direction. Assign its role before moving to specs.";
+
+function buildProductPieceReadFallback(pieceName: string): ProductPieceRead {
+  return {
+    title: pieceName,
+    body: PRODUCT_PIECE_READ_FALLBACK_BODY,
+  };
+}
+
+function getConceptSilhouetteLabel(conceptSilhouette: string): string {
+  return (
+    CONCEPT_SILHOUETTES.find((silhouette) => silhouette.id === conceptSilhouette)?.name.toLowerCase() ??
+    conceptSilhouette
+  );
+}
+
 function getStageIndex(stage: ConceptStageId): number {
   if (stage === "direction") return 0;
   if (stage === "language") return 1;
   return 2;
-}
-
-function buildExecutionGuidance(options: {
-  interpretationSummary: string;
-  conceptSilhouette: string;
-  conceptPalette: string | null;
-  paletteOptions: Array<{ id: string; name: string }>;
-  signals: Array<{ label: string; reason: string }>;
-  executionLevers: string[];
-}): ExecutionGuidancePoint[] {
-  const guidance: ExecutionGuidancePoint[] = [];
-  const silhouetteName =
-    CONCEPT_SILHOUETTES.find((silhouette) => silhouette.id === options.conceptSilhouette)?.name.toLowerCase() ??
-    options.conceptSilhouette;
-  const paletteName =
-    options.paletteOptions.find((palette) => palette.id === options.conceptPalette)?.name ?? options.conceptPalette;
-
-  guidance.push({
-    title: "Execution emphasis",
-    description: `Keep the collection grounded in ${silhouetteName} proportions so the direction reads with control, not noise.`,
-  });
-
-  if (paletteName) {
-    guidance.push({
-      title: "Palette discipline",
-      description: `Use ${paletteName.toLowerCase()} to hold the mood with restraint and keep the story editorial.`,
-    });
-  }
-
-  if (options.interpretationSummary && options.interpretationSummary !== "Pure direction") {
-    guidance.push({
-      title: "Interpretation",
-      description: `Let ${options.interpretationSummary.toLowerCase()} shape the styling language rather than sitting on top of it.`,
-    });
-  }
-
-  const leverSource = options.executionLevers.length > 0 ? options.executionLevers : options.signals.map((signal) => signal.label);
-  leverSource.slice(0, 2).forEach((lever, index) => {
-    guidance.push({
-      title: index === 0 ? "Priority signal" : "Supporting signal",
-      description: `${lever} should read as a clear collection cue, not a scattered accent.`,
-    });
-  });
-
-  return guidance.slice(0, 4);
 }
 
 function getRoleName(role: CollectionRoleId): string {
@@ -777,86 +764,6 @@ function buildPieceSuggestion(
   };
 }
 
-function buildPieceRead(
-  entry: PieceRecommendationEntry,
-  resonanceScore: number | null | undefined,
-  options: {
-    directionName: string | null;
-    conceptSilhouette: string;
-    conceptPaletteName: string | null;
-    interpretationSummary: string;
-    signalLabels: string[];
-  }
-): ProductPieceRead {
-  const silhouetteName =
-    CONCEPT_SILHOUETTES.find((silhouette) => silhouette.id === options.conceptSilhouette)?.name.toLowerCase() ??
-    options.conceptSilhouette;
-  const sourceClause = entry.recommendation?.bucket === "interpretation"
-    ? "It matters because it translates your interpretation into a visible product decision."
-    : "It matters because it keeps the collection legible at product level.";
-  const languageClause = options.conceptPaletteName
-    ? `${silhouetteName} proportions and ${options.conceptPaletteName.toLowerCase()} keep the language disciplined around it.`
-    : `${silhouetteName} proportions are what keep this piece aligned to the collection language.`;
-  const marketClause =
-    entry.piece.signal === "high-volume"
-      ? "Commercially, it has the broadest stabilizing potential and can absorb volume without flattening the story."
-      : entry.piece.signal === "ascending"
-      ? "Commercially, it has enough momentum to lead with confidence if the execution stays controlled."
-      : entry.piece.signal === "emerging"
-      ? "Commercially, it reads as a sharper point of view, so execution discipline matters more than scale."
-      : entry.piece.custom
-      ? "Commercially, treat it as an authored choice and validate the role through the assortment around it."
-      : "Commercially, it should support the collection through clarity rather than novelty.";
-  const executionClause = entry.piece.note
-    ? entry.piece.note
-    : entry.piece.type
-    ? `Keep the ${entry.piece.type} execution disciplined so the piece reads intentional rather than overstated.`
-    : "Keep the execution restrained so the role reads clearly.";
-  const pressureClause = resonanceScore != null && resonanceScore < 75
-    ? "The current market window is more selective, so the role assignment needs to be disciplined."
-    : "The current market window supports a clear role if the assortment around it stays balanced.";
-
-  return {
-    title: entry.piece.item,
-    body: `${sourceClause} ${languageClause} ${marketClause} ${executionClause} ${pressureClause}`,
-  };
-}
-
-function buildStartingPieceRead(
-  entry: PieceRecommendationEntry,
-  options: {
-    directionName: string | null;
-    conceptSilhouette: string;
-    conceptPaletteName: string | null;
-    interpretationSummary: string;
-  }
-): ProductPieceRead {
-  const directionName = options.directionName ?? "this direction";
-  const silhouetteName =
-    CONCEPT_SILHOUETTES.find((silhouette) => silhouette.id === options.conceptSilhouette)?.name.toLowerCase() ??
-    options.conceptSilhouette;
-  const languageClause = options.conceptPaletteName
-    ? `${silhouetteName} proportions and ${options.conceptPaletteName.toLowerCase()} keep it consistent with the collection language now taking shape.`
-    : `${silhouetteName} proportions keep it consistent with the collection language now taking shape.`;
-  const interpretationClause =
-    options.interpretationSummary && options.interpretationSummary !== "Pure direction"
-      ? `It carries the clearest expression of ${directionName} while staying aligned to the ${options.interpretationSummary.toLowerCase()} inflection defining this collection.`
-      : `It currently carries the clearest expression of ${directionName} at product level.`;
-  const marketClause =
-    entry.piece.signal === "ascending"
-      ? "Its market signal also gives you enough momentum to evaluate the line from a confident lead expression."
-      : entry.piece.signal === "high-volume"
-      ? "Its market signal gives it enough breadth to test how the collection can scale without losing character."
-      : entry.piece.signal === "emerging"
-      ? "Its market signal keeps the point of view sharp, which makes it useful as an early read on how far the line can push."
-      : "It offers the clearest early read on how the assortment is beginning to organize itself.";
-
-  return {
-    title: entry.piece.item,
-    body: `${entry.piece.item} currently carries the clearest expression of the collection DNA. ${interpretationClause} ${languageClause} ${marketClause}`,
-  };
-}
-
 function buildStrategicImplication(
   entry: PieceRecommendationEntry,
   options: {
@@ -986,11 +893,52 @@ export default function ConceptStudioPage() {
     setActiveProductPieceId,
     pieceRolesById,
     setPieceRolesById,
+    setSelectedPieceImage,
     setConceptInsight,
     clearConceptInsight,
     isProxyMatch,
     setIsProxyMatch,
-  } = useSessionStore();
+  } = useSessionStore(
+    useShallow((state) => ({
+      season: state.season,
+      collectionName: state.collectionName,
+      refinementModifiers: state.refinementModifiers,
+      aestheticInput: state.aestheticInput,
+      setAestheticInput: state.setAestheticInput,
+      identityPulse: state.identityPulse,
+      resonancePulse: state.resonancePulse,
+      lockConcept: state.lockConcept,
+      setCurrentStep: state.setCurrentStep,
+      conceptSilhouette: state.conceptSilhouette,
+      setConceptSilhouette: state.setConceptSilhouette,
+      conceptPalette: state.conceptPalette,
+      setConceptPalette: state.setConceptPalette,
+      collectionAesthetic: state.collectionAesthetic,
+      setCollectionAesthetic: state.setCollectionAesthetic,
+      directionInterpretationText: state.directionInterpretationText,
+      directionInterpretationChips: state.directionInterpretationChips,
+      setDirectionInterpretationText: state.setDirectionInterpretationText,
+      setDirectionInterpretationModifiers: state.setDirectionInterpretationModifiers,
+      setDirectionInterpretationChips: state.setDirectionInterpretationChips,
+      setCustomChips: state.setCustomChips,
+      setSelectedKeyPiece: state.setSelectedKeyPiece,
+      decisionGuidanceState: state.decisionGuidanceState,
+      setDecisionGuidanceState: state.setDecisionGuidanceState,
+      intentGoals: state.intentGoals,
+      intentTradeoff: state.intentTradeoff,
+      collectionRole: state.collectionRole,
+      setCollectionRole: state.setCollectionRole,
+      activeProductPieceId: state.activeProductPieceId,
+      setActiveProductPieceId: state.setActiveProductPieceId,
+      pieceRolesById: state.pieceRolesById,
+      setPieceRolesById: state.setPieceRolesById,
+      setSelectedPieceImage: state.setSelectedPieceImage,
+      setConceptInsight: state.setConceptInsight,
+      clearConceptInsight: state.clearConceptInsight,
+      isProxyMatch: state.isProxyMatch,
+      setIsProxyMatch: state.setIsProxyMatch,
+    }))
+  );
 
   const [headerCollectionName, setHeaderCollectionName] = useState<string>("Collection");
   const [headerSeasonLabel, setHeaderSeasonLabel] = useState<string>(season || "—");
@@ -1021,28 +969,6 @@ export default function ConceptStudioPage() {
       else setHeaderSeasonLabel(season || "—");
     } catch { setHeaderSeasonLabel(season || "—"); }
   }, [season]);
-
-  useEffect(() => {
-    try {
-      const storedCollectionAesthetic = window.localStorage.getItem(COLLECTION_AESTHETIC_STORAGE_KEY);
-      const storedInflection = window.localStorage.getItem(AESTHETIC_INFLECTION_STORAGE_KEY);
-
-      if (storedCollectionAesthetic) {
-        setLockedCollectionAesthetic(storedCollectionAesthetic);
-        setCollectionAesthetic(storedCollectionAesthetic);
-        const lockedAestheticName = resolveAestheticName(storedCollectionAesthetic);
-        if (lockedAestheticName) {
-          setAestheticInput(lockedAestheticName);
-        }
-      }
-
-      if (storedInflection) {
-        setAestheticInflection(storedInflection);
-      }
-    } catch {
-      // Ignore storage access failures in private or restricted contexts.
-    }
-  }, [setAestheticInput, setCollectionAesthetic]);
 
   // Real Critic identity scores for all aesthetics, populated once brandProfileId resolves.
   // Empty until the batch fetch completes — falls back to static scoring in the meantime.
@@ -1260,20 +1186,41 @@ export default function ConceptStudioPage() {
     if (trimmed) return trimmed;
     return collectionPieces.find((piece) => piece.aesthetic_inflection?.trim())?.aesthetic_inflection?.trim() ?? null;
   }, [aestheticInflection, collectionPieces]);
+  const conceptReadTriggerPhase = selectedAesthetic
+    ? ((aestheticInflection.trim() || selectedInterpretationChips.length > 0) ? "direction-defined" : "aesthetic-selected")
+    : null;
   // ─── Synthesizer: reactive MUKO INSIGHT (streaming) ──────────────────────
   const conceptAbortRef = useRef<AbortController | null>(null);
+  const conceptLanguageRequestKeyRef = useRef<string | null>(null);
   const conceptRawJsonRef = useRef<string>('');
   const criticAbortRef = useRef<AbortController | null>(null);
   const criticCacheRef = useRef<Map<string, number>>(new Map());
-  const [conceptInsightData, setConceptInsightData] = useState<InsightData | null>(null);
-  const [conceptInsightLoading, setConceptInsightLoading] = useState(false);
+  const pieceReadAbortRef = useRef<AbortController | null>(null);
+  const [step1ReadData, setStep1ReadData] = useState<InsightData | null>(null);
+  const [step1ReadLoading, setStep1ReadLoading] = useState(false);
+  const [step2ReadData, setStep2ReadData] = useState<ConceptLanguageRead | null>(null);
+  const [step2ReadLoading, setStep2ReadLoading] = useState(false);
+  const [activePieceRead, setActivePieceRead] = useState<ProductPieceRead | null>(null);
+  const [pieceReadLoading, setPieceReadLoading] = useState(false);
   const [conceptStreamingText, setConceptStreamingText] = useState('');
+  const [conceptStreamingParagraph, setConceptStreamingParagraph] = useState('');
+  const [conceptIsParagraphStreaming, setConceptIsParagraphStreaming] = useState(false);
 
   useEffect(() => {
     console.log('[Muko] Synthesizer effect fired, aesthetic:', selectedAesthetic);
     if (!selectedAesthetic) {
-      setConceptInsightData(null);
+      pieceReadAbortRef.current?.abort();
+      pieceReadAbortRef.current = null;
+      setActivePieceRead(null);
+      setPieceReadLoading(false);
+      setStep1ReadData(null);
+      setStep2ReadData(null);
+      setStep1ReadLoading(false);
+      setStep2ReadLoading(false);
       setConceptStreamingText('');
+      setConceptStreamingParagraph('');
+      setConceptIsParagraphStreaming(false);
+      conceptLanguageRequestKeyRef.current = null;
       clearConceptInsight();
       return;
     }
@@ -1351,8 +1298,10 @@ export default function ConceptStudioPage() {
 
     const timer = window.setTimeout(async () => {
       console.log('[Muko] Synthesizer timer firing');
-      setConceptInsightLoading(true);
+      setStep1ReadLoading(true);
       setConceptStreamingText('');
+      setConceptStreamingParagraph('');
+      setConceptIsParagraphStreaming(true);
       conceptRawJsonRef.current = '';
       try {
         const res = await fetch('/api/synthesizer/concept', {
@@ -1381,6 +1330,7 @@ export default function ConceptStudioPage() {
               // Extract partial insight_title value for display
               const match = accumulated.match(/"insight_title"\s*:\s*"([^"]*)/);
               setConceptStreamingText(match ? match[1] : (accumulated.length > 10 ? '...' : ''));
+              setConceptStreamingParagraph(extractPartialJsonString(accumulated, 'insight_description'));
             } catch { /* ignore parse errors on partial chunks */ }
           } else if (event === 'complete' || event === 'fallback') {
             try {
@@ -1388,8 +1338,10 @@ export default function ConceptStudioPage() {
               console.log('[Muko] Synthesizer setting data:', result?.data?.statements?.[0]);
               if (!controller.signal.aborted) {
                 const insightData = result.data ?? result;
-                setConceptInsightData(insightData);
+                setStep1ReadData(insightData);
                 setConceptStreamingText('');
+                setConceptStreamingParagraph(insightData.statements?.slice(1).join(' ').trim() ?? '');
+                setConceptIsParagraphStreaming(false);
                 // Persist insight fields to store for downstream stages
                 try {
                   const title = insightData.statements?.[0] ?? '';
@@ -1442,7 +1394,8 @@ export default function ConceptStudioPage() {
         if ((e as Error).name === 'AbortError') return;
       } finally {
         console.log('[Muko] Synthesizer stream ended, aborted:', controller.signal.aborted);
-        setConceptInsightLoading(false);
+        setStep1ReadLoading(false);
+        setConceptIsParagraphStreaming(false);
         if (!controller.signal.aborted) {
           setConceptStreamingText('');
         }
@@ -1455,7 +1408,17 @@ export default function ConceptStudioPage() {
       controller.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAesthetic, conceptSilhouette, conceptPalette, brandProfileName, customerProfile, referenceBrands, excludedBrands, brandKeywordSource, identityPulse?.score, resonancePulse?.score, collectionPieces, brandProfile3, activeCollectionInflection]);
+  }, [selectedAesthetic, conceptReadTriggerPhase]);
+
+  const conceptLanguageRequestKey = useMemo(() => {
+    if (!selectedAesthetic) return null;
+    return JSON.stringify({
+      aesthetic: selectedAesthetic,
+      brandKeywords: brandKeywordSource,
+      brandName: brandProfile3?.brand_name ?? brandProfileName ?? null,
+    });
+  }, [brandKeywordSource, brandProfile3?.brand_name, brandProfileName, selectedAesthetic]);
+
 
   useEffect(() => {
     if (!selectedAesthetic) {
@@ -1789,8 +1752,9 @@ export default function ConceptStudioPage() {
     setCollectionRole(null);
     setSelectedKeyPieceLocal(null);
     setSelectedKeyPiece(null);
+    setSelectedPieceImage(null);
     setDecisionGuidanceState({ is_confirmed: false, selected_anchor_piece: null });
-  }, [selectedAesthetic, setActiveProductPieceId, setCollectionRole, setDecisionGuidanceState, setPieceRolesById, setSelectedKeyPiece]);
+  }, [selectedAesthetic, setActiveProductPieceId, setCollectionRole, setDecisionGuidanceState, setPieceRolesById, setSelectedKeyPiece, setSelectedPieceImage]);
 
   useEffect(() => {
     const allStagePieceIds = new Set([...keyPieces, ...customProductPieces].map((piece) => piece.item));
@@ -1825,6 +1789,7 @@ export default function ConceptStudioPage() {
     if (!activeProductPieceEntry) {
       setSelectedKeyPieceLocal(null);
       setSelectedKeyPiece(null);
+      setSelectedPieceImage(null);
       setDecisionGuidanceState({
         is_confirmed: false,
         selected_anchor_piece: null,
@@ -1833,11 +1798,17 @@ export default function ConceptStudioPage() {
     }
     setSelectedKeyPieceLocal(activeProductPieceEntry.piece);
     setSelectedKeyPiece(activeProductPieceEntry.piece);
+    setSelectedPieceImage(
+      buildSelectedPieceImage({
+        type: activeProductPieceEntry.piece.type,
+        signal: activeProductPieceEntry.piece.signal ?? null,
+      })
+    );
     setDecisionGuidanceState({
       is_confirmed: false,
       selected_anchor_piece: activeProductPieceEntry.piece.item,
     });
-  }, [activeProductPieceEntry, setDecisionGuidanceState, setSelectedKeyPiece]);
+  }, [activeProductPieceEntry, setDecisionGuidanceState, setSelectedKeyPiece, setSelectedPieceImage]);
 
   const handleSelectProductPiece = useCallback((pieceName: string) => {
     // Once a role has been assigned to any piece, lock selection to that piece only
@@ -1885,7 +1856,7 @@ export default function ConceptStudioPage() {
     const primaryPiece = primaryPieceName
       ? [...keyPieces, ...customProductPieces].find((piece) => piece.item === primaryPieceName) ?? null
       : null;
-    const executionLevers = conceptInsightData?.decision_guidance?.execution_levers ?? [];
+    const executionLevers = step1ReadData?.decision_guidance?.execution_levers ?? [];
     const shouldPersistCollectionAesthetic = collectionPieces.length === 0 || isAestheticSelectionUnlocked;
     const selectedAestheticSlug = selectedAesthetic ? toAestheticSlug(selectedAesthetic) : null;
     const primaryRole = primaryPieceName ? pieceRolesById[primaryPieceName] ?? null : null;
@@ -1953,7 +1924,7 @@ export default function ConceptStudioPage() {
     }
   }, [
     activeProductPieceId,
-    conceptInsightData?.decision_guidance?.execution_levers,
+    step1ReadData?.decision_guidance?.execution_levers,
     customProductPieces,
     pieceRolesById,
     keyPieces,
@@ -2146,6 +2117,12 @@ export default function ConceptStudioPage() {
     // Clear silhouette/palette and concept insight when aesthetic changes
     setConceptSilhouette('');
     setConceptPalette(null);
+    setStep1ReadData(null);
+    setStep2ReadData(null);
+    setStep1ReadLoading(false);
+    setStep2ReadLoading(false);
+    setConceptStreamingText('');
+    conceptLanguageRequestKeyRef.current = null;
     clearConceptInsight();
     setAestheticInput(aesthetic);
     setLockedCollectionAesthetic(aestheticSlug);
@@ -2252,7 +2229,7 @@ export default function ConceptStudioPage() {
           palette: null,
         };
       })
-    : [...topChips.filter((c) => c.type === "spec").slice(0, 4), ...topChips.filter((c) => c.type === "mood").slice(0, 2)];
+    : [];
   const topContent = AESTHETIC_CONTENT[topAesthetic];
   const orderedSilhouettes = useMemo(() => {
     const order = combinedDirection?.silhouetteOrder ?? [];
@@ -2291,6 +2268,70 @@ export default function ConceptStudioPage() {
       : currentStageState === "language" && !canAdvanceToStage2
       ? "direction"
       : currentStageState;
+  const isStep3ProductStage = currentStage === "product";
+  const step3PulseReferenceLabel = selectedAesthetic ? `Concept locked · ${selectedAesthetic}` : null;
+
+  useEffect(() => {
+    if (currentStage !== "language" || !selectedAesthetic || !conceptLanguageRequestKey) return;
+    if (conceptLanguageRequestKeyRef.current === conceptLanguageRequestKey) return;
+
+    conceptLanguageRequestKeyRef.current = conceptLanguageRequestKey;
+    let cancelled = false;
+
+    const run = async () => {
+      setStep2ReadLoading(true);
+      try {
+        const res = await fetch('/api/synthesizer/concept-language', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            aesthetic_name: selectedAesthetic,
+            brand_keywords: brandKeywordSource,
+            brand_name: brandProfile3?.brand_name ?? brandProfileName ?? null,
+            customer_profile: brandProfile3?.customer_profile ?? customerProfile ?? null,
+            price_tier: brandProfile3?.price_tier ?? null,
+            tension_context: brandProfile3?.tension_context ?? null,
+            reference_brands: referenceBrands,
+            excluded_brands: excludedBrands,
+          }),
+        });
+        if (!res.ok) {
+          conceptLanguageRequestKeyRef.current = null;
+          return;
+        }
+        const data = await res.json() as ConceptLanguageRead;
+        if (!cancelled) {
+          setStep2ReadData(data);
+        }
+      } catch {
+        conceptLanguageRequestKeyRef.current = null;
+        // Leave the existing step 2 read intact on request failure.
+      } finally {
+        if (!cancelled) {
+          setStep2ReadLoading(false);
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    brandKeywordSource,
+    brandProfile3?.brand_name,
+    brandProfile3?.customer_profile,
+    brandProfile3?.price_tier,
+    brandProfile3?.tension_context,
+    brandProfileName,
+    conceptLanguageRequestKey,
+    currentStage,
+    customerProfile,
+    excludedBrands,
+    referenceBrands,
+    selectedAesthetic,
+  ]);
   const activePaletteName =
     orderedPaletteOptions.find((palette) => palette.id === conceptPalette)?.name ?? conceptPalette ?? null;
   const productSuggestionOptions = useMemo(
@@ -2333,27 +2374,6 @@ export default function ConceptStudioPage() {
     setActiveProductPieceId(pieceOrder[0]);
   }, [activeProductPieceId, pieceOrder, setActiveProductPieceId]);
 
-  const executionGuidancePoints = useMemo(
-    () =>
-      conceptSilhouette
-        ? buildExecutionGuidance({
-            interpretationSummary,
-            conceptSilhouette,
-            conceptPalette,
-            paletteOptions: orderedPaletteOptions.map((palette) => ({ id: palette.id, name: palette.name })),
-            signals: combinedDirection?.signals ?? [],
-            executionLevers: conceptInsightData?.decision_guidance?.execution_levers ?? [],
-          })
-        : [],
-    [
-      combinedDirection?.signals,
-      conceptInsightData?.decision_guidance?.execution_levers,
-      conceptPalette,
-      conceptSilhouette,
-      interpretationSummary,
-      orderedPaletteOptions,
-    ]
-  );
   const stageFrames = [
     { id: "direction" as const, label: "Define Direction", helper: "Set the concept anchor and strategic read." },
     { id: "language" as const, label: "Shape Collection Language", helper: "Translate direction into silhouette, palette, and signals." },
@@ -2390,28 +2410,95 @@ export default function ConceptStudioPage() {
         : null,
     [activeProductPieceEntry, productSuggestionOptions, collectionBalanceContext]
   );
-  const activePieceRead = useMemo(
-    () =>
-      currentStage !== "product"
-        ? null
-        : activeProductPieceEntry
-        ? buildPieceRead(activeProductPieceEntry, resonanceScore, {
-            directionName: combinedDirection?.dnaLines[0] ?? selectedAesthetic ?? null,
-            conceptSilhouette,
-            conceptPaletteName: activePaletteName,
-            interpretationSummary,
-            signalLabels: (combinedDirection?.signals ?? []).map((signal) => signal.label),
-          })
-        : suggestedStartingPieceEntry
-        ? buildStartingPieceRead(suggestedStartingPieceEntry, {
-            directionName: combinedDirection?.dnaLines[0] ?? selectedAesthetic ?? null,
-            conceptSilhouette,
-            conceptPaletteName: activePaletteName,
-            interpretationSummary,
-          })
-        : null,
-    [activePaletteName, activeProductPieceEntry, combinedDirection?.dnaLines, combinedDirection?.signals, conceptSilhouette, currentStage, interpretationSummary, resonanceScore, selectedAesthetic, suggestedStartingPieceEntry]
-  );
+  useEffect(() => {
+    pieceReadAbortRef.current?.abort();
+    pieceReadAbortRef.current = null;
+
+    if (currentStage !== "product") {
+      setActivePieceRead(null);
+      setPieceReadLoading(false);
+      return;
+    }
+
+    const targetEntry = activeProductPieceEntry ?? suggestedStartingPieceEntry;
+    if (!targetEntry) {
+      setActivePieceRead(null);
+      setPieceReadLoading(false);
+      return;
+    }
+
+    const fallback = buildProductPieceReadFallback(targetEntry.piece.item);
+    const controller = new AbortController();
+    const isStartingPiece = !activeProductPieceEntry;
+    pieceReadAbortRef.current = controller;
+    setPieceReadLoading(true);
+    setActivePieceRead(null);
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/piece-read", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            piece: {
+              item: targetEntry.piece.item,
+              type: targetEntry.piece.type ?? "",
+              signal: targetEntry.piece.signal ?? "",
+              note: targetEntry.piece.note ?? "",
+              bucket: targetEntry.recommendation?.bucket ?? "",
+            },
+            context: {
+              aestheticName: selectedAesthetic ?? combinedDirection?.dnaLines[0] ?? "this direction",
+              silhouetteLabel: getConceptSilhouetteLabel(conceptSilhouette),
+              paletteName: activePaletteName ?? "unknown",
+              resonanceScore: resonanceScore ?? null,
+              interpretationSummary: interpretationSummary || null,
+              isStartingPiece,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Piece read request failed with status ${response.status}`);
+        }
+
+        const data = (await response.json()) as Partial<ProductPieceRead>;
+        if (controller.signal.aborted) return;
+
+        setActivePieceRead({
+          title: typeof data.title === "string" && data.title.trim() ? data.title.trim() : targetEntry.piece.item,
+          body: typeof data.body === "string" && data.body.trim() ? data.body.trim() : fallback.body,
+        });
+      } catch {
+        if (controller.signal.aborted) return;
+        setActivePieceRead(fallback);
+      } finally {
+        if (controller.signal.aborted) return;
+        if (pieceReadAbortRef.current === controller) {
+          pieceReadAbortRef.current = null;
+        }
+        setPieceReadLoading(false);
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      if (pieceReadAbortRef.current === controller) {
+        pieceReadAbortRef.current = null;
+      }
+    };
+  }, [
+    activePaletteName,
+    activeProductPieceEntry,
+    combinedDirection?.dnaLines,
+    conceptSilhouette,
+    currentStage,
+    interpretationSummary,
+    resonanceScore,
+    selectedAesthetic,
+    suggestedStartingPieceEntry,
+  ]);
   const activeStrategicImplication = useMemo(
     () =>
       activeProductPieceEntry
@@ -2421,18 +2508,13 @@ export default function ConceptStudioPage() {
   );
   const stageAwareHeadline =
     currentStage === "language"
-      ? `Execution Guidance for ${combinedDirection?.dnaLines[0] ?? selectedAesthetic ?? recommendedAesthetic}`
-      : conceptInsightData?.statements[0] ?? insightContent.headline;
+      ? step2ReadData?.headline ?? `Shape ${combinedDirection?.dnaLines[0] ?? selectedAesthetic ?? recommendedAesthetic} with disciplined visual clarity.`
+      : step1ReadData?.statements[0] ?? insightContent.headline;
   const stageAwareParagraphs =
     currentStage === "language"
-      ? [
-          `Translate ${combinedDirection?.dnaLines[0] ?? selectedAesthetic ?? "this direction"} into a disciplined visual grammar before committing to the product mix.`,
-          conceptSilhouette
-            ? `${CONCEPT_SILHOUETTES.find((silhouette) => silhouette.id === conceptSilhouette)?.name ?? conceptSilhouette} is now setting the collection posture. Use palette and signals to reinforce that read.`
-            : "",
-        ].filter(Boolean)
-      : conceptInsightData
-      ? [conceptInsightData.statements[1] ?? "", conceptInsightData.statements[2] ?? ""].filter(Boolean)
+      ? []
+      : step1ReadData
+      ? [step1ReadData.statements[1] ?? "", step1ReadData.statements[2] ?? ""].filter(Boolean)
       : [insightContent.p1, insightContent.p2, insightContent.p3];
   const navigateStage = useCallback(
     (nextStage: ConceptStageId) => {
@@ -2606,26 +2688,55 @@ export default function ConceptStudioPage() {
                     background: "rgba(245,242,235,0.72)",
                   }}
                 >
-                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 184px", gap: 18, alignItems: "center" }}>
-                    <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                      <div style={{ fontFamily: sohne, fontSize: 11, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(67, 67, 43, 0.42)", marginBottom: 10 }}>
-                        Collection Direction
-                      </div>
-                      <span style={{ fontFamily: sohne, fontWeight: 500, fontSize: 30, color: OLIVE, letterSpacing: "-0.02em", lineHeight: 1.04, display: "block", marginBottom: 10, maxWidth: 520 }}>
-                        {topAesthetic}
-                      </span>
-                      <p style={{ margin: 0, fontFamily: inter, fontSize: 14, color: "rgba(67,67,43,0.58)", lineHeight: 1.55, maxWidth: 520 }}>
-                        {combinedDirection?.dnaLines[1] ?? interpretationSummary}
-                      </p>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                      {topMoodboardImages.slice(0, 6).map((src, i) => (
-                        <div key={`top-mb-${i}`} style={{ aspectRatio: "1", borderRadius: 10, overflow: "hidden", animation: `fadeIn 220ms ease ${i * 20}ms both` }}>
-                          <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} loading="lazy" />
+                  {selectedAesthetic ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 184px", gap: 18, alignItems: "center" }}>
+                      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                        <div style={{ fontFamily: sohne, fontSize: 11, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(67, 67, 43, 0.42)", marginBottom: 10 }}>
+                          Collection Direction
                         </div>
-                      ))}
+                        <span style={{ fontFamily: sohne, fontWeight: 500, fontSize: 30, color: OLIVE, letterSpacing: "-0.02em", lineHeight: 1.04, display: "block", marginBottom: 10, maxWidth: 520 }}>
+                          {topAesthetic}
+                        </span>
+                        <p style={{ margin: 0, fontFamily: inter, fontSize: 14, color: "rgba(67,67,43,0.58)", lineHeight: 1.55, maxWidth: 520 }}>
+                          {combinedDirection?.dnaLines[1] ?? interpretationSummary}
+                        </p>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                        {topMoodboardImages.slice(0, 6).map((src, i) => (
+                          <div key={`top-mb-${i}`} style={{ aspectRatio: "1", borderRadius: 10, overflow: "hidden", animation: `fadeIn 220ms ease ${i * 20}ms both` }}>
+                            <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} loading="lazy" />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 184px", gap: 18, alignItems: "center" }}>
+                      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                        <div style={{ fontFamily: sohne, fontSize: 11, fontWeight: 800, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(67, 67, 43, 0.42)", marginBottom: 10 }}>
+                          Collection Direction
+                        </div>
+                        <span style={{ fontFamily: sohne, fontWeight: 500, fontSize: 30, color: "rgba(67,67,43,0.32)", letterSpacing: "-0.02em", lineHeight: 1.04, display: "block", marginBottom: 10, maxWidth: 520 }}>
+                          Select a direction
+                        </span>
+                        <p style={{ margin: 0, fontFamily: inter, fontSize: 14, color: "rgba(67,67,43,0.46)", lineHeight: 1.55, maxWidth: 520 }}>
+                          Choose an aesthetic to begin shaping silhouette, palette, and product language.
+                        </p>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <div
+                            key={`top-placeholder-${i}`}
+                            style={{
+                              aspectRatio: "1",
+                              borderRadius: 10,
+                              border: "1px dashed rgba(67,67,43,0.10)",
+                              background: "rgba(255,255,255,0.55)",
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr)", gap: 14, marginBottom: 42, paddingTop: 18, borderTop: "1px solid rgba(67,67,43,0.08)", alignItems: "start" }}>
@@ -2719,7 +2830,10 @@ export default function ConceptStudioPage() {
                             <input
                               type="text"
                               value={aestheticInflection}
-                              onChange={(e) => setAestheticInflection(e.target.value.slice(0, 100))}
+                              onChange={(e) => {
+                                setAestheticInflection(e.target.value.slice(0, 100));
+                                setSelectedInterpretationChips([]);
+                              }}
                               maxLength={100}
                               placeholder="e.g. softer tailoring, fluid drape, matte restraint..."
                               style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: 13, borderRadius: 10, border: "1px solid rgba(67,67,43,0.12)", background: "rgba(255,255,255,0.88)", color: OLIVE, fontFamily: inter, outline: "none" }}
@@ -2733,11 +2847,11 @@ export default function ConceptStudioPage() {
                                     onClick={() => {
                                       if (isSelected) {
                                         setSelectedInterpretationChips((prev) => prev.filter((item) => item !== suggestion));
-                                        setAestheticInflection((prev) => removeInterpretationPhrase(prev, suggestion));
+                                        setAestheticInflection("");
                                         return;
                                       }
-                                      setSelectedInterpretationChips((prev) => [...prev, suggestion]);
-                                      setAestheticInflection((prev) => addInterpretationPhrase(prev, suggestion).slice(0, 100));
+                                      setSelectedInterpretationChips([suggestion]);
+                                      setAestheticInflection(suggestion);
                                     }}
                                     style={{
                                       whiteSpace: "nowrap",
@@ -3223,10 +3337,25 @@ export default function ConceptStudioPage() {
             {/* PULSE RAIL — slim strip */}
             <div style={{ marginBottom: 0 }}>
               <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>Pulse</div>
+              {isStep3ProductStage && step3PulseReferenceLabel && (
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "rgba(67,67,43,0.34)",
+                    marginBottom: 10,
+                  }}
+                >
+                  {step3PulseReferenceLabel}
+                </div>
+              )}
               {pulseRows.map((row) => (
                 <React.Fragment key={row.key}>
                   {/* Proxy message — shown above Resonance when LLM matched a different aesthetic */}
-                  {row.key === "resonance" && resonanceProxyMessage && !resonanceLoading && (
+                  {row.key === "resonance" && resonanceProxyMessage && !resonanceLoading && !isStep3ProductStage && (
                     <div style={{ fontSize: 11, color: "rgba(67,67,43,0.50)", fontFamily: inter, marginBottom: 8, lineHeight: 1.5 }}>
                       {resonanceProxyMessage}
                     </div>
@@ -3239,12 +3368,23 @@ export default function ConceptStudioPage() {
                     numericPercent={row.scoreNum}
                     scoreColor={row.color}
                     pill={row.chip ? { variant: row.chip.variant, label: row.chip.status } : null}
-                    subLabel={row.subLabel}
+                    subLabel={
+                      isStep3ProductStage && (row.key === "identity" || row.key === "resonance")
+                        ? null
+                        : isStep3ProductStage && row.key === "execution"
+                        ? "Unlocks when you define material and construction"
+                        : row.subLabel
+                    }
                     whatItMeans={row.what}
                     howCalculated={row.how}
                     isPending={row.pending}
-                    isExpanded={pulseExpandedRow === row.key}
-                    onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === row.key ? null : row.key)}
+                    isExpanded={!isStep3ProductStage || row.key === "execution" ? pulseExpandedRow === row.key : false}
+                    onToggleExpand={
+                      isStep3ProductStage && (row.key === "identity" || row.key === "resonance")
+                        ? undefined
+                        : () => setPulseExpandedRow(pulseExpandedRow === row.key ? null : row.key)
+                    }
+                    rowOpacity={isStep3ProductStage && (row.key === "identity" || row.key === "resonance") ? 0.5 : 1}
                   />
                 </React.Fragment>
               ))}
@@ -3259,23 +3399,23 @@ export default function ConceptStudioPage() {
                 <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>
                   Muko Guidance
                 </div>
-                <p style={{ margin: 0, fontFamily: inter, fontSize: 13.5, color: "rgba(67,67,43,0.42)", fontStyle: "italic", lineHeight: 1.6 }}>
-                  Select a direction to see Muko&apos;s analysis
-                </p>
+                <MukoStreamingParagraph
+                  text="Select a direction to see Muko's analysis"
+                  paragraphStyle={{ fontFamily: inter, fontSize: 13.5, color: "rgba(67,67,43,0.42)", fontStyle: "italic", lineHeight: 1.6 }}
+                />
               </div>
-            ) : conceptInsightLoading && !conceptInsightData && !conceptStreamingText ? (
+            ) : ((currentStage === "language" && step2ReadLoading && !step2ReadData) || (currentStage === "product" && pieceReadLoading && !activePieceRead) || (currentStage !== "language" && currentStage !== "product" && step1ReadLoading && !step1ReadData && !conceptStreamingText)) ? (
               <div style={{ marginBottom: 28 }}>
                 <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>
                   Muko Guidance
                 </div>
-                {/* Skeleton — shown only before first streaming chunk arrives */}
                 {[80, 60, 90, 55].map((w, i) => (
                   <div key={i} style={{ height: i === 0 ? 18 : 12, borderRadius: 6, background: "rgba(67,67,43,0.07)", marginBottom: i === 0 ? 14 : 8, width: `${w}%`, animation: "pulse 1.4s ease-in-out infinite" }} />
                 ))}
               </div>
             ) : (
               <motion.div
-                key={`${currentStage}-${activeProductPieceId ?? "none"}-${conceptInsightData?.statements?.[0] ?? stageAwareHeadline}`}
+                key={`${currentStage}-${activeProductPieceId ?? "none"}-${step1ReadData?.statements?.[0] ?? step2ReadData?.headline ?? stageAwareHeadline}`}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.24, ease: [0.22, 0.8, 0.2, 1] }}
@@ -3284,16 +3424,18 @@ export default function ConceptStudioPage() {
                   headline={stageAwareHeadline}
                   paragraphs={stageAwareParagraphs}
                   bullets={{
-                    label: conceptInsightData?.editLabel ?? 'POSITIONING',
-                    items: conceptInsightData?.edit ?? insightContent.opportunity,
+                    label: step1ReadData?.editLabel ?? 'POSITIONING',
+                    items: step1ReadData?.edit ?? insightContent.opportunity,
                   }}
-                  mode={conceptInsightData?.mode}
-                  isStreaming={conceptInsightLoading && !!conceptStreamingText}
+                  mode={step1ReadData?.mode}
+                  isStreaming={currentStage !== "language" && step1ReadLoading && !!conceptStreamingText}
                   streamingText={conceptStreamingText}
+                  streamingParagraph={conceptStreamingParagraph}
+                  isParagraphStreaming={currentStage !== "language" && conceptIsParagraphStreaming && !!conceptStreamingParagraph}
                   pageMode="concept"
                   canContinue={canLockDirection}
                   conceptStage={currentStage}
-                  executionGuidance={executionGuidancePoints}
+                  languageRead={step2ReadData}
                   productPieceRead={activePieceRead}
                   productStrategicImplication={activeStrategicImplication}
                   productStructure={collectionStructureSummary}
@@ -3301,14 +3443,14 @@ export default function ConceptStudioPage() {
                   onContinue={handleContinueToSpecs}
                   nextMove={{
                     mode: "concept",
-                    guidance: conceptInsightData?.decision_guidance ?? null,
+                    guidance: step1ReadData?.decision_guidance ?? null,
                     recommendedKeyPieces,
                     selectedAnchorPiece: activeProductPieceId,
                     isConfirmed: decisionGuidanceState.is_confirmed,
                     confirmedAnchorPiece: heroAssignedPieceId,
                     onSelectAnchorPiece: handleSelectProductPiece,
-                    onConfirm: conceptInsightData?.decision_guidance ? handleConfirmDirection : undefined,
-                    isLoading: conceptInsightLoading && !conceptInsightData?.decision_guidance,
+                    onConfirm: step1ReadData?.decision_guidance ? handleConfirmDirection : undefined,
+                    isLoading: step1ReadLoading && !step1ReadData?.decision_guidance,
                     onRoleSelect: (role) => activeProductPieceId && handleAssignRoleToPiece(activeProductPieceId, role),
                     currentRole: activeProductPieceId ? pieceRolesById[activeProductPieceId] ?? null : null,
                   }}

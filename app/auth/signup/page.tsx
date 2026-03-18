@@ -1,5 +1,7 @@
 // app/auth/signup/page.tsx
+import { AuthBackgroundPulse } from '@/components/auth/auth-background-pulse'
 import { SignUpForm } from '@/components/auth/signup-form'
+import { AuthBrand } from '@/components/auth/auth-brand'
 import { GoogleButton } from '@/components/auth/google-button'
 import Link from 'next/link'
 
@@ -7,45 +9,29 @@ export default function SignUpPage() {
   return (
     <main
       style={{
-        background: 'linear-gradient(150deg, #F9F7F4 0%, #F7F3F5 60%, #F3EDF0 100%)',
+        background: '#E8E3D6',
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '24px 16px',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
-      <div style={{ maxWidth: 480, width: '100%' }}>
-        {/* Logo */}
-        <h1
-          className="font-heading"
-          style={{
-            fontWeight: 600,
-            fontSize: 52,
-            color: '#4D302F',
-            letterSpacing: '-0.02em',
-            lineHeight: 1,
-            textAlign: 'center',
-            margin: '0 0 12px',
-          }}
-        >
-          muko.
-        </h1>
-
-        {/* Eyebrow */}
-        <p
-          style={{
-            fontFamily: 'var(--font-inter)',
-            fontSize: 11,
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-            color: '#999',
-            textAlign: 'center',
-            marginBottom: 28,
-          }}
-        >
-          Creative Intelligence · Private Beta
-        </p>
+      <AuthBackgroundPulse />
+      <div
+        aria-hidden="true"
+        className="auth-background-grain"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+      <div style={{ maxWidth: 480, width: '100%', position: 'relative', zIndex: 1 }}>
+        <AuthBrand />
 
         {/* Form card */}
         <div>
@@ -66,7 +52,7 @@ export default function SignUpPage() {
               style={{
                 fontFamily: 'var(--font-inter)',
                 fontSize: 11,
-                color: '#ccc',
+                color: '#756C61',
               }}
             >
               or
@@ -82,7 +68,7 @@ export default function SignUpPage() {
             style={{
               fontFamily: 'var(--font-inter)',
               fontSize: 12,
-              color: '#999',
+              color: '#92736E',
               textAlign: 'center',
               marginTop: 16,
             }}

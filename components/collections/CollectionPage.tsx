@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { getFlatForPiece } from '@/components/flats';
 import { useSessionStore } from '@/lib/store/sessionStore';
+import { parseSelectedPieceImage } from '@/lib/piece-image';
 
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
@@ -489,7 +490,10 @@ function Toast({ message }: { message: string }) {
 function PieceCard({ analysis, onClick }: { analysis: AnalysisRow; onClick: () => void }) {
   const pieceName = analysis.agent_versions?.saved_piece_name?.trim() ?? '';
   const score = getScore(analysis);
-  const flat = getFlatMatch(analysis.category, analysis.silhouette);
+  const storedPieceImage = parseSelectedPieceImage(analysis.agent_versions?.selected_piece_image);
+  const flat = storedPieceImage?.pieceType
+    ? getFlatForPiece(storedPieceImage.pieceType, storedPieceImage.signal)
+    : getFlatMatch(analysis.category, analysis.silhouette);
   const materialLabel = titleCase(analysis.material_id) || 'Unknown material';
   const complexityLabel = titleCase(analysis.construction_tier) || 'Unknown';
   const role = getPieceRole(analysis);

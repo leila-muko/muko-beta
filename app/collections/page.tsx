@@ -96,6 +96,23 @@ export default function CollectionsHubPage() {
   const handleStartCollection = useCallback(() => {
     setActiveCollection(null);
     useSessionStore.getState().setCollectionName('');
+    useSessionStore.setState({
+      aestheticInput: '',
+      aestheticMatchedId: null,
+      collectionAesthetic: null,
+      aestheticInflection: null,
+      directionInterpretationText: '',
+      directionInterpretationModifiers: [],
+      directionInterpretationChips: [],
+      identityPulse: null,
+      resonancePulse: null,
+      conceptLocked: false,
+      chipSelection: null,
+      customChips: {},
+      conceptSilhouette: '',
+      conceptPalette: null,
+      isProxyMatch: false,
+    });
     try {
       localStorage.removeItem('muko_collectionName');
       localStorage.removeItem('muko_seasonLabel');

@@ -9,9 +9,18 @@ import { MukoInsightSection } from '@/components/report/MukoInsightSection';
 import { NextStepsSection } from '@/components/report/NextStepsSection';
 import { OverallReadCallout } from '@/components/report/OverallReadCallout';
 import { PieceSummaryTable } from '@/components/report/PieceSummaryTable';
+import { ReportNarrativeSection } from '@/components/report/ReportNarrativeSection';
 import { reportPalette, sectionCard, sectionEyebrow, fonts } from '@/components/report/reportStyles';
 
-export function CollectionReportView({ report }: { report: CollectionReportPayload }) {
+export function CollectionReportView({
+  report,
+  reportInsightStreaming,
+  reportIsParagraphStreaming = false,
+}: {
+  report: CollectionReportPayload;
+  reportInsightStreaming?: string;
+  reportIsParagraphStreaming?: boolean;
+}) {
   return (
     <div
       style={{
@@ -26,6 +35,7 @@ export function CollectionReportView({ report }: { report: CollectionReportPaylo
       <CollectionReportHeader header={report.header} />
       <OverallReadCallout value={report.overall_read} detail={report.overall_read_detail} />
       <CollectionThesis thesis={report.collection_thesis} />
+      <ReportNarrativeSection narrative={report.narrative} />
       <CollectionOverview overview={report.overview} />
 
       <section style={{ ...sectionCard, padding: '28px 30px' }}>
@@ -44,7 +54,11 @@ export function CollectionReportView({ report }: { report: CollectionReportPaylo
         </div>
       </section>
 
-      <MukoInsightSection insight={report.muko_insight} />
+      <MukoInsightSection
+        insight={report.muko_insight}
+        streamingParagraph={reportInsightStreaming}
+        isParagraphStreaming={reportIsParagraphStreaming}
+      />
       <CollectionHealthSection health={report.collection_health} />
       <PieceSummaryTable pieces={report.piece_summary} />
       <KeyRisksSection risks={report.key_risks} />

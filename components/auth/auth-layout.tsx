@@ -12,37 +12,9 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
     <div 
       className="min-h-screen flex items-center justify-center px-4 py-12 relative overflow-hidden"
       style={{
-        background: 'linear-gradient(135deg, #FFFEF9 0%, #EBE1D1 50%, #F3E5DD 100%)',
+        background: '#E8E3D6',
       }}
     >
-      {/* Organic blob background elements */}
-      <div 
-        className="absolute animate-float pointer-events-none"
-        style={{
-          top: '-10%',
-          right: '-5%',
-          width: '500px',
-          height: '500px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, #A97B8F 0%, transparent 70%)',
-          opacity: 0.2,
-          filter: 'blur(60px)',
-        }}
-      />
-      <div 
-        className="absolute animate-float-reverse pointer-events-none"
-        style={{
-          bottom: '-10%',
-          left: '-5%',
-          width: '600px',
-          height: '600px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, #B8876B 0%, transparent 70%)',
-          opacity: 0.2,
-          filter: 'blur(60px)',
-        }}
-      />
-      
       <div className="w-full max-w-md relative" style={{ zIndex: 10 }}>
         {/* Header */}
         <div className="text-center mb-10">

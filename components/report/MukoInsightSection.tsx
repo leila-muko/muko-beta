@@ -1,5 +1,10 @@
 import type { CollectionReportPayload } from '@/lib/collection-report/types';
+import { MukoStreamingParagraph } from '@/components/ui/MukoStreamingParagraph';
 import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
+
+function flattenInsight(insight: CollectionReportPayload['muko_insight']) {
+  return [...insight.working, ...insight.watch, ...insight.recommendations].filter(Boolean).join(' ');
+}
 
 function InsightBlock({
   title,
@@ -71,12 +76,29 @@ function InsightBlock({
 
 export function MukoInsightSection({
   insight,
+  streamingParagraph,
+  isParagraphStreaming = false,
 }: {
   insight: CollectionReportPayload['muko_insight'];
+  streamingParagraph?: string;
+  isParagraphStreaming?: boolean;
 }) {
   return (
     <section style={{ ...sectionCard, padding: '28px 30px' }}>
       <p style={sectionEyebrow}>Muko Insight</p>
+
+      <MukoStreamingParagraph
+        text={flattenInsight(insight)}
+        streamingText={streamingParagraph}
+        isStreaming={isParagraphStreaming}
+        containerStyle={{ marginTop: 18 }}
+        paragraphStyle={{
+          fontFamily: fonts.body,
+          fontSize: 14,
+          lineHeight: 1.7,
+          color: reportPalette.olive,
+        }}
+      />
 
       <div
         style={{

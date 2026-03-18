@@ -30,15 +30,18 @@ import AskMuko from "@/components/AskMuko";
 import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
 import { PulseScoreRow } from "@/components/ui/PulseScoreRow";
+import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
 import type { PulseChipProps } from "@/components/ui/PulseChip";
 import type { InsightData, SpecInsightMode } from "@/lib/types/insight";
-import { buildSpecBlackboard } from "@/lib/synthesizer/assemble";
+import { buildReportBlackboard, buildSpecBlackboard } from "@/lib/synthesizer/assemble";
 import { buildAnalysisRow, AGENT_VERSIONS } from "@/lib/agents/orchestrator-shared";
 import type { PipelineBlackboard, AnalysisResult as AnalysisResultOrch } from "@/lib/agents/orchestrator-shared";
 import { createClient } from "@/lib/supabase/client";
 import type { SpecSuggestion } from "@/lib/types/next-move";
 import { ScorecardModal } from "@/components/spec-studio/ScorecardModal";
 import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
+import { getFlatForPiece } from "@/components/flats";
+import type { SelectedPieceImage } from "@/lib/piece-image";
 
 /* ─── Icons: matched to Concept Studio (star, users, cog) ─── */
 function IconIdentity({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
@@ -112,6 +115,16 @@ const PULSE_RED = "#8A3A3A";
 const PULSE_YELLOW = "#B8876B";
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
+
+function extractPartialJsonString(raw: string, key: string): string {
+  const match = raw.match(new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)`));
+  if (!match) return "";
+
+  return match[1]
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, " ")
+    .trim();
+}
 
 /* ─── Icons ─── */
 function IconExecution({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
@@ -552,7 +565,7 @@ function parseCostBadge(costNote: string): { label: string; variant: 'neutral' |
   ) {
     return { label: "+ 0", variant: 'neutral' };
   }
-  return { label: "+ Cost", variant: 'added' };
+  return { label: "Cost premium", variant: 'added' };
 }
 
 function parseRiskLevel(complexityFlag: string): 'Low' | 'Med' | 'High' {
@@ -595,6 +608,14 @@ function formatConceptPhrase(value: string | null | undefined) {
     .trim();
 }
 
+/*
+Frame the headline and body as an execution brief, not a warning.
+The user has made an informed concept decision - this section should help them
+understand what that decision requires in production, not alarm them about it.
+Tone: precise, technical, advisory. The headline should state the key production
+consideration as a fact, not a risk. The body should give specific, actionable
+craft guidance.
+*/
 function buildConstructionImplication(options: {
   materialName: string;
   constructionTier: "low" | "moderate" | "high";
@@ -676,23 +697,13 @@ function getConstructionImplicationCopy(options: {
 }
 
 function PieceFlatPreview({
-  pieceType,
-  signal,
+  selectedPieceImage,
 }: {
-  pieceType: string | null | undefined;
-  signal?: string | null;
+  selectedPieceImage: SelectedPieceImage | null;
 }) {
-  const normalizedType = pieceType?.toLowerCase() ?? "";
-  const isTailored = /blazer|jacket|coat|trench|outerwear|parka|cape/.test(normalizedType);
-  const isDress = /dress|slip|column/.test(normalizedType);
-  const isBottom = /pant|trouser|skirt/.test(normalizedType);
-  const isSoftTop = /blouse|shirt|top|tunic|tank|cardigan|sweater|vest/.test(normalizedType);
-
-  const fill = signal === "high-volume"
-    ? "#C5BAAB"
-    : signal === "emerging"
-      ? "#C7CDC3"
-      : "#D4CCC0";
+  const flatResult = selectedPieceImage?.pieceType
+    ? getFlatForPiece(selectedPieceImage.pieceType, selectedPieceImage.signal)
+    : null;
 
   return (
     <div
@@ -719,74 +730,23 @@ function PieceFlatPreview({
           filter: "blur(10px)",
         }}
       />
-      <svg width="164" height="200" viewBox="0 0 164 200" fill="none" aria-hidden style={{ position: "relative", zIndex: 1 }}>
-        <defs>
-          <linearGradient id="specGarmentFill" x1="82" y1="20" x2="82" y2="186" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#EEE7DD" />
-            <stop offset="1" stopColor={fill} />
-          </linearGradient>
-          <linearGradient id="specGarmentShade" x1="44" y1="42" x2="126" y2="182" gradientUnits="userSpaceOnUse">
-            <stop stopColor="rgba(255,255,255,0.42)" />
-            <stop offset="1" stopColor="rgba(67,67,43,0.08)" />
-          </linearGradient>
-        </defs>
-
-        {isTailored && (
-          <>
-            <path d="M49 42C57 31 68 24 82 24C96 24 107 31 115 42L130 58L124 176C123 182 118 186 111 186H53C46 186 41 182 40 176L34 58L49 42Z" fill="url(#specGarmentFill)" />
-            <path d="M62 38C68 31 75 28 82 28C89 28 96 31 102 38L97 60C92 56 87 54 82 54C77 54 72 56 67 60L62 38Z" fill="rgba(255,255,255,0.42)" />
-            <path d="M49 44L25 61L30 122L43 120L48 84L49 44Z" fill="url(#specGarmentFill)" />
-            <path d="M115 44L139 61L134 122L121 120L116 84L115 44Z" fill="url(#specGarmentFill)" />
-            <path d="M59 41C65 34 73 31 82 31C91 31 99 34 105 41" stroke="rgba(67,67,43,0.18)" strokeWidth="1.25" strokeLinecap="round" />
-            <path d="M82 63V186" stroke="rgba(67,67,43,0.10)" strokeWidth="1.25" strokeLinecap="round" />
-            <path d="M44 42C54 33 66 28 82 28C98 28 110 33 120 42" stroke="rgba(67,67,43,0.22)" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M34 58L40 176C41 182 46 186 53 186H111C118 186 123 182 124 176L130 58" stroke="rgba(67,67,43,0.18)" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M49 44L25 61L30 122" stroke="rgba(67,67,43,0.16)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M115 44L139 61L134 122" stroke="rgba(67,67,43,0.16)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M54 140C71 145 93 145 110 140" stroke="rgba(255,255,255,0.26)" strokeWidth="10" strokeLinecap="round" />
-          </>
-        )}
-
-        {isDress && (
-          <>
-            <path d="M60 29C67 25 74 23 82 23C90 23 97 25 104 29L119 48L130 179C116 184 100 187 82 187C64 187 48 184 34 179L45 48L60 29Z" fill="url(#specGarmentFill)" />
-            <path d="M62 30C66 36 73 40 82 40C91 40 98 36 102 30" stroke="rgba(67,67,43,0.16)" strokeWidth="1.25" strokeLinecap="round" />
-            <path d="M45 48L30 75L35 123" stroke="rgba(67,67,43,0.14)" strokeWidth="1.15" strokeLinecap="round" />
-            <path d="M119 48L134 75L129 123" stroke="rgba(67,67,43,0.14)" strokeWidth="1.15" strokeLinecap="round" />
-            <path d="M60 29C67 25 74 23 82 23C90 23 97 25 104 29L119 48L130 179C116 184 100 187 82 187C64 187 48 184 34 179L45 48L60 29Z" stroke="rgba(67,67,43,0.18)" strokeWidth="1.35" strokeLinejoin="round" />
-          </>
-        )}
-
-        {isBottom && (
-          <>
-            <path d="M52 28H112L123 184H90L83 92L74 184H41L52 28Z" fill="url(#specGarmentFill)" />
-            <path d="M60 28C66 24 73 22 82 22C91 22 98 24 104 28" stroke="rgba(67,67,43,0.16)" strokeWidth="1.2" strokeLinecap="round" />
-            <path d="M82 54L83 92" stroke="rgba(67,67,43,0.10)" strokeWidth="1.2" strokeLinecap="round" />
-            <path d="M52 28H112L123 184H90L83 92L74 184H41L52 28Z" stroke="rgba(67,67,43,0.18)" strokeWidth="1.35" strokeLinejoin="round" />
-          </>
-        )}
-
-        {isSoftTop && (
-          <>
-            <path d="M54 34C62 27 71 23 82 23C93 23 102 27 110 34L122 49L116 158C115 165 110 170 103 170H61C54 170 49 165 48 158L42 49L54 34Z" fill="url(#specGarmentFill)" />
-            <path d="M54 36L31 53L34 111L46 109L51 72L54 36Z" fill="url(#specGarmentFill)" />
-            <path d="M110 36L133 53L130 111L118 109L113 72L110 36Z" fill="url(#specGarmentFill)" />
-            <path d="M62 34C68 29 75 27 82 27C89 27 96 29 102 34" stroke="rgba(67,67,43,0.14)" strokeWidth="1.2" strokeLinecap="round" />
-            <path d="M54 34C62 27 71 23 82 23C93 23 102 27 110 34L122 49L116 158C115 165 110 170 103 170H61C54 170 49 165 48 158L42 49L54 34Z" stroke="rgba(67,67,43,0.18)" strokeWidth="1.35" strokeLinejoin="round" />
-          </>
-        )}
-
-        {!isTailored && !isDress && !isBottom && !isSoftTop && (
-          <>
-            <path d="M50 34C58 27 69 23 82 23C95 23 106 27 114 34L127 52L121 171C120 178 115 183 108 183H56C49 183 44 178 43 171L37 52L50 34Z" fill="url(#specGarmentFill)" />
-            <path d="M50 34L28 50L31 114L44 111L49 74L50 34Z" fill="url(#specGarmentFill)" />
-            <path d="M114 34L136 50L133 114L120 111L115 74L114 34Z" fill="url(#specGarmentFill)" />
-            <path d="M50 34C58 27 69 23 82 23C95 23 106 27 114 34L127 52L121 171C120 178 115 183 108 183H56C49 183 44 178 43 171L37 52L50 34Z" stroke="rgba(67,67,43,0.18)" strokeWidth="1.35" strokeLinejoin="round" />
-          </>
-        )}
-
-        <path d="M52 34C64 28 75 25 82 25C89 25 100 28 112 34" stroke="rgba(255,255,255,0.36)" strokeWidth="6" strokeLinecap="round" />
-      </svg>
+      {flatResult ? (
+        <div style={{ position: "relative", zIndex: 1, width: 164, height: 200 }}>
+          <flatResult.Flat color={flatResult.color} />
+        </div>
+      ) : (
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            width: 132,
+            height: 176,
+            borderRadius: 22,
+            border: "1px solid rgba(67,67,43,0.08)",
+            background: "linear-gradient(180deg, rgba(255,255,255,0.86) 0%, rgba(232,227,214,0.88) 100%)",
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -825,6 +785,10 @@ export default function SpecStudioPage() {
   const [targetMSRP, setTargetMSRP] = useState(() => {
     return useSessionStore.getState().targetMsrp ?? 450;
   });
+  const [targetMSRPInput, setTargetMSRPInput] = useState(() => {
+    const stored = useSessionStore.getState().targetMsrp;
+    return stored ? String(stored) : "";
+  });
   const [materialId, setMaterialId] = useState(() => {
     return useSessionStore.getState().materialId || "";
   });
@@ -840,6 +804,12 @@ export default function SpecStudioPage() {
     const isFW = season && (season.toLowerCase().includes('fw') || season.toLowerCase().includes('fall'));
     return isFW ? 24 : 20;
   });
+  const [timelineWeeksInput, setTimelineWeeksInput] = useState(() => {
+    const season = useSessionStore.getState().season;
+    const isFW = season && (season.toLowerCase().includes('fw') || season.toLowerCase().includes('fall'));
+    return String(isFW ? 24 : 20);
+  });
+  const [constraintPromptVisible, setConstraintPromptVisible] = useState(false);
   const [pulseUpdated, setPulseUpdated] = useState(false);
 
   // Scorecard modal state
@@ -883,8 +853,10 @@ export default function SpecStudioPage() {
   }, []);
 
   const storeAesthetic = useSessionStore((s) => s.aestheticMatchedId);
+  const storeAestheticName = useSessionStore((s) => s.aestheticInput);
   const storeModifiers = useSessionStore((s) => s.refinementModifiers);
   const selectedKeyPiece = useSessionStore((s) => s.selectedKeyPiece);
+  const selectedPieceImage = useSessionStore((s) => s.selectedPieceImage);
   const storeMoodboard = useSessionStore((s) => s.moodboardImages);
   const chipSelection = useSessionStore((s) => s.chipSelection);
   const conceptSilhouette = useSessionStore((s) => s.conceptSilhouette);
@@ -894,14 +866,14 @@ export default function SpecStudioPage() {
     if (!storeAesthetic) return FALLBACK_CONCEPT;
     const scores = AESTHETIC_CONTENT[storeAesthetic];
     return {
-      aestheticName: storeAesthetic,
+      aestheticName: storeAestheticName,
       aestheticMatchedId: toSlug(storeAesthetic),
       identityScore: scores?.identityScore ?? 88,
       resonanceScore: scores?.resonanceScore ?? 92,
       moodboardImages: storeMoodboard || [],
       recommendedPalette: [],
     };
-  }, [storeAesthetic, storeMoodboard]);
+  }, [storeAesthetic, storeAestheticName, storeMoodboard]);
 
   const refinement = useMemo(() => {
     if (!storeAesthetic) return FALLBACK_REFINEMENT;
@@ -974,10 +946,6 @@ export default function SpecStudioPage() {
     if (selectedSubcategory?.name) return selectedSubcategory.name;
     return selectedCategory.name;
   }, [selectedKeyPiece, selectedSubcategory, selectedCategory]);
-  const pieceTypeForFlat = useMemo(
-    () => selectedKeyPiece?.type || selectedSubcategory?.id || categoryId,
-    [selectedKeyPiece, selectedSubcategory, categoryId]
-  );
   const piecePaletteName = useMemo(() => {
     if (!conceptPalette) return null;
     const entry = (aestheticsData as unknown as Array<{ id: string; palette_options?: Array<{ id: string; name: string }> }>).find(
@@ -997,6 +965,20 @@ export default function SpecStudioPage() {
     () => formatConceptPhrase(conceptSilhouette),
     [conceptSilhouette]
   );
+  const pieceSignalLabel = useMemo(() => {
+    if (!selectedKeyPiece?.signal) return null;
+    const normalized = selectedKeyPiece.signal.replace(/-/g, " ");
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  }, [selectedKeyPiece?.signal]);
+  const pieceCategoryLabel = useMemo(() => {
+    if (!selectedKeyPiece?.category) return null;
+    return selectedKeyPiece.category.charAt(0).toUpperCase() + selectedKeyPiece.category.slice(1);
+  }, [selectedKeyPiece?.category]);
+  const pieceSubtitle = useMemo(() => {
+    if (!selectedKeyPiece) return null;
+    const parts = [pieceSignalLabel, pieceCategoryLabel].filter(Boolean);
+    return parts.length > 0 ? parts.join(" · ") : null;
+  }, [pieceCategoryLabel, pieceSignalLabel, selectedKeyPiece]);
 
 
   const hasUserSelection = userManuallySelected && (materialId !== "" || constructionTier !== null);
@@ -1220,8 +1202,12 @@ export default function SpecStudioPage() {
 
     const tags = [
       primaryCost.label,
-      `${primaryRisk} production risk`,
-      timelineStatus === "red" ? "Timeline risk" : timelineStatus === "yellow" ? "Tight timeline" : null,
+      primaryRisk === "High"
+        ? "Elevated sampling required"
+        : primaryRisk === "Med"
+          ? "Moderate sampling required"
+          : "Standard sampling required",
+      timelineStatus === "red" ? "Extended lead time" : timelineStatus === "yellow" ? "Tight lead time" : null,
     ].filter(Boolean) as string[];
 
     return { text, lead, body, tags };
@@ -1355,6 +1341,12 @@ export default function SpecStudioPage() {
   useEffect(() => {
     setTargetMsrp(targetMSRP);
   }, [targetMSRP, setTargetMsrp]);
+
+  useEffect(() => {
+    if (targetMSRPInput.trim() && timelineWeeksInput.trim()) {
+      setConstraintPromptVisible(false);
+    }
+  }, [targetMSRPInput, timelineWeeksInput]);
 
   useEffect(() => {
     if (materialId) setMaterial(materialId);
@@ -1615,6 +1607,8 @@ export default function SpecStudioPage() {
   const [specSynthInsightData, setSpecSynthInsightData] = useState<InsightData | null>(null);
   const [specInsightLoading, setSpecInsightLoading] = useState(false);
   const [specStreamingText, setSpecStreamingText] = useState('');
+  const [specStreamingParagraph, setSpecStreamingParagraph] = useState('');
+  const [specIsParagraphStreaming, setSpecIsParagraphStreaming] = useState(false);
 
 
   useEffect(() => {
@@ -1671,6 +1665,8 @@ export default function SpecStudioPage() {
     const timer = window.setTimeout(async () => {
       setSpecInsightLoading(true);
       setSpecStreamingText('');
+      setSpecStreamingParagraph('');
+      setSpecIsParagraphStreaming(true);
       specRawJsonRef.current = '';
       try {
         const res = await fetch('/api/synthesizer/spec', {
@@ -1697,6 +1693,7 @@ export default function SpecStudioPage() {
               // Extract partial insight_title value for display
               const match = accumulated.match(/"insight_title"\s*:\s*"([^"]*)/);
               setSpecStreamingText(match ? match[1] : (accumulated.length > 10 ? '...' : ''));
+              setSpecStreamingParagraph(extractPartialJsonString(accumulated, 'insight_description'));
             } catch { /* ignore parse errors on partial chunks */ }
           } else if (event === 'complete' || event === 'fallback') {
             try {
@@ -1704,6 +1701,8 @@ export default function SpecStudioPage() {
               if (!controller.signal.aborted) {
                 setSpecSynthInsightData(result.data);
                 setSpecStreamingText('');
+                setSpecStreamingParagraph(result.data.statements?.slice(0, 2).join(' ').trim() ?? '');
+                setSpecIsParagraphStreaming(false);
                 // Persist analysis — awaited inside async IIFE so the stream loop is not blocked
                 void (async () => {
                   try {
@@ -1715,6 +1714,54 @@ export default function SpecStudioPage() {
                     const finalScore = Math.round(
                       (dynamicIdentityScore + dynamicResonanceScore + executionScore) / 3
                     );
+                    let reportNarrative = result.data.statements?.join('\n\n') ?? '';
+
+                    const reportBlackboard = buildReportBlackboard({
+                      aestheticSlug: conceptContext.aestheticMatchedId || '',
+                      brandKeywords: refinementModifiers,
+                      identity_score: dynamicIdentityScore,
+                      resonance_score: dynamicResonanceScore,
+                      execution_score: executionScore,
+                      overall_score: finalScore,
+                      materialId: materialId || '',
+                      cogs_usd: insight?.cogs ?? 0,
+                      target_msrp: targetMSRP,
+                      margin_pass: marginGatePassed,
+                      construction_tier: constructionTier ?? 'moderate',
+                      timeline_weeks: timelineWeeks,
+                      season: storeSeason || 'SS27',
+                      collectionName: storeCollectionName || brandProfileName || '',
+                      brandName: brandProfileName ?? undefined,
+                      collection_role: storeCollectionRole ?? null,
+                      priceTier: 'Contemporary',
+                      targetMargin: brandTargetMargin,
+                      keyPiece: selectedKeyPiece && !selectedKeyPiece.custom && selectedKeyPiece.type
+                        ? { item: selectedKeyPiece.item, type: selectedKeyPiece.type, signal: selectedKeyPiece.signal ?? '' }
+                        : undefined,
+                      conceptInsightTitle: session.conceptInsightTitle,
+                      conceptInsightPositioning: session.conceptInsightPositioning,
+                      isProxyMatch: session.isProxyMatch,
+                    });
+
+                    if (reportBlackboard) {
+                      try {
+                        const reportResponse = await fetch('/api/synthesizer/report', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(reportBlackboard),
+                        });
+
+                        if (reportResponse.ok) {
+                          const reportResult = await reportResponse.json() as { data?: InsightData };
+                          const reportStatements = reportResult.data?.statements?.filter(Boolean) ?? [];
+                          if (reportStatements.length > 0) {
+                            reportNarrative = reportStatements.join('\n\n');
+                          }
+                        }
+                      } catch (err) {
+                        console.error('[Spec] Report narrative synthesis failed:', err);
+                      }
+                    }
 
                     const bb: PipelineBlackboard = {
                       input: {
@@ -1778,7 +1825,7 @@ export default function SpecStudioPage() {
                       cogs_delta:               0,
                       final_score:              finalScore,
                       redirect:                 null,
-                      narrative:                result.data.statements?.join('\n\n') ?? '',
+                      narrative:                reportNarrative,
                     };
 
                     const analysisResult: AnalysisResultOrch = {
@@ -1839,6 +1886,7 @@ export default function SpecStudioPage() {
       } catch (e) {
         if ((e as Error).name === 'AbortError') return;
       } finally {
+        setSpecIsParagraphStreaming(false);
         if (!controller.signal.aborted) {
           setSpecInsightLoading(false);
           setSpecStreamingText('');
@@ -2392,6 +2440,9 @@ export default function SpecStudioPage() {
     constructionTier: constructionTier ?? undefined,
   };
 
+  const isTargetMsrpEmpty = targetMSRPInput.trim().length === 0;
+  const isTimelineEmpty = timelineWeeksInput.trim().length === 0;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#FAF9F6", overflow: "hidden" }}>
       {/* ── Fixed Header ──────────────────────────────────────────────────── */}
@@ -2494,15 +2545,16 @@ export default function SpecStudioPage() {
               }}
             >
               <PieceFlatPreview
-                pieceType={pieceTypeForFlat}
-                signal={selectedKeyPiece?.signal ?? null}
+                selectedPieceImage={selectedPieceImage}
               />
               <div style={{ marginTop: 14, fontFamily: sohne, fontSize: 22, fontWeight: 500, color: OLIVE, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
                 {pieceAnchorName}
               </div>
-              <div style={{ marginTop: 4, fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.52)", lineHeight: 1.45 }}>
-                {[formattedSilhouette, selectedCategory?.name].filter(Boolean).join(" · ")}
-              </div>
+              {pieceSubtitle && (
+                <div style={{ marginTop: 4, fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.52)", lineHeight: 1.45 }}>
+                  {pieceSubtitle}
+                </div>
+              )}
             </div>
 
             {/* Divider */}
@@ -2799,66 +2851,118 @@ export default function SpecStudioPage() {
                   <div style={{ paddingBottom: 22, marginBottom: 28, borderBottom: "1px solid rgba(67,67,43,0.08)" }}>
                     <div style={{ ...microLabel, marginBottom: 10, color: "rgba(67,67,43,0.34)" }}>Constraints</div>
                     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontFamily: inter, fontSize: 15, color: "rgba(67,67,43,0.66)", lineHeight: 1.5 }}>
-                      <span>MSRP Target</span>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, minWidth: 118 }}>
-                        <span style={{ color: "rgba(67,67,43,0.58)" }}>$</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={targetMSRP}
-                          onChange={(e) => {
-                            const next = e.target.value.replace(/[^\d]/g, "");
-                            setTargetMSRP(next ? Number(next) : 0);
-                          }}
-                          aria-label="MSRP target"
-                          style={{
-                            width: 88,
-                            border: "none",
-                            background: "transparent",
-                            padding: 0,
-                            fontFamily: sohne,
-                            fontSize: 22,
-                            color: OLIVE,
-                            outline: "none",
-                            letterSpacing: "-0.02em",
-                            lineHeight: 1.1,
-                            appearance: "textfield",
-                            WebkitAppearance: "none",
-                            MozAppearance: "textfield",
-                          }}
-                        />
-                      </span>
-                      <span style={{ opacity: 0.42 }}>·</span>
-                      <span>Delivery Window</span>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={timelineWeeks}
-                        onChange={(e) => {
-                          const next = e.target.value.replace(/[^\d]/g, "");
-                          setTimelineWeeks(Math.max(4, next ? Number(next) : 4));
-                        }}
-                        aria-label="Delivery window in weeks"
-                        style={{
-                          width: 46,
-                          border: "none",
-                          background: "transparent",
-                          padding: 0,
-                          fontFamily: sohne,
-                          fontSize: 22,
-                          color: OLIVE,
-                          outline: "none",
-                          textAlign: "right",
-                          letterSpacing: "-0.02em",
-                          lineHeight: 1.1,
-                          appearance: "textfield",
-                          WebkitAppearance: "none",
-                          MozAppearance: "textfield",
-                        }}
-                      />
-                      <span>weeks</span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 148 }}>
+                        <span>MSRP Target</span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 3, minWidth: 118 }}>
+                          <span style={{ color: "rgba(67,67,43,0.58)" }}>$</span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={targetMSRPInput}
+                            placeholder="e.g. $450"
+                            onChange={(e) => {
+                              const next = e.target.value.replace(/[^\d]/g, "");
+                              setTargetMSRPInput(next);
+                              setTargetMSRP(next ? Number(next) : 0);
+                            }}
+                            aria-label="MSRP target"
+                            className="specConstraintInput"
+                            style={{
+                              width: 88,
+                              border: "none",
+                              background: "transparent",
+                              padding: 0,
+                              fontFamily: sohne,
+                              fontSize: 22,
+                              color: OLIVE,
+                              outline: "none",
+                              letterSpacing: "-0.02em",
+                              lineHeight: 1.1,
+                              appearance: "textfield",
+                              WebkitAppearance: "none",
+                              MozAppearance: "textfield",
+                            }}
+                          />
+                        </span>
+                        <span style={{ fontSize: 11.5, color: BRAND.camel, fontFamily: inter, lineHeight: 1.45 }}>
+                          Used to calculate margin viability
+                        </span>
+                        {constraintPromptVisible && isTargetMsrpEmpty && (
+                          <span
+                            style={{
+                              fontSize: 11.5,
+                              color: BRAND.camel,
+                              fontFamily: inter,
+                              lineHeight: 1.45,
+                              padding: "6px 10px",
+                              borderRadius: 999,
+                              background: "rgba(184,135,107,0.10)",
+                              border: "1px solid rgba(184,135,107,0.18)",
+                              width: "fit-content",
+                            }}
+                          >
+                            Add your target MSRP for a margin assessment
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ opacity: 0.42, alignSelf: "flex-start", paddingTop: 22 }}>·</span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 158 }}>
+                        <span>Delivery Window</span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={timelineWeeksInput}
+                            placeholder="e.g. 10 weeks"
+                            onChange={(e) => {
+                              const next = e.target.value.replace(/[^\d]/g, "");
+                              setTimelineWeeksInput(next);
+                              setTimelineWeeks(Math.max(4, next ? Number(next) : 4));
+                            }}
+                            aria-label="Delivery window in weeks"
+                            className="specConstraintInput"
+                            style={{
+                              width: 46,
+                              border: "none",
+                              background: "transparent",
+                              padding: 0,
+                              fontFamily: sohne,
+                              fontSize: 22,
+                              color: OLIVE,
+                              outline: "none",
+                              textAlign: "right",
+                              letterSpacing: "-0.02em",
+                              lineHeight: 1.1,
+                              appearance: "textfield",
+                              WebkitAppearance: "none",
+                              MozAppearance: "textfield",
+                            }}
+                          />
+                          <span>weeks</span>
+                        </span>
+                        <span style={{ fontSize: 11.5, color: BRAND.camel, fontFamily: inter, lineHeight: 1.45 }}>
+                          Used to assess execution feasibility
+                        </span>
+                        {constraintPromptVisible && isTimelineEmpty && (
+                          <span
+                            style={{
+                              fontSize: 11.5,
+                              color: BRAND.camel,
+                              fontFamily: inter,
+                              lineHeight: 1.45,
+                              padding: "6px 10px",
+                              borderRadius: 999,
+                              background: "rgba(184,135,107,0.10)",
+                              border: "1px solid rgba(184,135,107,0.18)",
+                              width: "fit-content",
+                            }}
+                          >
+                            Add your delivery window for an execution assessment
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div style={{ marginTop: 6, fontSize: 11.5, color: "rgba(67,67,43,0.42)", fontFamily: inter, lineHeight: 1.5 }}>
                       Ceiling ${marginCeiling}{timelineFeasibility ? ` · ${timelineFeasibility.required_weeks} weeks required at current build` : ""}
@@ -2951,7 +3055,13 @@ export default function SpecStudioPage() {
                   )}
                   <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
                     <button
-                      onClick={() => { if (selectedMaterial) advanceToConstruction(); }}
+                      onClick={() => {
+                        if (!selectedMaterial) return;
+                        if (isTargetMsrpEmpty || isTimelineEmpty) {
+                          setConstraintPromptVisible(true);
+                        }
+                        advanceToConstruction();
+                      }}
                       disabled={!selectedMaterial}
                       style={{
                         padding: "12px 18px",
@@ -3034,7 +3144,7 @@ export default function SpecStudioPage() {
                           color: "rgba(67,67,43,0.36)",
                           marginBottom: 10,
                         }}>
-                          Construction Implications
+                          Execution Brief
                         </div>
 
                         {/* LAYER 1: Material × construction tier — deterministic, instant */}
@@ -3070,6 +3180,18 @@ export default function SpecStudioPage() {
                           </div>
                         )}
 
+                        {constructionTier === "high" && (
+                          <div style={{
+                            fontFamily: inter,
+                            fontSize: 11.4,
+                            color: "rgba(67,67,43,0.48)",
+                            lineHeight: 1.58,
+                            marginBottom: ((buildInsightContent?.tags?.length ?? 0) > 0 || chipsForHighComplexity.length > 0) ? 10 : 0,
+                          }}>
+                            Continuing at High locks this complexity into your spec. Adjust the tier above if you want a different execution path.
+                          </div>
+                        )}
+
                         {/* LAYER 3: Risk tags + complexity chip count */}
                         {((buildInsightContent?.tags?.length ?? 0) > 0 || chipsForHighComplexity.length > 0) && (
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -3081,21 +3203,9 @@ export default function SpecStudioPage() {
                                 fontSize: 10,
                                 fontWeight: 600,
                                 letterSpacing: "0.04em",
-                                background: tag.toLowerCase().includes("high")
-                                  ? "rgba(169,123,143,0.10)"
-                                  : tag.toLowerCase().includes("mod")
-                                  ? "rgba(184,135,107,0.10)"
-                                  : "rgba(168,180,117,0.10)",
-                                color: tag.toLowerCase().includes("high")
-                                  ? "#A97B8F"
-                                  : tag.toLowerCase().includes("mod")
-                                  ? "#B8876B"
-                                  : "#6B7A40",
-                                border: tag.toLowerCase().includes("high")
-                                  ? "1px solid rgba(169,123,143,0.24)"
-                                  : tag.toLowerCase().includes("mod")
-                                  ? "1px solid rgba(184,135,107,0.24)"
-                                  : "1px solid rgba(168,180,117,0.24)",
+                                background: "rgba(67,67,43,0.06)",
+                                color: "rgba(67,67,43,0.62)",
+                                border: "1px solid rgba(67,67,43,0.12)",
                               }}>
                                 {tag}
                               </span>
@@ -3329,12 +3439,16 @@ export default function SpecStudioPage() {
                   )}
                   {!(specInsightLoading && !specSynthInsightData && !specStreamingText) && (
                     <>
-                      <div style={{ fontFamily: inter, fontSize: 12.75, color: "rgba(67,67,43,0.58)", lineHeight: 1.72, marginBottom: 16 }}>
-                        {(() => {
+                      <MukoStreamingParagraph
+                        text={(() => {
                           const text = specSynthInsightData?.statements?.slice(0, 2).join(" ") || mukoRead.body;
                           return text.split(/(?<=[.!?])\s+/).slice(0, 2).join(" ");
                         })()}
-                      </div>
+                        streamingText={specStreamingParagraph}
+                        isStreaming={specIsParagraphStreaming && !!specStreamingParagraph}
+                        containerStyle={{ marginBottom: 16 }}
+                        paragraphStyle={{ fontFamily: inter, fontSize: 12.75, color: "rgba(67,67,43,0.58)", lineHeight: 1.72 }}
+                      />
                       <button
                         onClick={() => setSpecAnalysisExpanded(e => !e)}
                         style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: inter, fontSize: 11, fontWeight: 600, color: "#6B7A40" }}
@@ -3380,12 +3494,16 @@ export default function SpecStudioPage() {
                   )}
                   {!(specInsightLoading && !specSynthInsightData && !specStreamingText) && (
                     <>
-                      <div style={{ fontFamily: inter, fontSize: 12.75, color: "rgba(67,67,43,0.58)", lineHeight: 1.72, marginBottom: 16 }}>
-                        {(() => {
+                      <MukoStreamingParagraph
+                        text={(() => {
                           const text = specSynthInsightData?.statements?.slice(0, 2).join(" ") || mukoRead.body;
                           return text.split(/(?<=[.!?])\s+/).slice(0, 2).join(" ");
                         })()}
-                      </div>
+                        streamingText={specStreamingParagraph}
+                        isStreaming={specIsParagraphStreaming && !!specStreamingParagraph}
+                        containerStyle={{ marginBottom: 16 }}
+                        paragraphStyle={{ fontFamily: inter, fontSize: 12.75, color: "rgba(67,67,43,0.58)", lineHeight: 1.72 }}
+                      />
                       <div style={{ marginTop: 18, borderTop: "1px solid rgba(67,67,43,0.08)", paddingTop: 14 }}>
                         {structuredReadouts.map((item) => (
                           <div key={item.label} style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 8, padding: "7px 0" }}>
@@ -3500,6 +3618,9 @@ export default function SpecStudioPage() {
           border-radius: 999px;
           padding: 3px 7px;
           font-family: ${inter};
+        }
+        .specConstraintInput::placeholder {
+          color: rgba(67,67,43,0.28);
         }
         .specRevealPrompt {
           padding: 14px 16px;

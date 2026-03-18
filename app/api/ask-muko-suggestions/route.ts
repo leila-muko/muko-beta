@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { anthropic, parseJSONResponse } from "@/lib/claude/client";
 import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 
 const SYSTEM_PROMPT = `You are Muko, a fashion decision intelligence assistant. Given an analysis context, generate 2–3 short questions a designer might want to ask right now. Make them specific to the actual scores and data present. Under 10 words each. Return only a JSON array of strings with no other text.`;
@@ -24,9 +24,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const client = new Anthropic();
-
-    const response = await client.messages.create({
+    const response = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 200,
       system: SYSTEM_PROMPT,
@@ -39,7 +37,7 @@ export async function POST(req: NextRequest) {
     });
 
     const raw = (response.content[0] as { type: string; text: string }).text.trim();
-    const questions = JSON.parse(raw);
+    const questions = parseJSONResponse<string[]>(raw);
 
     if (!Array.isArray(questions)) {
       throw new Error("Response is not an array");
@@ -50,6 +48,7 @@ export async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
+    console.error('[ask-muko-suggestions] error:', err);
     const message = err instanceof Error ? err.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {
       status: 500,

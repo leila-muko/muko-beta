@@ -46,6 +46,7 @@ export interface PulseScoreRowProps {
   onToggleExpand?: () => void;
   /** 'default' = full card with expand; 'strip' = slim bar-chart row */
   variant?: "default" | "strip";
+  rowOpacity?: number;
 }
 
 export function PulseScoreRow({
@@ -62,6 +63,7 @@ export function PulseScoreRow({
   isExpanded,
   onToggleExpand,
   variant = "default",
+  rowOpacity = 1,
 }: PulseScoreRowProps) {
   const pillStyle = pill ? PILL_COLORS[pill.variant] : null;
 
@@ -188,9 +190,10 @@ export function PulseScoreRow({
   const scoreBg = isPending
     ? "rgba(67,67,43,0.04)"
     : `${scoreColor}14`; // hex alpha ~8%
+  const canExpand = Boolean(onToggleExpand);
 
   return (
-    <div style={{ borderBottom: "1px solid rgba(67,67,43,0.07)", paddingBottom: 14, marginBottom: 14 }}>
+    <div style={{ borderBottom: "1px solid rgba(67,67,43,0.07)", paddingBottom: 14, marginBottom: 14, opacity: rowOpacity }}>
       {/* Top row: icon + label + pill ... score + chevron */}
       <button
         onClick={onToggleExpand}
@@ -202,7 +205,7 @@ export function PulseScoreRow({
           background: "none",
           border: "none",
           padding: 0,
-          cursor: "pointer",
+          cursor: canExpand ? "pointer" : "default",
           marginBottom: 8,
         }}
       >
@@ -258,19 +261,21 @@ export function PulseScoreRow({
           >
             {isPending ? <LockIcon size={21} color="rgba(67,67,43,0.72)" /> : displayScore}
           </span>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            fill="none"
-            style={{
-              opacity: 0.35,
-              transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 200ms ease",
-            }}
-          >
-            <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          {canExpand && (
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              style={{
+                opacity: 0.35,
+                transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 200ms ease",
+              }}
+            >
+              <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
         </div>
       </button>
 

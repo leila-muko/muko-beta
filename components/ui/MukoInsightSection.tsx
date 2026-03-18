@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { CheckIcon, PencilIcon } from "@/components/ui/icons/InsightIcons";
+import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
 import type { SpecSuggestion } from "@/lib/types/next-move";
 import type { DecisionGuidance, InsightMode } from "@/lib/types/insight";
 
@@ -58,6 +59,8 @@ export interface MukoInsightSectionProps {
   isStreaming?: boolean;
   /** Partial value extracted from the in-progress JSON */
   streamingText?: string;
+  streamingParagraph?: string;
+  isParagraphStreaming?: boolean;
   /** 'concept' activates the narrative right-panel layout */
   pageMode?: "concept" | "spec";
   /** Called when "Apply All & Continue →" is clicked in concept narrative mode */
@@ -65,7 +68,11 @@ export interface MukoInsightSectionProps {
   /** Whether the continue action is available (concept mode) */
   canContinue?: boolean;
   conceptStage?: "direction" | "language" | "product";
-  executionGuidance?: Array<{ title: string; description: string }>;
+  languageRead?: {
+    silhouette_steer: string;
+    palette_steer: string;
+    signals_note: string;
+  } | null;
   productPieceRead?: { title?: string; body: string } | null;
   productStrategicImplication?: {
     summary: string;
@@ -159,7 +166,7 @@ function ProductDecisionRail({
     <div style={{ marginBottom: 36 }}>
       {!productPieceRead ? (
         <div style={{ marginBottom: 28 }}>
-          <div style={{ ...zoneLabel, marginBottom: 10 }}>MUKO&apos;S INTERPRETATION</div>
+          <div style={{ ...zoneLabel, marginBottom: 10 }}>MUKO&apos;S TAKE</div>
           <div style={{ fontFamily: sohne, fontSize: 19, fontWeight: 500, lineHeight: 1.32, color: "#43432B", marginBottom: 8 }}>
             Begin with the piece carrying the clearest expression.
           </div>
@@ -215,7 +222,7 @@ function ProductDecisionRail({
       ) : (
         <>
           <div style={{ marginBottom: 28 }}>
-            <div style={{ ...zoneLabel, marginBottom: 10 }}>{hasSelectedProductPiece ? "MUKO'S INTERPRETATION" : "MUKO'S READ"}</div>
+            <div style={{ ...zoneLabel, marginBottom: 10 }}>{hasSelectedProductPiece ? "MUKO'S TAKE" : "MUKO'S READ"}</div>
             {productPieceRead.title && (
               <div style={{ fontFamily: sohne, fontSize: 21, fontWeight: 500, lineHeight: 1.24, color: "#43432B", marginBottom: 12 }}>
                 {productPieceRead.title}
@@ -298,6 +305,8 @@ function ConceptDecisionRail({
   isLoading,
   isStreaming,
   streamingText,
+  streamingParagraph,
+  isParagraphStreaming,
   recommendedKeyPieces,
   selectedAnchorPiece,
   onSelectAnchorPiece,
@@ -306,8 +315,9 @@ function ConceptDecisionRail({
   onContinue,
   canContinue,
   nextMove,
+  pageMode,
   conceptStage = "product",
-  executionGuidance = [],
+  languageRead,
   productPieceRead,
   productStrategicImplication,
   productStructure,
@@ -320,6 +330,8 @@ function ConceptDecisionRail({
   isLoading?: boolean;
   isStreaming: boolean;
   streamingText: string;
+  streamingParagraph?: string;
+  isParagraphStreaming?: boolean;
   recommendedKeyPieces: string[];
   selectedAnchorPiece?: string | null;
   onSelectAnchorPiece?: (piece: string) => void;
@@ -328,8 +340,13 @@ function ConceptDecisionRail({
   onContinue?: () => void;
   canContinue?: boolean;
   nextMove?: NextMoveProps;
+  pageMode?: "concept" | "spec";
   conceptStage?: "direction" | "language" | "product";
-  executionGuidance?: Array<{ title: string; description: string }>;
+  languageRead?: {
+    silhouette_steer: string;
+    palette_steer: string;
+    signals_note: string;
+  } | null;
   productPieceRead?: { title?: string; body: string } | null;
   productStrategicImplication?: {
     summary: string;
@@ -355,7 +372,6 @@ function ConceptDecisionRail({
     );
   }
 
-  const showExecutionGuidance = conceptStage === "language";
   const zoneOneLabel = "Muko's Read";
 
   function getFirstSentence(text: string): string {
@@ -382,6 +398,52 @@ function ConceptDecisionRail({
   };
   const leadInsight = !isStreaming && paragraphs[0] ? getFirstSentence(paragraphs[0]).trim() : headline;
   const leadBody = !isStreaming && paragraphs[0] ? removeFirstSentence(paragraphs[0]) : "";
+  const settledParagraphs = leadBody ? [leadBody, ...paragraphs.slice(1)] : paragraphs.slice(1);
+
+  if (conceptStage === "language") {
+    const rows = languageRead
+      ? [
+          { label: "Silhouette", value: languageRead.silhouette_steer },
+          { label: "Palette", value: languageRead.palette_steer },
+          { label: "Signals", value: languageRead.signals_note },
+        ]
+      : [];
+
+    return (
+      <div style={{ marginBottom: 52 }}>
+        <div style={{ marginBottom: 34 }}>
+          <div style={{ ...zoneLabel, marginBottom: 10 }}>{zoneOneLabel.toUpperCase()}</div>
+          <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, lineHeight: 1.18, color: "#43432B", width: "100%" }}>
+            {headline}
+          </div>
+        </div>
+
+        {rows.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {rows.map((row) => (
+              <div
+                key={row.label}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "110px minmax(0, 1fr)",
+                  gap: 10,
+                  paddingBottom: 14,
+                  borderBottom: "1px solid rgba(67,67,43,0.08)",
+                }}
+              >
+                <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "#B8876B", paddingTop: 2 }}>
+                  {row.label}
+                </div>
+                <div style={{ fontFamily: inter, fontSize: 12.5, lineHeight: 1.74, color: "rgba(67,67,43,0.68)" }}>
+                  {row.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{ marginBottom: 52 }}>
@@ -409,23 +471,25 @@ function ConceptDecisionRail({
       </div>
 
       {/* ── Zone 2 — Insight Paragraph ───────────────────────────────────── */}
-      {!isStreaming && paragraphs.length > 0 && (
-        <div style={{ marginBottom: 32 }}>
-          {headline && headline !== leadInsight && (
+      {((!isParagraphStreaming && paragraphs.length > 0) || !!streamingParagraph) && (
+        <div style={{ marginTop: -10, marginBottom: 32 }}>
+          {pageMode !== "concept" && headline && headline !== leadInsight && (
             <div style={{ marginBottom: 12, fontFamily: inter, fontSize: 11, fontWeight: 500, color: "rgba(67,67,43,0.46)", lineHeight: 1.55 }}>
               {headline}
             </div>
           )}
-          {leadBody && (
-            <p style={{ margin: 0, fontFamily: inter, fontSize: 12.5, lineHeight: 1.8, color: "rgba(67,67,43,0.65)" }}>
-              {leadBody}
-            </p>
-          )}
-          {paragraphs.slice(1).map((paragraph) => (
-            <p key={paragraph} style={{ margin: "12px 0 0", fontFamily: inter, fontSize: 12.5, lineHeight: 1.8, color: "rgba(67,67,43,0.65)" }}>
-              {paragraph}
-            </p>
-          ))}
+          <MukoStreamingParagraph
+            paragraphs={settledParagraphs}
+            streamingText={streamingParagraph}
+            isStreaming={isParagraphStreaming}
+            paragraphStyle={{
+              fontFamily: inter,
+              fontSize: 12.5,
+              lineHeight: 1.8,
+              color: "rgba(67,67,43,0.65)",
+            }}
+            paragraphSpacing={12}
+          />
 
           {bullets.items.length > 0 && (
             <div style={{ marginTop: 18 }}>
@@ -463,33 +527,6 @@ function ConceptDecisionRail({
         </div>
       )}
 
-      {showExecutionGuidance && executionGuidance.length > 0 && (
-        <>
-          <div style={hairline} />
-          <div style={{ marginBottom: 34 }}>
-            <div style={{ ...zoneLabel, marginBottom: 12 }}>EXECUTION READ</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {executionGuidance.map((item) => (
-                <div
-                  key={`${item.title}-${item.description}`}
-                  style={{
-                    paddingBottom: 12,
-                    borderBottom: "1px solid rgba(67,67,43,0.08)",
-                  }}
-                >
-                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "#B8876B", marginBottom: 6 }}>
-                    {item.title}
-                  </div>
-                  <div style={{ fontFamily: inter, fontSize: 12.5, lineHeight: 1.74, color: "rgba(67,67,43,0.68)" }}>
-                    {item.description}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
       {/* ── Spec Next Move (spec mode only) ─────────────────────────────── */}
       {nextMove?.mode === "spec" && nextMove.suggestions.length > 0 && (() => {
         const suggestions = nextMove.suggestions
@@ -522,11 +559,13 @@ export function MukoInsightSection({
   mode,
   isStreaming = false,
   streamingText = '',
+  streamingParagraph = '',
+  isParagraphStreaming = false,
   pageMode,
   onContinue,
   canContinue,
   conceptStage,
-  executionGuidance,
+  languageRead,
   productPieceRead,
   productStrategicImplication,
   productStructure,
@@ -565,6 +604,8 @@ export function MukoInsightSection({
         isLoading={nmProps?.isLoading}
         isStreaming={isStreaming}
         streamingText={streamingText}
+        streamingParagraph={streamingParagraph}
+        isParagraphStreaming={isParagraphStreaming}
         recommendedKeyPieces={nmProps?.recommendedKeyPieces ?? []}
         selectedAnchorPiece={nmProps?.selectedAnchorPiece}
         onSelectAnchorPiece={nmProps?.onSelectAnchorPiece}
@@ -573,8 +614,9 @@ export function MukoInsightSection({
         onContinue={onContinue}
         canContinue={canContinue}
         nextMove={nextMove}
+        pageMode={pageMode}
         conceptStage={conceptStage}
-        executionGuidance={executionGuidance}
+        languageRead={languageRead}
         productPieceRead={productPieceRead}
         productStrategicImplication={productStrategicImplication}
         productStructure={productStructure}
@@ -649,20 +691,19 @@ export function MukoInsightSection({
       </div>
 
       {/* Body paragraphs */}
-      {!isStreaming && paragraphs.map((p, i) => (
-        <p
-          key={i}
-          style={{
-            margin: i < paragraphs.length - 1 ? "0 0 12px" : "0 0 20px",
-            fontFamily: inter,
-            fontSize: 12.5,
-            color: `rgba(67,67,43,${0.64 - i * 0.04})`,
-            lineHeight: 1.7,
-          }}
-        >
-          {p}
-        </p>
-      ))}
+      <MukoStreamingParagraph
+        paragraphs={paragraphs}
+        streamingText={streamingParagraph}
+        isStreaming={isParagraphStreaming}
+        containerStyle={{ marginBottom: 20 }}
+        paragraphStyle={{
+          fontFamily: inter,
+          fontSize: 12.5,
+          color: "rgba(67,67,43,0.64)",
+          lineHeight: 1.7,
+        }}
+        paragraphSpacing={12}
+      />
 
       {/* Construction Implications */}
       {constructionImplications && constructionImplications.length > 0 && (

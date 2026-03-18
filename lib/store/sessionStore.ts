@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { SelectedPieceImage } from '@/lib/piece-image';
 
 interface PulseState {
   status: 'green' | 'yellow' | 'red';
@@ -93,6 +94,7 @@ interface SessionState {
   intentTradeoff: string;
   collectionRole: CollectionRoleId | null;
   selectedKeyPiece: KeyPiece | null;
+  selectedPieceImage: SelectedPieceImage | null;
   decisionGuidanceState: DecisionGuidanceState;
   activeProductPieceId: string | null;
   pieceRolesById: PieceRolesById;
@@ -135,6 +137,7 @@ interface SessionState {
   setIntentTradeoff: (tradeoff: string) => void;
   setCollectionRole: (role: CollectionRoleId | null) => void;
   setSelectedKeyPiece: (piece: KeyPiece | null) => void;
+  setSelectedPieceImage: (image: SelectedPieceImage | null) => void;
   setDecisionGuidanceState: (state: DecisionGuidanceState) => void;
   setActiveProductPieceId: (pieceId: string | null) => void;
   setPieceRolesById: (roles: PieceRolesById) => void;
@@ -195,6 +198,7 @@ export const useSessionStore = create<SessionState>()(
       intentTradeoff: '',
       collectionRole: null,
       selectedKeyPiece: null,
+      selectedPieceImage: null,
       decisionGuidanceState: { is_confirmed: false, selected_anchor_piece: null },
       activeProductPieceId: null,
       pieceRolesById: {},
@@ -234,6 +238,7 @@ export const useSessionStore = create<SessionState>()(
       setIntentTradeoff: (intentTradeoff) => set({ intentTradeoff }),
       setCollectionRole: (collectionRole) => set({ collectionRole }),
       setSelectedKeyPiece: (selectedKeyPiece) => set({ selectedKeyPiece }),
+      setSelectedPieceImage: (selectedPieceImage) => set({ selectedPieceImage }),
       setDecisionGuidanceState: (decisionGuidanceState) => set({ decisionGuidanceState }),
       setActiveProductPieceId: (activeProductPieceId) => set({ activeProductPieceId }),
       setPieceRolesById: (pieceRolesById) => set({ pieceRolesById }),
@@ -303,6 +308,7 @@ export const useSessionStore = create<SessionState>()(
         intentTradeoff: '',
         collectionRole: null,
         selectedKeyPiece: null,
+        selectedPieceImage: null,
         decisionGuidanceState: { is_confirmed: false, selected_anchor_piece: null },
         activeProductPieceId: null,
         pieceRolesById: {},
@@ -314,7 +320,7 @@ export const useSessionStore = create<SessionState>()(
       name: 'muko-session',
       partialize: (state) => {
         // Persist everything except actions
-        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setCollectionRole, setSelectedKeyPiece, setParentAnalysisId, setSavedAnalysisId, setActiveCollection, setAssortmentInsightCache, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
+        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setCollectionRole, setSelectedKeyPiece, setSelectedPieceImage, setParentAnalysisId, setSavedAnalysisId, setActiveCollection, setAssortmentInsightCache, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
         return rest;
       },
     }

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import { createClient } from "@/lib/supabase/client";
+import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
 import type { SpecSuggestion } from "@/lib/types/next-move";
 import type { ScorecardInsight, Consideration } from "@/app/api/synthesizer/scorecard/route";
 import type {
@@ -234,6 +235,7 @@ export function ScorecardModal({
     constructionTierOverride,
     collectionRole,
     selectedKeyPiece,
+    selectedPieceImage,
     refinementModifiers,
     intentGoals,
   } = useSessionStore();
@@ -406,6 +408,7 @@ export function ScorecardModal({
         agent_versions: {
           scorecard_modal: "v1",
           ...(trimmedPieceName ? { saved_piece_name: trimmedPieceName } : {}),
+          ...(selectedPieceImage ? { selected_piece_image: JSON.stringify(selectedPieceImage) } : {}),
           ...(collectionRole ? { collection_role: collectionRole } : {}),
         },
         parent_analysis_id: null,
@@ -564,17 +567,16 @@ export function ScorecardModal({
                 }}
               />
             ) : (
-              <div
-                style={{
+              <MukoStreamingParagraph
+                text={scorecardData?.insight ?? mukoInsight ?? "Reviewing your piece for creative and commercial fit."}
+                paragraphStyle={{
                   fontFamily: sohne,
                   fontSize: 17,
                   fontWeight: 600,
                   color: OLIVE,
                   lineHeight: 1.35,
                 }}
-              >
-                {scorecardData?.insight ?? mukoInsight ?? "Reviewing your piece for creative and commercial fit."}
-              </div>
+              />
             )}
           </div>
 

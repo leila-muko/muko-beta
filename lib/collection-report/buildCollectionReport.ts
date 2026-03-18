@@ -813,6 +813,7 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
         roleBalanceLabel: roleBalance.label,
         silhouetteLabel: silhouetteDiversity.label,
       }),
+      narrative: input.narrative?.trim() || '',
       overview: {
         total_pieces: pieceCount,
         role_distribution: overviewRoleDistribution,

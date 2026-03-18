@@ -103,10 +103,16 @@ export async function* streamClaude(
  * Strips markdown code fences if present before parsing.
  */
 export function parseJSONResponse<T>(raw: string): T {
-  const cleaned = raw
+  let cleaned = raw
     .replace(/```json\s*/gi, '')
     .replace(/```\s*/g, '')
     .trim();
+
+  cleaned = cleaned
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u2014/g, '-')
+    .replace(/\u2026/g, '...');
 
   try {
     return JSON.parse(cleaned) as T;

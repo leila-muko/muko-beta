@@ -1,6 +1,7 @@
 'use client';
 
 import type { MukoInsight } from '@/lib/spec-studio/calculator';
+import { MukoStreamingParagraph } from '@/components/ui/MukoStreamingParagraph';
 
 interface MukoInsightPanelProps {
   insight: MukoInsight | null;
@@ -16,9 +17,14 @@ export default function MukoInsightPanel({ insight }: MukoInsightPanelProps) {
             Muko Insight
           </span>
         </div>
-        <p className="text-[13px] text-[#43432B]/35 leading-relaxed m-0">
-          Start making selections to see live intelligence...
-        </p>
+        <MukoStreamingParagraph
+          text="Start making selections to see live intelligence..."
+          paragraphStyle={{
+            fontSize: 13,
+            lineHeight: 1.6,
+            color: 'rgba(67,67,43,0.35)',
+          }}
+        />
       </div>
     );
   }
@@ -82,9 +88,14 @@ export default function MukoInsightPanel({ insight }: MukoInsightPanelProps) {
       <p className="text-[13px] font-medium text-[#43432B] mb-1.5 leading-snug">
         {insight.headline}
       </p>
-      <p className="text-[13px] text-[#43432B]/65 leading-relaxed m-0">
-        {insight.body}
-      </p>
+      <MukoStreamingParagraph
+        text={insight.body}
+        paragraphStyle={{
+          fontSize: 13,
+          lineHeight: 1.6,
+          color: 'rgba(67,67,43,0.65)',
+        }}
+      />
 
       {/* Alternative Material Suggestion */}
       {insight.alternative && (

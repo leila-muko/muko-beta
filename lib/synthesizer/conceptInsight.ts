@@ -825,9 +825,11 @@ BRAND REASONING LAYER
 
 You are writing for brand.name specifically. Every sentence must be written through the lens of this brand's specific position — not the category generally.
 
+Never mention brand keywords by name or reference them as "keywords". Instead, speak as a senior fashion strategist who has internalized the brand's identity and expresses it through market and aesthetic judgment — e.g. instead of "your Minimalist and Sustainable keywords", write "Reformation's equity in restraint and material honesty" or "the brand's established position in considered, low-impact dressing". The analysis should read as expert synthesis, not a report on the system's own inputs.
+
 Apply these reasoning rules in order:
 
-1. KEYWORD LENS — identify which of brand.keywords this aesthetic directly reinforces and which it strains. Name the specific keywords in your reasoning. Do not say "aligns with your DNA" — say which signals specifically.
+1. KEYWORD LENS — identify which parts of the brand's identity this aesthetic directly reinforces and which it strains. Express that through concrete brand signals and market language, not keyword labels or system terminology.
 
 2. CUSTOMER TEST — if brand.customer is provided, run every commercial claim through her. Would she buy this? What would make her choose this over what she already buys? What would make her walk away. Anchor the insight in her behavior, not the market abstractly.
 
@@ -877,7 +879,7 @@ Before writing, internally derive:
 1) Cultural Shift — what changed in consumer behavior or desire
 2) Market Gap — whitespace at the brand's price tier
 3) Competitive implication — who defines it now; who will commoditize it
-4) Brand Permission — tied to brand keywords
+4) Brand Permission — tied to the brand's established identity, equity, and right to execute
 5) Failure mode — how this becomes costume or wallpaper
 6) Intent Filter — aggressive or conservative stance given intent signals
 7) Opposition pass — draft a skeptical merchant counter-argument; refine to remove weak claims
@@ -951,7 +953,7 @@ Labels must be exactly:
 
 Market Gap: name the whitespace at the brand's price point.
 Competitive Position: name 1–3 competitors; state the genericization risk if relevant.
-Brand Permission: tie to brand keywords; state the one angle that makes this execution distinct.
+Brand Permission: state the one angle in the brand's established identity and market equity that makes this execution distinct.
 
 Brevity gate: if any bullet exceeds 22 words, rewrite it shorter before outputting.
 
@@ -1028,6 +1030,65 @@ Return JSON only.`;
 export const CONCEPT_STUDIO_PROMPT = CONCEPT_STUDIO_PROMPT_V6_2;
 export const CONCEPT_SYSTEM_PROMPT = CONCEPT_STUDIO_PROMPT_V6_2;
 
+export const CONCEPT_LANGUAGE_SYSTEM_PROMPT = `ROLE
+You are Muko's senior fashion strategist.
+
+TASK
+You are shaping Step 2: Shape Collection Language.
+You will receive:
+- a locked aesthetic name
+- brand identity context
+
+Return a concise execution read for the collection language.
+
+VOICE
+Senior fashion strategist. Decisive. Specific. Fashion-literate.
+No hedging. No filler. No methodology language.
+
+NON-NEGOTIABLE RULES
+Never expose brand keywords or refer to them as "keywords."
+Speak through aesthetic judgment, market fluency, and brand equity.
+Do not include scores.
+Do not include market commentary, competitor references, whitespace language, or permission analysis.
+Do not output a subtitle line.
+Each field must be exactly one sentence.
+
+OUTPUT FORMAT
+Return JSON only. No markdown. No preamble. No extra keys.
+
+{
+  "headline": "string",
+  "silhouette_steer": "string",
+  "palette_steer": "string",
+  "signals_note": "string"
+}
+
+FIELD RULES
+headline
+One directive sentence. This is the shaping imperative for the aesthetic.
+Actionable and specific.
+No market commentary.
+
+silhouette_steer
+One sentence on which silhouette posture or postures are most coherent with this aesthetic and brand voice.
+Do not mention scores.
+
+palette_steer
+One sentence on what color register reinforces this aesthetic and what dilutes it.
+
+signals_note
+One sentence framing what the Layer These In chips are doing for the collection's visual grammar.
+
+VALIDATION
+Before returning, check:
+• Output contains exactly 4 keys: headline, silhouette_steer, palette_steer, signals_note.
+• Every value is a single sentence.
+• No keyword exposure.
+• No subtitles.
+• No markdown.
+• Valid JSON.
+If any check fails, rewrite before returning.`;
+
 // ─────────────────────────────────────────────
 // USER MESSAGE ASSEMBLY
 // ─────────────────────────────────────────────
@@ -1079,6 +1140,34 @@ export function buildConceptPrompt(bb: ConceptBlackboard): string {
   return JSON.stringify(sanitizePayload(raw as Record<string, unknown>));
 }
 
+export function buildConceptLanguagePrompt(input: {
+  aesthetic_name: string;
+  brand_keywords: string[];
+  brand_name?: string | null;
+  customer_profile?: string | null;
+  price_tier?: string | null;
+  tension_context?: string | null;
+  reference_brands?: string[];
+  excluded_brands?: string[];
+}): string {
+  const raw = {
+    brand: {
+      name: input.brand_name ?? null,
+      keywords: input.brand_keywords,
+      customer: input.customer_profile ?? null,
+      price_tier: input.price_tier ?? null,
+      reference_brands: input.reference_brands ?? [],
+      never_be_brands: input.excluded_brands ?? [],
+      tension_context: input.tension_context ?? null,
+    },
+    aesthetic: {
+      name: input.aesthetic_name,
+    },
+  };
+
+  return JSON.stringify(sanitizePayload(raw as Record<string, unknown>));
+}
+
 // ─────────────────────────────────────────────
 // RESPONSE PARSING (v5.0 JSON output)
 // ─────────────────────────────────────────────
@@ -1093,6 +1182,13 @@ interface ConceptV5Output {
     execution_levers: string[];
   };
   confidence: number;
+}
+
+export interface ConceptLanguageOutput {
+  headline: string;
+  silhouette_steer: string;
+  palette_steer: string;
+  signals_note: string;
 }
 
 function stripFences(raw: string): string {
@@ -1119,6 +1215,18 @@ export function parseConceptV5Output(raw: string): ConceptV5Output | null {
       parsed.decision_guidance.execution_levers.length < 2 ||
       parsed.decision_guidance.execution_levers.length > 4
     ) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function parseConceptLanguageOutput(raw: string): ConceptLanguageOutput | null {
+  try {
+    const parsed = JSON.parse(stripFences(raw)) as ConceptLanguageOutput;
+    if (!parsed.headline || !parsed.silhouette_steer || !parsed.palette_steer || !parsed.signals_note) {
+      return null;
+    }
     return parsed;
   } catch {
     return null;

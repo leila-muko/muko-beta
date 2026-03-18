@@ -29,7 +29,7 @@ export function GoogleButton() {
         borderRadius: 100,
         background: 'transparent',
         border: '1px solid rgba(73,66,53,0.2)',
-        color: '#4D302F',
+        color: '#6F675C',
         fontFamily: 'var(--font-inter)',
         fontSize: 13,
         fontWeight: 600,

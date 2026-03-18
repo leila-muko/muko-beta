@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import { BRAND } from "../../lib/concept-studio/constants";
 
@@ -463,6 +464,9 @@ export default function IntentCalibrationPage() {
 
     useSessionStore.setState({
       aestheticInput: "",
+      aestheticMatchedId: null,
+      collectionAesthetic: null,
+      aestheticInflection: null,
       conceptLocked: false,
       identityPulse: null,
       resonancePulse: null,
@@ -473,6 +477,7 @@ export default function IntentCalibrationPage() {
       directionInterpretationText: "",
       directionInterpretationModifiers: [],
       directionInterpretationChips: [],
+      isProxyMatch: false,
     });
 
     router.push("/concept");
@@ -894,14 +899,18 @@ export default function IntentCalibrationPage() {
                   key={mukoInsight}
                   style={{
                     marginTop: 34,
-                    fontFamily: inter,
-                    fontSize: 13.5,
-                    lineHeight: 1.82,
-                    color: "rgba(67,67,43,0.68)",
                     animation: "intentInsightFade 300ms ease",
                   }}
                 >
-                  {mukoInsight}
+                  <MukoStreamingParagraph
+                    text={mukoInsight}
+                    paragraphStyle={{
+                      fontFamily: inter,
+                      fontSize: 13.5,
+                      lineHeight: 1.82,
+                      color: "rgba(67,67,43,0.68)",
+                    }}
+                  />
                 </div>
 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 24 }}>
