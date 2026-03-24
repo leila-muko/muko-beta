@@ -27,6 +27,7 @@ export interface AlternativeMaterial {
   saving_vs_selected: number;
   lead_reduction_weeks: number;
   aesthetic_note: string;
+  tradeoff_note?: string; // e.g. "Resolves lead time · margin improves"
 }
 
 export interface ActionSuggestionPayload {
@@ -93,12 +94,12 @@ Rules you must follow:
 - The directive is a recommendation, not a requirement. Frame it as the clearest path, not the only path.
 - The directive must be a single sentence. Maximum 18 words.
 - The explanation must be 2 sentences maximum. Be specific — name the material, the lead time, the dollar figure. Vague explanations are useless.
-- Alternatives must only include options that fully resolve the primary conflict. Do not include partial fixes.
+- Alternatives are ranked by how much they reduce the primary constraint. Each has a tradeoff_note field summarising what it resolves and what it trades off. Use it to construct the chip label: e.g. "Tencel · Resolves lead time" or "Linen · Reduces by 5 wks · aesthetic trade-off". If tradeoff_note is absent, fall back to "MaterialName · Xwk · $Y/yd".
 - Tone: direct, considered, unhurried. A trusted advisor flagging a risk before a decision locks — not a consultant deck, not a warning system.
 
 Conflict type handling:
 COST_GATE: The build doesn't clear margin. Suggest a material switch or construction reduction that resolves the gap. Name the specific saving.
-EXECUTION_TIMELINE: Lead time threatens the delivery window. Suggest only materials whose lead time actually fits within the window. Do not suggest materials that merely reduce the problem without solving it.
+EXECUTION_TIMELINE: Lead time threatens the delivery window. Present alternatives ranked by lead time reduction. Prefer materials that fully fit within the window; if none do, include those that reduce the problem and label them accordingly using tradeoff_note.
 EXECUTION_COMPLEXITY: Construction complexity creates development risk. Suggest reducing construction tier or simplifying the build approach. Frame this as protecting the collection's development capacity, not as a critique of the piece.
 IDENTITY_MISALIGNMENT: The concept is pulling away from the brand's established voice. Suggest returning to Concept Studio to narrow the interpretation. Be specific about what the tension is so the designer knows what to adjust.
 
@@ -121,7 +122,7 @@ Execution reason: ${p.execution_reason}
 Collection complexity load: ${p.complexity_load_label} (${p.complexity_load_score}/100)
 Collection role distribution: ${p.role_distribution_summary}
 
-Alternative materials available (pre-filtered — every option listed here fully resolves the primary conflict, do not invent others):
+Alternative materials (ranked by primary constraint reduction — tradeoff_note describes what each resolves and trades off; do not invent others):
 ${JSON.stringify(p.alternatives, null, 2)}
 
 Return raw JSON only:
@@ -130,7 +131,7 @@ Return raw JSON only:
   "directive": "single sentence, max 18 words. The recommended path. Not a requirement.",
   "explanation": "2 sentences max. Specific: name materials, dollars, weeks. No 'must' language.",
   "show_alternatives": true or false,
-  "alternatives": [{ "label": "e.g. 'Linen · 13wk · $15/yd'", "material_id": "from materials list" }],
+  "alternatives": [{ "label": "e.g. 'Tencel · Resolves lead time' or 'Linen · Reduces by 5 wks · aesthetic trade-off'", "material_id": "from materials list" }],
   "cta_variant": "revise_recommended",
   "hint_text": "max 18 words. Contextual note below the buttons. Not a repeat of the directive."
 }`;

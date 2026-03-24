@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import materialsData from '@/data/materials.json';
 import { CollectionReportView } from '@/components/report/CollectionReportView';
@@ -94,12 +94,10 @@ function extractPartialCollectionInsight(raw: string) {
   ].join(' ');
 }
 
-function inferRole(value: string | null | undefined, score: number | null | undefined): CollectionPieceRole {
+function inferRole(value: string | null | undefined, score: number | null | undefined): CollectionPieceRole | null {
   const token = normalizeToken(value);
   if (token === 'hero' || token === 'core' || token === 'support') return token;
-  if ((score ?? 0) >= 82) return 'hero';
-  if ((score ?? 0) >= 64) return 'core';
-  return 'support';
+  return null;
 }
 
 function inferComplexity(value: AnalysisRow['construction_tier']): CollectionComplexity {
@@ -262,6 +260,7 @@ function ReportPageContent() {
   const season = useSessionStore((state) => state.season);
   const category = useSessionStore((state) => state.category);
   const aestheticInput = useSessionStore((state) => state.aestheticInput);
+  const aestheticMatchedId = useSessionStore((state) => state.aestheticMatchedId);
   const materialId = useSessionStore((state) => state.materialId);
   const silhouette = useSessionStore((state) => state.silhouette);
   const constructionTier = useSessionStore((state) => state.constructionTier);
@@ -353,11 +352,13 @@ function ReportPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [reportInsightStreaming, setReportInsightStreaming] = useState('');
   const [reportIsParagraphStreaming, setReportIsParagraphStreaming] = useState(false);
+  const collectionAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-
     async function loadReport() {
+      collectionAbortRef.current?.abort();
+      const controller = new AbortController();
+      collectionAbortRef.current = controller;
       setLoading(true);
       setError(null);
       setReportInsightStreaming('');
@@ -418,7 +419,7 @@ function ReportPageContent() {
         }
 
         if (input && input.pieces.length === 0) {
-          if (!cancelled) {
+          if (!controller.signal.aborted) {
             setReport(buildCollectionReport(input).collection_report);
             setLoading(false);
           }
@@ -446,7 +447,7 @@ function ReportPageContent() {
         }
 
         if (!input) {
-          if (!cancelled) {
+          if (!controller.signal.aborted) {
             setReport(null);
             setLoading(false);
           }
@@ -462,6 +463,7 @@ function ReportPageContent() {
               action: 'collection_report',
               payload: input,
             }),
+            signal: controller.signal,
           });
 
           if (!response.ok) throw new Error('Report request failed');
@@ -478,7 +480,7 @@ function ReportPageContent() {
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;
-              if (cancelled) { reader.cancel(); break; }
+              if (controller.signal.aborted) { reader.cancel(); break; }
 
               buffer += decoder.decode(value, { stream: true });
               const lines = buffer.split('\n');
@@ -495,19 +497,19 @@ function ReportPageContent() {
                     payload?: CollectionReportPayload;
                   };
 
-                  if (event.type === 'fallback' && event.payload && !cancelled) {
+                  if (event.type === 'fallback' && event.payload && !controller.signal.aborted) {
                     // Deterministic fields — render immediately
                     setReport(event.payload);
                   }
 
-                  if (event.type === 'delta' && event.payload && !cancelled) {
+                  if (event.type === 'delta' && event.payload && !controller.signal.aborted) {
                     const payload = event.payload as { text?: string };
                     reportRawStream += payload.text ?? '';
                     setReportInsightStreaming(extractPartialCollectionInsight(reportRawStream));
                     setReportIsParagraphStreaming(true);
                   }
 
-                  if (event.type === 'done' && event.payload && !cancelled) {
+                  if (event.type === 'done' && event.payload && !controller.signal.aborted) {
                     // Fully merged result — swap in final narrative
                     sseReport = event.payload;
                     setReportInsightStreaming('');
@@ -518,7 +520,7 @@ function ReportPageContent() {
                 }
               }
             }
-            if (!cancelled) {
+            if (!controller.signal.aborted) {
               setReportIsParagraphStreaming(false);
             }
             // Always assign nextReport — if cancelled before done, the !cancelled guard
@@ -531,21 +533,23 @@ function ReportPageContent() {
             setReportInsightStreaming('');
             setReportIsParagraphStreaming(false);
           }
-        } catch {
+        } catch (err) {
+          if ((err as Error)?.name === 'AbortError') return;
           nextReport = buildCollectionReport(input).collection_report;
           setReportInsightStreaming('');
           setReportIsParagraphStreaming(false);
         }
 
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setReport(nextReport);
         }
-      } catch {
+      } catch (err) {
+        if ((err as Error)?.name === 'AbortError') return;
         const activeCollectionName = collectionFromUrl || activeCollection || collectionName;
         const activeSeason = seasonFromUrl || season || 'Current Season';
         const intent = typeof window !== 'undefined' ? readIntentFromStorage() : null;
 
-        if (!cancelled && activeCollectionName) {
+        if (!controller.signal.aborted && activeCollectionName) {
           setReportInsightStreaming('');
           setReportIsParagraphStreaming(false);
           setReport(
@@ -560,13 +564,13 @@ function ReportPageContent() {
             }).collection_report
           );
           setError(null);
-        } else if (!cancelled) {
+        } else if (!controller.signal.aborted) {
           setReportInsightStreaming('');
           setReportIsParagraphStreaming(false);
           setError('Unable to build the collection report right now.');
         }
       } finally {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setReportIsParagraphStreaming(false);
           setLoading(false);
         }
@@ -576,7 +580,7 @@ function ReportPageContent() {
     loadReport();
 
     return () => {
-      cancelled = true;
+      collectionAbortRef.current?.abort();
     };
   }, [activeCollection, collectionFromUrl, collectionName, season, seasonFromUrl, sessionFallbackInput]);
 
@@ -666,8 +670,9 @@ function ReportPageContent() {
                     user_id:          userId,
                     collection_name:  resolvedCollectionName,
                     season:           resolvedSeason,
-                    category:         category || null,
+                    category:         category?.toLowerCase()?.trim() || null,
                     aesthetic_input:  aestheticInput || null,
+                    aesthetic_matched_id: aestheticMatchedId ?? aestheticInput?.toLowerCase()?.replace(/\s+/g, '-') ?? null,
                     material_id:      materialId || null,
                     silhouette:       silhouette || null,
                     construction_tier: constructionTier ?? null,

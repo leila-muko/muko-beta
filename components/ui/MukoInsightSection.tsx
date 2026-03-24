@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { CheckIcon, PencilIcon } from "@/components/ui/icons/InsightIcons";
 import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
 import type { SpecSuggestion } from "@/lib/types/next-move";
@@ -73,6 +73,14 @@ export interface MukoInsightSectionProps {
     palette_steer: string;
     signals_note: string;
   } | null;
+  /** Streaming state for language stage */
+  languageStreamingText?: string;
+  languageStreamingRows?: { silhouette: string; palette: string; signals: string };
+  isLanguageStreaming?: boolean;
+  /** Streaming state for product/piece stage */
+  pieceStreamingTitle?: string;
+  pieceStreamingBody?: string;
+  isPieceStreaming?: boolean;
   productPieceRead?: { title?: string; body: string } | null;
   productStrategicImplication?: {
     summary: string;
@@ -84,6 +92,8 @@ export interface MukoInsightSectionProps {
     notes: string[];
   } | null;
   hasSelectedProductPiece?: boolean;
+  /** Show "Shaped by your brand context" label near narrative output */
+  showBrandContextLabel?: boolean;
 }
 
 /* ─── Fixed positioning row labels (concept narrative mode) ─────────────── */
@@ -128,6 +138,9 @@ function ProductDecisionRail({
   productStrategicImplication,
   productStructure,
   hasSelectedProductPiece = false,
+  pieceStreamingTitle = '',
+  pieceStreamingBody = '',
+  isPieceStreaming = false,
 }: {
   productPieceRead?: { title?: string; body: string } | null;
   productStrategicImplication?: {
@@ -140,6 +153,9 @@ function ProductDecisionRail({
     notes: string[];
   } | null;
   hasSelectedProductPiece?: boolean;
+  pieceStreamingTitle?: string;
+  pieceStreamingBody?: string;
+  isPieceStreaming?: boolean;
 }) {
   const zoneLabel: React.CSSProperties = {
     fontFamily: inter,
@@ -164,7 +180,10 @@ function ProductDecisionRail({
 
   return (
     <div style={{ marginBottom: 36 }}>
-      {!productPieceRead ? (
+      {isPieceStreaming && (
+        <style>{`@keyframes mukoCursorBlink{0%,100%{opacity:1}50%{opacity:0}}@keyframes mukoCardPulse{0%,100%{opacity:0.5}50%{opacity:0.8}}`}</style>
+      )}
+      {(!productPieceRead && !isPieceStreaming) ? (
         <div style={{ marginBottom: 28 }}>
           <div style={{ ...zoneLabel, marginBottom: 10 }}>MUKO&apos;S TAKE</div>
           <div style={{ fontFamily: sohne, fontSize: 19, fontWeight: 500, lineHeight: 1.32, color: "#43432B", marginBottom: 8 }}>
@@ -219,16 +238,34 @@ function ProductDecisionRail({
             </>
           )}
         </div>
+      ) : isPieceStreaming ? (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ ...zoneLabel, marginBottom: 10 }}>MUKO&apos;S READ</div>
+          {pieceStreamingTitle ? (
+            <div style={{ fontFamily: sohne, fontSize: 21, fontWeight: 500, lineHeight: 1.24, color: "#43432B", marginBottom: 12 }}>
+              {pieceStreamingTitle}
+              <span style={{ display: "inline-block", width: 2, height: "0.85em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
+            </div>
+          ) : null}
+          {pieceStreamingBody ? (
+            <p style={bodyText}>
+              {pieceStreamingBody}
+              {!pieceStreamingTitle && (
+                <span style={{ display: "inline-block", width: 2, height: "0.85em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
+              )}
+            </p>
+          ) : null}
+        </div>
       ) : (
         <>
           <div style={{ marginBottom: 28 }}>
             <div style={{ ...zoneLabel, marginBottom: 10 }}>{hasSelectedProductPiece ? "MUKO'S TAKE" : "MUKO'S READ"}</div>
-            {productPieceRead.title && (
+            {productPieceRead?.title && (
               <div style={{ fontFamily: sohne, fontSize: 21, fontWeight: 500, lineHeight: 1.24, color: "#43432B", marginBottom: 12 }}>
                 {productPieceRead.title}
               </div>
             )}
-            <p style={bodyText}>{productPieceRead.body}</p>
+            <p style={bodyText}>{productPieceRead?.body ?? ''}</p>
           </div>
 
           {hasSelectedProductPiece && productStrategicImplication && (
@@ -307,6 +344,12 @@ function ConceptDecisionRail({
   streamingText,
   streamingParagraph,
   isParagraphStreaming,
+  languageStreamingText = '',
+  languageStreamingRows,
+  isLanguageStreaming = false,
+  pieceStreamingTitle = '',
+  pieceStreamingBody = '',
+  isPieceStreaming = false,
   recommendedKeyPieces,
   selectedAnchorPiece,
   onSelectAnchorPiece,
@@ -322,6 +365,7 @@ function ConceptDecisionRail({
   productStrategicImplication,
   productStructure,
   hasSelectedProductPiece,
+  showBrandContextLabel,
 }: {
   headline: string;
   paragraphs: string[];
@@ -332,6 +376,12 @@ function ConceptDecisionRail({
   streamingText: string;
   streamingParagraph?: string;
   isParagraphStreaming?: boolean;
+  languageStreamingText?: string;
+  languageStreamingRows?: { silhouette: string; palette: string; signals: string };
+  isLanguageStreaming?: boolean;
+  pieceStreamingTitle?: string;
+  pieceStreamingBody?: string;
+  isPieceStreaming?: boolean;
   recommendedKeyPieces: string[];
   selectedAnchorPiece?: string | null;
   onSelectAnchorPiece?: (piece: string) => void;
@@ -358,8 +408,42 @@ function ConceptDecisionRail({
     notes: string[];
   } | null;
   hasSelectedProductPiece?: boolean;
+  showBrandContextLabel?: boolean;
 }) {
   const [analysisExpanded, setAnalysisExpanded] = useState(false);
+
+  // ── Crossfade: pre-read → LLM headline ──────────────────────────────────
+  const [headlineFadedOut, setHeadlineFadedOut] = useState(false);
+  const [displayedHeadline, setDisplayedHeadline] = useState<string | null>(null);
+  const prevIsStreamingRef = useRef(isStreaming);
+  const paragraphsRef = useRef(paragraphs);
+  const headlineRef = useRef(headline);
+
+  useEffect(() => { paragraphsRef.current = paragraphs; }, [paragraphs]);
+  useEffect(() => { headlineRef.current = headline; }, [headline]);
+
+  useEffect(() => {
+    const wasStreaming = prevIsStreamingRef.current;
+    prevIsStreamingRef.current = isStreaming;
+
+    if (isStreaming) {
+      // New fetch cycle — reset so next settle can crossfade
+      setDisplayedHeadline(null);
+      setHeadlineFadedOut(false);
+    } else if (wasStreaming && paragraphsRef.current[0]) {
+      const match = paragraphsRef.current[0].match(/^[^.!?]*[.!?]/);
+      const newText = (match ? match[0] : paragraphsRef.current[0]).trim();
+      if (newText !== headlineRef.current) {
+        setHeadlineFadedOut(true);
+        const timer = setTimeout(() => {
+          setDisplayedHeadline(newText);
+          setHeadlineFadedOut(false);
+        }, 150);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isStreaming]);
+  // ────────────────────────────────────────────────────────────────────────
 
   if (conceptStage === "product") {
     return (
@@ -368,6 +452,9 @@ function ConceptDecisionRail({
         productStrategicImplication={productStrategicImplication}
         productStructure={productStructure}
         hasSelectedProductPiece={hasSelectedProductPiece}
+        pieceStreamingTitle={pieceStreamingTitle}
+        pieceStreamingBody={pieceStreamingBody}
+        isPieceStreaming={isPieceStreaming}
       />
     );
   }
@@ -401,44 +488,68 @@ function ConceptDecisionRail({
   const settledParagraphs = leadBody ? [leadBody, ...paragraphs.slice(1)] : paragraphs.slice(1);
 
   if (conceptStage === "language") {
-    const rows = languageRead
+    const settledRows = languageRead
       ? [
           { label: "Silhouette", value: languageRead.silhouette_steer },
           { label: "Palette", value: languageRead.palette_steer },
           { label: "Signals", value: languageRead.signals_note },
         ]
       : [];
+    const streamingRowList = isLanguageStreaming && languageStreamingRows
+      ? [
+          { label: "Silhouette", value: languageStreamingRows.silhouette },
+          { label: "Palette", value: languageStreamingRows.palette },
+          { label: "Signals", value: languageStreamingRows.signals },
+        ]
+      : [];
+    const displayRows = settledRows.length > 0 ? settledRows : streamingRowList;
+    const displayHeadline = isLanguageStreaming && languageStreamingText ? languageStreamingText : headline;
+    const isCursorOnHeadline = isLanguageStreaming && !!languageStreamingText && streamingRowList.every(r => !r.value);
 
     return (
       <div style={{ marginBottom: 52 }}>
+        {isLanguageStreaming && (
+          <style>{`@keyframes mukoCursorBlink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
+        )}
         <div style={{ marginBottom: 34 }}>
           <div style={{ ...zoneLabel, marginBottom: 10 }}>{zoneOneLabel.toUpperCase()}</div>
           <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, lineHeight: 1.18, color: "#43432B", width: "100%" }}>
-            {headline}
+            {displayHeadline}
+            {isCursorOnHeadline && (
+              <span style={{ display: "inline-block", width: 2, height: "0.85em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
+            )}
           </div>
         </div>
 
-        {rows.length > 0 && (
+        {displayRows.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {rows.map((row) => (
-              <div
-                key={row.label}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "110px minmax(0, 1fr)",
-                  gap: 10,
-                  paddingBottom: 14,
-                  borderBottom: "1px solid rgba(67,67,43,0.08)",
-                }}
-              >
-                <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "#B8876B", paddingTop: 2 }}>
-                  {row.label}
+            {displayRows.map((row, idx) => {
+              const isLastRow = idx === displayRows.length - 1;
+              const isStreaming = isLanguageStreaming;
+              const isActiveStreamRow = isStreaming && !!row.value && streamingRowList.slice(idx + 1).every(r => !r.value);
+              return (
+                <div
+                  key={row.label}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "110px minmax(0, 1fr)",
+                    gap: 10,
+                    paddingBottom: 14,
+                    borderBottom: isLastRow ? "none" : "1px solid rgba(67,67,43,0.08)",
+                  }}
+                >
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "#B8876B", paddingTop: 2 }}>
+                    {row.label}
+                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 12.5, lineHeight: 1.74, color: "rgba(67,67,43,0.68)" }}>
+                    {row.value}
+                    {isActiveStreamRow && (
+                      <span style={{ display: "inline-block", width: 2, height: "0.85em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
+                    )}
+                  </div>
                 </div>
-                <div style={{ fontFamily: inter, fontSize: 12.5, lineHeight: 1.74, color: "rgba(67,67,43,0.68)" }}>
-                  {row.value}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -456,7 +567,7 @@ function ConceptDecisionRail({
         <div style={{ ...zoneLabel, marginBottom: 10 }}>{zoneOneLabel.toUpperCase()}</div>
 
         {/* Guidance statement */}
-        <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, lineHeight: 1.18, color: "#43432B", width: "100%" }}>
+        <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, lineHeight: 1.18, color: "#43432B", width: "100%", opacity: headlineFadedOut ? 0 : 1, transition: headlineFadedOut ? "opacity 150ms ease-out" : "opacity 250ms ease-in" }}>
           {isStreaming && streamingText ? (
             <>
               {streamingText}
@@ -465,7 +576,9 @@ function ConceptDecisionRail({
           ) : isStreaming ? (
             <span style={{ opacity: 0.35, animation: "mukoCardPulse 1.2s ease-in-out infinite" }}>{headline}</span>
           ) : (
-            leadInsight
+            (displayedHeadline && displayedHeadline !== headlineRef.current)
+              ? displayedHeadline
+              : leadInsight
           )}
         </div>
       </div>
@@ -490,6 +603,12 @@ function ConceptDecisionRail({
             }}
             paragraphSpacing={12}
           />
+
+          {showBrandContextLabel && (
+            <div style={{ marginTop: 8, fontFamily: inter, fontSize: 11, color: "#9C9690" }}>
+              Shaped by your brand context
+            </div>
+          )}
 
           {bullets.items.length > 0 && (
             <div style={{ marginTop: 18 }}>
@@ -561,6 +680,12 @@ export function MukoInsightSection({
   streamingText = '',
   streamingParagraph = '',
   isParagraphStreaming = false,
+  languageStreamingText = '',
+  languageStreamingRows,
+  isLanguageStreaming = false,
+  pieceStreamingTitle = '',
+  pieceStreamingBody = '',
+  isPieceStreaming = false,
   pageMode,
   onContinue,
   canContinue,
@@ -570,6 +695,7 @@ export function MukoInsightSection({
   productStrategicImplication,
   productStructure,
   hasSelectedProductPiece,
+  showBrandContextLabel,
 }: MukoInsightSectionProps) {
   const [dlExpanded, setDlExpanded] = useState(true);
   const [bulletsExpanded, setBulletsExpanded] = useState(true);
@@ -606,6 +732,12 @@ export function MukoInsightSection({
         streamingText={streamingText}
         streamingParagraph={streamingParagraph}
         isParagraphStreaming={isParagraphStreaming}
+        languageStreamingText={languageStreamingText}
+        languageStreamingRows={languageStreamingRows}
+        isLanguageStreaming={isLanguageStreaming}
+        pieceStreamingTitle={pieceStreamingTitle}
+        pieceStreamingBody={pieceStreamingBody}
+        isPieceStreaming={isPieceStreaming}
         recommendedKeyPieces={nmProps?.recommendedKeyPieces ?? []}
         selectedAnchorPiece={nmProps?.selectedAnchorPiece}
         onSelectAnchorPiece={nmProps?.onSelectAnchorPiece}
@@ -621,6 +753,7 @@ export function MukoInsightSection({
         productStrategicImplication={productStrategicImplication}
         productStructure={productStructure}
         hasSelectedProductPiece={hasSelectedProductPiece}
+        showBrandContextLabel={showBrandContextLabel}
       />
     );
   }

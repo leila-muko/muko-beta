@@ -765,7 +765,8 @@ export default function SpecStudioPage() {
   const router = useRouter();
   const previousMaterialIdRef = useRef<string | null>(null);
   const materialDeltaTimeoutRef = useRef<number | null>(null);
-  const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setParentAnalysisId } = useSessionStore();
+  const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId } = useSessionStore();
+  // parent_analysis_id — deferred to Phase 2
   const categories: Category[] = categoriesData.categories as unknown as Category[];
   const materials: Material[] = materialsData as unknown as Material[];
   const allSubcategories = subcategoriesData as Record<string, SubcategoryEntry[]>;
@@ -1603,6 +1604,7 @@ export default function SpecStudioPage() {
 
   // ─── Synthesizer: reactive MUKO INSIGHT (streaming) ──────────────────────
   const specAbortRef = useRef<AbortController | null>(null);
+  const reportAbortRef = useRef<AbortController | null>(null);
   const specRawJsonRef = useRef<string>('');
   const [specSynthInsightData, setSpecSynthInsightData] = useState<InsightData | null>(null);
   const [specInsightLoading, setSpecInsightLoading] = useState(false);
@@ -1745,10 +1747,13 @@ export default function SpecStudioPage() {
 
                     if (reportBlackboard) {
                       try {
+                        reportAbortRef.current?.abort();
+                        reportAbortRef.current = new AbortController();
                         const reportResponse = await fetch('/api/synthesizer/report', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify(reportBlackboard),
+                          signal: reportAbortRef.current.signal,
                         });
 
                         if (reportResponse.ok) {
@@ -1759,6 +1764,7 @@ export default function SpecStudioPage() {
                           }
                         }
                       } catch (err) {
+                        if ((err as Error)?.name === 'AbortError') return;
                         console.error('[Spec] Report narrative synthesis failed:', err);
                       }
                     }
@@ -1897,6 +1903,7 @@ export default function SpecStudioPage() {
     return () => {
       window.clearTimeout(timer);
       controller.abort();
+      reportAbortRef.current?.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [materialId, constructionTier, categoryId, targetMSRP, userManuallySelected]);

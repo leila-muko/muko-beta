@@ -43,6 +43,9 @@ export default function EntryScreen() {
   const [touchedSeason, setTouchedSeason] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [savedCollections, setSavedCollections] = useState<RecentCollectionItem[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [hoveredCollection, setHoveredCollection] = useState<string | null>(null);
+  const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
 
   const recentCollections = useMemo(() => {
     const names = new Set<string>();
@@ -69,25 +72,9 @@ export default function EntryScreen() {
     setSelectedSeason('fw26');
     setTouchedName(false);
     setTouchedSeason(false);
-    setStoreCollectionName('');
-    setActiveCollection(null);
-    useSessionStore.setState({
-      aestheticInput: '',
-      aestheticMatchedId: null,
-      collectionAesthetic: null,
-      aestheticInflection: null,
-      directionInterpretationText: '',
-      directionInterpretationModifiers: [],
-      directionInterpretationChips: [],
-      identityPulse: null,
-      resonancePulse: null,
-      conceptLocked: false,
-      chipSelection: null,
-      customChips: {},
-      conceptSilhouette: '',
-      conceptPalette: null,
-      isProxyMatch: false,
-    });
+    const { assortmentInsightCache } = useSessionStore.getState();
+    useSessionStore.getState().resetSession();
+    useSessionStore.setState({ activeCollection: null, assortmentInsightCache });
     try {
       window.localStorage.removeItem('muko_collectionName');
       window.localStorage.removeItem('muko_seasonLabel');
@@ -124,6 +111,7 @@ export default function EntryScreen() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || cancelled) return;
+      setUserId(user.id);
 
       const { data } = await supabase
         .from('analyses')
@@ -168,6 +156,17 @@ export default function EntryScreen() {
       window.localStorage.setItem('muko_collectionName', name);
     } catch {}
     router.push('/collections');
+  };
+
+  const handleDeleteCollection = async (name: string) => {
+    if (!userId) return;
+    setMenuOpenFor(null);
+    const supabase = createClient();
+    await supabase.from('analyses').delete().eq('user_id', userId).eq('collection_name', name);
+    setSavedCollections((prev) => prev.filter((c) => c.name !== name));
+    if (collectionName.trim() === name) {
+      setCollectionName('');
+    }
   };
 
   const handleContinue = () => {
@@ -267,35 +266,115 @@ export default function EntryScreen() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {recentCollections.length > 0 ? (
-              recentCollections.map((collection) => (
-                <button
-                  key={collection.id}
-                  onClick={() => handleOpenCollection(collection.name)}
-                  style={{
-                    textAlign: 'left',
-                    fontSize: 13,
-                    color: 'rgba(67,67,43,0.58)',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    padding: '9px 12px',
-                    cursor: 'pointer',
-                    fontFamily: inter,
-                    fontWeight: 500,
-                    borderRadius: 8,
-                    transition: 'all 160ms ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(67,67,43,0.04)';
-                    e.currentTarget.style.color = OLIVE;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = 'rgba(67,67,43,0.58)';
-                  }}
-                >
-                  {collection.name}
-                </button>
-              ))
+              recentCollections.map((collection) => {
+                const isHovered = hoveredCollection === collection.id;
+                const isMenuOpen = menuOpenFor === collection.id;
+
+                return (
+                  <div
+                    key={collection.id}
+                    style={{ position: 'relative' }}
+                    onMouseEnter={() => setHoveredCollection(collection.id)}
+                    onMouseLeave={() => { setHoveredCollection(null); if (!isMenuOpen) setMenuOpenFor(null); }}
+                  >
+                    <button
+                      onClick={() => { setMenuOpenFor(null); handleOpenCollection(collection.name); }}
+                      style={{
+                        textAlign: 'left',
+                        fontSize: 13,
+                        color: isHovered ? OLIVE : 'rgba(67,67,43,0.58)',
+                        backgroundColor: isHovered ? 'rgba(67,67,43,0.04)' : 'transparent',
+                        border: 'none',
+                        padding: '9px 12px',
+                        paddingRight: 36,
+                        cursor: 'pointer',
+                        fontFamily: inter,
+                        fontWeight: 500,
+                        borderRadius: 8,
+                        transition: 'all 160ms ease',
+                        width: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {collection.name}
+                    </button>
+
+                    {/* Ellipsis button — appears on hover */}
+                    {(isHovered || isMenuOpen) && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setMenuOpenFor(isMenuOpen ? null : collection.id); }}
+                        style={{
+                          position: 'absolute',
+                          right: 8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: 22,
+                          height: 22,
+                          borderRadius: 5,
+                          background: 'rgba(255,255,255,0.9)',
+                          border: '0.5px solid rgba(67,67,43,0.14)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 12,
+                          color: 'rgba(67,67,43,0.55)',
+                          letterSpacing: '0.04em',
+                          lineHeight: 1,
+                          padding: 0,
+                          zIndex: 2,
+                        }}
+                        title="More options"
+                      >
+                        ···
+                      </button>
+                    )}
+
+                    {/* Delete popover */}
+                    {isMenuOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          right: 0,
+                          background: '#FFFFFF',
+                          border: '1px solid rgba(67,67,43,0.1)',
+                          borderRadius: 8,
+                          boxShadow: '0 6px 20px rgba(25,25,25,0.1)',
+                          zIndex: 30,
+                          overflow: 'hidden',
+                          minWidth: 160,
+                          marginTop: 4,
+                        }}
+                      >
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteCollection(collection.name); }}
+                          style={{
+                            display: 'block',
+                            width: '100%',
+                            padding: '10px 14px',
+                            textAlign: 'left',
+                            fontFamily: inter,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            color: '#C47B6B',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            transition: 'background 120ms ease',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#FAF0EF'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          Delete collection
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             ) : (
               <div
                 style={{

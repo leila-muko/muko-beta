@@ -51,6 +51,7 @@ interface CollectionPageProps {
   season: string | null;
   userId: string;
   onNewPiece: () => void;
+  onPieceDeleted?: () => void;
 }
 
 function normalizeToken(value: string | null | undefined) {
@@ -487,7 +488,10 @@ function Toast({ message }: { message: string }) {
   );
 }
 
-function PieceCard({ analysis, onClick }: { analysis: AnalysisRow; onClick: () => void }) {
+function PieceCard({ analysis, onClick, onDelete }: { analysis: AnalysisRow; onClick: () => void; onDelete: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const pieceName = analysis.agent_versions?.saved_piece_name?.trim() ?? '';
   const score = getScore(analysis);
   const storedPieceImage = parseSelectedPieceImage(analysis.agent_versions?.selected_piece_image);
@@ -502,154 +506,224 @@ function PieceCard({ analysis, onClick }: { analysis: AnalysisRow; onClick: () =
   const scoreColor = score >= 80 ? '#A8B475' : '#B8876B';
 
   return (
-    <button
-      onClick={onClick}
-      style={{
-        appearance: 'none',
-        WebkitAppearance: 'none',
-        display: 'block',
-        width: '100%',
-        background: 'transparent',
-        border: '1px solid #E8E3D6',
-        borderRadius: 10,
-        overflow: 'hidden',
-        cursor: 'pointer',
-        boxShadow: 'none',
-        padding: 0,
-        textAlign: 'left',
-        fontFamily: inter,
-        transition: 'box-shadow 180ms ease',
-      }}
-      onMouseEnter={(event) => {
-        event.currentTarget.style.boxShadow = '0 4px 16px rgba(25,25,25,0.07)';
-      }}
-      onMouseLeave={(event) => {
-        event.currentTarget.style.boxShadow = 'none';
-      }}
+    <div
+      style={{ position: 'relative' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setMenuOpen(false); }}
     >
-      {/* Visual zone */}
-      <div
+      <button
+        onClick={onClick}
         style={{
+          appearance: 'none',
+          WebkitAppearance: 'none',
+          display: 'block',
           width: '100%',
-          height: 120,
-          background: '#F9F7F4',
-          borderTopLeftRadius: 9,
-          borderTopRightRadius: 9,
-          position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          background: 'transparent',
+          border: '1px solid #E8E3D6',
+          borderRadius: 10,
+          overflow: 'hidden',
+          cursor: 'pointer',
+          boxShadow: hovered ? '0 4px 16px rgba(25,25,25,0.07)' : 'none',
+          padding: 0,
+          textAlign: 'left',
+          fontFamily: inter,
+          transition: 'box-shadow 180ms ease',
         }}
       >
-        {flat ? (
-          <div style={{ height: '100%', width: 'auto' }}>
-            <flat.Flat color={flat.color} />
-          </div>
-        ) : (
-          <PlaceholderFlat />
-        )}
-
-        <span
-          style={{
-            position: 'absolute',
-            top: 8,
-            left: 8,
-            background: '#FFFFFF',
-            border: '0.5px solid #E8E3D6',
-            borderRadius: 20,
-            padding: '3px 10px',
-            fontSize: 12,
-            fontWeight: 500,
-            color: scoreColor,
-            lineHeight: 1,
-          }}
-        >
-          {score}
-        </span>
-      </div>
-
-      {/* Body zone */}
-      <div
-        style={{
-          padding: '10px 12px 14px',
-          background: '#FFFFFF',
-          borderBottomLeftRadius: 9,
-          borderBottomRightRadius: 9,
-        }}
-      >
+        {/* Visual zone */}
         <div
           style={{
+            width: '100%',
+            height: 120,
+            background: '#F9F7F4',
+            borderTopLeftRadius: 9,
+            borderTopRightRadius: 9,
+            position: 'relative',
             display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: 8,
-            marginBottom: 8,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {flat ? (
+            <div style={{ height: '100%', width: 'auto' }}>
+              <flat.Flat color={flat.color} />
+            </div>
+          ) : (
+            <PlaceholderFlat />
+          )}
+
+          <span
+            style={{
+              position: 'absolute',
+              top: 8,
+              left: 8,
+              background: '#FFFFFF',
+              border: '0.5px solid #E8E3D6',
+              borderRadius: 20,
+              padding: '3px 10px',
+              fontSize: 12,
+              fontWeight: 500,
+              color: scoreColor,
+              lineHeight: 1,
+            }}
+          >
+            {score}
+          </span>
+        </div>
+
+        {/* Body zone */}
+        <div
+          style={{
+            padding: '10px 12px 14px',
+            background: '#FFFFFF',
+            borderBottomLeftRadius: 9,
+            borderBottomRightRadius: 9,
           }}
         >
           <div
             style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: pieceName ? '#191919' : '#A8A09A',
-              fontStyle: pieceName ? 'normal' : 'italic',
-              lineHeight: 1.4,
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 8,
+              marginBottom: 8,
             }}
           >
-            {pieceName || 'Unnamed Piece'}
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                color: pieceName ? '#191919' : '#A8A09A',
+                fontStyle: pieceName ? 'normal' : 'italic',
+                lineHeight: 1.4,
+              }}
+            >
+              {pieceName || 'Unnamed Piece'}
+            </div>
+
+            <span
+              style={{
+                ...getRoleBadgeStyles(role),
+                fontSize: 9,
+                fontWeight: 500,
+                letterSpacing: '0.07em',
+                textTransform: 'uppercase',
+                borderRadius: 20,
+                padding: '2px 8px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                lineHeight: 1.6,
+              }}
+            >
+              {roleLabel}
+            </span>
           </div>
 
-          <span
-            style={{
-              ...getRoleBadgeStyles(role),
-              fontSize: 9,
-              fontWeight: 500,
-              letterSpacing: '0.07em',
-              textTransform: 'uppercase',
-              borderRadius: 20,
-              padding: '2px 8px',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              lineHeight: 1.6,
-            }}
-          >
-            {roleLabel}
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 500,
-              background: '#F5F1EA',
-              color: '#A8A09A',
-              borderRadius: 20,
-              padding: '2px 7px',
-              lineHeight: 1.5,
-            }}
-          >
-            {aestheticLabel}
-          </span>
-
-          {[materialLabel, complexityLabel].map((tag) => (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             <span
-              key={tag}
               style={{
                 fontSize: 10,
-                fontWeight: 400,
-                border: '0.5px solid #E8E3D6',
-                color: '#C8BFB8',
+                fontWeight: 500,
+                background: '#F5F1EA',
+                color: '#A8A09A',
                 borderRadius: 20,
                 padding: '2px 7px',
                 lineHeight: 1.5,
               }}
             >
-              {tag}
+              {aestheticLabel}
             </span>
-          ))}
+
+            {[materialLabel, complexityLabel].map((tag) => (
+              <span
+                key={tag}
+                style={{
+                  fontSize: 10,
+                  fontWeight: 400,
+                  border: '0.5px solid #E8E3D6',
+                  color: '#C8BFB8',
+                  borderRadius: 20,
+                  padding: '2px 7px',
+                  lineHeight: 1.5,
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
-    </button>
+      </button>
+
+      {/* Ellipsis button — appears on hover */}
+      {(hovered || menuOpen) && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setMenuOpen((prev) => !prev); }}
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            width: 24,
+            height: 24,
+            borderRadius: 6,
+            background: 'rgba(255,255,255,0.92)',
+            border: '0.5px solid rgba(67,67,43,0.14)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 13,
+            color: 'rgba(67,67,43,0.55)',
+            zIndex: 2,
+            letterSpacing: '0.04em',
+            lineHeight: 1,
+            padding: 0,
+          }}
+          title="More options"
+        >
+          ···
+        </button>
+      )}
+
+      {/* Delete popover */}
+      {menuOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 36,
+            right: 8,
+            background: '#FFFFFF',
+            border: '1px solid rgba(67,67,43,0.1)',
+            borderRadius: 8,
+            boxShadow: '0 6px 20px rgba(25,25,25,0.1)',
+            zIndex: 20,
+            overflow: 'hidden',
+            minWidth: 140,
+          }}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); setMenuOpen(false); }}
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '10px 14px',
+              textAlign: 'left',
+              fontFamily: inter,
+              fontSize: 13,
+              fontWeight: 500,
+              color: '#C47B6B',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'background 120ms ease',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#FAF0EF'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            Delete piece
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -658,6 +732,7 @@ export default function CollectionPage({
   season,
   userId,
   onNewPiece,
+  onPieceDeleted,
 }: CollectionPageProps) {
   const router = useRouter();
   const setActiveCollection = useSessionStore((state) => state.setActiveCollection);
@@ -705,6 +780,14 @@ export default function CollectionPage({
 
     return () => window.clearTimeout(timeoutId);
   }, [toastMessage]);
+
+  const handleDeletePiece = async (id: string) => {
+    const supabase = createClient();
+    await supabase.from('analyses').delete().eq('id', id);
+    setAnalyses((prev) => prev.filter((a) => a.id !== id));
+    onPieceDeleted?.();
+    setToastMessage('Piece removed from collection');
+  };
 
   const collectionHealth = useMemo(() => getCollectionHealthMetrics(analyses), [analyses]);
 
@@ -880,6 +963,7 @@ export default function CollectionPage({
                   key={analysis.id}
                   analysis={analysis}
                   onClick={() => router.push('/spec')}
+                  onDelete={() => handleDeletePiece(analysis.id)}
                 />
               ))
             )}

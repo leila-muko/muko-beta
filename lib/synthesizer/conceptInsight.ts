@@ -56,6 +56,8 @@ export interface ConceptBlackboard {
   intent?: IntentCalibration;
   /** Key pieces identified for this aesthetic direction */
   key_pieces?: Array<{ item: string; type?: string; signal?: string }>;
+  /** Chip labels actively selected by the designer in Concept Studio */
+  chip_selection?: string[];
   /** Collection context for collection-aware Decision Guidance */
   collection_context?: {
     aesthetic_inflection?: string | null;
@@ -1115,6 +1117,7 @@ export function buildConceptPrompt(bb: ConceptBlackboard): string {
       matched_id: bb.aesthetic_matched_id,
       key_pieces: bb.key_pieces ?? [],
       available_execution_levers: getAestheticChipLabels(bb.aesthetic_matched_id),
+      selected_chips: bb.chip_selection ?? [],
       saturation_score: bb.aesthetic_context.saturation_score ?? 0,
       saturation_basis: bb.aesthetic_context.saturation_basis ?? undefined,
       trend_velocity: bb.aesthetic_context.trend_velocity ?? 'unknown',
@@ -1137,7 +1140,13 @@ export function buildConceptPrompt(bb: ConceptBlackboard): string {
         }
       : undefined,
   };
-  return JSON.stringify(sanitizePayload(raw as Record<string, unknown>));
+  const json = JSON.stringify(sanitizePayload(raw as Record<string, unknown>));
+  const chips = bb.chip_selection ?? [];
+  if (chips.length > 0) {
+    const chipNames = chips.join(', ');
+    return `${json}\n\nReference the specific signals selected by the designer by name: ${chipNames}. Weave these directly into your analysis rather than speaking generically about aesthetic direction.`;
+  }
+  return json;
 }
 
 export function buildConceptLanguagePrompt(input: {

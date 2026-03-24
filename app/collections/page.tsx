@@ -24,6 +24,8 @@ export default function CollectionsHubPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [collections, setCollections] = useState<CollectionGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hoveredCollection, setHoveredCollection] = useState<string | null>(null);
+  const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
 
   const loadCollections = useCallback(async (uid: string) => {
     const supabase = createClient();
@@ -94,25 +96,9 @@ export default function CollectionsHubPage() {
   }, [activeCollection, collections]);
 
   const handleStartCollection = useCallback(() => {
-    setActiveCollection(null);
-    useSessionStore.getState().setCollectionName('');
-    useSessionStore.setState({
-      aestheticInput: '',
-      aestheticMatchedId: null,
-      collectionAesthetic: null,
-      aestheticInflection: null,
-      directionInterpretationText: '',
-      directionInterpretationModifiers: [],
-      directionInterpretationChips: [],
-      identityPulse: null,
-      resonancePulse: null,
-      conceptLocked: false,
-      chipSelection: null,
-      customChips: {},
-      conceptSilhouette: '',
-      conceptPalette: null,
-      isProxyMatch: false,
-    });
+    const { assortmentInsightCache } = useSessionStore.getState();
+    useSessionStore.getState().resetSession();
+    useSessionStore.setState({ activeCollection: null, assortmentInsightCache });
     try {
       localStorage.removeItem('muko_collectionName');
       localStorage.removeItem('muko_seasonLabel');
@@ -121,7 +107,7 @@ export default function CollectionsHubPage() {
       localStorage.removeItem('muko_intent');
     } catch {}
     router.push('/entry');
-  }, [router, setActiveCollection]);
+  }, [router]);
 
   const handleNewPiece = useCallback(() => {
     if (activeCollection) {
@@ -140,6 +126,17 @@ export default function CollectionsHubPage() {
     setCurrentStep(2);
     router.push('/concept');
   }, [activeCollection, collections, router, setCurrentStep]);
+
+  const handleDeleteCollection = useCallback(async (name: string) => {
+    if (!userId) return;
+    setMenuOpenFor(null);
+    const supabase = createClient();
+    await supabase.from('analyses').delete().eq('user_id', userId).eq('collection_name', name);
+    setCollections((prev) => prev.filter((c) => c.name !== name));
+    if (activeCollection === name) {
+      setActiveCollection(null);
+    }
+  }, [userId, activeCollection, setActiveCollection]);
 
   const activeCollectionMeta = collections.find((collection) => collection.name === activeCollection) ?? null;
 
@@ -234,38 +231,113 @@ export default function CollectionsHubPage() {
             ) : (
               collections.map((collection) => {
                 const isActive = activeCollection === collection.name;
+                const isHovered = hoveredCollection === collection.name;
+                const isMenuOpen = menuOpenFor === collection.name;
 
                 return (
-                  <button
+                  <div
                     key={collection.name}
-                    onClick={() => setActiveCollection(collection.name)}
-                    style={{
-                      textAlign: 'left',
-                      fontSize: 13,
-                      color: isActive ? '#191919' : '#A8A09A',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      borderLeft: isActive ? '3px solid #A8B475' : '3px solid transparent',
-                      padding: '9px 12px',
-                      cursor: 'pointer',
-                      fontFamily: inter,
-                      fontWeight: 500,
-                      borderRadius: 8,
-                      transition: 'all 160ms ease',
-                    }}
-                    onMouseEnter={(event) => {
-                      if (isActive) return;
-                      event.currentTarget.style.backgroundColor = 'rgba(67,67,43,0.04)';
-                      event.currentTarget.style.color = OLIVE;
-                    }}
-                    onMouseLeave={(event) => {
-                      if (isActive) return;
-                      event.currentTarget.style.backgroundColor = 'transparent';
-                      event.currentTarget.style.color = '#A8A09A';
-                    }}
+                    style={{ position: 'relative' }}
+                    onMouseEnter={() => setHoveredCollection(collection.name)}
+                    onMouseLeave={() => { setHoveredCollection(null); if (!isMenuOpen) setMenuOpenFor(null); }}
                   >
-                    {collection.name}
-                  </button>
+                    <button
+                      onClick={() => { setMenuOpenFor(null); setActiveCollection(collection.name); }}
+                      style={{
+                        textAlign: 'left',
+                        fontSize: 13,
+                        color: isActive ? '#191919' : (isHovered ? OLIVE : '#A8A09A'),
+                        backgroundColor: isActive ? 'transparent' : (isHovered ? 'rgba(67,67,43,0.04)' : 'transparent'),
+                        border: 'none',
+                        borderLeft: isActive ? '3px solid #A8B475' : '3px solid transparent',
+                        padding: '9px 12px',
+                        paddingRight: 36,
+                        cursor: 'pointer',
+                        fontFamily: inter,
+                        fontWeight: 500,
+                        borderRadius: 8,
+                        transition: 'all 160ms ease',
+                        width: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {collection.name}
+                    </button>
+
+                    {/* Ellipsis button — appears on hover */}
+                    {(isHovered || isMenuOpen) && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setMenuOpenFor(isMenuOpen ? null : collection.name); }}
+                        style={{
+                          position: 'absolute',
+                          right: 8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: 22,
+                          height: 22,
+                          borderRadius: 5,
+                          background: 'rgba(255,255,255,0.9)',
+                          border: '0.5px solid rgba(67,67,43,0.14)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 12,
+                          color: 'rgba(67,67,43,0.55)',
+                          letterSpacing: '0.04em',
+                          lineHeight: 1,
+                          padding: 0,
+                          zIndex: 2,
+                        }}
+                        title="More options"
+                      >
+                        ···
+                      </button>
+                    )}
+
+                    {/* Delete popover */}
+                    {isMenuOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          right: 0,
+                          background: '#FFFFFF',
+                          border: '1px solid rgba(67,67,43,0.1)',
+                          borderRadius: 8,
+                          boxShadow: '0 6px 20px rgba(25,25,25,0.1)',
+                          zIndex: 30,
+                          overflow: 'hidden',
+                          minWidth: 160,
+                          marginTop: 4,
+                        }}
+                      >
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteCollection(collection.name); }}
+                          style={{
+                            display: 'block',
+                            width: '100%',
+                            padding: '10px 14px',
+                            textAlign: 'left',
+                            fontFamily: inter,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            color: '#C47B6B',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            transition: 'background 120ms ease',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#FAF0EF'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          Delete collection
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 );
               })
             )}
@@ -288,6 +360,7 @@ export default function CollectionsHubPage() {
             season={activeCollectionMeta?.season ?? null}
             userId={userId}
             onNewPiece={handleNewPiece}
+            onPieceDeleted={() => loadCollections(userId)}
           />
         ) : (
           <EmptyState onStart={handleStartCollection} />

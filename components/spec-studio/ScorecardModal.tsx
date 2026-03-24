@@ -103,7 +103,7 @@ function buildAlternatives(
   if (conflictType === "identity_misalignment" || conflictType === "execution_complexity" || conflictType === "none") {
     return [];
   }
-  if (!currentMaterial?.redirect_compatible) return [];
+  if (!currentMaterial || !currentMaterial.redirect_compatible) return [];
 
   const isFW = /fw|fall|autumn/i.test(season);
   const deliveryWindow = isFW ? DELIVERY_WINDOW_FW : DELIVERY_WINDOW_SS;
@@ -113,15 +113,59 @@ function buildAlternatives(
     .map((id) => allMaterials.find((mat) => mat.id === id))
     .filter((m): m is MaterialEntry => m !== null);
 
+  // Build a trade-off label for each candidate describing what it resolves + secondary trade-offs
+  function buildTradeoffNote(m: MaterialEntry): string {
+    const parts: string[] = [];
+    const currentAesthetics = new Set(currentMaterial?.typical_aesthetics ?? []);
+    const sharedAesthetics = (m.typical_aesthetics ?? []).filter((a) => currentAesthetics.has(a)).length;
+
+    if (conflictType === "execution_timeline") {
+      const newRequired = complexityW + m.lead_time_weeks;
+      if (newRequired <= deliveryWindow) {
+        parts.push("Resolves lead time");
+      } else {
+        const weeksSaved = (currentMaterial?.lead_time_weeks ?? 0) - m.lead_time_weeks;
+        parts.push(`Reduces by ${weeksSaved} wk${weeksSaved !== 1 ? "s" : ""}`);
+      }
+      if (m.cost_per_yard < (currentMaterial?.cost_per_yard ?? Infinity)) {
+        parts.push("margin improves");
+      } else if (m.cost_per_yard > (currentMaterial?.cost_per_yard ?? -Infinity)) {
+        parts.push("cost increases");
+      }
+      if ((m.typical_aesthetics?.length ?? 0) > 0) {
+        if (sharedAesthetics === 0) {
+          parts.push("aesthetic trade-off");
+        } else if (sharedAesthetics < 2) {
+          parts.push("slight aesthetic trade-off");
+        }
+      }
+    } else if (conflictType === "cost_gate") {
+      const saving = ((currentMaterial?.cost_per_yard ?? 0) - m.cost_per_yard) * ESTIMATED_YARDAGE;
+      if (saving >= cogsGap) {
+        parts.push("Resolves margin gap");
+      } else {
+        parts.push(`Saves $${Math.round(saving)}`);
+      }
+      if (m.lead_time_weeks < (currentMaterial?.lead_time_weeks ?? Infinity)) {
+        parts.push("lead time improves");
+      } else if (m.lead_time_weeks > (currentMaterial?.lead_time_weeks ?? -Infinity)) {
+        parts.push("longer lead time");
+      }
+      if ((m.typical_aesthetics?.length ?? 0) > 0 && sharedAesthetics === 0) {
+        parts.push("aesthetic trade-off");
+      }
+    }
+
+    return parts.join(" · ");
+  }
+
+  // Relaxed filter: primary constraint must improve (does not need to fully resolve)
   const filtered = candidates.filter((m) => {
     if (conflictType === "execution_timeline") {
-      // Must fully fit within the delivery window — no partial fixes
-      return complexityW + m.lead_time_weeks <= deliveryWindow;
+      return m.lead_time_weeks < currentMaterial.lead_time_weeks;
     }
     if (conflictType === "cost_gate") {
-      // Saving must fully close the COGS gap
-      const saving = (currentMaterial.cost_per_yard - m.cost_per_yard) * ESTIMATED_YARDAGE;
-      return saving >= cogsGap && m.cost_per_yard < currentMaterial.cost_per_yard;
+      return m.cost_per_yard < currentMaterial.cost_per_yard;
     }
     return false;
   });
@@ -140,6 +184,7 @@ function buildAlternatives(
     saving_vs_selected: Math.round(currentMaterial.cost_per_yard - m.cost_per_yard),
     lead_reduction_weeks: currentMaterial.lead_time_weeks - m.lead_time_weeks,
     aesthetic_note: m.typical_aesthetics?.slice(0, 2).join(", ") ?? "",
+    tradeoff_note: buildTradeoffNote(m),
   }));
 }
 
@@ -225,6 +270,7 @@ export function ScorecardModal({
     setSavedAnalysisId,
     setCurrentStep,
     aestheticInput,
+    aestheticMatchedId,
     materialId,
     category,
     season,
@@ -254,6 +300,7 @@ export function ScorecardModal({
   const [actionSuggestion, setActionSuggestion] = useState<ActionSuggestion | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [hasConflict, setHasConflict] = useState(false);
+  const [conflictTypeState, setConflictTypeState] = useState<ConflictType>("none");
 
   const animatedScore = useCountUp(mukoScore);
 
@@ -304,6 +351,8 @@ export function ScorecardModal({
       constructionTier,
       season || ""
     );
+
+    setConflictTypeState(conflictType);
 
     if (conflictType === "none") {
       // Clean piece — use static fallback, no LLM call
@@ -359,9 +408,13 @@ export function ScorecardModal({
         .then((r) => r.json())
         .then((json: ActionSuggestion & { error?: string }) => {
           if (signal.aborted) return;
-          if (!json.error && json.directive) setActionSuggestion(json);
+          if (json.directive && typeof json.directive === 'string') {
+            setActionSuggestion(json);
+          } else {
+            setActionSuggestion(STATIC_ACTION_FALLBACK);
+          }
         })
-        .catch((err) => { if (err?.name !== "AbortError") { /* swallow — action suggestion is non-critical */ } })
+        .catch((err) => { if (err?.name !== "AbortError") { console.warn('[scorecard-action] failed:', err); } })
         .finally(() => { if (!signal.aborted) setActionLoading(false); });
     }
 
@@ -386,9 +439,10 @@ export function ScorecardModal({
         user_id: userId,
         collection_name: effectiveCollection,
         season: season || "SS27",
-        category: category || null,
+        category: category?.toLowerCase()?.trim() || null,
         target_msrp: storeTargetMsrp ?? null,
         aesthetic_input: aestheticInput || null,
+        aesthetic_matched_id: aestheticMatchedId ?? aestheticInput?.toLowerCase()?.replace(/\s+/g, '-') ?? null,
         material_id: materialId || null,
         silhouette: silhouette || null,
         construction_tier: constructionTier ?? null,
@@ -404,12 +458,7 @@ export function ScorecardModal({
         },
         collection_role: collectionRole || null,
         narrative: scorecardData?.insight ?? fallbackText ?? mukoInsight ?? '',
-        agent_versions: {
-          scorecard_modal: "v1",
-          ...(trimmedPieceName ? { saved_piece_name: trimmedPieceName } : {}),
-          ...(selectedPieceImage ? { selected_piece_image: JSON.stringify(selectedPieceImage) } : {}),
-          ...(collectionRole ? { collection_role: collectionRole } : {}),
-        },
+        agent_versions: {},
         // parent_analysis_id removed — branching deferred to Phase 2
       };
 
@@ -685,7 +734,7 @@ export function ScorecardModal({
         )}
 
         {/* ── ACTION SUGGESTION ── */}
-        {hasConflict && (actionLoading || actionSuggestion) && (
+        {hasConflict && (
           <div style={{ padding: "20px 32px", borderBottom: "1px solid rgba(67,67,43,0.09)" }}>
             {actionLoading ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -751,8 +800,36 @@ export function ScorecardModal({
                     ))}
                   </div>
                 )}
+
+                {/* Empty state: alternatives were relevant but none found even with relaxed constraints */}
+                {(conflictTypeState === "execution_timeline" || conflictTypeState === "cost_gate") &&
+                  actionSuggestion.alternatives.length === 0 && (
+                  <p
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 12,
+                      lineHeight: 1.6,
+                      color: "rgba(67,67,43,0.50)",
+                      margin: "10px 0 0",
+                    }}
+                  >
+                    No alternatives found for this combination. Consider adjusting your timeline or construction tier.
+                  </p>
+                )}
               </>
-            ) : null}
+            ) : (
+              <p
+                style={{
+                  fontFamily: inter,
+                  fontSize: 12.5,
+                  lineHeight: 1.65,
+                  color: "rgba(67,67,43,0.60)",
+                  margin: 0,
+                }}
+              >
+                We couldn&apos;t generate a suggestion right now. Try running the analysis again.
+              </p>
+            )}
           </div>
         )}
 

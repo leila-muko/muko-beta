@@ -47,6 +47,7 @@ Rules you must follow:
 - "What to watch" items: name the structural problem, not the symptom. E.g. not "complexity is high" but "development weight is sitting in too few pieces, which narrows the window for revision without cascading delays"
 - Recommendations must be actionable in the next two weeks. Nothing strategic, nothing long-term. Specific enough that the design director could hand it to a product developer today.
 - Tone: the tone of a trusted advisor in the room, not a consultant report. Sentences can be short. Directness is respect.
+- Do not reference specific piece names, garment names, or individual product details. Write only about the collection direction, aesthetic world, and creative intent.
 
 Output valid JSON only. No preamble, no explanation, no markdown fences.`;
 
@@ -73,7 +74,6 @@ function buildSynthesizerUserMessage(
   const health = report.collection_health;
 
   const piecesJson = payload.pieces.map((piece) => ({
-    piece_name: piece.piece_name ?? 'Untitled',
     category: piece.category ?? 'Unknown',
     role: piece.role ?? 'unspecified',
     material: piece.material ?? 'Unknown',
@@ -92,7 +92,7 @@ function buildSynthesizerUserMessage(
 
   const conflictsSummary = payload.pieces
     .filter((p) => p.execution_reason)
-    .map((p) => `${p.piece_name ?? 'Piece'}: ${p.execution_reason}`)
+    .map((p) => p.execution_reason)
     .join('; ') || 'None flagged';
 
   const topMaterials = report.overview.top_materials

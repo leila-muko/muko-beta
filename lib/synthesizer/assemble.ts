@@ -208,6 +208,8 @@ export interface ConceptBlackboardInput {
   collection_context?: ConceptBlackboard['collection_context'];
   /** Whether the aesthetic was a proxy/fallback match rather than exact. */
   isProxyMatch?: boolean;
+  /** Chip labels actively selected by the designer in Concept Studio */
+  chipSelection?: string[];
 }
 
 /** Returns null when aestheticSlug is missing — callers must guard. */
@@ -238,6 +240,7 @@ export function buildConceptBlackboard(
     },
     intent: input.intent,
     key_pieces: input.keyPieces,
+    chip_selection: input.chipSelection,
     collection_context: input.collection_context,
   };
 }

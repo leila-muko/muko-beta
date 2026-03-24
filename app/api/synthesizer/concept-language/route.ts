@@ -17,6 +17,10 @@ interface ConceptLanguageRequest {
   excluded_brands?: string[];
 }
 
+function sse(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
 export async function POST(req: NextRequest) {
   let body;
   try {
@@ -47,36 +51,50 @@ export async function POST(req: NextRequest) {
     excluded_brands: payload.excluded_brands ?? [],
   });
 
-  try {
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 300,
-      temperature: 0.45,
-      system: CONCEPT_LANGUAGE_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        const client = new Anthropic();
+        const anthropicStream = client.messages.stream({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 300,
+          temperature: 0.45,
+          system: CONCEPT_LANGUAGE_SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: userPrompt }],
+        });
 
-    const text = response.content
-      .filter((block) => block.type === 'text')
-      .map((block) => block.text)
-      .join('');
-    const parsed = parseConceptLanguageOutput(text);
+        let accumulated = '';
 
-    if (!parsed) {
-      return new Response(JSON.stringify({ error: 'Invalid model output' }), {
-        status: 502,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+        for await (const event of anthropicStream) {
+          if (
+            event.type === 'content_block_delta' &&
+            event.delta.type === 'text_delta'
+          ) {
+            accumulated += event.delta.text;
+            controller.enqueue(encoder.encode(sse('chunk', { text: event.delta.text })));
+          }
+        }
 
-    return new Response(JSON.stringify(parsed), {
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch {
-    return new Response(JSON.stringify({ error: 'Concept language request failed' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+        const parsed = parseConceptLanguageOutput(accumulated);
+        if (parsed) {
+          controller.enqueue(encoder.encode(sse('complete', parsed)));
+        } else {
+          controller.enqueue(encoder.encode(sse('error', { error: 'Invalid model output' })));
+        }
+      } catch {
+        controller.enqueue(encoder.encode(sse('error', { error: 'Concept language request failed' })));
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
+  });
 }
