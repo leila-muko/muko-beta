@@ -93,6 +93,12 @@ interface SessionState {
   // Intent
   intentGoals: string[];
   intentTradeoff: string;
+  successPriorities: string[];
+  targetMargin: number;
+  sliderTrend: number;
+  sliderCreative: number;
+  sliderElevated: number;
+  sliderNovelty: number;
   collectionRole: CollectionRoleId | null;
   selectedKeyPiece: KeyPiece | null;
   selectedPieceImage: SelectedPieceImage | null;
@@ -133,6 +139,12 @@ interface SessionState {
 
   setIntentGoals: (goals: string[]) => void;
   setIntentTradeoff: (tradeoff: string) => void;
+  setSuccessPriorities: (priorities: string[]) => void;
+  setTargetMargin: (margin: number) => void;
+  setSliderTrend: (value: number) => void;
+  setSliderCreative: (value: number) => void;
+  setSliderElevated: (value: number) => void;
+  setSliderNovelty: (value: number) => void;
   setCollectionRole: (role: CollectionRoleId | null) => void;
   setSelectedKeyPiece: (piece: KeyPiece | null) => void;
   setSelectedPieceImage: (image: SelectedPieceImage | null) => void;
@@ -193,6 +205,12 @@ export const useSessionStore = create<SessionState>()(
       conceptLocked: false,
       intentGoals: [],
       intentTradeoff: '',
+      successPriorities: [],
+      targetMargin: 50,
+      sliderTrend: 50,
+      sliderCreative: 50,
+      sliderElevated: 50,
+      sliderNovelty: 50,
       collectionRole: null,
       selectedKeyPiece: null,
       selectedPieceImage: null,
@@ -239,6 +257,12 @@ export const useSessionStore = create<SessionState>()(
 
       setIntentGoals: (intentGoals) => set({ intentGoals }),
       setIntentTradeoff: (intentTradeoff) => set({ intentTradeoff }),
+      setSuccessPriorities: (successPriorities) => set({ successPriorities }),
+      setTargetMargin: (targetMargin) => set({ targetMargin }),
+      setSliderTrend: (sliderTrend) => set({ sliderTrend }),
+      setSliderCreative: (sliderCreative) => set({ sliderCreative }),
+      setSliderElevated: (sliderElevated) => set({ sliderElevated }),
+      setSliderNovelty: (sliderNovelty) => set({ sliderNovelty }),
       setCollectionRole: (collectionRole) => set({ collectionRole }),
       setSelectedKeyPiece: (selectedKeyPiece) => set({ selectedKeyPiece }),
       setSelectedPieceImage: (selectedPieceImage) => set({ selectedPieceImage }),
@@ -308,6 +332,12 @@ export const useSessionStore = create<SessionState>()(
         conceptLocked: false,
         intentGoals: [],
         intentTradeoff: '',
+        successPriorities: [],
+        targetMargin: 50,
+        sliderTrend: 50,
+        sliderCreative: 50,
+        sliderElevated: 50,
+        sliderNovelty: 50,
         collectionRole: null,
         selectedKeyPiece: null,
         selectedPieceImage: null,
@@ -319,18 +349,24 @@ export const useSessionStore = create<SessionState>()(
     }),
     {
       name: 'muko-session',
-      version: 1,
+      version: 2,
       migrate: (persistedState, version) => {
-        if (version === 0) {
-          // Schema changed — return clean initial state
-          // to avoid stale field hydration
-          return {}
+        if (version < 2) {
+          return {
+            ...(persistedState as object),
+            successPriorities: [],
+            targetMargin: 50,
+            sliderTrend: 50,
+            sliderCreative: 50,
+            sliderElevated: 50,
+            sliderNovelty: 50,
+          };
         }
-        return persistedState
+        return persistedState;
       },
       partialize: (state) => {
         // Persist everything except actions
-        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setCollectionRole, setSelectedKeyPiece, setSelectedPieceImage, setSavedAnalysisId, setActiveCollection, setAssortmentInsightCache, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
+        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setSuccessPriorities, setTargetMargin, setSliderTrend, setSliderCreative, setSliderElevated, setSliderNovelty, setCollectionRole, setSelectedKeyPiece, setSelectedPieceImage, setSavedAnalysisId, setActiveCollection, setAssortmentInsightCache, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
         return rest;
       },
     }

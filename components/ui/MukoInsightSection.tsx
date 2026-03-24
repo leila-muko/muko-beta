@@ -161,9 +161,9 @@ function ProductDecisionRail({
     fontFamily: inter,
     fontSize: 9,
     fontWeight: 600,
-    letterSpacing: "0.12em",
+    letterSpacing: "0.18em",
     textTransform: "uppercase",
-    color: "rgba(67,67,43,0.38)",
+    color: "#888078",
   };
   const hairline: React.CSSProperties = {
     height: 1,
@@ -474,9 +474,9 @@ function ConceptDecisionRail({
     fontFamily: inter,
     fontSize: 9,
     fontWeight: 600,
-    letterSpacing: "0.12em",
+    letterSpacing: "0.18em",
     textTransform: "uppercase",
-    color: "rgba(67,67,43,0.38)",
+    color: "#888078",
   };
   const hairline: React.CSSProperties = {
     height: 1,
@@ -513,7 +513,7 @@ function ConceptDecisionRail({
         )}
         <div style={{ marginBottom: 34 }}>
           <div style={{ ...zoneLabel, marginBottom: 10 }}>{zoneOneLabel.toUpperCase()}</div>
-          <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, lineHeight: 1.18, color: "#43432B", width: "100%" }}>
+          <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em", width: "100%" }}>
             {displayHeadline}
             {isCursorOnHeadline && (
               <span style={{ display: "inline-block", width: 2, height: "0.85em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
@@ -567,7 +567,7 @@ function ConceptDecisionRail({
         <div style={{ ...zoneLabel, marginBottom: 10 }}>{zoneOneLabel.toUpperCase()}</div>
 
         {/* Guidance statement */}
-        <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, lineHeight: 1.18, color: "#43432B", width: "100%", opacity: headlineFadedOut ? 0 : 1, transition: headlineFadedOut ? "opacity 150ms ease-out" : "opacity 250ms ease-in" }}>
+        <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em", width: "100%", opacity: headlineFadedOut ? 0 : 1, transition: headlineFadedOut ? "opacity 150ms ease-out" : "opacity 250ms ease-in" }}>
           {isStreaming && streamingText ? (
             <>
               {streamingText}

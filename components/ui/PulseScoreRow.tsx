@@ -187,13 +187,10 @@ export function PulseScoreRow({
   }
 
   /* ── Default variant ───────────────────────────────────────────────────── */
-  const scoreBg = isPending
-    ? "rgba(67,67,43,0.04)"
-    : `${scoreColor}14`; // hex alpha ~8%
   const canExpand = Boolean(onToggleExpand);
 
   return (
-    <div style={{ borderBottom: "1px solid rgba(67,67,43,0.07)", paddingBottom: 14, marginBottom: 14, opacity: rowOpacity }}>
+    <div style={{ borderBottom: "1px solid #E2DDD6", paddingBottom: 16, marginBottom: 16, opacity: rowOpacity }}>
       {/* Top row: icon + label + pill ... score + chevron */}
       <button
         onClick={onToggleExpand}
@@ -206,19 +203,19 @@ export function PulseScoreRow({
           border: "none",
           padding: 0,
           cursor: canExpand ? "pointer" : "default",
-          marginBottom: 8,
+          marginBottom: 3,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: scoreColor, opacity: 0.9, display: "flex", alignItems: "center" }}>{icon}</span>
           <span
             style={{
-              fontFamily: sohne,
-              fontWeight: 700,
+              fontFamily: inter,
+              fontWeight: 600,
               fontSize: 11,
-              letterSpacing: "0.10em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "rgba(67,67,43,0.68)",
+              color: "#191919",
             }}
           >
             {label}
@@ -243,23 +240,16 @@ export function PulseScoreRow({
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span
             style={{
+              fontFamily: inter,
+              fontSize: 28,
+              fontWeight: 700,
+              color: isPending ? "rgba(67,67,43,0.30)" : scoreColor,
+              lineHeight: 1,
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              fontFamily: sohne,
-              fontSize: 21,
-              fontWeight: 700,
-              color: "rgba(67,67,43,0.72)",
-              padding: "3px 10px",
-              borderRadius: 8,
-              background: scoreBg,
-              lineHeight: 1.1,
-              minHeight: 29,
-              minWidth: 41,
-              boxSizing: "border-box",
             }}
           >
-            {isPending ? <LockIcon size={21} color="rgba(67,67,43,0.72)" /> : displayScore}
+            {isPending ? <LockIcon size={20} color="rgba(67,67,43,0.30)" /> : displayScore}
           </span>
           {canExpand && (
             <svg
@@ -279,25 +269,25 @@ export function PulseScoreRow({
         </div>
       </button>
 
+      {/* Sub label */}
+      {subLabel && (
+        <div style={{ fontSize: 11, color: "#888078", fontFamily: inter, marginTop: 3, marginBottom: 6 }}>
+          {subLabel}
+        </div>
+      )}
+
       {/* Progress bar */}
-      <div style={{ height: 2, borderRadius: 1, background: "rgba(67,67,43,0.08)", marginBottom: subLabel ? 6 : 0 }}>
+      <div style={{ height: 3, borderRadius: 2, background: "#E2DDD6", marginTop: subLabel ? 0 : 6 }}>
         <div
           style={{
-            height: 2,
-            borderRadius: 1,
-            background: scoreColor,
+            height: 3,
+            borderRadius: 2,
+            background: isPending ? "transparent" : scoreColor,
             width: `${numericPercent}%`,
             transition: "width 500ms ease, background 300ms ease",
           }}
         />
       </div>
-
-      {/* Sub label */}
-      {subLabel && (
-        <div style={{ fontSize: 10, color: "rgba(67,67,43,0.45)", fontFamily: inter, marginTop: 4 }}>
-          {subLabel}
-        </div>
-      )}
 
       {/* Expanded detail panel */}
       {isExpanded && (

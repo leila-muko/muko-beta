@@ -40,6 +40,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { SpecSuggestion } from "@/lib/types/next-move";
 import { ScorecardModal } from "@/components/spec-studio/ScorecardModal";
 import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
+import { MukoNav } from "@/components/MukoNav";
 import { getFlatForPiece } from "@/components/flats";
 import type { SelectedPieceImage } from "@/lib/piece-image";
 
@@ -765,7 +766,7 @@ export default function SpecStudioPage() {
   const router = useRouter();
   const previousMaterialIdRef = useRef<string | null>(null);
   const materialDeltaTimeoutRef = useRef<number | null>(null);
-  const { setCategory, setSubcategory: setStoreSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId } = useSessionStore();
+  const { setCategory, setSubcategory: setStoreSubcategory, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setSelectedKeyPiece, setActiveProductPieceId } = useSessionStore();
   // parent_analysis_id — deferred to Phase 2
   const categories: Category[] = categoriesData.categories as unknown as Category[];
   const materials: Material[] = materialsData as unknown as Material[];
@@ -783,13 +784,8 @@ export default function SpecStudioPage() {
   const [subcategoryId, setSubcategoryId] = useState(() => {
     return useSessionStore.getState().subcategory || "";
   });
-  const [targetMSRP, setTargetMSRP] = useState(() => {
-    return useSessionStore.getState().targetMsrp ?? 450;
-  });
-  const [targetMSRPInput, setTargetMSRPInput] = useState(() => {
-    const stored = useSessionStore.getState().targetMsrp;
-    return stored ? String(stored) : "";
-  });
+  // targetMSRP is now set in the Intent step — read-only here
+  const targetMSRP = useSessionStore((s) => s.targetMsrp) ?? 0;
   const [materialId, setMaterialId] = useState(() => {
     return useSessionStore.getState().materialId || "";
   });
@@ -880,7 +876,8 @@ export default function SpecStudioPage() {
     if (!storeAesthetic) return FALLBACK_REFINEMENT;
     return { base: storeAesthetic, modifiers: [] as string[] };
   }, [storeAesthetic]);
-  const brandTargetMargin = 0.60;
+  const storeTargetMargin = useSessionStore((s) => s.targetMargin);
+  const brandTargetMargin = storeTargetMargin > 0 ? storeTargetMargin / 100 : 0.60;
 
   const storeCollectionName = useSessionStore((s) => s.collectionName);
   const storeSeason = useSessionStore((s) => s.season);
@@ -1340,14 +1337,10 @@ export default function SpecStudioPage() {
   }, [categoryId, categories, setCategory]);
 
   useEffect(() => {
-    setTargetMsrp(targetMSRP);
-  }, [targetMSRP, setTargetMsrp]);
-
-  useEffect(() => {
-    if (targetMSRPInput.trim() && timelineWeeksInput.trim()) {
+    if (timelineWeeksInput.trim()) {
       setConstraintPromptVisible(false);
     }
-  }, [targetMSRPInput, timelineWeeksInput]);
+  }, [timelineWeeksInput]);
 
   useEffect(() => {
     if (materialId) setMaterial(materialId);
@@ -2447,95 +2440,19 @@ export default function SpecStudioPage() {
     constructionTier: constructionTier ?? undefined,
   };
 
-  const isTargetMsrpEmpty = targetMSRPInput.trim().length === 0;
   const isTimelineEmpty = timelineWeeksInput.trim().length === 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#FAF9F6", overflow: "hidden" }}>
-      {/* ── Fixed Header ──────────────────────────────────────────────────── */}
-      <header
-        style={{
-          position: "fixed",
-          top: 0, left: 0, right: 0,
-          height: 72,
-          background: "rgba(250,249,246,0.92)",
-          backdropFilter: "blur(24px) saturate(160%)",
-          WebkitBackdropFilter: "blur(24px) saturate(160%)",
-          borderBottom: "1px solid rgba(67,67,43,0.09)",
-          zIndex: 200,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 40px",
-          justifyContent: "space-between",
-          gap: 20,
-        }}
-      >
-        {/* Left: logo + stepper */}
-        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <button
-            type="button"
-            onClick={() => router.push("/entry")}
-            aria-label="Go to entry page"
-            style={{ fontFamily: sohne, fontWeight: 700, fontSize: 18, letterSpacing: "-0.02em", color: OLIVE, padding: 0, border: "none", background: "transparent", cursor: "pointer" }}
-          >
-            muko
-          </button>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {[
-              { label: "Intent", done: true, active: false },
-              { label: "Concept", done: true, active: false },
-              { label: "Spec", done: false, active: true },
-              { label: "Report", done: false, active: false },
-            ].map((s) => (
-              <div
-                key={s.label}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "6px 12px",
-                  borderRadius: 999,
-                  border: s.done ? `1.5px solid ${CHARTREUSE}` : s.active ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)",
-                  background: s.done ? "rgba(168,180,117,0.08)" : s.active ? "rgba(125,150,172,0.07)" : "rgba(67,67,43,0.03)",
-                  fontFamily: sohne, fontSize: 11, fontWeight: 600, letterSpacing: "0.01em",
-                  color: s.done ? "rgba(67,67,43,0.70)" : s.active ? OLIVE : "rgba(67,67,43,0.35)",
-                }}
-              >
-                {s.done ? (
-                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                    <path d="M4.5 7.2L6.2 8.8L9.5 5.5" stroke={CHARTREUSE} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                ) : s.active ? (
-                  <span style={{ width: 7, height: 7, borderRadius: 999, background: STEEL, boxShadow: `0 0 0 3px rgba(125,150,172,0.20)` }} />
-                ) : (
-                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(67,67,43,0.18)" }} />
-                )}
-                {s.label}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right: season/collection + actions */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span style={{ fontFamily: sohne, fontSize: 12, fontWeight: 600, color: "rgba(67,67,43,0.50)", letterSpacing: "0.03em" }}>
-            {headerSeasonLabel}<span style={{ padding: "0 7px", opacity: 0.35 }}>·</span>{headerCollectionName}
-          </span>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button
-              onClick={() => window.history.back()}
-              style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px 7px 10px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "rgba(67,67,43,0.62)", cursor: "pointer", letterSpacing: "0.01em" }}
-            >
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7L8.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              Back
-            </button>
-            <button
-              onClick={() => {}}
-              style={{ padding: "7px 14px", borderRadius: 999, border: "none", background: OLIVE, fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "#F5F0E8", cursor: "pointer", letterSpacing: "0.01em" }}
-            >
-              SAVE & CLOSE
-            </button>
-          </div>
-        </div>
-      </header>
+      <MukoNav
+        activeTab="pieces"
+        setupComplete={true}
+        piecesComplete={false}
+        collectionName={headerCollectionName}
+        seasonLabel={headerSeasonLabel}
+        onBack={() => window.history.back()}
+        onSaveClose={() => {}}
+      />
 
       <div className="specStudioLayout">
         <aside className="specStudioColumn specStudioLeft" style={{ paddingTop: 72 }}>
@@ -2703,79 +2620,86 @@ export default function SpecStudioPage() {
                 </h1>
               </div>
 
-              {/* ── Step tracker ──────────────────────────────────────────── */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
-                  gap: 14,
-                  marginBottom: 32,
-                  paddingTop: 18,
-                  borderTop: "1px solid rgba(67,67,43,0.08)",
-                  alignItems: "start",
-                }}
-              >
-                {/* Step 1: Material */}
-                <button
-                  onClick={() => backToMaterial()}
-                  style={{
-                    textAlign: "left",
-                    border: "none",
-                    borderTop: specStep === "material" ? "2px solid rgba(168,180,117,0.55)" : "2px solid rgba(67,67,43,0.08)",
-                    background: "transparent",
-                    padding: "14px 0 0",
-                    cursor: "pointer",
-                    opacity: 1,
-                  }}
-                >
-                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: specStep === "material" ? "#6B7A40" : (selectedMaterial ? "#6B7A40" : "rgba(67,67,43,0.36)"), marginBottom: 6 }}>
-                    {selectedMaterial ? "Complete" : specStep === "material" ? "Current" : "Upcoming"}
+              {/* ── Progress stepper ──────────────────────────────────────── */}
+              {(() => {
+                const roleStatus = storeCollectionRole !== null ? "complete" : "upcoming";
+                const materialStatus = specStep === "material" ? "active" : (materialId !== "" ? "complete" : "upcoming");
+                const constructionStatus = constructionConfirmed ? "complete" : (specStep === "construction" ? "active" : "upcoming");
+
+                const dotStyle = (status: "complete" | "active" | "upcoming"): React.CSSProperties => ({
+                  width: 20,
+                  height: 20,
+                  borderRadius: "50%",
+                  border: status === "complete" ? "1.5px solid #A8B475" : status === "active" ? "1.5px solid #191919" : "1.5px solid #E2DDD6",
+                  background: status === "complete" ? "#A8B475" : "#FFFFFF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  fontSize: 9,
+                  fontWeight: 700,
+                  color: "#FFFFFF",
+                  fontFamily: inter,
+                });
+
+                const labelStyle = (status: "complete" | "active" | "upcoming"): React.CSSProperties => ({
+                  fontFamily: inter,
+                  fontSize: 12,
+                  fontWeight: status === "active" ? 600 : 400,
+                  color: status === "complete" ? "#A8B475" : status === "active" ? "#191919" : "#888078",
+                });
+
+                const stepStyle: React.CSSProperties = {
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                };
+
+                const arrowStyle: React.CSSProperties = {
+                  fontFamily: inter,
+                  fontSize: 13,
+                  color: "#E2DDD6",
+                  padding: "0 12px",
+                  flexShrink: 0,
+                };
+
+                return (
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 0,
+                    marginBottom: 32,
+                    paddingBottom: 24,
+                    borderBottom: "1px solid #E2DDD6",
+                  }}>
+                    {/* Step 1: Role */}
+                    <div style={stepStyle}>
+                      <div style={dotStyle(roleStatus)}>
+                        {roleStatus === "complete" && "✓"}
+                      </div>
+                      <span style={labelStyle(roleStatus)}>Role</span>
+                    </div>
+                    <div style={arrowStyle} aria-hidden>→</div>
+                    {/* Step 2: Material */}
+                    <div style={stepStyle}>
+                      <div style={dotStyle(materialStatus)}>
+                        {materialStatus === "complete" && "✓"}
+                      </div>
+                      <span style={labelStyle(materialStatus)}>Material</span>
+                    </div>
+                    <div style={arrowStyle} aria-hidden>→</div>
+                    {/* Step 3: Construction */}
+                    <div style={stepStyle}>
+                      <div style={dotStyle(constructionStatus)}>
+                        {constructionStatus === "complete" && "✓"}
+                      </div>
+                      <span style={labelStyle(constructionStatus)}>Construction</span>
+                    </div>
                   </div>
-                  <div style={{ fontFamily: sohne, fontSize: 16, fontWeight: 500, color: OLIVE, lineHeight: 1.15, marginBottom: 6 }}>
-                    Material
-                  </div>
-                  <div style={{ fontFamily: inter, fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.48)" }}>
-                    Choose the fabric that anchors the build.
-                  </div>
-                </button>
-                {/* Arrow */}
-                <div
-                  style={{
-                    alignSelf: "center",
-                    paddingTop: 28,
-                    fontFamily: sohne,
-                    fontSize: 16,
-                    color: "rgba(67,67,43,0.24)",
-                    lineHeight: 1,
-                  }}
-                  aria-hidden
-                >
-                  →
-                </div>
-                {/* Step 2: Construction */}
-                <button
-                  onClick={() => { if (selectedMaterial) advanceToConstruction(); }}
-                  style={{
-                    textAlign: "left",
-                    border: "none",
-                    borderTop: specStep === "construction" ? "2px solid rgba(168,180,117,0.55)" : "2px solid rgba(67,67,43,0.08)",
-                    background: "transparent",
-                    padding: "14px 0 0",
-                    cursor: selectedMaterial ? "pointer" : "default",
-                    opacity: !selectedMaterial ? 0.72 : 1,
-                  }}
-                >
-                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: specStep === "construction" ? "#6B7A40" : (constructionConfirmed ? "#6B7A40" : "rgba(67,67,43,0.36)"), marginBottom: 6 }}>
-                    {constructionConfirmed ? "Complete" : specStep === "construction" ? "Current" : "Upcoming"}
-                  </div>
-                  <div style={{ fontFamily: sohne, fontSize: 16, fontWeight: 500, color: OLIVE, lineHeight: 1.15, marginBottom: 6 }}>
-                    Construction
-                  </div>
-                  <div style={{ fontFamily: inter, fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.48)" }}>
-                    Lock the operational intensity of the build.
-                  </div>
-                </button>
-              </div>
+                );
+              })()}
 
               <div style={{ position: "relative", minHeight: 760 }}>
                 <AnimatePresence mode="wait" custom={specStepDirection}>
@@ -2858,62 +2782,6 @@ export default function SpecStudioPage() {
                   <div style={{ paddingBottom: 22, marginBottom: 28, borderBottom: "1px solid rgba(67,67,43,0.08)" }}>
                     <div style={{ ...microLabel, marginBottom: 10, color: "rgba(67,67,43,0.34)" }}>Constraints</div>
                     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontFamily: inter, fontSize: 15, color: "rgba(67,67,43,0.66)", lineHeight: 1.5 }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 148 }}>
-                        <span>MSRP Target</span>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 3, minWidth: 118 }}>
-                          <span style={{ color: "rgba(67,67,43,0.58)" }}>$</span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={targetMSRPInput}
-                            placeholder="e.g. $450"
-                            onChange={(e) => {
-                              const next = e.target.value.replace(/[^\d]/g, "");
-                              setTargetMSRPInput(next);
-                              setTargetMSRP(next ? Number(next) : 0);
-                            }}
-                            aria-label="MSRP target"
-                            className="specConstraintInput"
-                            style={{
-                              width: 88,
-                              border: "none",
-                              background: "transparent",
-                              padding: 0,
-                              fontFamily: sohne,
-                              fontSize: 22,
-                              color: OLIVE,
-                              outline: "none",
-                              letterSpacing: "-0.02em",
-                              lineHeight: 1.1,
-                              appearance: "textfield",
-                              WebkitAppearance: "none",
-                              MozAppearance: "textfield",
-                            }}
-                          />
-                        </span>
-                        <span style={{ fontSize: 11.5, color: BRAND.camel, fontFamily: inter, lineHeight: 1.45 }}>
-                          Used to calculate margin viability
-                        </span>
-                        {constraintPromptVisible && isTargetMsrpEmpty && (
-                          <span
-                            style={{
-                              fontSize: 11.5,
-                              color: BRAND.camel,
-                              fontFamily: inter,
-                              lineHeight: 1.45,
-                              padding: "6px 10px",
-                              borderRadius: 999,
-                              background: "rgba(184,135,107,0.10)",
-                              border: "1px solid rgba(184,135,107,0.18)",
-                              width: "fit-content",
-                            }}
-                          >
-                            Add your target MSRP for a margin assessment
-                          </span>
-                        )}
-                      </div>
-                      <span style={{ opacity: 0.42, alignSelf: "flex-start", paddingTop: 22 }}>·</span>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 158 }}>
                         <span>Delivery Window</span>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -3064,7 +2932,7 @@ export default function SpecStudioPage() {
                     <button
                       onClick={() => {
                         if (!selectedMaterial) return;
-                        if (isTargetMsrpEmpty || isTimelineEmpty) {
+                        if (isTimelineEmpty) {
                           setConstraintPromptVisible(true);
                         }
                         advanceToConstruction();
@@ -3263,7 +3131,6 @@ export default function SpecStudioPage() {
                             onClick={() => {
                               const cat = categories.find(c => c.id === categoryId);
                               setCategory(cat?.name ?? categoryId);
-                              setTargetMsrp(targetMSRP);
                               setMaterial(materialId);
                               setSilhouette(conceptSilhouette ? conceptSilhouette.charAt(0).toUpperCase() + conceptSilhouette.slice(1) : "");
                               setStoreTier(constructionTier!);
@@ -3276,31 +3143,27 @@ export default function SpecStudioPage() {
                                   setColorPalette(palOption.swatches, palOption.name);
                                 }
                               }
-                              setIsRunningAnalysis(true);
-                              setLoadingPhase(0);
-                              const phaseDelays = [650, 1300, 1950, 2500];
-                              phaseDelays.forEach((delay, i) => {
-                                setTimeout(() => setLoadingPhase(i + 1), delay);
-                              });
-                              setTimeout(() => {
-                                setIsRunningAnalysis(false);
-                                setShowScorecardModal(true);
-                              }, 2900);
+                              setSelectedKeyPiece(null);
+                              setActiveProductPieceId(null);
+                              router.push('/pieces');
                             }}
                             disabled={!selectedMaterial || !constructionConfirmed}
                             style={{
-                              padding: "12px 18px",
+                              padding: "11px 24px",
                               borderRadius: 999,
-                              border: (selectedMaterial && constructionConfirmed) ? "1px solid rgba(125,150,172,0.34)" : "1px solid rgba(67,67,43,0.10)",
-                              background: (selectedMaterial && constructionConfirmed) ? "rgba(125,150,172,0.04)" : "rgba(255,255,255,0.6)",
-                              color: (selectedMaterial && constructionConfirmed) ? "rgba(89,112,133,0.92)" : "rgba(67,67,43,0.30)",
-                              fontFamily: sohne,
-                              fontSize: 12,
-                              fontWeight: 600,
+                              border: "none",
+                              background: (selectedMaterial && constructionConfirmed) ? "#191919" : "#E2DDD6",
+                              color: (selectedMaterial && constructionConfirmed) ? "#FFFFFF" : "#888078",
+                              fontFamily: inter,
+                              fontSize: 13,
+                              fontWeight: 500,
+                              letterSpacing: "0.02em",
                               cursor: (selectedMaterial && constructionConfirmed) ? "pointer" : "not-allowed",
                             }}
+                            onMouseEnter={(e) => { if (selectedMaterial && constructionConfirmed) e.currentTarget.style.background = "#2A2622"; }}
+                            onMouseLeave={(e) => { if (selectedMaterial && constructionConfirmed) e.currentTarget.style.background = "#191919"; }}
                           >
-                            Continue to Report →
+                            Save Piece &amp; Return to Pieces →
                           </button>
                         </div>
                       </div>
@@ -3317,7 +3180,7 @@ export default function SpecStudioPage() {
             <aside className="specStudioColumn specStudioRight" style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
           <div className="specStudioSticky" style={{ padding: "36px 28px 44px" }}>
             <section style={{ marginBottom: 30 }}>
-              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>Pulse</div>
+              <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 20 }}>Pulse</div>
               <PulseScoreRow
                 dimensionKey="identity"
                 label="Identity"
@@ -3418,13 +3281,14 @@ export default function SpecStudioPage() {
             </section>
 
             {/* Muko's Read — 3-state progressive disclosure */}
-            <section style={{ paddingTop: 24, marginBottom: 30, borderTop: "1px solid rgba(67,67,43,0.08)" }}>
-              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>Muko&apos;s Read</div>
+            <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
+            <section style={{ marginBottom: 30 }}>
+              <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 20 }}>Muko&apos;s Read</div>
 
               {/* State 0: no material selected */}
               {!selectedMaterial && (
                 <>
-                  <div style={{ fontFamily: sohne, fontSize: 21, fontWeight: 600, lineHeight: 1.22, color: OLIVE, marginBottom: 0 }}>
+                  <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em", marginBottom: 0 }}>
                     {mukoRead.headline}
                   </div>
                 </>
@@ -3440,7 +3304,7 @@ export default function SpecStudioPage() {
                       ))}
                     </>
                   ) : (
-                    <div style={{ fontFamily: sohne, fontSize: 21, fontWeight: 600, lineHeight: 1.22, color: OLIVE, marginBottom: 10 }}>
+                    <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em", marginBottom: 10 }}>
                       {specStreamingText || mukoRead.headline}
                     </div>
                   )}
@@ -3454,30 +3318,30 @@ export default function SpecStudioPage() {
                         streamingText={specStreamingParagraph}
                         isStreaming={specIsParagraphStreaming && !!specStreamingParagraph}
                         containerStyle={{ marginBottom: 16 }}
-                        paragraphStyle={{ fontFamily: inter, fontSize: 12.75, color: "rgba(67,67,43,0.58)", lineHeight: 1.72 }}
+                        paragraphStyle={{ fontFamily: inter, fontSize: 12, color: "#888078", lineHeight: 1.7 }}
                       />
                       <button
                         onClick={() => setSpecAnalysisExpanded(e => !e)}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: inter, fontSize: 11, fontWeight: 600, color: "#6B7A40" }}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: inter, fontSize: 11, fontWeight: 600, color: "#A8B475" }}
                       >
                         {specAnalysisExpanded ? "Hide analysis" : "See analysis"}
                         <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ transform: specAnalysisExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 180ms ease", flexShrink: 0 }}>
-                          <path d="M2 4.5L6 8L10 4.5" stroke="#6B7A40" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M2 4.5L6 8L10 4.5" stroke="#A8B475" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </button>
                       {specAnalysisExpanded && (
-                        <div style={{ marginTop: 18, borderTop: "1px solid rgba(67,67,43,0.08)", paddingTop: 14 }}>
+                        <div style={{ marginTop: 18, borderTop: "1px solid #E2DDD6", paddingTop: 14 }}>
                           <div style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 8, padding: "7px 0" }}>
-                            <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "#B8876B", paddingTop: 1, lineHeight: 1.5 }}>
+                            <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#888078", paddingTop: 1, lineHeight: 1.5 }}>
                               Execution Risk
                             </div>
-                            <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.65)", lineHeight: 1.55 }}>
+                            <div style={{ fontFamily: inter, fontSize: 11, color: "#191919", lineHeight: 1.5 }}>
                               {getFirstSentence(structuredReadouts[0]?.body ?? "")}
                             </div>
                           </div>
                         </div>
                       )}
-                      <div style={{ fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.38)", marginTop: 12, lineHeight: 1.55 }}>
+                      <div style={{ fontFamily: inter, fontSize: 11, color: "#888078", fontStyle: "italic", marginTop: 12, lineHeight: 1.55 }}>
                         Select construction discipline to unlock the full build analysis.
                       </div>
                     </>
@@ -3495,7 +3359,7 @@ export default function SpecStudioPage() {
                       ))}
                     </>
                   ) : (
-                    <div style={{ fontFamily: sohne, fontSize: 21, fontWeight: 600, lineHeight: 1.22, color: OLIVE, marginBottom: 10 }}>
+                    <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em", marginBottom: 10 }}>
                       {specStreamingText || mukoRead.headline}
                     </div>
                   )}
@@ -3509,15 +3373,15 @@ export default function SpecStudioPage() {
                         streamingText={specStreamingParagraph}
                         isStreaming={specIsParagraphStreaming && !!specStreamingParagraph}
                         containerStyle={{ marginBottom: 16 }}
-                        paragraphStyle={{ fontFamily: inter, fontSize: 12.75, color: "rgba(67,67,43,0.58)", lineHeight: 1.72 }}
+                        paragraphStyle={{ fontFamily: inter, fontSize: 12, color: "#888078", lineHeight: 1.7 }}
                       />
-                      <div style={{ marginTop: 18, borderTop: "1px solid rgba(67,67,43,0.08)", paddingTop: 14 }}>
+                      <div style={{ marginTop: 18, borderTop: "1px solid #E2DDD6", paddingTop: 14 }}>
                         {structuredReadouts.map((item) => (
                           <div key={item.label} style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 8, padding: "7px 0" }}>
-                            <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "#B8876B", paddingTop: 1, lineHeight: 1.5 }}>
+                            <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "#888078", paddingTop: 1, lineHeight: 1.5 }}>
                               {item.label}
                             </div>
-                            <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.65)", lineHeight: 1.55 }}>
+                            <div style={{ fontFamily: inter, fontSize: 11, color: "#191919", lineHeight: 1.5 }}>
                               {getFirstSentence(item.body)}
                             </div>
                           </div>

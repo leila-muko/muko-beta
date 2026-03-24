@@ -28,6 +28,7 @@ import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
 import { buildConceptBlackboard, toAestheticSlug } from "@/lib/synthesizer/assemble";
 import type { InsightData } from "@/lib/types/insight";
 import { createClient } from "@/lib/supabase/client";
+import { MukoNav } from "@/components/MukoNav";
 import { debounce } from "@/lib/utils/debounce";
 import {
   checkMarketSaturation,
@@ -2727,6 +2728,35 @@ export default function ConceptStudioPage() {
     setCurrentStep,
     topMoodboardImages,
   ]);
+
+  const handleLockAndStartPieces = useCallback(async () => {
+    if (!canAdvanceToStage3 || !selectedAesthetic) return;
+    await handleConfirmDirection();
+    useSessionStore.setState({
+      aestheticMatchedId: selectedAesthetic,
+      moodboardImages: topMoodboardImages,
+      conceptSilhouette,
+      conceptPalette,
+      directionInterpretationText: aestheticInflection.trim(),
+      directionInterpretationModifiers: combinedDirection?.modifierLabels ?? [],
+      directionInterpretationChips: selectedInterpretationChips,
+    });
+    setCurrentStep(3);
+    router.push('/pieces');
+  }, [
+    aestheticInflection,
+    canAdvanceToStage3,
+    combinedDirection?.modifierLabels,
+    conceptPalette,
+    conceptSilhouette,
+    handleConfirmDirection,
+    router,
+    selectedAesthetic,
+    selectedInterpretationChips,
+    setCurrentStep,
+    topMoodboardImages,
+  ]);
+
   /* ─── RENDER ──────────────────────────────────────────────────────────────── */
   const askMukoContext: AskMukoContext = {
     step: "concept",
@@ -2756,37 +2786,15 @@ export default function ConceptStudioPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#FAF9F6", overflow: "hidden" }}>
 
-      {/* ── Fixed Header ─────────────────────────────────────────────────────── */}
-      <header style={{ position: "fixed", top: 0, left: 0, right: 0, height: 72, background: "rgba(250,249,246,0.92)", backdropFilter: "blur(24px) saturate(160%)", WebkitBackdropFilter: "blur(24px) saturate(160%)", borderBottom: "1px solid rgba(67,67,43,0.09)", zIndex: 200, display: "flex", alignItems: "center", padding: "0 40px", justifyContent: "space-between", gap: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <button
-            type="button"
-            onClick={() => router.push("/entry")}
-            aria-label="Go to entry page"
-            style={{ fontFamily: sohne, fontWeight: 700, fontSize: 18, letterSpacing: "-0.02em", color: OLIVE, padding: 0, border: "none", background: "transparent", cursor: "pointer" }}
-          >
-            muko
-          </button>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {[{ label: "Intent", done: true, active: false }, { label: "Concept", done: false, active: true }, { label: "Spec", done: false, active: false }, { label: "Report", done: false, active: false }].map((s) => (
-              <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: s.done ? `1.5px solid ${CHARTREUSE}` : s.active ? `1.5px solid ${STEEL}` : "1.5px solid rgba(67,67,43,0.10)", background: s.done ? "rgba(168,180,117,0.08)" : s.active ? "rgba(125,150,172,0.07)" : "rgba(67,67,43,0.03)", fontFamily: sohne, fontSize: 11, fontWeight: 600, letterSpacing: "0.01em", color: s.done ? "rgba(67,67,43,0.70)" : s.active ? OLIVE : "rgba(67,67,43,0.35)" }}>
-                {s.done ? <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M4.5 7.2L6.2 8.8L9.5 5.5" stroke={CHARTREUSE} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg> : s.active ? <span style={{ width: 7, height: 7, borderRadius: 999, background: STEEL, boxShadow: `0 0 0 3px rgba(125,150,172,0.20)` }} /> : <span style={{ width: 6, height: 6, borderRadius: 999, background: "rgba(67,67,43,0.18)" }} />}
-                {s.label}
-              </div>
-            ))}
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span style={{ fontFamily: sohne, fontSize: 12, fontWeight: 600, color: "rgba(67,67,43,0.50)", letterSpacing: "0.03em" }}>{headerSeasonLabel}<span style={{ padding: "0 7px", opacity: 0.35 }}>·</span>{headerCollectionName}</span>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => window.history.back()} style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 13px 7px 10px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "rgba(67,67,43,0.62)", cursor: "pointer", letterSpacing: "0.01em" }}>
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7L8.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              Back
-            </button>
-            <button onClick={() => {}} style={{ padding: "7px 14px", borderRadius: 999, border: "none", background: OLIVE, fontFamily: sohne, fontSize: 11, fontWeight: 600, color: "#F5F0E8", cursor: "pointer", letterSpacing: "0.01em" }}>SAVE & CLOSE</button>
-          </div>
-        </div>
-      </header>
+      <MukoNav
+        activeTab="setup"
+        setupComplete={false}
+        piecesComplete={false}
+        collectionName={headerCollectionName}
+        seasonLabel={headerSeasonLabel}
+        onBack={() => window.history.back()}
+        onSaveClose={() => {}}
+      />
 
       {/* ── Two-column body ───────────────────────────────────────────────────── */}
       <ResizableSplitPanel
@@ -2888,60 +2896,6 @@ export default function ConceptStudioPage() {
                       </div>
                     </div>
                   )}
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr)", gap: 14, marginBottom: 42, paddingTop: 18, borderTop: "1px solid rgba(67,67,43,0.08)", alignItems: "start" }}>
-                  {stageFrames.flatMap((stage, index) => {
-                    const stageIndex = getStageIndex(stage.id);
-                    const currentIndex = getStageIndex(currentStage);
-                    const isActive = currentStage === stage.id;
-                    const isComplete = completedStages[stage.id];
-                    const isClickable = stageIndex <= getStageIndex(highestAvailableStage);
-                    const nodes: React.ReactNode[] = [(
-                      <button
-                        key={stage.id}
-                        onClick={() => isClickable && navigateStage(stage.id)}
-                        style={{
-                          textAlign: "left",
-                          border: "none",
-                          borderTop: isActive ? "2px solid rgba(168,180,117,0.55)" : "2px solid rgba(67,67,43,0.08)",
-                          background: "transparent",
-                          padding: "14px 0 0",
-                          cursor: isClickable ? "pointer" : "default",
-                          opacity: stageIndex > currentIndex && !isComplete && !isActive ? 0.72 : 1,
-                        }}
-                      >
-                        <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: isActive ? "#6B7A40" : "rgba(67,67,43,0.36)", marginBottom: 6 }}>
-                          {isComplete ? "Complete" : isActive ? "Current" : "Upcoming"}
-                        </div>
-                        <div style={{ fontFamily: sohne, fontSize: 16, fontWeight: 500, color: OLIVE, lineHeight: 1.15, marginBottom: 6 }}>
-                          {stage.label}
-                        </div>
-                        <div style={{ fontFamily: inter, fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.48)" }}>
-                          {stage.helper}
-                        </div>
-                      </button>
-                    )];
-                    if (index < stageFrames.length - 1) {
-                      nodes.push(
-                        <div
-                          key={`${stage.id}-arrow`}
-                          style={{
-                            alignSelf: "center",
-                            paddingTop: 28,
-                            fontFamily: sohne,
-                            fontSize: 16,
-                            color: "rgba(67,67,43,0.24)",
-                            lineHeight: 1,
-                          }}
-                          aria-hidden
-                        >
-                          →
-                        </div>
-                      );
-                    }
-                    return nodes;
-                  })}
                 </div>
 
                 <div style={{ position: "relative", minHeight: 760 }}>
@@ -3385,21 +3339,21 @@ export default function ConceptStudioPage() {
                                   Back to Direction
                                 </button>
                                 <button
-                                  onClick={() => navigateStage("product")}
+                                  onClick={handleLockAndStartPieces}
                                   disabled={!canAdvanceToStage3}
                                   style={{
-                                    padding: "12px 18px",
-                                    borderRadius: 999,
-                                    border: canAdvanceToStage3 ? "1.5px solid #7D96AC" : "1px solid rgba(67,67,43,0.10)",
-                                    background: canAdvanceToStage3 ? "rgba(125,150,172,0.08)" : "rgba(255,255,255,0.6)",
-                                    color: canAdvanceToStage3 ? "#7D96AC" : "rgba(67,67,43,0.30)",
+                                    padding: "11px 24px",
+                                    borderRadius: 100,
+                                    border: "none",
+                                    background: canAdvanceToStage3 ? "#191919" : "rgba(67,67,43,0.10)",
+                                    color: canAdvanceToStage3 ? "#FFFFFF" : "rgba(67,67,43,0.30)",
                                     fontFamily: sohne,
-                                    fontSize: 12,
-                                    fontWeight: 600,
+                                    fontSize: 13,
+                                    fontWeight: 500,
                                     cursor: canAdvanceToStage3 ? "pointer" : "not-allowed",
                                   }}
                                 >
-                                  Continue to Product Expression
+                                  Lock Collection &amp; Start Pieces →
                                 </button>
                               </div>
                             </>
@@ -3407,232 +3361,6 @@ export default function ConceptStudioPage() {
                         </>
                       )}
 
-                      {currentStage === "product" && (
-                        <>
-                          <div style={{ paddingTop: 12, borderTop: "1px solid rgba(67,67,43,0.08)", marginBottom: 34 }}>
-                            <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: CHARTREUSE, marginBottom: 8 }}>
-                            Stage 3
-                            </div>
-                            <div style={{ fontFamily: sohne, fontSize: 28, fontWeight: 500, color: OLIVE, marginBottom: 8, letterSpacing: "-0.03em" }}>
-                              Build Product Expression
-                            </div>
-                            <div style={{ fontFamily: inter, fontSize: 13.5, color: "rgba(67,67,43,0.56)", lineHeight: 1.62, maxWidth: 560 }}>
-                              Select one piece to take into specs and assign its role in the collection.
-                            </div>
-                          </div>
-
-                          <div style={{ marginBottom: 34 }}>
-                            <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 4 }}>
-                              Piece Selection
-                            </div>
-                            <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.56)", marginBottom: 12, lineHeight: 1.5 }}>
-                              Pick one piece to take into specs this session. Select it below — you can return to assign others separately.
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-                              {pieceRecommendations.map(({ piece, recommendation }) => {
-                                const isSelected = activeProductPieceId === piece.item;
-                                const isSuggestedStartingPiece = suggestedStartingPieceEntry?.piece.item === piece.item;
-                                const assignedRole = pieceRolesById[piece.item] ?? null;
-                                const anyRoleAssigned = Object.keys(pieceRolesById).length > 0;
-                                const isLocked = anyRoleAssigned && !isSelected;
-                                const fitLabel = piece.custom ? "From interpretation" : recommendation?.bucket === "interpretation" ? "From interpretation" : "Core to direction";
-                                const fitPillStyle = fitLabel === "Core to direction"
-                                  ? { background: "#EAF3DE", color: "#3B6D11" }
-                                  : { background: "#F1EFE8", color: "#5F5E5A" };
-                                const marketLabel = (
-                                  piece.signal === "high-volume" ? "High volume" :
-                                  piece.signal === "emerging" ? "Emerging" :
-                                  piece.signal === "ascending" ? "Emerging" :
-                                  null
-                                ) as "High volume" | "Emerging" | "Peak" | null;
-                                const marketPillStyle: { background: string; color: string } =
-                                  marketLabel === "High volume" ? { background: "#E6F1FB", color: "#185FA5" } :
-                                  marketLabel === "Peak" ? { background: "#FAECE7", color: "#993C1D" } :
-                                  { background: "#FAEEDA", color: "#854F0B" };
-                                return (
-                                  <button
-                                    key={piece.item}
-                                    onClick={() => handleSelectProductPiece(piece.item)}
-                                    disabled={isLocked}
-                                    style={{
-                                      display: "flex",
-                                      flexDirection: "column",
-                                      position: "relative",
-                                      borderRadius: 14,
-                                      overflow: "hidden",
-                                      border: isSelected ? "2px solid #A8B475" : isSuggestedStartingPiece ? "2px solid #B8876B" : "0.5px solid rgba(0,0,0,0.1)",
-                                      boxShadow: isSelected ? "0 18px 42px rgba(67,67,43,0.10), 0 0 0 3px rgba(168,180,117,0.10)" : isSuggestedStartingPiece ? "0 14px 30px rgba(67,67,43,0.05)" : "0 10px 24px rgba(67,67,43,0.035)",
-                                      background: isSelected ? "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(246,243,236,0.98) 100%)" : "rgba(255,255,255,0.92)",
-                                      cursor: isLocked ? "default" : "pointer",
-                                      textAlign: "left",
-                                      padding: 0,
-                                      transition: "border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, opacity 180ms ease",
-                                      transform: isSelected ? "translateY(-2px)" : isSuggestedStartingPiece && !isLocked ? "translateY(-1px)" : "translateY(0)",
-                                      opacity: isLocked ? 0.38 : isSelected ? 1 : 0.88,
-                                    }}
-                                    onMouseEnter={(e) => { if (!isLocked) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(0,0,0,0.22)"; }}
-                                    onMouseLeave={(e) => { if (!isLocked) (e.currentTarget as HTMLButtonElement).style.borderColor = isSelected ? "#A8B475" : isSuggestedStartingPiece ? "#B8876B" : "rgba(0,0,0,0.1)"; }}
-                                  >
-                                    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: isSelected ? "radial-gradient(circle at top left, rgba(168,180,117,0.12), transparent 48%)" : "transparent" }} />
-                                    <div style={{ height: 152, background: isSelected ? "#F7F4EE" : isSuggestedStartingPiece ? "#F3F0EA" : "#F4F1EB", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative" }}>
-                                      {(() => {
-                                        const flatResult = getFlatForPiece(piece.type, piece.signal);
-                                        if (!flatResult) return <KeyPiecePlaceholder category={piece.category} />;
-                                        const { Flat, color } = flatResult;
-                                        return <Flat color={color} />;
-                                      })()}
-                                      {(isSelected || isSuggestedStartingPiece) && (
-                                        <div style={{
-                                          position: "absolute",
-                                          top: 8,
-                                          left: 8,
-                                          background: isSelected ? "#A8B475" : "#B8876B",
-                                          color: "#fff",
-                                          fontSize: 10,
-                                          fontWeight: 500,
-                                          letterSpacing: "0.06em",
-                                          padding: "3px 8px",
-                                          borderRadius: 20,
-                                          fontFamily: "var(--font-inter), system-ui, sans-serif",
-                                          whiteSpace: "nowrap",
-                                        }}>
-                                          {isSelected ? "Selected" : "Muko pick"}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div style={{ background: isSelected ? "rgba(168,180,117,0.06)" : isSuggestedStartingPiece ? "rgba(168,180,117,0.03)" : "#FFFFFF", borderTop: "1px solid #F0EDE8", padding: "12px 14px 14px" }}>
-                                      {assignedRole && (
-                                        <div style={{ display: "inline-flex", alignItems: "center", padding: "4px 9px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.10)", background: "rgba(255,255,255,0.75)", fontFamily: inter, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: assignedRole === "hero" ? "#6D7F8D" : "rgba(67,67,43,0.58)", marginBottom: 8 }}>
-                                          {getRoleName(assignedRole)}
-                                        </div>
-                                      )}
-                                      <div style={{ fontFamily: sohne, fontSize: 13, fontWeight: 500, color: "#191919", lineHeight: 1.35, marginBottom: 10 }}>
-                                        {piece.item}
-                                      </div>
-                                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                          <span style={{ fontFamily: inter, fontSize: 10, color: "#9C9690", minWidth: 42 }}>Fit</span>
-                                          <span style={{ ...fitPillStyle, fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap" as const }}>
-                                            {fitLabel}
-                                          </span>
-                                        </div>
-                                        {marketLabel && (
-                                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                            <span style={{ fontFamily: inter, fontSize: 10, color: "#9C9690", minWidth: 42 }}>Market</span>
-                                            <span style={{ ...marketPillStyle, fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap" as const }}>
-                                              {marketLabel}
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </div>
-
-                            {!showCustomInput ? (
-                              <button
-                                onClick={() => setShowCustomInput(true)}
-                                style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6, padding: 0, border: "none", background: "none", cursor: "pointer", fontFamily: inter, fontSize: 12, fontWeight: 600, color: "#7D96AC", textAlign: "left" }}
-                              >
-                                + Add piece
-                              </button>
-                            ) : (
-                              <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(67,67,43,0.08)", maxWidth: 320 }}>
-                                <input
-                                  autoFocus
-                                  value={customKeyPieceText}
-                                  onChange={(e) => setCustomKeyPieceText(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter" && customKeyPieceText.trim()) commitCustomProductPiece();
-                                  }}
-                                  onBlur={() => {
-                                    if (customKeyPieceText.trim()) commitCustomProductPiece();
-                                  }}
-                                  placeholder="e.g. Asymmetric Hem Midi Dress"
-                                  style={{ width: "100%", boxSizing: "border-box", border: "none", background: "transparent", fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.80)", outline: "none", padding: 0 }}
-                                />
-                                {customKeyPieceConfirmed && (
-                                  <div style={{ marginTop: 6, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.44)", fontStyle: "italic" }}>
-                                    Muko doesn&apos;t have market data on this piece yet. It won&apos;t affect scoring, but it will carry into specs.
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {activeProductPieceId && (
-                          <div style={{ marginBottom: 36 }}>
-                            <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 6 }}>
-                              Role Assignment
-                            </div>
-                            <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.56)", marginBottom: 12, lineHeight: 1.5 }}>
-                              How should <strong style={{ color: "rgba(67,67,43,0.72)", fontWeight: 600 }}>{activeProductPieceEntry?.piece.item}</strong> function in this collection? This is the only piece you&apos;re assigning right now.
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                              {COLLECTION_ROLE_OPTIONS.map((role) => {
-                                const isSelected = activeProductPieceEntry ? pieceRolesById[activeProductPieceEntry.piece.item] === role.id : false;
-                                const isSuggested = activePieceSuggestion?.suggestedRoles.includes(role.id);
-                                return (
-                                  <button
-                                    key={role.id}
-                                    onClick={() => activeProductPieceEntry && handleAssignRoleToPiece(activeProductPieceEntry.piece.item, role.id)}
-                                    disabled={!activeProductPieceEntry}
-                                    style={{
-                                      textAlign: "left",
-                                      padding: "15px 14px 14px",
-                                      borderRadius: 14,
-                                      border: isSelected
-                                        ? "1px solid rgba(168,180,117,0.72)"
-                                        : isSuggested
-                                        ? "1px solid rgba(168,180,117,0.24)"
-                                        : "1px solid rgba(67,67,43,0.08)",
-                                      background: isSelected
-                                        ? "linear-gradient(180deg, rgba(168,180,117,0.10) 0%, rgba(255,255,255,0.92) 100%)"
-                                        : isSuggested
-                                        ? "rgba(168,180,117,0.04)"
-                                        : "rgba(255,255,255,0.68)",
-                                      cursor: activeProductPieceEntry ? "pointer" : "not-allowed",
-                                      opacity: activeProductPieceEntry ? 1 : 0.45,
-                                      boxShadow: isSelected ? "0 14px 30px rgba(67,67,43,0.05)" : "none",
-                                    }}
-                                  >
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
-                                      <div style={{ fontFamily: inter, fontSize: 12, fontWeight: 600, color: "#43432B" }}>
-                                        {role.name}
-                                      </div>
-                                      {isSuggested && (
-                                        <MukoPickTag />
-                                      )}
-                                    </div>
-                                    <div style={{ fontFamily: inter, fontSize: 11, lineHeight: 1.5, color: "rgba(67,67,43,0.55)" }}>
-                                      {role.description}
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                          )}
-
-                          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                            <button
-                              onClick={() => navigateStage("language")}
-                              style={{ padding: "12px 18px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", color: "rgba(67,67,43,0.62)", fontFamily: sohne, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                            >
-                              Back to Collection Language
-                            </button>
-                            <button
-                              onClick={handleContinueToSpecs}
-                              disabled={!canLockDirection}
-                              style={{ padding: "12px 18px", borderRadius: 999, border: canLockDirection ? "1px solid rgba(125,150,172,0.34)" : "1px solid rgba(67,67,43,0.10)", background: canLockDirection ? "rgba(125,150,172,0.04)" : "rgba(255,255,255,0.6)", color: canLockDirection ? "rgba(89,112,133,0.92)" : "rgba(67,67,43,0.30)", fontFamily: sohne, fontSize: 12, fontWeight: 600, cursor: canLockDirection ? "pointer" : "not-allowed" }}
-                            >
-                              Lock Direction &amp; Build Specs
-                            </button>
-                          </div>
-                        </>
-                      )}
                     </motion.div>
                   </AnimatePresence>
                 </div>
@@ -3716,26 +3444,11 @@ export default function ConceptStudioPage() {
 
             {/* PULSE RAIL — slim strip */}
             <div style={{ marginBottom: 0 }}>
-              <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>Pulse</div>
-              {isStep3ProductStage && step3PulseReferenceLabel && (
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                    color: "rgba(67,67,43,0.34)",
-                    marginBottom: 10,
-                  }}
-                >
-                  {step3PulseReferenceLabel}
-                </div>
-              )}
+              <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 20 }}>Pulse</div>
               {pulseRows.map((row) => (
                 <React.Fragment key={row.key}>
                   {/* Proxy message — shown above Resonance when LLM matched a different aesthetic */}
-                  {row.key === "resonance" && resonanceProxyMessage && !resonanceLoading && !isStep3ProductStage && (
+                  {row.key === "resonance" && resonanceProxyMessage && !resonanceLoading && (
                     <div style={{ fontSize: 11, color: "rgba(67,67,43,0.50)", fontFamily: inter, marginBottom: 8, lineHeight: 1.5 }}>
                       {resonanceProxyMessage}
                     </div>
@@ -3748,35 +3461,25 @@ export default function ConceptStudioPage() {
                     numericPercent={row.scoreNum}
                     scoreColor={row.color}
                     pill={row.chip ? { variant: row.chip.variant, label: row.chip.status } : null}
-                    subLabel={
-                      isStep3ProductStage && (row.key === "identity" || row.key === "resonance")
-                        ? null
-                        : isStep3ProductStage && row.key === "execution"
-                        ? "Unlocks when you define material and construction"
-                        : row.subLabel
-                    }
+                    subLabel={row.subLabel}
                     whatItMeans={row.what}
                     howCalculated={row.how}
                     isPending={row.pending}
-                    isExpanded={!isStep3ProductStage || row.key === "execution" ? pulseExpandedRow === row.key : false}
-                    onToggleExpand={
-                      isStep3ProductStage && (row.key === "identity" || row.key === "resonance")
-                        ? undefined
-                        : () => setPulseExpandedRow(pulseExpandedRow === row.key ? null : row.key)
-                    }
-                    rowOpacity={isStep3ProductStage && (row.key === "identity" || row.key === "resonance") ? 0.5 : 1}
+                    isExpanded={pulseExpandedRow === row.key}
+                    onToggleExpand={() => setPulseExpandedRow(pulseExpandedRow === row.key ? null : row.key)}
+                    rowOpacity={1}
                   />
                 </React.Fragment>
               ))}
             </div>
 
             {/* Major section divider */}
-            <div style={{ height: 1, background: "#E8E3D6", margin: "20px 0 24px" }} />
+            <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px", marginTop: 4 }} />
 
             {/* MUKO INSIGHT */}
             {!selectedAesthetic ? (
               <div style={{ marginBottom: 28 }}>
-                <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>
+                <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 20 }}>
                   Muko Guidance
                 </div>
                 <MukoStreamingParagraph
@@ -3787,7 +3490,7 @@ export default function ConceptStudioPage() {
             ) : (
               (currentStage !== "language" && currentStage !== "product" && step1ReadLoading && !step1ReadData && !conceptStreamingText) ? (
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#A8A09A", marginBottom: 14 }}>
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 20 }}>
                     Muko Guidance
                   </div>
                   {[80, 60, 90, 55].map((w, i) => (
@@ -3809,26 +3512,17 @@ export default function ConceptStudioPage() {
                       items: step1ReadData?.edit ?? insightContent.opportunity,
                     }}
                     mode={step1ReadData?.mode}
-                    isStreaming={currentStage !== "language" && currentStage !== "product" && step1ReadLoading && !!conceptStreamingText}
+                    isStreaming={currentStage !== "language" && step1ReadLoading && !!conceptStreamingText}
                     streamingText={conceptStreamingText}
                     streamingParagraph={conceptStreamingParagraph}
-                    isParagraphStreaming={currentStage !== "language" && currentStage !== "product" && conceptIsParagraphStreaming && !!conceptStreamingParagraph}
+                    isParagraphStreaming={currentStage !== "language" && conceptIsParagraphStreaming && !!conceptStreamingParagraph}
                     languageStreamingText={step2StreamingText}
                     languageStreamingRows={step2StreamingRows}
                     isLanguageStreaming={currentStage === "language" && step2ReadLoading && !!step2StreamingText}
-                    pieceStreamingTitle={pieceStreamingTitle}
-                    pieceStreamingBody={pieceStreamingBody}
-                    isPieceStreaming={currentStage === "product" && pieceReadLoading && !!(pieceStreamingTitle || pieceStreamingBody)}
                     pageMode="concept"
-                    canContinue={canLockDirection}
                     conceptStage={currentStage}
                     languageRead={step2ReadData}
-                    productPieceRead={activePieceRead}
-                    productStrategicImplication={activeStrategicImplication}
-                    productStructure={collectionStructureSummary}
-                    hasSelectedProductPiece={Boolean(activeProductPieceEntry)}
                     showBrandContextLabel={Boolean(aestheticInflection.trim())}
-                    onContinue={handleContinueToSpecs}
                     nextMove={{
                       mode: "concept",
                       guidance: step1ReadData?.decision_guidance ?? null,
@@ -3836,11 +3530,8 @@ export default function ConceptStudioPage() {
                       selectedAnchorPiece: activeProductPieceId,
                       isConfirmed: decisionGuidanceState.is_confirmed,
                       confirmedAnchorPiece: heroAssignedPieceId,
-                      onSelectAnchorPiece: handleSelectProductPiece,
                       onConfirm: step1ReadData?.decision_guidance ? handleConfirmDirection : undefined,
                       isLoading: step1ReadLoading && !step1ReadData?.decision_guidance,
-                      onRoleSelect: (role) => activeProductPieceId && handleAssignRoleToPiece(activeProductPieceId, role),
-                      currentRole: activeProductPieceId ? pieceRolesById[activeProductPieceId] ?? null : null,
                     }}
                   />
                 </motion.div>

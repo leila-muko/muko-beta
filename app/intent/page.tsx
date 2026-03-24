@@ -1,13 +1,26 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
 import { useSessionStore } from "@/lib/store/sessionStore";
-import { BRAND } from "../../lib/concept-studio/constants";
+import { MukoNav } from "@/components/MukoNav";
+import { createClient } from "@/lib/supabase/client";
 
-type CollectionRoleId = "hero" | "directional" | "core-evolution" | "volume-driver";
+// --- Design tokens ---
+const BG = "#F9F7F4";
+const BG2 = "#F2EFE9";
+const TEXT = "#191919";
+const MUTED = "#888078";
+const BORDER = "#E2DDD6";
+const CHARTREUSE = "#A8B475";
+const CAMEL = "#B8876B";
+const STEEL = "#7D96AC";
+const ROSE = "#CDAAB3";
 
+const inter = "var(--font-inter), -ui-sans-serif, sans-serif";
+const sohne = "var(--font-sohne-breit), -ui-sans-serif, sans-serif";
+
+// --- Types ---
 type SuccessId =
   | "brand_statement"
   | "commercial_performance"
@@ -15,75 +28,9 @@ type SuccessId =
   | "protect_margins"
   | "experiment_learn";
 
-type TradeoffId =
-  | "refinement_over_boldness"
-  | "margin_over_materials"
-  | "speed_over_perfection"
-  | "trend_over_longevity"
-  | "nothing_line_in_sand";
+// --- Constants ---
 
-type TensionValue = "left" | "center" | "right";
-
-type IntentPayload = {
-  success: SuccessId[];
-  tradeoff: TradeoffId | null;
-  collectionRole: CollectionRoleId | null;
-  tensions: {
-    trendForward_vs_timeless: TensionValue;
-    creative_vs_commercial: TensionValue;
-    elevated_vs_accessible: TensionValue;
-    novelty_vs_continuity: TensionValue;
-  };
-  miss: string;
-  meta: {
-    seasonLabel: string;
-    collectionName: string;
-    savedAt: string;
-  };
-};
-
-type BrandPalette = typeof BRAND & {
-  steelBlue?: string;
-  steel?: string;
-};
-
-type SuccessOption = {
-  id: SuccessId;
-  title: string;
-  description: string;
-};
-
-type TradeoffOption = {
-  id: TradeoffId;
-  title: string;
-  description: string;
-};
-
-type TensionDefinition = {
-  key: "trend" | "creative" | "elevated" | "novelty";
-  left: string;
-  right: string;
-  accent: string;
-  value: TensionValue;
-  onChange: (next: TensionValue) => void;
-};
-
-const CHARTREUSE = "#A8B475";
-const OLIVE = BRAND.oliveInk;
-const CREAM = "#FAF9F6";
-const inter = "var(--font-inter), system-ui, sans-serif";
-const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
-
-const microLabel: React.CSSProperties = {
-  fontFamily: inter,
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase",
-  color: "rgba(67,67,43,0.38)",
-};
-
-const successOptions: SuccessOption[] = [
+const SUCCESS_OPTIONS: { id: SuccessId; title: string; description: string }[] = [
   {
     id: "brand_statement",
     title: "Make a strong brand statement",
@@ -111,357 +58,420 @@ const successOptions: SuccessOption[] = [
   },
 ];
 
-const tradeoffOptions: TradeoffOption[] = [
+const SLIDERS = [
   {
-    id: "refinement_over_boldness",
-    title: "Refinement over boldness",
-    description: "Keep the direction tighter and safer than pushing too far.",
+    key: "trend" as const,
+    label: "Trend ↔ Timeless",
+    left: "Trend-forward",
+    right: "Timeless",
+    description: "How exposed to trend velocity should this collection be?",
+    color: CHARTREUSE,
+    labels: ["Trend-forward", "Balanced Horizon", "Timeless"] as [string, string, string],
   },
   {
-    id: "margin_over_materials",
-    title: "Margin over materials",
-    description: "Protect the business by staying flexible on fabric choices.",
+    key: "creative" as const,
+    label: "Creative ↔ Commercial",
+    left: "Creative expression",
+    right: "Commercial safety",
+    description: "Where does the collection sit between expression and broad market usability?",
+    color: STEEL,
+    labels: ["Creative-led", "Balanced Creativity", "Commercially safe"] as [string, string, string],
   },
   {
-    id: "speed_over_perfection",
-    title: "Speed over perfection",
-    description: "Move on time, even if every detail is not fully resolved.",
+    key: "elevated" as const,
+    label: "Elevated ↔ Accessible",
+    left: "Elevated design",
+    right: "Accessible price",
+    description: "How should design ambition and price architecture be balanced?",
+    color: CAMEL,
+    labels: ["Design-elevated", "Balanced Value", "Accessible"] as [string, string, string],
   },
   {
-    id: "trend_over_longevity",
-    title: "Trend clarity over longevity",
-    description: "Prioritize relevance now, even if it dates faster.",
-  },
-  {
-    id: "nothing_line_in_sand",
-    title: "Nothing — this is a line in the sand",
-    description: "This collection should not compromise here.",
+    key: "novelty" as const,
+    label: "Novelty ↔ Continuity",
+    left: "Novelty",
+    right: "Continuity",
+    description: "Should the collection introduce fresh ground or reinforce what is already owned?",
+    color: ROSE,
+    labels: ["Novelty-forward", "Continuity-aware", "Continuity-first"] as [string, string, string],
   },
 ];
 
-const tensionDescriptorMap: Record<
-  TensionDefinition["key"],
-  Record<TensionValue, string>
-> = {
-  trend: {
-    left: "Strong trend lean",
-    center: "Balanced horizon",
-    right: "Strong timeless lean",
-  },
-  creative: {
-    left: "Expressive bias",
-    center: "Balanced creativity",
-    right: "Commercially protective",
-  },
-  elevated: {
-    left: "Slight premium bias",
-    center: "Balanced value posture",
-    right: "Price-aware discipline",
-  },
-  novelty: {
-    left: "Novelty-led",
-    center: "Continuity-aware",
-    right: "Continuity-led",
-  },
-};
-
-const tensionNarrativeMap: Record<
-  TensionDefinition["key"],
-  Record<TensionValue, string>
-> = {
-  trend: {
-    left: "This collection should read as current, directional, and culturally alert.",
-    center: "This collection should hold current relevance without chasing the moment too hard.",
-    right: "This collection should feel enduring, grounded, and less exposed to rapid trend turnover.",
-  },
-  creative: {
-    left: "Muko should preserve room for expression, even when choices become harder to commercialize.",
-    center: "Muko should maintain a balanced creative-commercial posture.",
-    right: "Muko should protect clarity, confidence, and broader market usability.",
-  },
-  elevated: {
-    left: "Muko should favor elevated design cues, then work backward to protect feasibility.",
-    center: "Muko should balance perceived elevation with realistic price architecture.",
-    right: "Muko should maintain design integrity while keeping price accessibility in view.",
-  },
-  novelty: {
-    left: "Muko should encourage freshness and visible evolution across the assortment.",
-    center: "Muko should evolve the line while keeping recognizable continuity.",
-    right: "Muko should protect recognizability and build on what already feels owned.",
-  },
-};
-
-function valueToIndex(value: TensionValue) {
-  return value === "left" ? 0 : value === "center" ? 1 : 2;
+// --- Helpers ---
+function positionLabel(v: number, labels: [string, string, string]): string {
+  if (v <= 30) return labels[0];
+  if (v <= 69) return labels[1];
+  return labels[2];
 }
 
-function indexToValue(index: number): TensionValue {
-  if (index <= 0) return "left";
-  if (index >= 2) return "right";
-  return "center";
+function deliveryWeeks(season: string): number | null {
+  const m = season.match(/^(SS|FW)(\d{2})$/i);
+  if (!m) return null;
+  const type = m[1].toUpperCase();
+  const year = 2000 + parseInt(m[2], 10);
+  // FW: target Aug 1; SS: target Feb 1
+  const delivery = type === "FW" ? new Date(year, 7, 1) : new Date(year, 1, 1);
+  const now = new Date();
+  const weeks = Math.round((delivery.getTime() - now.getTime()) / (7 * 24 * 3600 * 1000));
+  return weeks > 0 ? weeks : null;
 }
 
-function sentenceCaseJoin(items: string[]) {
-  if (items.length === 0) return "";
-  if (items.length === 1) return items[0];
-  if (items.length === 2) return `${items[0]} and ${items[1]}`;
-  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+// --- Sub-components ---
+
+function BeatHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div>
+      {/* Eyebrow with extending hairline */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 10,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: inter,
+            fontSize: 9,
+            fontWeight: 600,
+            letterSpacing: "0.2em",
+            textTransform: "uppercase" as const,
+            color: MUTED,
+            flexShrink: 0,
+          }}
+        >
+          {eyebrow}
+        </span>
+        <div style={{ flex: 1, height: 1, background: BORDER }} />
+      </div>
+      {/* Heading */}
+      <div
+        style={{
+          fontFamily: sohne,
+          fontSize: 30,
+          fontWeight: 700,
+          color: TEXT,
+          letterSpacing: "-0.02em",
+          lineHeight: 1.15,
+          marginBottom: 6,
+        }}
+      >
+        {title}
+      </div>
+      {/* Description */}
+      {description && (
+        <div
+          style={{
+            fontFamily: inter,
+            fontSize: 13,
+            color: MUTED,
+            fontStyle: "italic",
+            lineHeight: 1.6,
+            marginBottom: 28,
+            maxWidth: 560,
+          }}
+        >
+          {description}
+        </div>
+      )}
+    </div>
+  );
 }
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontFamily: inter,
+        fontSize: 9,
+        fontWeight: 600,
+        letterSpacing: "0.16em",
+        textTransform: "uppercase" as const,
+        color: MUTED,
+        marginBottom: 5,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function BeatDivider() {
+  return <div style={{ height: 1, background: BORDER, margin: "0 0 52px" }} />;
+}
+
+function RailCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        background: BG2,
+        borderRadius: 10,
+        padding: "14px 16px",
+        marginBottom: 12,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function IntentSlider({
+  label,
+  left,
+  right,
+  description,
+  color,
+  posLabel,
+  value,
+  onChange,
+}: {
+  label: string;
+  left: string;
+  right: string;
+  description: string;
+  color: string;
+  posLabel: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const parts = label.split("↔");
+  return (
+    <div>
+      {/* Axis title row */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginBottom: 4,
+        }}
+      >
+        <span style={{ fontFamily: sohne, fontSize: 17, fontWeight: 700, color: TEXT, letterSpacing: "-0.01em" }}>
+          {parts[0]}
+          <span style={{ fontFamily: inter, fontSize: 14, color: MUTED, margin: "0 4px", verticalAlign: "middle" }}>↔</span>
+          {parts[1]}
+        </span>
+        <span
+          style={{
+            fontFamily: inter,
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase" as const,
+            color,
+            ...(color === ROSE ? { filter: "saturate(1.4)" } : {}),
+          }}
+        >
+          {posLabel}
+        </span>
+      </div>
+      {/* Description */}
+      <p
+        style={{
+          fontFamily: inter,
+          fontSize: 12,
+          fontStyle: "italic",
+          color: MUTED,
+          margin: "0 0 14px",
+          lineHeight: 1.5,
+        }}
+      >
+        {description}
+      </p>
+      {/* Track row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span
+          style={{
+            width: 88,
+            fontFamily: inter,
+            fontSize: 10,
+            color: MUTED,
+            flexShrink: 0,
+            lineHeight: 1.3,
+          }}
+        >
+          {left}
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="intent-range"
+          style={
+            {
+              "--intent-accent": color,
+              "--intent-fill": `${value}%`,
+            } as React.CSSProperties
+          }
+        />
+        <span
+          style={{
+            width: 88,
+            fontFamily: inter,
+            fontSize: 10,
+            color: MUTED,
+            textAlign: "right",
+            flexShrink: 0,
+            lineHeight: 1.3,
+          }}
+        >
+          {right}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// --- Main page ---
 
 export default function IntentCalibrationPage() {
   const router = useRouter();
+
   const {
-    season,
-    setCurrentStep,
+    setTargetMsrp: storeTargetMsrp,
+    setTargetMargin: storeTargetMargin,
+    setSuccessPriorities: storeSuccessPriorities,
+    setSliderTrend: storeSliderTrend,
+    setSliderCreative: storeSliderCreative,
+    setSliderElevated: storeSliderElevated,
+    setSliderNovelty: storeSliderNovelty,
     setIntentGoals,
     setIntentTradeoff,
-    setCollectionRole: storeSetCollectionRole,
+    setCurrentStep,
   } = useSessionStore();
 
-  const STEEL = (BRAND as BrandPalette).steelBlue ?? (BRAND as BrandPalette).steel ?? "#7D96AC";
-  const maxSuccess = 3;
+  // Read-only context from entry page — reactive store subscriptions
+  const season = useSessionStore((s) => s.season);
+  const collectionName = useSessionStore((s) => s.collectionName);
 
-  const [headerCollectionName] = useState<string>(() => {
-    try {
-      return window.localStorage.getItem("muko_collectionName") ?? "Collection";
-    } catch {
-      return "Collection";
-    }
-  });
-  const [headerSeasonLabel] = useState<string>(() => {
-    try {
-      return window.localStorage.getItem("muko_seasonLabel") ?? (season || "—");
-    } catch {
-      return season || "—";
-    }
-  });
+  // Initialize editable fields from persisted store
+  const init = useSessionStore.getState();
+  const [targetMsrp, setTargetMsrp] = useState<number>(init.targetMsrp ?? 0);
+  const [targetMargin, setTargetMargin] = useState<number>(
+    init.targetMargin > 0 ? init.targetMargin : 0
+  );
+  const [successPriorities, setSuccessPriorities] = useState<SuccessId[]>(
+    (init.successPriorities as SuccessId[]) || []
+  );
+  const [sliderTrend, setSliderTrend] = useState(init.sliderTrend ?? 50);
+  const [sliderCreative, setSliderCreative] = useState(init.sliderCreative ?? 50);
+  const [sliderElevated, setSliderElevated] = useState(init.sliderElevated ?? 50);
+  const [sliderNovelty, setSliderNovelty] = useState(init.sliderNovelty ?? 50);
+  const [brandDnaChips, setBrandDnaChips] = useState<string[]>([]);
 
   useEffect(() => {
     setCurrentStep?.(1);
   }, [setCurrentStep]);
 
-  const [success, setSuccess] = useState<SuccessId[]>(() => {
-    try {
-      const saved = window.localStorage.getItem("muko_intent");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.success ?? [];
+  // Seed MSRP, margin, and brand DNA keywords from brand profile on mount
+  useEffect(() => {
+    const supabase = createClient();
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("brand_profiles")
+        .select("target_margin, target_msrp, keywords")
+        .eq("user_id", user.id)
+        .single();
+      if (!data) return;
+      if (targetMargin === 0 && data.target_margin) {
+        const pct = Math.round(data.target_margin * 100);
+        setTargetMargin(pct);
+        storeTargetMargin(pct);
       }
-    } catch {}
-    return [];
-  });
-  const [tradeoff, setTradeoff] = useState<TradeoffId | null>(() => {
-    try {
-      const saved = window.localStorage.getItem("muko_intent");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.tradeoff ?? null;
+      if (targetMsrp === 0 && data.target_msrp) {
+        setTargetMsrp(data.target_msrp);
+        storeTargetMsrp(data.target_msrp);
       }
-    } catch {}
-    return null;
-  });
-  const [collectionRole] = useState<CollectionRoleId | null>(() => {
-    try {
-      const saved = window.localStorage.getItem("muko_intent");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.collectionRole ?? null;
+      if (data.keywords && Array.isArray(data.keywords)) {
+        setBrandDnaChips(data.keywords as string[]);
       }
-    } catch {}
-    return null;
-  });
-  const [tTrend, setTTrend] = useState<TensionValue>(() => {
-    try {
-      const saved = window.localStorage.getItem("muko_intent");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.tensions?.trendForward_vs_timeless ?? "center";
-      }
-    } catch {}
-    return "center";
-  });
-  const [tCreative, setTCreative] = useState<TensionValue>(() => {
-    try {
-      const saved = window.localStorage.getItem("muko_intent");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.tensions?.creative_vs_commercial ?? "center";
-      }
-    } catch {}
-    return "center";
-  });
-  const [tElevated, setTElevated] = useState<TensionValue>(() => {
-    try {
-      const saved = window.localStorage.getItem("muko_intent");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.tensions?.elevated_vs_accessible ?? "center";
-      }
-    } catch {}
-    return "center";
-  });
-  const [tNovelty, setTNovelty] = useState<TensionValue>(() => {
-    try {
-      const saved = window.localStorage.getItem("muko_intent");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.tensions?.novelty_vs_continuity ?? "center";
-      }
-    } catch {}
-    return "center";
-  });
-  const [touched, setTouched] = useState({ success: false, tradeoff: false, role: false });
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const selectedSuccessOptions = useMemo(
-    () => successOptions.filter((option) => success.includes(option.id)),
-    [success]
-  );
-  const selectedTradeoffOption = useMemo(
-    () => tradeoffOptions.find((option) => option.id === tradeoff) ?? null,
-    [tradeoff]
-  );
-  const canContinue = success.length > 0 && Boolean(tradeoff);
+  // Derived values
+  const cogsCeiling =
+    targetMsrp > 0 && targetMargin > 0
+      ? Math.round(targetMsrp * (1 - targetMargin / 100))
+      : null;
+  const weeksOut = deliveryWeeks(season);
 
-  const tensionDefinitions: TensionDefinition[] = [
-    {
-      key: "trend",
-      left: "Trend-forward",
-      right: "Timeless",
-      accent: CHARTREUSE,
-      value: tTrend,
-      onChange: setTTrend,
-    },
-    {
-      key: "creative",
-      left: "Creative expression",
-      right: "Commercial safety",
-      accent: STEEL,
-      value: tCreative,
-      onChange: setTCreative,
-    },
-    {
-      key: "elevated",
-      left: "Elevated design",
-      right: "Accessible price",
-      accent: "#B8876B",
-      value: tElevated,
-      onChange: setTElevated,
-    },
-    {
-      key: "novelty",
-      left: "Novelty",
-      right: "Continuity",
-      accent: "#A97B8F",
-      value: tNovelty,
-      onChange: setTNovelty,
-    },
-  ];
-
-  const tensionChips = tensionDefinitions.map(
-    (item) => tensionDescriptorMap[item.key][item.value]
-  );
-
-  const primaryGoalText = selectedSuccessOptions[0]?.title ?? "Not yet set";
-  const tradeoffText = selectedTradeoffOption?.title ?? "Not yet set";
-
-  const mukoInsight = useMemo(() => {
-    if (!success.length && !tradeoff) {
-      return "Set the collection stance here and Muko will carry that posture forward into concept, specification, and downstream recommendations.";
-    }
-
-    const lines: string[] = [];
-
-    if (selectedSuccessOptions.length) {
-      const lead = selectedSuccessOptions[0].title;
-      const support = selectedSuccessOptions.slice(1).map((item) => item.title.toLowerCase());
-      if (support.length) {
-        lines.push(
-          `The collection is being framed around ${lead.toLowerCase()}, while still holding space for ${sentenceCaseJoin(
-            support
-          )}.`
-        );
-      } else {
-        lines.push(`The collection is being framed around ${lead.toLowerCase()}.`);
-      }
-    }
-
-    if (selectedTradeoffOption) {
-      lines.push(`When pressure appears, Muko should protect against compromising ${selectedTradeoffOption.title.toLowerCase()}.`);
-    }
-
-    lines.push(
-      tensionNarrativeMap.trend[tTrend],
-      tensionNarrativeMap.creative[tCreative],
-      tensionNarrativeMap.elevated[tElevated],
-      tensionNarrativeMap.novelty[tNovelty]
-    );
-
-    if (collectionRole === "hero") {
-      lines.push("This reads like a hero collection posture: conviction first, with Muko flagging commercial risk rather than flattening it.");
-    } else if (collectionRole === "directional") {
-      lines.push("This reads as a directional move: Muko should help keep the proposition sharp without losing viability.");
-    } else if (collectionRole === "core-evolution") {
-      lines.push("This reads as controlled evolution: Muko should tighten guardrails around overreach and protect clarity.");
-    } else if (collectionRole === "volume-driver") {
-      lines.push("This reads as a volume-driver posture: Muko should protect margin, pace, and repeatability.");
-    }
-
-    return lines.join(" ");
-  }, [
-    collectionRole,
-    selectedSuccessOptions,
-    selectedTradeoffOption,
-    success.length,
-    tradeoff,
-    tTrend,
-    tCreative,
-    tElevated,
-    tNovelty,
-  ]);
-
-  const toggleSuccess = (id: SuccessId) => {
-    setTouched((current) => ({ ...current, success: true }));
-    setSuccess((current) => {
-      if (current.includes(id)) return current.filter((item) => item !== id);
-      if (current.length >= maxSuccess) return current;
-      return [...current, id];
-    });
+  const sliderLabels = {
+    trend: positionLabel(sliderTrend, SLIDERS[0].labels),
+    creative: positionLabel(sliderCreative, SLIDERS[1].labels),
+    elevated: positionLabel(sliderElevated, SLIDERS[2].labels),
+    novelty: positionLabel(sliderNovelty, SLIDERS[3].labels),
   };
 
-  const saveIntent = () => {
-    const payload: IntentPayload = {
-      success,
-      tradeoff,
-      collectionRole,
-      tensions: {
-        trendForward_vs_timeless: tTrend,
-        creative_vs_commercial: tCreative,
-        elevated_vs_accessible: tElevated,
-        novelty_vs_continuity: tNovelty,
-      },
-      miss: "",
-      meta: {
-        seasonLabel: headerSeasonLabel,
-        collectionName: headerCollectionName,
-        savedAt: new Date().toISOString(),
-      },
-    };
+  const canContinue =
+    collectionName.trim().length > 0 &&
+    season.length > 0 &&
+    successPriorities.length > 0;
 
-    try {
-      window.localStorage.setItem("muko_intent", JSON.stringify(payload));
-    } catch {}
-
-    setIntentGoals(selectedSuccessOptions.map((item) => item.title));
-    setIntentTradeoff(selectedTradeoffOption?.title ?? "");
-    if (collectionRole) storeSetCollectionRole(collectionRole);
+  // --- Handlers ---
+  const handleTargetMsrp = (v: number) => {
+    setTargetMsrp(v);
+    storeTargetMsrp(v);
+  };
+  const handleTargetMargin = (v: number) => {
+    setTargetMargin(v);
+    storeTargetMargin(v);
+  };
+  const togglePriority = (id: SuccessId) => {
+    setSuccessPriorities((prev) => {
+      let next: SuccessId[];
+      if (prev.includes(id)) {
+        next = prev.filter((x) => x !== id);
+      } else if (prev.length >= 3) {
+        next = prev;
+      } else {
+        next = [...prev, id];
+      }
+      storeSuccessPriorities(next);
+      return next;
+    });
+  };
+  const handleSlider = (
+    key: "trend" | "creative" | "elevated" | "novelty",
+    v: number
+  ) => {
+    if (key === "trend") {
+      setSliderTrend(v);
+      storeSliderTrend(v);
+    } else if (key === "creative") {
+      setSliderCreative(v);
+      storeSliderCreative(v);
+    } else if (key === "elevated") {
+      setSliderElevated(v);
+      storeSliderElevated(v);
+    } else {
+      setSliderNovelty(v);
+      storeSliderNovelty(v);
+    }
   };
 
   const onContinue = () => {
-    setTouched({ success: true, tradeoff: true, role: true });
     if (!canContinue) return;
-
-    saveIntent();
-
+    // Populate intentGoals (titles) for backward compat with scoring pipeline
+    const titles = successPriorities
+      .map((id) => SUCCESS_OPTIONS.find((o) => o.id === id)?.title ?? "")
+      .filter(Boolean);
+    setIntentGoals(titles);
+    setIntentTradeoff(""); // cleared in new model
+    // Reset concept state for a fresh flow
     useSessionStore.setState({
       aestheticInput: "",
       aestheticMatchedId: null,
@@ -479,875 +489,652 @@ export default function IntentCalibrationPage() {
       directionInterpretationChips: [],
       isProxyMatch: false,
     });
-
+    // TODO: persist collection-level intent to Supabase when schema supports it
     router.push("/concept");
   };
 
+  const sliderValues = {
+    trend: sliderTrend,
+    creative: sliderCreative,
+    elevated: sliderElevated,
+    novelty: sliderNovelty,
+  };
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: CREAM,
-        display: "flex",
-        position: "relative",
-      }}
-    >
+    <div style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column" }}>
       <style>{`
-        @keyframes intentInsightFade {
-          from { opacity: 0; transform: translateY(4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        .intent-shell {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) 360px;
-          gap: 72px;
-          align-items: start;
-        }
-
-        .intent-goal-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 0;
-        }
-
-        .intent-tradeoff-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 0;
-        }
-
-        .intent-tension-stack {
-          display: flex;
-          flex-direction: column;
-          gap: 48px;
-        }
-
         .intent-range {
-          width: 100%;
           -webkit-appearance: none;
           appearance: none;
-          background: transparent;
+          width: 100%;
           height: 28px;
+          background: transparent;
           cursor: pointer;
+          display: block;
         }
-
-        .intent-range:focus {
-          outline: none;
-        }
-
+        .intent-range:focus { outline: none; }
         .intent-range::-webkit-slider-runnable-track {
-          height: 4px;
-          border-radius: 999px;
-          background:
-            linear-gradient(to right,
-              var(--intent-accent) 0%,
-              var(--intent-accent) var(--intent-fill),
-              rgba(220, 215, 206, 0.9) var(--intent-fill),
-              rgba(220, 215, 206, 0.9) 100%);
+          height: 3px;
+          border-radius: 2px;
+          background: linear-gradient(
+            to right,
+            var(--intent-accent) 0%,
+            var(--intent-accent) var(--intent-fill),
+            ${BORDER} var(--intent-fill),
+            ${BORDER} 100%
+          );
         }
-
         .intent-range::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 18px;
-          height: 18px;
-          border-radius: 999px;
-          background: rgba(255,255,255,0.98);
-          border: 1.5px solid var(--intent-accent);
-          margin-top: -7px;
-          box-shadow: 0 10px 24px rgba(67,67,43,0.12), 0 0 0 4px color-mix(in srgb, var(--intent-accent) 14%, transparent);
-          transition: transform 180ms ease, box-shadow 180ms ease;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: white;
+          border: 2px solid var(--intent-accent);
+          margin-top: -6.5px;
+          box-shadow: 0 1px 6px rgba(0,0,0,0.14);
+          transition: transform 120ms ease;
         }
-
-        .intent-range:active::-webkit-slider-thumb {
-          transform: scale(1.06);
-        }
-
+        .intent-range:active::-webkit-slider-thumb { transform: scale(1.08); }
         .intent-range::-moz-range-track {
-          height: 4px;
-          border-radius: 999px;
-          background: rgba(220, 215, 206, 0.9);
+          height: 3px;
+          border-radius: 2px;
+          background: ${BORDER};
         }
-
         .intent-range::-moz-range-progress {
-          height: 4px;
-          border-radius: 999px;
+          height: 3px;
+          border-radius: 2px;
           background: var(--intent-accent);
         }
-
         .intent-range::-moz-range-thumb {
-          width: 18px;
-          height: 18px;
-          border-radius: 999px;
-          background: rgba(255,255,255,0.98);
-          border: 1.5px solid var(--intent-accent);
-          box-shadow: 0 10px 24px rgba(67,67,43,0.12);
+          -moz-appearance: none;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: white;
+          border: 2px solid var(--intent-accent);
+          box-shadow: 0 1px 6px rgba(0,0,0,0.14);
         }
-
-        @media (max-width: 1180px) {
-          .intent-shell {
-            grid-template-columns: 1fr;
-          }
-
-          .intent-rail {
-            position: static !important;
-          }
+        .intent-card-field {
+          width: 100%;
+          padding: 10px 0;
+          border: none;
+          border-bottom: 1px solid #F2EFE9;
+          border-radius: 0;
+          font-family: ${inter};
+          font-size: 15px;
+          font-weight: 500;
+          color: ${TEXT};
+          background: transparent;
+          outline: none;
+          box-sizing: border-box;
+          transition: border-bottom-color 0.15s;
         }
-
+        .intent-card-field::placeholder { color: ${BORDER}; font-weight: 400; font-size: 14px; }
+        .intent-card-field:focus { border-bottom: 1.5px solid ${CHARTREUSE}; }
+        .priority-row {
+          width: 100%;
+          background: white;
+          border: 1px solid ${BORDER};
+          border-radius: 10px;
+          padding: 16px 18px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          cursor: pointer;
+          text-align: left;
+          font: inherit;
+          position: relative;
+          overflow: hidden;
+          transition: border-color 0.12s, background 0.12s;
+        }
+        .priority-row:hover:not(.selected):not(:disabled) {
+          border-color: #C8C2BA;
+          background: #FDFCFB;
+        }
+        .priority-row.selected {
+          border: 1px solid ${CHARTREUSE};
+          background: #F7F9F1;
+        }
+        .priority-row.selected::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 3px;
+          background: ${CHARTREUSE};
+          border-radius: 2px 0 0 2px;
+        }
+        .priority-row:disabled {
+          opacity: 0.35;
+          cursor: not-allowed;
+          pointer-events: none;
+        }
+        .intent-continue-btn:hover:not(:disabled) {
+          background: #2A2622 !important;
+        }
       `}</style>
 
-      <header
+      <MukoNav
+        activeTab="setup"
+        setupComplete={false}
+        piecesComplete={false}
+        collectionName={collectionName || undefined}
+        seasonLabel={season || undefined}
+        onSaveClose={() => {}}
+      />
+
+      {/* Two-column body */}
+      <div
         style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 72,
-          background: "rgba(250,249,246,0.92)",
-          backdropFilter: "blur(24px) saturate(160%)",
-          WebkitBackdropFilter: "blur(24px) saturate(160%)",
-          borderBottom: "1px solid rgba(67,67,43,0.09)",
-          zIndex: 200,
           display: "flex",
-          alignItems: "center",
-          padding: "0 40px",
-          justifyContent: "space-between",
-          gap: 20,
+          flex: 1,
+          marginTop: 72,
+          height: "calc(100vh - 72px)",
+          overflow: "hidden",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <button
-            type="button"
-            onClick={() => router.push("/entry")}
-            aria-label="Go to entry page"
-            style={{
-              fontFamily: sohne,
-              fontWeight: 700,
-              fontSize: 18,
-              letterSpacing: "-0.02em",
-              color: OLIVE,
-              padding: 0,
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-            }}
-          >
-            muko
-          </button>
+        {/* ── Left: scrollable content ── */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "48px 52px 60px",
+            borderRight: `1px solid ${BORDER}`,
+          }}
+        >
+          {/* ── Beat 1: Collection context ── */}
+          <section style={{ marginBottom: 52 }}>
+            <BeatHeader
+              eyebrow="Collection Context"
+              title="Set the stage."
+              description="Your season and collection name are set. Confirm your commercial parameters before building your direction."
+            />
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {[
-              { label: "Intent", done: false, active: true },
-              { label: "Concept", done: false, active: false },
-              { label: "Spec", done: false, active: false },
-              { label: "Report", done: false, active: false },
-            ].map((step) => (
-              <div
-                key={step.label}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 12px",
-                  borderRadius: 999,
-                  border: step.done
-                    ? `1.5px solid ${CHARTREUSE}`
-                    : step.active
-                    ? `1.5px solid ${STEEL}`
-                    : "1.5px solid rgba(67,67,43,0.10)",
-                  background: step.done
-                    ? "rgba(168,180,117,0.08)"
-                    : step.active
-                    ? "rgba(125,150,172,0.07)"
-                    : "rgba(67,67,43,0.03)",
-                  fontFamily: sohne,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: "0.01em",
-                  color: step.done
-                    ? "rgba(67,67,43,0.70)"
-                    : step.active
-                    ? OLIVE
-                    : "rgba(67,67,43,0.35)",
-                }}
-              >
-                {step.done ? (
-                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                    <path
-                      d="M4.5 7.2L6.2 8.8L9.5 5.5"
-                      stroke={CHARTREUSE}
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                ) : step.active ? (
-                  <span
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: 999,
-                      background: STEEL,
-                      boxShadow: "0 0 0 3px rgba(125,150,172,0.20)",
-                    }}
-                  />
-                ) : (
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 999,
-                      background: "rgba(67,67,43,0.18)",
-                    }}
-                  />
-                )}
-                {step.label}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span
-            style={{
-              fontFamily: sohne,
-              fontSize: 12,
-              fontWeight: 600,
-              color: "rgba(67,67,43,0.50)",
-              letterSpacing: "0.03em",
-            }}
-          >
-            {headerSeasonLabel}
-            <span style={{ padding: "0 7px", opacity: 0.35 }}>·</span>
-            {headerCollectionName}
-          </span>
-
-          <div style={{ display: "flex", gap: 6 }}>
-            <button
-              onClick={() => window.history.back()}
+            {/* Read-only context strip */}
+            <div
               style={{
                 display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "7px 13px 7px 10px",
-                borderRadius: 999,
-                border: "1px solid rgba(67,67,43,0.14)",
-                background: "transparent",
-                fontFamily: sohne,
-                fontSize: 11,
-                fontWeight: 600,
-                color: "rgba(67,67,43,0.62)",
-                cursor: "pointer",
-                letterSpacing: "0.01em",
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                <path
-                  d="M8.5 3L4.5 7L8.5 11"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Back
-            </button>
-
-            <button
-              onClick={saveIntent}
-              style={{
-                padding: "7px 14px",
-                borderRadius: 999,
-                border: "none",
-                background: OLIVE,
-                fontFamily: sohne,
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#F5F0E8",
-                cursor: "pointer",
-                letterSpacing: "0.01em",
-              }}
-            >
-              SAVE &amp; CLOSE
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main style={{ flex: 1, paddingTop: 72 }}>
-        <div style={{ maxWidth: 1520, margin: "0 auto", padding: "44px 44px 120px" }}>
-          <div className="intent-shell">
-            <div style={{ display: "flex", flexDirection: "column", gap: 72 }}>
-              <HeroIntro />
-
-              <SectionBlock
-                title="What does success look like for this collection?"
-                description={`Choose up to ${maxSuccess}. This sets the priorities Muko will optimize around.`}
-              >
-                <div className="intent-goal-grid">
-                  {successOptions.map((option) => {
-                    const active = success.includes(option.id);
-                    const disabled = !active && success.length >= maxSuccess;
-                    return (
-                      <SelectionCard
-                        key={option.id}
-                        title={option.title}
-                        description={option.description}
-                        selected={active}
-                        disabled={disabled}
-                        onClick={() => toggleSuccess(option.id)}
-                        accent={CHARTREUSE}
-                        variant="multi"
-                        subtleTag={active ? "Selected" : disabled ? "Limit reached" : "Choose up to 3"}
-                      />
-                    );
-                  })}
-                </div>
-                {touched.success && success.length === 0 ? (
-                  <ValidationMessage text="Select at least one objective to continue." />
-                ) : null}
-              </SectionBlock>
-
-              <SectionBlock
-                title="When tension arises, where do you hold the line?"
-                description="Choose one. This tells Muko what to protect when tradeoffs appear."
-              >
-                <div className="intent-tradeoff-grid">
-                  {tradeoffOptions.map((option) => (
-                    <SelectionCard
-                      key={option.id}
-                      title={option.title}
-                      description={option.description}
-                      selected={tradeoff === option.id}
-                      disabled={false}
-                      onClick={() => {
-                        setTouched((current) => ({ ...current, tradeoff: true }));
-                        setTradeoff(option.id);
-                      }}
-                      accent={STEEL}
-                      variant="single"
-                      subtleTag={tradeoff === option.id ? "Protected principle" : "Choose one"}
-                    />
-                  ))}
-                </div>
-                {touched.tradeoff && !tradeoff ? (
-                  <ValidationMessage text="Choose one protected principle to continue." />
-                ) : null}
-              </SectionBlock>
-
-              <SectionBlock
-                title="Define the line you&apos;re walking"
-                description="Set the balance Muko should help protect across the collection."
-              >
-                <div className="intent-tension-stack">
-                  {tensionDefinitions.map((item) => (
-                    <TensionModule
-                      key={item.key}
-                      leftLabel={item.left}
-                      rightLabel={item.right}
-                      descriptor={tensionDescriptorMap[item.key][item.value]}
-                      narrative={tensionNarrativeMap[item.key][item.value]}
-                      value={item.value}
-                      accent={item.accent}
-                      onChange={item.onChange}
-                    />
-                  ))}
-                </div>
-              </SectionBlock>
-            </div>
-
-            <aside
-              className="intent-rail"
-              style={{
-                position: "sticky",
-                top: "50%",
-                transform: "translateY(-50%)",
-                display: "flex",
-                flexDirection: "column",
-                gap: 22,
-                paddingLeft: 28,
-                borderLeft: "1px solid rgba(67,67,43,0.08)",
+                alignItems: "stretch",
+                background: BG2,
+                borderRadius: 12,
+                padding: "18px 22px",
+                marginBottom: 20,
+                gap: 32,
               }}
             >
               <div>
-                <div style={{ ...microLabel, marginBottom: 20 }}>Muko&apos;s Read</div>
                 <div
                   style={{
-                    fontFamily: sohne,
-                    fontSize: 18,
-                    lineHeight: 1.24,
-                    color: OLIVE,
-                    letterSpacing: "-0.02em",
-                    marginBottom: 8,
+                    fontFamily: inter,
+                    fontSize: 9,
+                    fontWeight: 600,
+                    letterSpacing: "0.16em",
+                    textTransform: "uppercase",
+                    color: MUTED,
+                    marginBottom: 4,
                   }}
                 >
-                  {primaryGoalText}
+                  Season
                 </div>
                 <div
                   style={{
                     fontFamily: inter,
-                    fontSize: 13,
-                    lineHeight: 1.65,
-                    color: "rgba(67,67,43,0.56)",
+                    fontSize: 15,
+                    fontWeight: 500,
+                    color: season ? TEXT : MUTED,
                   }}
                 >
-                  {tradeoffText}
-                </div>
-
-                <div
-                  key={mukoInsight}
-                  style={{
-                    marginTop: 34,
-                    animation: "intentInsightFade 300ms ease",
-                  }}
-                >
-                  <MukoStreamingParagraph
-                    text={mukoInsight}
-                    paragraphStyle={{
-                      fontFamily: inter,
-                      fontSize: 13.5,
-                      lineHeight: 1.82,
-                      color: "rgba(67,67,43,0.68)",
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 24 }}>
-                  {tensionChips.map((chip) => (
-                    <SoftChip key={`rail-${chip}`} text={chip} compact />
-                  ))}
+                  {season || "—"}
                 </div>
               </div>
 
-              <ContinueButton canContinue={canContinue} accent={STEEL} onClick={onContinue} />
-            </aside>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
+              <div style={{ width: 1, background: BORDER, flexShrink: 0 }} />
 
-function HeroIntro() {
-  return (
-    <section
-      style={{
-        padding: "28px 0 6px",
-      }}
-    >
-      <h1
-        style={{
-          margin: 0,
-          fontFamily: sohne,
-          fontWeight: 500,
-          fontSize: 38,
-          color: OLIVE,
-          letterSpacing: "-0.03em",
-          lineHeight: 1.02,
-          maxWidth: 720,
-        }}
-      >
-        Intent Calibration
-      </h1>
-      <p
-        style={{
-          margin: "12px 0 0",
-          fontFamily: inter,
-          fontSize: 15,
-          color: "rgba(67,67,43,0.62)",
-          lineHeight: 1.8,
-          maxWidth: 740,
-        }}
-      >
-        Set the intention for this collection: what you are optimizing for, where you are flexible,
-        and which tensions Muko should help you navigate. This becomes the strategic thesis the rest
-        of the flow will build around.
-      </p>
-    </section>
-  );
-}
+              <div>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 9,
+                    fontWeight: 600,
+                    letterSpacing: "0.16em",
+                    textTransform: "uppercase",
+                    color: MUTED,
+                    marginBottom: 4,
+                  }}
+                >
+                  Collection Name
+                </div>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 15,
+                    fontWeight: 500,
+                    color: collectionName ? TEXT : MUTED,
+                  }}
+                >
+                  {collectionName || "—"}
+                </div>
+              </div>
+            </div>
 
-function SectionBlock({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      style={{
-        padding: "0",
-      }}
-    >
-      <div
-        style={{
-          marginBottom: 24,
-          maxWidth: 760,
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            fontFamily: sohne,
-            fontSize: 28,
-            fontWeight: 500,
-            color: OLIVE,
-            letterSpacing: "-0.025em",
-            lineHeight: 1.06,
-          }}
-        >
-          {title}
-        </h2>
-        <p
-          style={{
-            margin: "12px 0 0",
-            fontFamily: inter,
-            fontSize: 14,
-            lineHeight: 1.7,
-            color: "rgba(67,67,43,0.56)",
-          }}
-        >
-          {description}
-        </p>
-      </div>
-      {children}
-    </section>
-  );
-}
+            {/* MSRP + Margin card */}
+            <div
+              style={{
+                background: "white",
+                border: `1px solid ${BORDER}`,
+                borderRadius: 12,
+                padding: "22px 24px",
+                marginBottom: 20,
+              }}
+            >
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                <div>
+                  <FieldLabel>Target MSRP ($)</FieldLabel>
+                  <input
+                    className="intent-card-field"
+                    type="number"
+                    placeholder="e.g. 450"
+                    value={targetMsrp || ""}
+                    min={0}
+                    onChange={(e) =>
+                      handleTargetMsrp(e.target.value ? Number(e.target.value) : 0)
+                    }
+                  />
+                </div>
 
-function SelectionCard({
-  title,
-  description,
-  selected,
-  disabled,
-  onClick,
-  accent,
-  variant,
-  subtleTag,
-}: {
-  title: string;
-  description: string;
-  selected: boolean;
-  disabled: boolean;
-  onClick: () => void;
-  accent: string;
-  variant: "multi" | "single";
-  subtleTag: string;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const tone = selected
-    ? `color-mix(in srgb, ${accent} 6%, rgba(255,255,255,0.52))`
-    : hovered
-    ? "rgba(255,255,255,0.22)"
-    : "transparent";
+                <div style={{ borderLeft: `1px solid ${BG2}`, paddingLeft: 16 }}>
+                  <FieldLabel>Target Margin (%)</FieldLabel>
+                  <input
+                    className="intent-card-field"
+                    type="number"
+                    placeholder="e.g. 60"
+                    value={targetMargin || ""}
+                    min={0}
+                    max={100}
+                    onChange={(e) =>
+                      handleTargetMargin(e.target.value ? Number(e.target.value) : 0)
+                    }
+                  />
+                </div>
+              </div>
+            </div>
 
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={selected}
-      onMouseEnter={() => !disabled && setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        textAlign: "left",
-        width: "100%",
-        minHeight: variant === "single" ? 98 : 92,
-        borderRadius: 18,
-        padding: "16px 0 16px 12px",
-        border: "none",
-        background: tone,
-        boxShadow: "none",
-        opacity: disabled ? 0.48 : 1,
-        cursor: disabled ? "not-allowed" : "pointer",
-        transition: "background 180ms ease, color 180ms ease, opacity 180ms ease",
-        transform: "translateY(0)",
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 24,
-        borderLeft: selected ? `1px solid color-mix(in srgb, ${accent} 58%, transparent)` : "1px solid transparent",
-        borderBottom: "1px solid rgba(67,67,43,0.07)",
-      }}
-    >
-      <div style={{ paddingRight: 12 }}>
-        <div>
-          <div
-            style={{
-              fontFamily: sohne,
-              fontSize: 17,
-              lineHeight: 1.12,
-              letterSpacing: "-0.02em",
-              color: "rgba(67,67,43,0.88)",
-              marginBottom: 6,
-            }}
-          >
-            {title}
-          </div>
-          <div
-            style={{
-              fontFamily: inter,
-              fontSize: 12.5,
-              lineHeight: 1.7,
-              color: "rgba(67,67,43,0.58)",
-              maxWidth: 420,
-            }}
-          >
-            {description}
-          </div>
-        </div>
+            {/* Brand DNA chip card */}
+            {brandDnaChips.length > 0 && (
+              <div
+                style={{
+                  background: "white",
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 12,
+                  padding: "16px 20px",
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 9,
+                    fontWeight: 600,
+                    letterSpacing: "0.16em",
+                    textTransform: "uppercase",
+                    color: MUTED,
+                    marginBottom: 10,
+                  }}
+                >
+                  Brand DNA
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {brandDnaChips.map((chip) => (
+                    <span
+                      key={chip}
+                      style={{
+                        borderRadius: 100,
+                        border: `1px solid ${BORDER}`,
+                        background: BG,
+                        padding: "5px 13px",
+                        fontSize: 11,
+                        fontWeight: 500,
+                        fontFamily: inter,
+                        color: MUTED,
+                      }}
+                    >
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
 
-      </div>
+          <BeatDivider />
 
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 10,
-          width: "fit-content",
-          padding: "4px 0",
-          borderRadius: 999,
-          fontFamily: inter,
-          fontSize: 11,
-          fontWeight: 500,
-          letterSpacing: "0.04em",
-          textTransform: "uppercase",
-          color: selected ? OLIVE : "rgba(67,67,43,0.44)",
-          whiteSpace: "nowrap",
-          flexShrink: 0,
-        }}
-      >
-        {selected ? (
-          <svg width="13" height="11" viewBox="0 0 13 11" fill="none" aria-hidden>
-            <path
-              d="M1.5 5.5L4.7 8.7L11.2 2.2"
-              stroke={accent}
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          {/* ── Beat 2: Success priorities ── */}
+          <section style={{ marginBottom: 52 }}>
+            <BeatHeader
+              eyebrow="Priorities"
+              title="Set your priorities."
+              description="Choose up to 3. These set what Muko optimizes toward when scoring and giving guidance."
             />
-          </svg>
-        ) : variant === "multi" ? (
-          <span style={{ fontSize: 18, lineHeight: 1, color: "rgba(67,67,43,0.34)" }} aria-hidden>+</span>
-        ) : (
-          <span style={{ width: 7, height: 7, borderRadius: 999, background: "rgba(67,67,43,0.24)" }} aria-hidden />
-        )}
-        <span>{subtleTag}</span>
-      </div>
-    </button>
-  );
-}
 
-function TensionModule({
-  leftLabel,
-  rightLabel,
-  descriptor,
-  narrative,
-  value,
-  accent,
-  onChange,
-}: {
-  leftLabel: string;
-  rightLabel: string;
-  descriptor: string;
-  narrative: string;
-  value: TensionValue;
-  accent: string;
-  onChange: (value: TensionValue) => void;
-}) {
-  const sliderValue = valueToIndex(value);
-  const fill = `${sliderValue * 50}%`;
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {SUCCESS_OPTIONS.map((opt) => {
+                const selected = successPriorities.includes(opt.id);
+                const disabled = !selected && successPriorities.length >= 3;
+                return (
+                  <button
+                    key={opt.id}
+                    className={`priority-row${selected ? " selected" : ""}`}
+                    disabled={disabled}
+                    onClick={() => togglePriority(opt.id)}
+                  >
+                    <div style={{ flex: 1, paddingLeft: selected ? 21 : 4 }}>
+                      <div
+                        style={{
+                          fontFamily: sohne,
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color: TEXT,
+                          marginBottom: 3,
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {opt.title}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: inter,
+                          fontSize: 11,
+                          color: MUTED,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {opt.description}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        flexShrink: 0,
+                        marginLeft: 16,
+                        border: selected ? "none" : `1.5px solid ${BORDER}`,
+                        background: selected ? CHARTREUSE : "transparent",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "background 0.12s",
+                      }}
+                    >
+                      {selected && (
+                        <svg width="9" height="7" viewBox="0 0 10 8" fill="none">
+                          <path
+                            d="M1.5 4L3.5 6.5L8.5 1"
+                            stroke="white"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
-  return (
-    <div
-      style={{
-        padding: "0",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 16,
-          marginBottom: 12,
-        }}
-      >
-        <div>
+          <BeatDivider />
+
+          {/* ── Beat 3: Sliders ── */}
+          <section>
+            <BeatHeader
+              eyebrow="Tradeoffs"
+              title="Set the balance."
+              description="These weight what Muko emphasizes in scoring and guidance. They travel with every piece you build."
+            />
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+              {SLIDERS.map((s) => (
+                <IntentSlider
+                  key={s.key}
+                  label={s.label}
+                  left={s.left}
+                  right={s.right}
+                  description={s.description}
+                  color={s.color}
+                  value={sliderValues[s.key]}
+                  posLabel={positionLabel(sliderValues[s.key], s.labels)}
+                  onChange={(v) => handleSlider(s.key, v)}
+                />
+              ))}
+            </div>
+          </section>
+
+          {/* ── Continue button — sticky to bottom of scroll area ── */}
           <div
             style={{
-            fontFamily: sohne,
-            fontSize: 17,
-            color: OLIVE,
-            letterSpacing: "-0.02em",
-            lineHeight: 1.08,
+              position: "sticky",
+              bottom: 0,
+              background: `linear-gradient(to top, ${BG} 80%, transparent)`,
+              padding: "24px 0 0",
+              marginTop: 52,
+              display: "flex",
+              justifyContent: "flex-end",
             }}
           >
-            {leftLabel} <span style={{ color: "rgba(67,67,43,0.34)" }}>↔</span> {rightLabel}
-          </div>
-          <div
-            style={{
-              marginTop: 10,
-              fontFamily: inter,
-              fontSize: 13,
-              lineHeight: 1.7,
-              color: "rgba(67,67,43,0.56)",
-              maxWidth: 620,
-            }}
-          >
-            {narrative}
+            <button
+              onClick={onContinue}
+              disabled={!canContinue}
+              className="intent-continue-btn"
+              style={{
+                padding: "13px 28px",
+                borderRadius: 100,
+                border: "none",
+                background: canContinue ? TEXT : BORDER,
+                color: canContinue ? "white" : MUTED,
+                fontFamily: inter,
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: canContinue ? "pointer" : "not-allowed",
+                transition: "background 0.15s",
+                letterSpacing: "0.02em",
+              }}
+            >
+              Continue to Direction →
+            </button>
           </div>
         </div>
 
+        {/* ── Right rail: Intent Preview ── */}
         <div
           style={{
-            padding: "0",
-            borderRadius: 999,
-            fontFamily: inter,
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            color: OLIVE,
-            whiteSpace: "nowrap",
+            width: 320,
+            flexShrink: 0,
+            overflowY: "auto",
+            padding: "28px 28px",
+            background: BG,
+            borderLeft: `1px solid ${BORDER}`,
           }}
         >
-          {descriptor}
+          <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, marginBottom: 20 }}>Intent Preview</div>
+
+          {/* Margin Gate */}
+          <RailCard>
+            <div
+              style={{
+                fontFamily: inter,
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color: MUTED,
+                marginBottom: 6,
+              }}
+            >
+              Margin Gate
+            </div>
+            <div
+              style={{
+                fontFamily: inter,
+                fontSize: 22,
+                fontWeight: 600,
+                color: TEXT,
+              }}
+            >
+              {cogsCeiling !== null ? `$${cogsCeiling}` : "—"}
+            </div>
+            <div
+              style={{
+                fontFamily: inter,
+                fontSize: 11,
+                color: MUTED,
+                marginTop: 2,
+              }}
+            >
+              COGS ceiling at {targetMargin}% margin
+            </div>
+            {targetMsrp > 0 && (
+              <div
+                style={{
+                  marginTop: 8,
+                  height: 3,
+                  borderRadius: 2,
+                  background: BORDER,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${Math.min(Math.max(targetMargin, 0), 100)}%`,
+                    height: "100%",
+                    background: CHARTREUSE,
+                    borderRadius: 2,
+                    transition: "width 0.2s",
+                  }}
+                />
+              </div>
+            )}
+          </RailCard>
+
+          {/* Delivery Window */}
+          <RailCard>
+            <div
+              style={{
+                fontFamily: inter,
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color: MUTED,
+                marginBottom: 6,
+              }}
+            >
+              Delivery Window
+            </div>
+            <div
+              style={{
+                fontFamily: inter,
+                fontSize: 22,
+                fontWeight: 600,
+                color: TEXT,
+              }}
+            >
+              {weeksOut !== null ? `${weeksOut}w` : "—"}
+            </div>
+            <div
+              style={{
+                fontFamily: inter,
+                fontSize: 11,
+                color: MUTED,
+                marginTop: 2,
+              }}
+            >
+              {weeksOut !== null
+                ? `${weeksOut} weeks to ${season} delivery`
+                : "Select a season to see delivery window"}
+            </div>
+          </RailCard>
+
+          <div style={{ height: 1, background: BORDER, margin: "0 0 24px" }} />
+
+          {/* Collection Stance */}
+          <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, marginBottom: 12 }}>Collection Stance</div>
+
+          {[
+            { label: "Trend", value: sliderLabels.trend, color: CHARTREUSE },
+            { label: "Creative", value: sliderLabels.creative, color: STEEL },
+            { label: "Elevated", value: sliderLabels.elevated, color: CAMEL },
+            { label: "Novelty", value: sliderLabels.novelty, color: ROSE },
+          ].map((row) => (
+            <div
+              key={row.label}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: BG2,
+                borderRadius: 8,
+                padding: "8px 10px",
+                marginBottom: 4,
+              }}
+            >
+              <span style={{ fontFamily: inter, fontSize: 11, color: MUTED }}>
+                {row.label}
+              </span>
+              <span
+                style={{
+                  fontFamily: inter,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: row.color,
+                }}
+              >
+                {row.value}
+              </span>
+            </div>
+          ))}
+
+          {/* Priorities */}
+          {successPriorities.length > 0 && (
+            <>
+              <div style={{ height: 1, background: BORDER, margin: "16px 0 24px" }} />
+              <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, marginBottom: 12 }}>Priorities</div>
+              {successPriorities.map((id) => {
+                const opt = SUCCESS_OPTIONS.find((o) => o.id === id);
+                if (!opt) return null;
+                return (
+                  <div
+                    key={id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 5,
+                        height: 5,
+                        borderRadius: "50%",
+                        background: CHARTREUSE,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ fontFamily: inter, fontSize: 11, color: TEXT }}>
+                      {opt.title}
+                    </span>
+                  </div>
+                );
+              })}
+            </>
+          )}
         </div>
       </div>
-
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 14, marginTop: 18 }}>
-        <span style={{ fontFamily: inter, fontSize: 12, fontWeight: 500, color: "rgba(67,67,43,0.68)" }}>
-          {leftLabel}
-        </span>
-        <span style={{ fontFamily: inter, fontSize: 12, fontWeight: 500, color: "rgba(67,67,43,0.68)" }}>
-          {rightLabel}
-        </span>
-      </div>
-
-      <input
-        className="intent-range"
-        type="range"
-        min={0}
-        max={2}
-        step={1}
-        value={sliderValue}
-        aria-label={`${leftLabel} versus ${rightLabel}`}
-        onChange={(event) => onChange(indexToValue(Number(event.target.value)))}
-        style={
-          {
-            "--intent-accent": accent,
-            "--intent-fill": fill,
-          } as React.CSSProperties
-        }
-      />
-    </div>
-  );
-}
-
-function SoftChip({
-  text,
-  compact,
-}: {
-  text: string;
-  compact?: boolean;
-}) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 7,
-        padding: compact ? "5px 0" : "7px 0",
-        borderRadius: 999,
-        fontFamily: inter,
-        fontSize: compact ? 11 : 12,
-        fontWeight: 500,
-        lineHeight: 1,
-        color: "rgba(67,67,43,0.68)",
-      }}
-    >
-      <span style={{ color: "rgba(67,67,43,0.34)", fontSize: compact ? 12 : 13, lineHeight: 1 }}>•</span>
-      {text}
-    </span>
-  );
-}
-
-function ContinueButton({
-  canContinue,
-  accent,
-  onClick,
-}: {
-  canContinue: boolean;
-  accent: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!canContinue}
-      style={{
-        width: "100%",
-        padding: "15px 18px",
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 700,
-        fontFamily: sohne,
-        letterSpacing: "0.02em",
-        color: canContinue ? accent : "rgba(67,67,43,0.30)",
-        background: canContinue
-          ? "linear-gradient(180deg, rgba(125,150,172,0.12) 0%, rgba(125,150,172,0.08) 100%)"
-          : "rgba(255,255,255,0.46)",
-        border: canContinue
-          ? `1.5px solid ${accent}`
-          : "1.5px solid rgba(67,67,43,0.10)",
-        cursor: canContinue ? "pointer" : "not-allowed",
-        transition: "all 220ms ease",
-        opacity: canContinue ? 1 : 0.65,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 10,
-      }}
-    >
-      <span>Continue to Concept</span>
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 16 16"
-        fill="none"
-        style={{ opacity: canContinue ? 1 : 0.4 }}
-      >
-        <path
-          d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </button>
-  );
-}
-
-function ValidationMessage({ text }: { text: string }) {
-  return (
-    <div
-      style={{
-        marginTop: 12,
-        fontFamily: inter,
-        fontSize: 12,
-        fontWeight: 600,
-        color: BRAND.rose,
-      }}
-    >
-      {text}
     </div>
   );
 }

@@ -44,6 +44,8 @@ interface AnalysisRow {
   score?: number | null;
   gates_passed?: { cost?: boolean | null } | null;
   agent_versions?: Record<string, string | null> | null;
+  dimensions?: { identity?: number | null; resonance?: number | null; execution?: number | null } | null;
+  narrative?: string | null;
 }
 
 interface CollectionPageProps {
@@ -252,13 +254,13 @@ function CollectionHealthFooter({
   health,
   analysesCount,
   onGenerateReport,
+  reportExists,
 }: {
   health: CollectionHealthState;
   analysesCount: number;
   onGenerateReport: () => void;
+  reportExists: boolean;
 }) {
-  const canGenerateReport = analysesCount >= 2;
-
   const flagged = health.metrics
     .filter((metric) => metric.variant !== 'green')
     .slice(0, 2);
@@ -272,118 +274,76 @@ function CollectionHealthFooter({
 
   const needsWord = flagged.length === 1 ? 'needs' : 'need';
 
+  // Approximate last-run date from most recent analysis
+  const lastRunLabel: string | null = null; // Would need stored report date — omit for now
+
   return (
     <div
       style={{
-        position: 'sticky',
-        bottom: 0,
-        padding: '14px 36px 20px',
+        flexShrink: 0,
+        borderTop: '1px solid #E2DDD6',
+        padding: '13px 32px',
+        background: '#F9F7F4',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 16,
         boxSizing: 'border-box',
-        borderTop: '1px solid rgba(67,67,43,0.08)',
-        background: 'rgba(250,249,246,0.98)',
       }}
     >
-      {flaggedNames ? (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            minWidth: 0,
-            padding: '6px 10px',
-            borderRadius: 999,
-            border: '1px solid rgba(67,67,43,0.08)',
-            background: 'rgba(255,255,255,0.72)',
-          }}
-        >
-          <div
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: '#B8876B',
-              flexShrink: 0,
-            }}
-          />
-          <span
-            style={{
-              minWidth: 0,
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: 4,
-              flexWrap: 'wrap',
-              fontFamily: inter,
-              fontSize: 12,
-              lineHeight: 1.2,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: '#8D7668',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Watchlist
+      {/* Left: watchlist */}
+      <div style={{ display: 'flex', flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#B8876B', flexShrink: 0 }} />
+        <span style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#B8876B' }}>
+          Watchlist
+        </span>
+        {flaggedNames ? (
+          <>
+            <span style={{ fontFamily: inter, fontSize: 11, color: '#C8C2BA' }}> · </span>
+            <span style={{ fontFamily: inter, fontSize: 11, color: '#888078' }}>
+              {flaggedNames}{' '}
+              <span style={{ color: '#B8876B' }}>{needsWord} attention</span>
             </span>
-            <span style={{ fontWeight: 500, color: '#5B524D' }}>{flaggedNames}</span>
-            <span style={{ fontWeight: 400, color: '#A8A09A' }}>{needsWord} attention</span>
-          </span>
-        </div>
-      ) : <div />}
+          </>
+        ) : (
+          <>
+            <span style={{ fontFamily: inter, fontSize: 11, color: '#C8C2BA' }}> · </span>
+            <span style={{ fontFamily: inter, fontSize: 11, color: '#888078' }}>
+              see report for guidance
+            </span>
+          </>
+        )}
+      </div>
 
-      <button
-        onClick={onGenerateReport}
-        disabled={!canGenerateReport}
-        style={{
-          padding: '14px 16px',
-          borderRadius: 10,
-          fontSize: 12,
-          fontWeight: 700,
-          fontFamily: sohne,
-          letterSpacing: '0.02em',
-          color: canGenerateReport ? '#7D96AC' : 'rgba(67,67,43,0.30)',
-          background: canGenerateReport ? 'rgba(125,150,172,0.07)' : 'rgba(255,255,255,0.46)',
-          border: canGenerateReport ? '1.5px solid #7D96AC' : '1.5px solid rgba(67,67,43,0.10)',
-          cursor: canGenerateReport ? 'pointer' : 'not-allowed',
-          transition: 'all 280ms ease',
-          opacity: canGenerateReport ? 1 : 0.65,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 10,
-          flexShrink: 0,
-          minWidth: 180,
-        }}
-      >
-        <span>Generate Report</span>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          style={{
-            transition: 'transform 280ms ease',
-            transform: canGenerateReport ? 'translateX(0)' : 'translateX(-2px)',
-            opacity: canGenerateReport ? 1 : 0.4,
-          }}
-        >
-          <path
-            d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
+      {/* Right: report actions */}
+      {analysesCount === 0 ? null : reportExists ? (
+        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {lastRunLabel && (
+            <span style={{ fontFamily: inter, fontSize: 10, color: '#888078' }}>Last run: {lastRunLabel}</span>
+          )}
+          {lastRunLabel && <span style={{ fontFamily: inter, fontSize: 10, color: '#888078' }}> · </span>}
+          <button
+            onClick={onGenerateReport}
+            style={{
+              fontFamily: inter,
+              fontSize: 10,
+              color: '#191919',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#A8B475'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#191919'; }}
+          >
+            Re-run analysis
+          </button>
+        </div>
+      ) : (
+        <span style={{ fontFamily: inter, fontSize: 11, color: '#888078', opacity: 0.5 }}>
+          {analysesCount < 2 ? 'Generate Report — spec all pieces first' : 'Generate Report from header above'}
+        </span>
+      )}
     </div>
   );
 }
@@ -752,7 +712,7 @@ export default function CollectionPage({
       const { data } = await supabase
         .from('analyses')
         .select(
-          'id, category, aesthetic_input, season, material_id, silhouette, construction_tier, created_at, score, gates_passed, agent_versions'
+          'id, category, aesthetic_input, season, material_id, silhouette, construction_tier, created_at, score, gates_passed, agent_versions, dimensions, narrative'
         )
         .eq('user_id', userId)
         .eq('collection_name', collectionName)
@@ -794,6 +754,23 @@ export default function CollectionPage({
   const seasonLabel = season ?? analyses[0]?.season ?? '';
   const canGenerateReport = analyses.length >= 2;
 
+  // Aggregate scores for score banner
+  const scoredAnalyses = useMemo(() => analyses.filter(a => (a.score ?? 0) > 0), [analyses]);
+  const reportExists = scoredAnalyses.length > 0;
+  const collectionScore = reportExists
+    ? Math.round(scoredAnalyses.reduce((sum, a) => sum + (a.score ?? 0), 0) / scoredAnalyses.length)
+    : 0;
+  const avgIdentity = reportExists
+    ? Math.round(scoredAnalyses.reduce((sum, a) => sum + (a.dimensions?.identity ?? 0), 0) / scoredAnalyses.length)
+    : 0;
+  const avgResonance = reportExists
+    ? Math.round(scoredAnalyses.reduce((sum, a) => sum + (a.dimensions?.resonance ?? 0), 0) / scoredAnalyses.length)
+    : 0;
+  const avgExecution = reportExists
+    ? Math.round(scoredAnalyses.reduce((sum, a) => sum + (a.dimensions?.execution ?? 0), 0) / scoredAnalyses.length)
+    : 0;
+  const mukoReadNarrative = scoredAnalyses[0]?.narrative ?? null;
+
   const handleGenerateReport = () => {
     if (!canGenerateReport) return;
 
@@ -822,103 +799,267 @@ export default function CollectionPage({
     <>
       <div
         style={{
-          minHeight: '100%',
+          height: '100%',
           display: 'flex',
           flexDirection: 'column',
           boxSizing: 'border-box',
+          background: '#F9F7F4',
         }}
       >
+        {/* ── Collection header ──────────────────────────────────────────── */}
         <div
           style={{
-            flex: 1,
-            padding: '32px 36px 0',
-            boxSizing: 'border-box',
+            padding: '22px 32px',
+            borderBottom: '1px solid #E2DDD6',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 24,
+            flexShrink: 0,
+            background: '#F9F7F4',
           }}
         >
-          <div
-            style={{
-              padding: '0 0 24px',
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: 24,
-            }}
-          >
-            <div>
-              <h1
-                style={{
-                  margin: 0,
-                  fontFamily: sohne,
-                  fontSize: 22,
-                  fontWeight: 700,
-                  letterSpacing: '-0.02em',
-                  color: '#191919',
-                }}
-              >
-                {collectionName}
-              </h1>
-
-              <div
-                style={{
-                  marginTop: 4,
-                  fontFamily: inter,
-                  fontSize: 12,
-                  color: '#A8A09A',
-                }}
-              >
-                {seasonLabel || 'Season not set'}
+          <div>
+            {seasonLabel && (
+              <div style={{ fontFamily: inter, fontSize: 11, color: '#888078', marginBottom: 4 }}>
+                {seasonLabel}
               </div>
+            )}
+            <h1
+              style={{
+                margin: '0 0 10px 0',
+                fontFamily: sohne,
+                fontSize: 28,
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+                color: '#191919',
+                lineHeight: 1.1,
+              }}
+            >
+              {collectionName}
+            </h1>
+            {/* Tags row */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {analyses[0]?.aesthetic_input && (
+                <span
+                  style={{
+                    background: '#EFF2E5',
+                    color: '#6B7A40',
+                    border: '1px solid #C8D49A',
+                    borderRadius: 100,
+                    fontSize: 9,
+                    fontWeight: 600,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    padding: '4px 10px',
+                    fontFamily: inter,
+                  }}
+                >
+                  ✓ {analyses[0].aesthetic_input}
+                </span>
+              )}
+              <button
+                onClick={() => router.push('/intent')}
+                style={{
+                  fontFamily: inter,
+                  fontSize: 11,
+                  color: '#888078',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#191919'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = '#888078'; }}
+              >
+                Edit Setup →
+              </button>
             </div>
+          </div>
 
+          {/* Right CTAs */}
+          <div style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'flex-start', flexShrink: 0 }}>
             <button
               onClick={onNewPiece}
               style={{
-                padding: '14px 16px',
-                borderRadius: 10,
-                fontSize: 12,
-                fontFamily: sohne,
-                fontWeight: 700,
-                letterSpacing: '0.02em',
-                color: '#A8B475',
-                background: 'rgba(168,180,117,0.08)',
-                border: '1.5px solid #A8B475',
+                border: '1px solid #E2DDD6',
+                background: '#FFFFFF',
+                color: '#888078',
+                borderRadius: 100,
+                padding: '8px 16px',
+                fontSize: 11,
+                fontFamily: inter,
                 cursor: 'pointer',
-                transition: 'all 280ms ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 10,
+                transition: 'border-color 150ms ease, color 150ms ease',
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#A8B475'; e.currentTarget.style.color = '#A8B475'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E2DDD6'; e.currentTarget.style.color = '#888078'; }}
             >
-              <span>Add Piece</span>
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
+              Add Piece →
+            </button>
+
+            {reportExists ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                <button
+                  onClick={handleGenerateReport}
+                  style={{
+                    background: '#A8B475',
+                    color: '#3A4020',
+                    borderRadius: 100,
+                    border: 'none',
+                    padding: '9px 20px',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    fontFamily: inter,
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#95A164'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = '#A8B475'; }}
+                >
+                  View Report →
+                </button>
+                <button
+                  onClick={handleGenerateReport}
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 10,
+                    color: '#888078',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    textAlign: 'right',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#191919'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#888078'; }}
+                >
+                  Re-run analysis
+                </button>
+              </div>
+            ) : (
+              <button
+                disabled
                 style={{
-                  transition: 'transform 280ms ease',
-                  transform: 'translateX(0)',
-                  opacity: 1,
+                  background: '#E2DDD6',
+                  color: '#888078',
+                  borderRadius: 100,
+                  border: 'none',
+                  padding: '9px 18px',
+                  fontSize: 12,
+                  fontFamily: inter,
+                  cursor: 'not-allowed',
                 }}
               >
-                <path
-                  d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
+                Generate Report
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── Score banner (only when report exists) ─────────────────────── */}
+        {reportExists && (
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderBottom: '1px solid #E2DDD6',
+              padding: '16px 32px',
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 28,
+              flexShrink: 0,
+            }}
+          >
+            {/* Overall score */}
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+              <span style={{ fontFamily: sohne, fontWeight: 700, fontSize: 48, color: '#191919', lineHeight: 1 }}>
+                {collectionScore}
+              </span>
+              <span style={{ fontFamily: inter, fontSize: 11, color: '#888078' }}>Collection Score</span>
+            </div>
+
+            <div style={{ width: 1, height: 40, background: '#E2DDD6', flexShrink: 0 }} />
+
+            {/* Dimension scores */}
+            <div style={{ display: 'flex', flexDirection: 'row', gap: 24 }}>
+              {([
+                { label: 'Identity', score: avgIdentity, color: '#A8B475' },
+                { label: 'Resonance', score: avgResonance, color: '#B8876B' },
+                {
+                  label: 'Execution',
+                  score: avgExecution,
+                  color: avgExecution >= 70 ? '#7A9E7E' : avgExecution >= 50 ? '#C4955A' : '#B85C5C',
+                },
+              ] as Array<{ label: string; score: number; color: string }>).map(({ label, score, color }) => (
+                <div key={label}>
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888078', marginBottom: 2 }}>
+                    {label}
+                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 20, fontWeight: 700, color }}>
+                    {score || '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {mukoReadNarrative && (
+              <>
+                <div style={{ width: 1, height: 40, background: '#E2DDD6', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: inter, fontSize: 13, fontWeight: 600, color: '#191919', marginBottom: 3 }}>
+                    {mukoReadNarrative.split('.')[0]?.trim()}.
+                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 11, color: '#888078', lineHeight: 1.5 }}>
+                    {mukoReadNarrative.split('.')[1]?.trim() ?? ''}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Pieces section ─────────────────────────────────────────────── */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+          {/* Section label */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginBottom: 16,
+            }}
+          >
+            <span
+              style={{
+                display: 'inline-block',
+                width: 3,
+                height: 14,
+                background: '#A8B475',
+                borderRadius: 2,
+                marginRight: 10,
+                verticalAlign: 'middle',
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{
+                fontFamily: inter,
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: '#888078',
+              }}
+            >
+              Pieces{analyses.length > 0 ? ` · ${analyses.length} total` : ''}
+            </span>
           </div>
 
           <div
             style={{
-              padding: '0 0 100px',
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-              gap: 16,
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: 14,
+              paddingBottom: 100,
             }}
           >
             {loading ? (
@@ -929,33 +1070,16 @@ export default function CollectionPage({
               <div
                 style={{
                   gridColumn: '1 / -1',
-                  minHeight: 260,
+                  padding: '40px 0',
                   display: 'flex',
-                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   textAlign: 'center',
                 }}
               >
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 14,
-                    color: '#A8A09A',
-                  }}
-                >
-                  No pieces yet.
-                </div>
-                <div
-                  style={{
-                    marginTop: 6,
-                    fontFamily: inter,
-                    fontSize: 12,
-                    color: '#C8BFB8',
-                  }}
-                >
-                  Run an analysis and add it to this collection.
-                </div>
+                <span style={{ fontFamily: inter, fontSize: 13, color: '#888078' }}>
+                  No pieces have been added yet. Add your first piece to get started.
+                </span>
               </div>
             ) : (
               analyses.map((analysis) => (
@@ -970,11 +1094,13 @@ export default function CollectionPage({
           </div>
         </div>
 
-        {!loading && analyses.length > 0 && (
+        {/* ── Watchlist footer ───────────────────────────────────────────── */}
+        {!loading && (
           <CollectionHealthFooter
             health={collectionHealth}
             analysesCount={analyses.length}
             onGenerateReport={handleGenerateReport}
+            reportExists={reportExists}
           />
         )}
       </div>
