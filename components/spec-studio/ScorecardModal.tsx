@@ -23,7 +23,7 @@ const STATIC_ACTION_FALLBACK: ActionSuggestion = {
   show_alternatives: false,
   alternatives: [],
   cta_variant: "add",
-  hint_text: "Revise to keep refining · Branch to explore a variation",
+  hint_text: "Revise to keep refining",
 };
 
 /* ─── Brand tokens (match all other pages exactly) ─── */
@@ -223,7 +223,6 @@ export function ScorecardModal({
     activeCollection,
     savedAnalysisId,
     setSavedAnalysisId,
-    setParentAnalysisId,
     setCurrentStep,
     aestheticInput,
     materialId,
@@ -411,7 +410,7 @@ export function ScorecardModal({
           ...(selectedPieceImage ? { selected_piece_image: JSON.stringify(selectedPieceImage) } : {}),
           ...(collectionRole ? { collection_role: collectionRole } : {}),
         },
-        parent_analysis_id: null,
+        // parent_analysis_id removed — branching deferred to Phase 2
       };
 
       let insertResult = await supabase
@@ -453,14 +452,6 @@ export function ScorecardModal({
     }
     setSaveState("saved");
     setTimeout(() => router.push("/collections"), 1500);
-  };
-
-  /* ─── Existing: Branch ─── */
-  const handleBranch = () => {
-    if (savedAnalysisId) setParentAnalysisId(savedAnalysisId);
-    onRevise();
-    setCurrentStep(2);
-    router.push("/concept");
   };
 
   const mainScoreColor = scoreColor(mukoScore);
@@ -859,9 +850,6 @@ export function ScorecardModal({
                 >
                   {isRevise ? "← Revise specs" : "Revise"}
                 </button>
-
-                {/* Branch — always ghost */}
-                <GhostButton onClick={handleBranch}>Branch</GhostButton>
 
                 {/* Add to Collection — primary fill when clean, ghost when conflict */}
                 <button

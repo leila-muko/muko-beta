@@ -10,9 +10,16 @@ import { createClient } from '@/lib/supabase/server';
 export const runtime = 'nodejs'; // NOT edge — needs full Node.js for Anthropic SDK
 
 export async function POST(req: NextRequest) {
+  let body;
   try {
-    const body = await req.json();
-
+    body = await req.json();
+  } catch {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  try {
     // ── INPUT VALIDATION ──
     const { aesthetic_keywords, aesthetic_name, brand_profile_id } = body;
 

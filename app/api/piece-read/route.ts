@@ -27,7 +27,16 @@ function buildStaticFallback(pieceItem: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const { piece, context }: PieceReadRequest = await req.json();
+  let body: PieceReadRequest;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  const { piece, context } = body;
   const pieceItem = piece?.item?.trim() ?? "";
   const fallback = buildStaticFallback(pieceItem);
 

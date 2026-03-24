@@ -15,7 +15,16 @@ const STATIC_FALLBACK = {
 };
 
 export async function POST(req: NextRequest) {
-  const { aesthetic_name, brand_keywords }: InflectionSuggestionRequest = await req.json();
+  let body: InflectionSuggestionRequest;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  const { aesthetic_name, brand_keywords } = body;
 
   if (!aesthetic_name?.trim()) {
     return NextResponse.json({ suggestions: [] });

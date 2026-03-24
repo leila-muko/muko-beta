@@ -301,8 +301,16 @@ async function streamCollectionReport(payload: CollectionReportInput): Promise<R
 }
 
 export async function POST(req: NextRequest) {
+  let body: AssortmentInsightRequest | CollectionReportRequest;
   try {
-    const body = (await req.json()) as AssortmentInsightRequest | CollectionReportRequest;
+    body = await req.json();
+  } catch {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  try {
 
     if (body.action === 'assortment_insight') {
       return NextResponse.json({

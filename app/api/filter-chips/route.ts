@@ -6,7 +6,10 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
   }
 
   const { chipLabels, synthEdit, keyPiece } = body;

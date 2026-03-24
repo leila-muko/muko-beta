@@ -116,7 +116,7 @@ export function buildAnalysisRow(
 ): Record<string, unknown> {
   const intent        = bb.session.intent as IntentCalibration | undefined;
   const existingId    = (bb.session.savedAnalysisId as string | null | undefined) ?? null;
-  const parentId      = (bb.session.parentAnalysisId as string | null | undefined) ?? null;
+  // parent_analysis_id removed — branching deferred to Phase 2
   const collAesthetic = (bb.session.collectionAesthetic as string | null | undefined) ?? null;
   const aestheticInfl = (bb.session.aestheticInflection as string | null | undefined)
     ?? (bb.session.directionInterpretationText as string | null | undefined)
@@ -160,7 +160,7 @@ export function buildAnalysisRow(
     intent_tension_creative: intent?.tension_sliders?.creative_expression ?? null,
     intent_tension_elevated: intent?.tension_sliders?.elevated_design ?? null,
     intent_tension_novelty:  intent?.tension_sliders?.novelty ?? null,
-    parent_analysis_id: parentId,
+    // parent_analysis_id removed — branching deferred to Phase 2
   };
 
   if (existingId) row.id = existingId;

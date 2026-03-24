@@ -39,8 +39,16 @@ function getFallbacks(scores: SubscoresRequest['scores']): SubscoresResult {
 const SYSTEM_PROMPT = `You are a fashion strategy analyst writing one-sentence dimension summaries for a design intelligence report. Each sentence should be sharp, specific, and explain WHY the score is what it is — not just what the dimension means. Reference the actual inputs (aesthetic name, material, brand keywords) rather than generic descriptions. Write like a creative director leaving a margin note. Never be generic. Never restate the score number. Return only raw JSON with no markdown fences, no backticks, no preamble.`;
 
 export async function POST(req: NextRequest) {
+  let body: SubscoresRequest;
   try {
-    const body: SubscoresRequest = await req.json();
+    body = await req.json();
+  } catch {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  try {
     console.log('[subscores] route hit', JSON.stringify(body));
     const { aesthetic, material, category, season, brandKeywords, scores, gates } = body;
 

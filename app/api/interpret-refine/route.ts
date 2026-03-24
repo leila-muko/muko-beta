@@ -20,8 +20,17 @@ const VALID_MODIFIERS = [
 ];
 
 export async function POST(req: NextRequest) {
+  let body;
   try {
-    const { base, text } = await req.json();
+    body = await req.json();
+  } catch {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  try {
+    const { base, text } = body;
 
     if (!base || !text || text.trim().length < 2) {
       return NextResponse.json({ modifiers: [], confidence: "high" });

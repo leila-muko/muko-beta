@@ -5,16 +5,16 @@ import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 const SYSTEM_PROMPT = `You are Muko, a fashion decision intelligence assistant. Given an analysis context, generate 2–3 short questions a designer might want to ask right now. Make them specific to the actual scores and data present. Under 10 words each. Return only a JSON array of strings with no other text.`;
 
 export async function POST(req: NextRequest) {
-  let context: AskMukoContext;
-
+  let body;
   try {
-    ({ context } = await req.json());
+    body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
   }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  const { context }: { context: AskMukoContext } = body;
 
   if (!context) {
     return new Response(JSON.stringify({ error: "Missing context" }), {

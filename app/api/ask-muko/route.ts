@@ -88,17 +88,16 @@ function buildSystemPrompt(context: AskMukoContext): string {
 }
 
 export async function POST(req: NextRequest) {
-  let question: string;
-  let context: AskMukoContext;
-
+  let body;
   try {
-    ({ question, context } = await req.json());
+    body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
   }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  const { question, context }: { question: string; context: AskMukoContext } = body;
 
   if (!question || !context) {
     return new Response(JSON.stringify({ error: "Missing question or context" }), {

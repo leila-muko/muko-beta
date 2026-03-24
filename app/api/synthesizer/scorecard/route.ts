@@ -86,13 +86,16 @@ Rules:
 }
 
 export async function POST(req: NextRequest) {
-  let payload: ScorecardPayload;
+  let body;
   try {
-    payload = await req.json();
-  } catch (err) {
-    console.error('[scorecard synthesizer error]', err);
-    return NextResponse.json({ error: 'Synthesis failed', detail: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    body = await req.json();
+  } catch {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
   }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  const payload: ScorecardPayload = body;
 
   try {
     const raw = await callClaude(buildPrompt(payload), {

@@ -91,13 +91,5 @@ export async function updateAnalysis(id: string, updates: Partial<Analysis>) {
   return data as Analysis;
 }
 
-export async function getChildAnalyses(parentId: string) {
-  const { data, error } = await supabase
-    .from('analyses')
-    .select('*')
-    .eq('parent_analysis_id', parentId)
-    .order('created_at', { ascending: false });
-  
-  if (error) throw error;
-  return data as Analysis[];
-}
+// parent_analysis_id removed — branching deferred to Phase 2
+// getChildAnalyses() removed

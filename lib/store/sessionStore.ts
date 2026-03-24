@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { SelectedPieceImage } from '@/lib/piece-image';
+import { getSmartDefault } from '@/lib/spec-studio/smart-defaults';
 
 interface PulseState {
   status: 'green' | 'yellow' | 'red';
@@ -99,10 +100,7 @@ interface SessionState {
   activeProductPieceId: string | null;
   pieceRolesById: PieceRolesById;
 
-  // Branch tracking
-  parentAnalysisId: string | null;
   savedAnalysisId: string | null;
-  // (parentAnalysisId and collectionAesthetic are accessed directly by the orchestrator)
 
   // Collections hub
   activeCollection: string | null;
@@ -144,7 +142,6 @@ interface SessionState {
   setConceptInsight: (insight: { title: string; description: string; positioning: string[]; confidence: number | null }) => void;
   clearConceptInsight: () => void;
   setIsProxyMatch: (value: boolean) => void;
-  setParentAnalysisId: (id: string | null) => void;
   setSavedAnalysisId: (id: string | null) => void;
   setActiveCollection: (name: string | null) => void;
   setAssortmentInsightCache: (collectionName: string, insight: string) => void;
@@ -202,7 +199,6 @@ export const useSessionStore = create<SessionState>()(
       decisionGuidanceState: { is_confirmed: false, selected_anchor_piece: null },
       activeProductPieceId: null,
       pieceRolesById: {},
-      parentAnalysisId: null,
       savedAnalysisId: null,
       activeCollection: null,
       assortmentInsightCache: {},
@@ -210,19 +206,26 @@ export const useSessionStore = create<SessionState>()(
       // Actions
       setSeason: (season) => set({ season }),
       setCollectionName: (collectionName) => set({ collectionName }),
-      setAestheticInput: (aestheticInput) => set({ aestheticInput }),
+      setAestheticInput: (aestheticInput) => set((state) => state.conceptLocked ? {} : { aestheticInput }),
       setColorPalette: (colorPalette, colorPaletteName) =>
         set({ colorPalette, colorPaletteName }),
       setChipSelection: (chipSelection) => set({ chipSelection }),
       setCustomChips: (customChips) => set({ customChips }),
       setConceptSilhouette: (conceptSilhouette) => set({ conceptSilhouette }),
       setConceptPalette: (conceptPalette) => set({ conceptPalette }),
-      setCollectionAesthetic: (collectionAesthetic) => set({ collectionAesthetic }),
+      setCollectionAesthetic: (collectionAesthetic) => set((state) =>
+        state.collectionAesthetic !== null && state.selectedKeyPiece !== null
+          ? {}
+          : { collectionAesthetic }
+      ),
       setAestheticInflection: (aestheticInflection) => set({ aestheticInflection }),
       setDirectionInterpretationText: (directionInterpretationText) => set({ directionInterpretationText }),
       setDirectionInterpretationModifiers: (directionInterpretationModifiers) => set({ directionInterpretationModifiers }),
       setDirectionInterpretationChips: (directionInterpretationChips) => set({ directionInterpretationChips }),
-      setCategory: (category) => set({ category, subcategory: '' }),
+      setCategory: (category) => {
+        const tier = getSmartDefault(category);
+        set({ category, subcategory: '', constructionTierOverride: false, ...(tier ? { constructionTier: tier } : {}) });
+      },
       setSubcategory: (subcategory) => set({ subcategory }),
       setTargetMsrp: (targetMsrp) => set({ targetMsrp }),
       setMaterial: (materialId) => set({ materialId }),
@@ -257,7 +260,6 @@ export const useSessionStore = create<SessionState>()(
           conceptInsightConfidence: null,
         }),
       setIsProxyMatch: (isProxyMatch) => set({ isProxyMatch }),
-      setParentAnalysisId: (parentAnalysisId) => set({ parentAnalysisId }),
       setSavedAnalysisId: (savedAnalysisId) => set({ savedAnalysisId }),
       setActiveCollection: (activeCollection) => set({ activeCollection }),
       setAssortmentInsightCache: (collectionName, insight) =>
@@ -312,7 +314,6 @@ export const useSessionStore = create<SessionState>()(
         decisionGuidanceState: { is_confirmed: false, selected_anchor_piece: null },
         activeProductPieceId: null,
         pieceRolesById: {},
-        parentAnalysisId: null,
         savedAnalysisId: null,
       }),
     }),

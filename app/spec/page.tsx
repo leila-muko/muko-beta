@@ -1798,7 +1798,7 @@ export default function SpecStudioPage() {
                         collectionRole:    storeCollectionRole ?? null,
                         // Extra fields read by buildAnalysisRow via [key: string]: unknown
                         savedAnalysisId:             session.savedAnalysisId,
-                        parentAnalysisId:            session.parentAnalysisId,
+                        // parent_analysis_id removed — branching deferred to Phase 2
                         collectionAesthetic:         session.collectionAesthetic,
                         aestheticInflection:         session.aestheticInflection,
                         directionInterpretationText: session.directionInterpretationText,

@@ -18,15 +18,16 @@ interface ConceptLanguageRequest {
 }
 
 export async function POST(req: NextRequest) {
-  let payload: ConceptLanguageRequest;
+  let body;
   try {
-    payload = await req.json();
+    body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
   }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  const payload: ConceptLanguageRequest = body;
 
   if (!payload?.aesthetic_name) {
     return new Response(JSON.stringify({ error: 'Missing aesthetic_name' }), {

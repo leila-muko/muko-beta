@@ -29,15 +29,16 @@ function makeFallback(bb: ConceptBlackboard, editLabel: string, mode: InsightMod
 }
 
 export async function POST(req: NextRequest) {
-  let blackboard: ConceptBlackboard;
+  let body;
   try {
-    blackboard = await req.json();
+    body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
   }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  const blackboard: ConceptBlackboard = body;
 
   if (!blackboard?.aesthetic_matched_id) {
     return new Response(JSON.stringify({ error: 'Missing aesthetic_matched_id' }), {

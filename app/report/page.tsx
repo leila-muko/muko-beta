@@ -270,7 +270,7 @@ function ReportPageContent() {
   const executionPulse = useSessionStore((state) => state.executionPulse);
   const savedAnalysisId = useSessionStore((state) => state.savedAnalysisId);
   const setSavedAnalysisId = useSessionStore((state) => state.setSavedAnalysisId);
-  const setParentAnalysisId = useSessionStore((state) => state.setParentAnalysisId);
+
   const collectionFromUrl = searchParams.get('collection');
   const seasonFromUrl = searchParams.get('season');
 
@@ -631,51 +631,6 @@ function ReportPageContent() {
             Back to Collections
           </button>
 
-          {/* Branch Design — secondary/ghost style */}
-          <button
-            onClick={async () => {
-              if (!savedAnalysisId) {
-                setToastMessage('Please save this analysis first');
-                return;
-              }
-              setParentAnalysisId(savedAnalysisId);
-              useSessionStore.setState({
-                aestheticInput: '',
-                aestheticMatchedId: null,
-                collectionAesthetic: null,
-                aestheticInflection: null,
-                materialId: '',
-                silhouette: '',
-                constructionTier: 'moderate',
-                constructionTierOverride: false,
-                identityPulse: null,
-                resonancePulse: null,
-                executionPulse: null,
-                conceptLocked: false,
-                chipSelection: null,
-                customChips: {},
-                conceptSilhouette: '',
-                conceptPalette: null,
-                directionInterpretationText: '',
-                directionInterpretationModifiers: [],
-                directionInterpretationChips: [],
-                isProxyMatch: false,
-              });
-              router.push('/concept');
-            }}
-            style={{
-              padding: '12px 16px',
-              borderRadius: 999,
-              border: `1px solid rgba(67,67,43,0.18)`,
-              background: 'transparent',
-              color: `rgba(67,67,43,0.72)`,
-              fontFamily: fonts.body,
-              fontSize: 13,
-              cursor: 'pointer',
-            }}
-          >
-            Branch Design
-          </button>
 
           {/* Save to Collection — chartreuse primary style */}
           <button

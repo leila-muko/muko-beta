@@ -78,7 +78,7 @@ const STATIC_ACTION_FALLBACK: ActionSuggestion = {
   show_alternatives: false,
   alternatives: [],
   cta_variant: 'add',
-  hint_text: 'Revise to keep refining · Branch to explore a variation',
+  hint_text: 'Revise to keep refining',
 };
 
 const SYSTEM_PROMPT = `You are Muko's decision advisor. You write the action suggestion that appears on a piece scorecard after a designer runs an analysis.
@@ -137,12 +137,16 @@ Return raw JSON only:
 }
 
 export async function POST(req: NextRequest) {
-  let payload: ActionSuggestionPayload;
+  let body;
   try {
-    payload = await req.json();
+    body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
   }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  const payload: ActionSuggestionPayload = body;
 
   // Static fallback for clean pieces — no LLM call needed
   if (payload.conflict_type === 'none') {

@@ -7,8 +7,17 @@ import { generateReportNarrative } from '@/lib/synthesizer/reportNarrative';
 import type { ReportBlackboard } from '@/lib/synthesizer/reportNarrative';
 
 export async function POST(req: NextRequest) {
+  let body;
   try {
-    const blackboard: ReportBlackboard = await req.json();
+    body = await req.json();
+  } catch {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  try {
+    const blackboard: ReportBlackboard = body;
 
     if (!blackboard?.aesthetic_matched_id || !blackboard?.material_id) {
       return NextResponse.json(

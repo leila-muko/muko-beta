@@ -20,8 +20,8 @@ export interface BrandProfile {
     id: string;
     user_id: string;
     brand_profile_id: string | null;
-    parent_analysis_id: string | null;
-    
+    parent_analysis_id: string | null; // parent_analysis_id — deferred to Phase 2
+
     // Session context
     season: string;
     collection_name: string | null;

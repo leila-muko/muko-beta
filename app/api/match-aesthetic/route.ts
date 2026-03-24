@@ -26,8 +26,17 @@ const AESTHETIC_CONTEXT = `
 `;
 
 export async function POST(req: NextRequest) {
+  let body;
   try {
-    const { input } = await req.json();
+    body = await req.json();
+  } catch {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  if (!body) {
+    return Response.json({ message: 'Request body is required' }, { status: 400 });
+  }
+  try {
+    const { input } = body;
 
     if (!input || input.trim().length < 2) {
       return NextResponse.json({ match: null });
