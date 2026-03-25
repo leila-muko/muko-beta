@@ -171,7 +171,7 @@ export default function SpecStudio({
   const isComplete = materialId && silhouetteId && constructionTier;
 
   return (
-    <div className="min-h-screen bg-[#FAF8F4]">
+    <div className="min-h-screen bg-[#FAF9F6]">
       {/* Step Progress Header */}
       <div className="border-b border-[#E8E3D6] px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">

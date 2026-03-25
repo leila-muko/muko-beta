@@ -68,15 +68,16 @@ export function MukoStreamingParagraph({
 
   const prevWordCountRef = useRef(0);
   const [animateFromIndex, setAnimateFromIndex] = useState(0);
-  const [showCursor, setShowCursor] = useState(false);
+  const [showCursorTail, setShowCursorTail] = useState(false);
 
   useEffect(() => {
     const nextWordCount = splitWords(streamingText).length;
+    let frameId = 0;
 
     if (!streamingText) {
       prevWordCountRef.current = 0;
-      setAnimateFromIndex(0);
-      return;
+      frameId = window.requestAnimationFrame(() => setAnimateFromIndex(0));
+      return () => window.cancelAnimationFrame(frameId);
     }
 
     if (nextWordCount < prevWordCountRef.current) {
@@ -84,26 +85,41 @@ export function MukoStreamingParagraph({
     }
 
     if (isStreaming && nextWordCount > prevWordCountRef.current) {
-      setAnimateFromIndex(prevWordCountRef.current);
+      const startIndex = prevWordCountRef.current;
+      frameId = window.requestAnimationFrame(() => setAnimateFromIndex(startIndex));
     }
 
     prevWordCountRef.current = nextWordCount;
+
+    return () => window.cancelAnimationFrame(frameId);
   }, [isStreaming, streamingText]);
 
   useEffect(() => {
+    let frameId = 0;
+    let timeoutId = 0;
+
     if (isStreaming) {
-      setShowCursor(true);
-      return;
+      frameId = window.requestAnimationFrame(() => setShowCursorTail(false));
+      return () => window.cancelAnimationFrame(frameId);
     }
 
-    if (!showCursor) return;
+    if (!streamingText) {
+      frameId = window.requestAnimationFrame(() => setShowCursorTail(false));
+      return () => window.cancelAnimationFrame(frameId);
+    }
 
-    const timeoutId = window.setTimeout(() => {
-      setShowCursor(false);
+    frameId = window.requestAnimationFrame(() => setShowCursorTail(true));
+    timeoutId = window.setTimeout(() => {
+      setShowCursorTail(false);
     }, 400);
 
-    return () => window.clearTimeout(timeoutId);
-  }, [isStreaming, showCursor]);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [isStreaming, streamingText]);
+
+  const showCursor = isStreaming || showCursorTail;
 
   const activeStreamingText = isStreaming
     ? streamingText

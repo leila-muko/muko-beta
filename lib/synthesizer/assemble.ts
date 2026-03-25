@@ -196,12 +196,24 @@ export interface ConceptBlackboardInput {
   brandName?: string;
   /** Customer profile description from brand onboarding */
   customerProfile?: string | null;
+  /** Brand price tier from setup */
+  priceTier?: string | null;
+  /** Brand target margin from setup */
+  targetMargin?: number | null;
+  /** Brand tension context from setup */
+  tensionContext?: string | null;
   /** Reference brands from brand onboarding */
   referenceBrands?: string[];
   /** Excluded brands from brand onboarding */
   excludedBrands?: string[];
   /** Optional intent calibration from the Intent page */
   intent?: IntentCalibration;
+  /** Setup-derived strategy framing summary */
+  strategySummary?: string | null;
+  /** Expression signals from selected direction chips */
+  expressionSignals?: string[];
+  /** Brand-specific interpretation captured in setup / concept shaping */
+  brandInterpretation?: string | null;
   /** Key pieces identified for the selected concept direction */
   keyPieces?: Array<{ item: string; type?: string; signal?: string }>;
   /** Collection context for collection-aware Decision Guidance */
@@ -210,6 +222,38 @@ export interface ConceptBlackboardInput {
   isProxyMatch?: boolean;
   /** Chip labels actively selected by the designer in Concept Studio */
   chipSelection?: string[];
+}
+
+export function deriveConceptStrategySummary(input: Pick<
+  ConceptBlackboardInput,
+  | 'strategySummary'
+  | 'brandName'
+  | 'collectionName'
+  | 'priceTier'
+  | 'customerProfile'
+  | 'tensionContext'
+  | 'brandKeywords'
+  | 'targetMargin'
+  | 'referenceBrands'
+>): string | null {
+  const explicit = input.strategySummary?.trim();
+  if (explicit) return explicit;
+
+  const brandName = input.brandName?.trim() || input.collectionName?.trim() || 'The brand';
+  const parts: string[] = [];
+
+  if (input.priceTier?.trim()) parts.push(`${brandName} operates at ${input.priceTier.trim()}.`);
+  if (input.customerProfile?.trim()) parts.push(`Core customer: ${input.customerProfile.trim()}.`);
+  if (input.tensionContext?.trim()) parts.push(`Strategic tension: ${input.tensionContext.trim()}.`);
+  if (input.brandKeywords.length > 0) parts.push(`Brand equities center on ${input.brandKeywords.join(', ')}.`);
+  if (typeof input.targetMargin === 'number' && Number.isFinite(input.targetMargin)) {
+    parts.push(`Target margin sits around ${Math.round(input.targetMargin * 100)}%.`);
+  }
+  if ((input.referenceBrands ?? []).length > 0) {
+    parts.push(`Reference frame includes ${(input.referenceBrands ?? []).slice(0, 3).join(', ')}.`);
+  }
+
+  return parts.length > 0 ? parts.join(' ') : null;
 }
 
 /** Returns null when aestheticSlug is missing — callers must guard. */
@@ -227,10 +271,12 @@ export function buildConceptBlackboard(
     aesthetic_matched_id: input.aestheticSlug,
     is_proxy_match: input.isProxyMatch ?? false,
     brand_keywords: input.brandKeywords,
+    price_tier: input.priceTier ?? undefined,
     identity_score: input.identity_score,
     resonance_score: input.resonance_score,
     season: seasonKey,
     brand_name: input.brandName ?? input.collectionName ?? undefined,
+    tension_context: input.tensionContext ?? undefined,
     customer_profile: input.customerProfile ?? null,
     reference_brands: input.referenceBrands ?? [],
     excluded_brands: input.excludedBrands ?? [],
@@ -239,6 +285,9 @@ export function buildConceptBlackboard(
       brand_mismatch: null,
     },
     intent: input.intent,
+    strategy_summary: deriveConceptStrategySummary(input),
+    expression_signals: input.expressionSignals ?? [],
+    brand_interpretation: input.brandInterpretation ?? null,
     key_pieces: input.keyPieces,
     chip_selection: input.chipSelection,
     collection_context: input.collection_context,
@@ -250,6 +299,10 @@ export function buildConceptBlackboard(
 export interface SpecBlackboardInput {
   aestheticSlug: string;
   brandKeywords: string[];
+  collectionDirection?: string;
+  collectionLanguage?: string[];
+  expressionSignals?: string[];
+  brandInterpretation?: string | null;
   identity_score: number;
   resonance_score: number;
   execution_score: number;
@@ -269,6 +322,13 @@ export interface SpecBlackboardInput {
   category?: string;
   /** Key piece selected in Concept Studio */
   keyPiece?: { item: string; type: string; signal: string };
+  /** Summary of what the current assortment already expresses */
+  currentPieceSet?: {
+    collection_language?: string[];
+    expression_signals?: string[];
+  };
+  gapState?: string[];
+  tensionState?: string[];
   /** Optional intent calibration from the Intent page */
   intent?: IntentCalibration;
 }
@@ -291,6 +351,10 @@ export function buildSpecBlackboard(
     aesthetic_name: aestheticName,
     aesthetic_consumer_insight: aestheticConsumerInsight,
     brand_keywords: input.brandKeywords,
+    collection_direction: input.collectionDirection ?? aestheticName ?? input.aestheticSlug,
+    collection_language: input.collectionLanguage ?? [],
+    expression_signals: input.expressionSignals ?? [],
+    brand_interpretation: input.brandInterpretation ?? null,
     identity_score: input.identity_score,
     resonance_score: input.resonance_score,
     execution_score: input.execution_score,
@@ -308,6 +372,9 @@ export function buildSpecBlackboard(
     category: input.category,
     silhouette: input.silhouette,
     keyPiece: input.keyPiece,
+    current_piece_set: input.currentPieceSet,
+    gap_state: input.gapState ?? [],
+    tension_state: input.tensionState ?? [],
     resolved_redirects: {
       brand_mismatch: resolveBrandMismatch(input.aestheticSlug, input.brandKeywords),
       cost_reduction: resolveCostReduction(input.materialId, input.margin_pass),

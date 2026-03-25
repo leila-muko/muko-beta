@@ -81,7 +81,16 @@ function buildSystemPrompt(context: AskMukoContext): string {
   if (context.pieceRole) extras.push(`Piece role: ${context.pieceRole}`);
   if (context.silhouette) extras.push(`Silhouette: ${context.silhouette}`);
   if (context.constructionTier) extras.push(`Construction: ${context.constructionTier}`);
+  if (context.brandInterpretation) extras.push(`Brand interpretation: ${context.brandInterpretation}`);
   if (extras.length) lines.push(`- ${extras.join(", ")}`);
+
+  if (context.collectionLanguage?.length) {
+    lines.push(`- Collection language: ${context.collectionLanguage.join(", ")}`);
+  }
+
+  if (context.expressionSignals?.length) {
+    lines.push(`- Expression signals: ${context.expressionSignals.join(", ")}`);
+  }
 
 
   return lines.join("\n");

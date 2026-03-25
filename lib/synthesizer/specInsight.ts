@@ -26,6 +26,14 @@ export interface SpecBlackboard {
   aesthetic_consumer_insight: string | null;
   /** Brand DNA keywords from the designer's brief */
   brand_keywords: string[];
+  /** Locked collection direction label */
+  collection_direction?: string;
+  /** Direction-defining collection language */
+  collection_language?: string[];
+  /** Execution-driving expression signals */
+  expression_signals?: string[];
+  /** Brand interpretation captured in setup */
+  brand_interpretation?: string | null;
   /** Brand price tier (e.g. "Contemporary", "Bridge", "Luxury") */
   price_tier?: string;
   /** Brand target margin as a decimal (e.g. 0.60 for 60%) */
@@ -78,6 +86,13 @@ export interface SpecBlackboard {
   silhouette?: string;
   /** Key piece context from Concept Studio */
   keyPiece?: { item: string; type: string; signal: string };
+  /** Summary of what the current assortment already expresses */
+  current_piece_set?: {
+    collection_language?: string[];
+    expression_signals?: string[];
+  };
+  gap_state?: string[];
+  tension_state?: string[];
   /** Resolved redirects — both brand_mismatch and cost_reduction */
   resolved_redirects: ResolvedRedirects;
   /** Optional intent calibration from the designer's Intent page selections */
@@ -527,6 +542,10 @@ You are a Technical Production Director and sourcing lead writing with Vogue Bus
 
 You declare whether the spec holds together and what becomes irreversible next.
 Concept is locked. Do not re-evaluate aesthetic positioning.
+The input separates collection_language from expression_signals.
+Treat collection_language as identity and direction anchors.
+Treat expression_signals as execution cues that must come through material, construction, and finishing.
+Always reason about the interaction between them. Do not collapse them into one list.
 
 PERSONALIZATION RULE
 Use "YOUR brand" exactly once in insight_description to establish personalization.
@@ -688,6 +707,8 @@ export function buildSpecSystemPrompt(bb: SpecBlackboard): string {
   const lockedLine =
     `Concept direction is already locked: ${bb.aesthetic_name} for ${bb.brand_name ?? 'YOUR brand'}. ` +
     `Identity scored ${bb.identity_score}, Resonance scored ${bb.resonance_score}. ` +
+    `Collection language: ${(bb.collection_language ?? []).join(', ') || 'none provided'}. ` +
+    `Expression signals: ${(bb.expression_signals ?? []).join(', ') || 'none provided'}. ` +
     `Do not re-evaluate the aesthetic. Evaluate whether the physical spec can successfully execute it.`;
 
   return SPEC_STUDIO_PROMPT_V6_2.replace(
@@ -706,6 +727,10 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
 
   const conceptContext = (bb.aesthetic_name != null || bb.brand_name != null || bb.brand_keywords.length > 0)
     ? {
+        collection_direction: bb.collection_direction ?? bb.aesthetic_name ?? null,
+        collection_language: bb.collection_language ?? [],
+        expression_signals: bb.expression_signals ?? [],
+        brand_interpretation: bb.brand_interpretation ?? null,
         aesthetic: bb.aesthetic_name ?? null,
         consumer_insight: bb.aesthetic_consumer_insight ?? null,
         identity_score: bb.identity_score ?? null,
@@ -723,7 +748,12 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
     key_piece: bb.keyPiece
       ? `${bb.keyPiece.item} (${bb.keyPiece.type}) — signal: ${bb.keyPiece.signal}`
       : undefined,
+    piece_role: bb.intent?.piece_role ?? undefined,
+    trend_archetype: bb.keyPiece?.item ?? undefined,
     concept_context: conceptContext,
+    current_piece_set: bb.current_piece_set ?? undefined,
+    gap_state: bb.gap_state ?? undefined,
+    tension_state: bb.tension_state ?? undefined,
     spec: {
       material_id: bb.material_id,
       material_name: bb.material_name ?? bb.material_id,

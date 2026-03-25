@@ -4,11 +4,11 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import { MukoNav } from "@/components/MukoNav";
+import { CollectionReadBar, COLLECTION_READ_BAR_OFFSET } from "@/components/collection/CollectionReadBar";
 import { createClient } from "@/lib/supabase/client";
+import { buildProgressiveStrategySummary, buildStrategySummary } from "@/lib/strategy-summary";
 
-// --- Design tokens ---
-const BG = "#F9F7F4";
-const BG2 = "#F2EFE9";
+const BG = "#FAF9F6";
 const TEXT = "#191919";
 const MUTED = "#888078";
 const BORDER = "#E2DDD6";
@@ -20,7 +20,6 @@ const ROSE = "#CDAAB3";
 const inter = "var(--font-inter), -ui-sans-serif, sans-serif";
 const sohne = "var(--font-sohne-breit), -ui-sans-serif, sans-serif";
 
-// --- Types ---
 type SuccessId =
   | "brand_statement"
   | "commercial_performance"
@@ -28,76 +27,73 @@ type SuccessId =
   | "protect_margins"
   | "experiment_learn";
 
-// --- Constants ---
-
 const SUCCESS_OPTIONS: { id: SuccessId; title: string; description: string }[] = [
   {
     id: "brand_statement",
-    title: "Make a strong brand statement",
-    description: "Lead with a distinct point of view this season.",
+    title: "Lead with a distinct point of view",
+    description: "Set the season around a sharper brand perspective.",
   },
   {
     id: "commercial_performance",
-    title: "Drive commercial performance",
-    description: "Optimize toward sell-through and market clarity.",
+    title: "Prioritize sell-through confidence",
+    description: "Keep the collection legible, productive, and easy to place.",
   },
   {
     id: "trend_moment",
-    title: "Capture a current trend moment",
-    description: "Lean into what feels culturally and commercially relevant now.",
+    title: "Move with the current market mood",
+    description: "Lean closer to what feels culturally and commercially current.",
   },
   {
     id: "protect_margins",
-    title: "Protect margins and reduce risk",
-    description: "Prioritize business resilience and lower-exposure bets.",
+    title: "Protect margin and reduce exposure",
+    description: "Bias the season toward resilience, clarity, and tighter control.",
   },
   {
     id: "experiment_learn",
-    title: "Experiment and learn",
-    description: "Use the collection to test, observe, and sharpen future direction.",
+    title: "Test a new idea and learn from it",
+    description: "Use the season to probe, observe, and refine what comes next.",
   },
 ];
 
 const SLIDERS = [
   {
     key: "trend" as const,
-    label: "Trend ↔ Timeless",
-    left: "Trend-forward",
-    right: "Timeless",
-    description: "How exposed to trend velocity should this collection be?",
+    label: "Trend Exposure",
+    left: "Of-the-moment",
+    right: "Long-horizon",
+    description: "Decide how closely the collection should move with the current market mood.",
     color: CHARTREUSE,
-    labels: ["Trend-forward", "Balanced Horizon", "Timeless"] as [string, string, string],
+    labels: ["High exposure", "Calibrated exposure", "Steady longevity"] as [string, string, string],
   },
   {
     key: "creative" as const,
-    label: "Creative ↔ Commercial",
-    left: "Creative expression",
-    right: "Commercial safety",
-    description: "Where does the collection sit between expression and broad market usability?",
+    label: "Expression Level",
+    left: "Expressive",
+    right: "Restrained",
+    description: "Set how far the collection should push visual attitude versus broad usability.",
     color: STEEL,
-    labels: ["Creative-led", "Balanced Creativity", "Commercially safe"] as [string, string, string],
+    labels: ["High expression", "Measured expression", "Commercial restraint"] as [string, string, string],
   },
   {
     key: "elevated" as const,
-    label: "Elevated ↔ Accessible",
-    left: "Elevated design",
-    right: "Accessible price",
-    description: "How should design ambition and price architecture be balanced?",
+    label: "Value Position",
+    left: "Elevated",
+    right: "Accessible",
+    description: "Balance perceived elevation against how open and reachable the offer should feel.",
     color: CAMEL,
-    labels: ["Design-elevated", "Balanced Value", "Accessible"] as [string, string, string],
+    labels: ["Elevated stance", "Balanced position", "Access-led"] as [string, string, string],
   },
   {
     key: "novelty" as const,
-    label: "Novelty ↔ Continuity",
-    left: "Novelty",
-    right: "Continuity",
-    description: "Should the collection introduce fresh ground or reinforce what is already owned?",
+    label: "Innovation Level",
+    left: "Newness-led",
+    right: "Continuity-led",
+    description: "Choose whether the season should introduce new territory or reinforce what already resonates.",
     color: ROSE,
-    labels: ["Novelty-forward", "Continuity-aware", "Continuity-first"] as [string, string, string],
+    labels: ["High innovation", "Considered evolution", "Continuity-first"] as [string, string, string],
   },
 ];
 
-// --- Helpers ---
 function positionLabel(v: number, labels: [string, string, string]): string {
   if (v <= 30) return labels[0];
   if (v <= 69) return labels[1];
@@ -109,65 +105,34 @@ function deliveryWeeks(season: string): number | null {
   if (!m) return null;
   const type = m[1].toUpperCase();
   const year = 2000 + parseInt(m[2], 10);
-  // FW: target Aug 1; SS: target Feb 1
   const delivery = type === "FW" ? new Date(year, 7, 1) : new Date(year, 1, 1);
   const now = new Date();
   const weeks = Math.round((delivery.getTime() - now.getTime()) / (7 * 24 * 3600 * 1000));
   return weeks > 0 ? weeks : null;
 }
 
-// --- Sub-components ---
-
 function BeatHeader({
-  eyebrow,
   title,
   description,
 }: {
-  eyebrow: string;
   title: string;
   description?: string;
 }) {
   return (
     <div>
-      {/* Eyebrow with extending hairline */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          marginBottom: 10,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: inter,
-            fontSize: 9,
-            fontWeight: 600,
-            letterSpacing: "0.2em",
-            textTransform: "uppercase" as const,
-            color: MUTED,
-            flexShrink: 0,
-          }}
-        >
-          {eyebrow}
-        </span>
-        <div style={{ flex: 1, height: 1, background: BORDER }} />
-      </div>
-      {/* Heading */}
       <div
         style={{
           fontFamily: sohne,
-          fontSize: 30,
-          fontWeight: 700,
+          fontSize: 24,
+          fontWeight: 500,
           color: TEXT,
-          letterSpacing: "-0.02em",
-          lineHeight: 1.15,
-          marginBottom: 6,
+          letterSpacing: "-0.015em",
+          lineHeight: 1.2,
+          marginBottom: 8,
         }}
       >
         {title}
       </div>
-      {/* Description */}
       {description && (
         <div
           style={{
@@ -176,8 +141,8 @@ function BeatHeader({
             color: MUTED,
             fontStyle: "italic",
             lineHeight: 1.6,
-            marginBottom: 28,
-            maxWidth: 560,
+            marginBottom: 30,
+            maxWidth: 600,
           }}
         >
           {description}
@@ -195,7 +160,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
         fontSize: 9,
         fontWeight: 600,
         letterSpacing: "0.16em",
-        textTransform: "uppercase" as const,
+        textTransform: "uppercase",
         color: MUTED,
         marginBottom: 5,
       }}
@@ -206,22 +171,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 function BeatDivider() {
-  return <div style={{ height: 1, background: BORDER, margin: "0 0 52px" }} />;
-}
-
-function RailCard({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        background: BG2,
-        borderRadius: 10,
-        padding: "14px 16px",
-        marginBottom: 12,
-      }}
-    >
-      {children}
-    </div>
-  );
+  return <div style={{ height: 1, background: BORDER, margin: "0 0 56px" }} />;
 }
 
 function IntentSlider({
@@ -243,22 +193,27 @@ function IntentSlider({
   value: number;
   onChange: (v: number) => void;
 }) {
-  const parts = label.split("↔");
   return (
     <div>
-      {/* Axis title row */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "baseline",
-          marginBottom: 4,
+          alignItems: "flex-start",
+          gap: 12,
+          marginBottom: 8,
         }}
       >
-        <span style={{ fontFamily: sohne, fontSize: 17, fontWeight: 700, color: TEXT, letterSpacing: "-0.01em" }}>
-          {parts[0]}
-          <span style={{ fontFamily: inter, fontSize: 14, color: MUTED, margin: "0 4px", verticalAlign: "middle" }}>↔</span>
-          {parts[1]}
+        <span
+          style={{
+            fontFamily: sohne,
+            fontSize: 18,
+            fontWeight: 700,
+            color: TEXT,
+            letterSpacing: "-0.015em",
+          }}
+        >
+          {label}
         </span>
         <span
           style={{
@@ -266,32 +221,30 @@ function IntentSlider({
             fontSize: 9,
             fontWeight: 700,
             letterSpacing: "0.14em",
-            textTransform: "uppercase" as const,
+            textTransform: "uppercase",
             color,
-            ...(color === ROSE ? { filter: "saturate(1.4)" } : {}),
           }}
         >
           {posLabel}
         </span>
       </div>
-      {/* Description */}
       <p
         style={{
           fontFamily: inter,
           fontSize: 12,
           fontStyle: "italic",
           color: MUTED,
-          margin: "0 0 14px",
+          margin: "0 0 16px",
           lineHeight: 1.5,
+          maxWidth: 620,
         }}
       >
         {description}
       </p>
-      {/* Track row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
         <span
           style={{
-            width: 88,
+            width: 96,
             fontFamily: inter,
             fontSize: 10,
             color: MUTED,
@@ -317,7 +270,7 @@ function IntentSlider({
         />
         <span
           style={{
-            width: 88,
+            width: 96,
             fontFamily: inter,
             fontSize: 10,
             color: MUTED,
@@ -329,11 +282,19 @@ function IntentSlider({
           {right}
         </span>
       </div>
+      <div
+        style={{
+          marginTop: 10,
+          fontFamily: inter,
+          fontSize: 11,
+          color: MUTED,
+        }}
+      >
+        Currently: <span style={{ color: TEXT }}>{posLabel}</span>
+      </div>
     </div>
   );
 }
-
-// --- Main page ---
 
 export default function IntentCalibrationPage() {
   const router = useRouter();
@@ -348,22 +309,17 @@ export default function IntentCalibrationPage() {
     setSliderNovelty: storeSliderNovelty,
     setIntentGoals,
     setIntentTradeoff,
+    setStrategySummary,
     setCurrentStep,
   } = useSessionStore();
 
-  // Read-only context from entry page — reactive store subscriptions
   const season = useSessionStore((s) => s.season);
   const collectionName = useSessionStore((s) => s.collectionName);
 
-  // Initialize editable fields from persisted store
   const init = useSessionStore.getState();
   const [targetMsrp, setTargetMsrp] = useState<number>(init.targetMsrp ?? 0);
-  const [targetMargin, setTargetMargin] = useState<number>(
-    init.targetMargin > 0 ? init.targetMargin : 0
-  );
-  const [successPriorities, setSuccessPriorities] = useState<SuccessId[]>(
-    (init.successPriorities as SuccessId[]) || []
-  );
+  const [targetMargin, setTargetMargin] = useState<number>(init.targetMargin > 0 ? init.targetMargin : 0);
+  const [successPriorities, setSuccessPriorities] = useState<SuccessId[]>((init.successPriorities as SuccessId[]) || []);
   const [sliderTrend, setSliderTrend] = useState(init.sliderTrend ?? 50);
   const [sliderCreative, setSliderCreative] = useState(init.sliderCreative ?? 50);
   const [sliderElevated, setSliderElevated] = useState(init.sliderElevated ?? 50);
@@ -374,11 +330,12 @@ export default function IntentCalibrationPage() {
     setCurrentStep?.(1);
   }, [setCurrentStep]);
 
-  // Seed MSRP, margin, and brand DNA keywords from brand profile on mount
   useEffect(() => {
     const supabase = createClient();
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("brand_profiles")
@@ -399,14 +356,10 @@ export default function IntentCalibrationPage() {
         setBrandDnaChips(data.keywords as string[]);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [storeTargetMargin, storeTargetMsrp, targetMargin, targetMsrp]);
 
-  // Derived values
   const cogsCeiling =
-    targetMsrp > 0 && targetMargin > 0
-      ? Math.round(targetMsrp * (1 - targetMargin / 100))
-      : null;
+    targetMsrp > 0 && targetMargin > 0 ? Math.round(targetMsrp * (1 - targetMargin / 100)) : null;
   const weeksOut = deliveryWeeks(season);
 
   const sliderLabels = {
@@ -416,38 +369,63 @@ export default function IntentCalibrationPage() {
     novelty: positionLabel(sliderNovelty, SLIDERS[3].labels),
   };
 
-  const canContinue =
-    collectionName.trim().length > 0 &&
-    season.length > 0 &&
-    successPriorities.length > 0;
+  const strategySummary = buildStrategySummary({
+    priorities: successPriorities
+      .map((id) => SUCCESS_OPTIONS.find((option) => option.id === id)?.title ?? "")
+      .filter(Boolean),
+    trendLabel: sliderLabels.trend,
+    creativeLabel: sliderLabels.creative,
+    elevatedLabel: sliderLabels.elevated,
+    noveltyLabel: sliderLabels.novelty,
+    targetMargin,
+    targetMsrp,
+    sliderTrendValue: sliderTrend,
+    sliderCreativeValue: sliderCreative,
+    sliderElevatedValue: sliderElevated,
+    sliderNoveltyValue: sliderNovelty,
+  });
+  const collectionRead = buildProgressiveStrategySummary({
+    priorities: successPriorities
+      .map((id) => SUCCESS_OPTIONS.find((option) => option.id === id)?.title ?? "")
+      .filter(Boolean),
+    trendLabel: sliderLabels.trend,
+    creativeLabel: sliderLabels.creative,
+    elevatedLabel: sliderLabels.elevated,
+    noveltyLabel: sliderLabels.novelty,
+    targetMargin,
+    targetMsrp,
+    sliderTrendValue: sliderTrend,
+    sliderCreativeValue: sliderCreative,
+    sliderElevatedValue: sliderElevated,
+    sliderNoveltyValue: sliderNovelty,
+  });
 
-  // --- Handlers ---
+  const canContinue = collectionName.trim().length > 0 && season.length > 0 && successPriorities.length > 0;
+
   const handleTargetMsrp = (v: number) => {
     setTargetMsrp(v);
     storeTargetMsrp(v);
   };
+
   const handleTargetMargin = (v: number) => {
     setTargetMargin(v);
     storeTargetMargin(v);
   };
+
   const togglePriority = (id: SuccessId) => {
-    setSuccessPriorities((prev) => {
-      let next: SuccessId[];
-      if (prev.includes(id)) {
-        next = prev.filter((x) => x !== id);
-      } else if (prev.length >= 3) {
-        next = prev;
-      } else {
-        next = [...prev, id];
-      }
-      storeSuccessPriorities(next);
-      return next;
-    });
+    let next: SuccessId[];
+    if (successPriorities.includes(id)) {
+      next = successPriorities.filter((x) => x !== id);
+    } else if (successPriorities.length >= 3) {
+      next = successPriorities;
+    } else {
+      next = [...successPriorities, id];
+    }
+    setSuccessPriorities(next);
+    storeSuccessPriorities(next);
   };
-  const handleSlider = (
-    key: "trend" | "creative" | "elevated" | "novelty",
-    v: number
-  ) => {
+
+  const handleSlider = (key: "trend" | "creative" | "elevated" | "novelty", v: number) => {
     if (key === "trend") {
       setSliderTrend(v);
       storeSliderTrend(v);
@@ -465,13 +443,12 @@ export default function IntentCalibrationPage() {
 
   const onContinue = () => {
     if (!canContinue) return;
-    // Populate intentGoals (titles) for backward compat with scoring pipeline
     const titles = successPriorities
       .map((id) => SUCCESS_OPTIONS.find((o) => o.id === id)?.title ?? "")
       .filter(Boolean);
     setIntentGoals(titles);
-    setIntentTradeoff(""); // cleared in new model
-    // Reset concept state for a fresh flow
+    setIntentTradeoff("");
+    setStrategySummary(strategySummary);
     useSessionStore.setState({
       aestheticInput: "",
       aestheticMatchedId: null,
@@ -489,9 +466,12 @@ export default function IntentCalibrationPage() {
       directionInterpretationChips: [],
       isProxyMatch: false,
     });
-    // TODO: persist collection-level intent to Supabase when schema supports it
     router.push("/concept");
   };
+
+  useEffect(() => {
+    setStrategySummary(strategySummary);
+  }, [setStrategySummary, strategySummary]);
 
   const sliderValues = {
     trend: sliderTrend,
@@ -507,15 +487,15 @@ export default function IntentCalibrationPage() {
           -webkit-appearance: none;
           appearance: none;
           width: 100%;
-          height: 28px;
+          height: 20px;
           background: transparent;
           cursor: pointer;
           display: block;
         }
         .intent-range:focus { outline: none; }
         .intent-range::-webkit-slider-runnable-track {
-          height: 3px;
-          border-radius: 2px;
+          height: 2px;
+          border-radius: 999px;
           background: linear-gradient(
             to right,
             var(--intent-accent) 0%,
@@ -527,40 +507,40 @@ export default function IntentCalibrationPage() {
         .intent-range::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 16px;
-          height: 16px;
+          width: 12px;
+          height: 12px;
           border-radius: 50%;
           background: white;
-          border: 2px solid var(--intent-accent);
-          margin-top: -6.5px;
-          box-shadow: 0 1px 6px rgba(0,0,0,0.14);
+          border: 1.5px solid var(--intent-accent);
+          margin-top: -5px;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.12);
           transition: transform 120ms ease;
         }
-        .intent-range:active::-webkit-slider-thumb { transform: scale(1.08); }
+        .intent-range:active::-webkit-slider-thumb { transform: scale(1.06); }
         .intent-range::-moz-range-track {
-          height: 3px;
-          border-radius: 2px;
+          height: 2px;
+          border-radius: 999px;
           background: ${BORDER};
         }
         .intent-range::-moz-range-progress {
-          height: 3px;
-          border-radius: 2px;
+          height: 2px;
+          border-radius: 999px;
           background: var(--intent-accent);
         }
         .intent-range::-moz-range-thumb {
           -moz-appearance: none;
-          width: 16px;
-          height: 16px;
+          width: 12px;
+          height: 12px;
           border-radius: 50%;
           background: white;
-          border: 2px solid var(--intent-accent);
-          box-shadow: 0 1px 6px rgba(0,0,0,0.14);
+          border: 1.5px solid var(--intent-accent);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.12);
         }
         .intent-card-field {
           width: 100%;
-          padding: 10px 0;
+          padding: 10px 0 12px;
           border: none;
-          border-bottom: 1px solid #F2EFE9;
+          border-bottom: 1px solid rgba(67, 67, 43, 0.12);
           border-radius: 0;
           font-family: ${inter};
           font-size: 15px;
@@ -575,38 +555,38 @@ export default function IntentCalibrationPage() {
         .intent-card-field:focus { border-bottom: 1.5px solid ${CHARTREUSE}; }
         .priority-row {
           width: 100%;
-          background: white;
-          border: 1px solid ${BORDER};
-          border-radius: 10px;
-          padding: 16px 18px;
+          background: transparent;
+          border: none;
+          border-left: 1px solid transparent;
+          border-radius: 0;
+          padding: 14px 18px 14px 16px;
           display: flex;
           justify-content: space-between;
-          align-items: center;
+          align-items: flex-start;
           gap: 12px;
           cursor: pointer;
           text-align: left;
           font: inherit;
           position: relative;
-          overflow: hidden;
           transition: border-color 0.12s, background 0.12s;
         }
         .priority-row:hover:not(.selected):not(:disabled) {
-          border-color: #C8C2BA;
-          background: #FDFCFB;
+          background: rgba(242, 239, 233, 0.46);
+          border-left-color: rgba(67, 67, 43, 0.14);
         }
         .priority-row.selected {
-          border: 1px solid ${CHARTREUSE};
-          background: #F7F9F1;
+          border-left-color: ${CHARTREUSE};
+          background: rgba(168, 180, 117, 0.12);
         }
         .priority-row.selected::before {
-          content: '';
+          content: "";
           position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 3px;
+          left: -1px;
+          top: 12px;
+          bottom: 12px;
+          width: 1px;
           background: ${CHARTREUSE};
-          border-radius: 2px 0 0 2px;
+          border-radius: 999px;
         }
         .priority-row:disabled {
           opacity: 0.35;
@@ -627,110 +607,123 @@ export default function IntentCalibrationPage() {
         onSaveClose={() => {}}
       />
 
-      {/* Two-column body */}
+      <CollectionReadBar
+        collectionName={collectionName}
+        season={season}
+        summary={collectionRead.text}
+        stage={collectionRead.stage}
+        stickyTop={72}
+        isSticky
+      />
+
       <div
         style={{
-          display: "flex",
           flex: 1,
-          marginTop: 72,
-          height: "calc(100vh - 72px)",
-          overflow: "hidden",
+          marginTop: 72 + COLLECTION_READ_BAR_OFFSET,
+          minHeight: `calc(100vh - ${72 + COLLECTION_READ_BAR_OFFSET}px)`,
         }}
       >
-        {/* ── Left: scrollable content ── */}
         <div
           style={{
             flex: 1,
-            overflowY: "auto",
-            padding: "48px 52px 60px",
-            borderRight: `1px solid ${BORDER}`,
+            padding: "44px 60px 60px",
           }}
         >
-          {/* ── Beat 1: Collection context ── */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              marginBottom: 38,
+            }}
+          >
+            {["Frame", "Intent", "Tension"].map((step, index) => (
+              <React.Fragment key={step}>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: "0.16em",
+                    textTransform: "uppercase",
+                    color: index === 0 ? TEXT : MUTED,
+                  }}
+                >
+                  {step}
+                </div>
+                {index < 2 && <div style={{ width: 34, height: 1, background: BORDER }} />}
+              </React.Fragment>
+            ))}
+          </div>
+
           <section style={{ marginBottom: 52 }}>
             <BeatHeader
-              eyebrow="Collection Context"
-              title="Set the stage."
-              description="Your season and collection name are set. Confirm your commercial parameters before building your direction."
+              title="Frame the collection."
+              description="Set the context, then define the commercial frame that will shape every directional decision."
             />
 
-            {/* Read-only context strip */}
             <div
               style={{
                 display: "flex",
-                alignItems: "stretch",
-                background: BG2,
-                borderRadius: 12,
-                padding: "18px 22px",
-                marginBottom: 20,
-                gap: 32,
+                flexWrap: "wrap",
+                alignItems: "center",
+                marginBottom: 30,
+                gap: 18,
               }}
             >
-              <div>
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 9,
-                    fontWeight: 600,
-                    letterSpacing: "0.16em",
-                    textTransform: "uppercase",
-                    color: MUTED,
-                    marginBottom: 4,
-                  }}
-                >
-                  Season
-                </div>
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 15,
-                    fontWeight: 500,
-                    color: season ? TEXT : MUTED,
-                  }}
-                >
-                  {season || "—"}
-                </div>
+              <div
+                style={{
+                  fontFamily: sohne,
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: collectionName ? TEXT : MUTED,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {collectionName || "Untitled Collection"}
               </div>
-
-              <div style={{ width: 1, background: BORDER, flexShrink: 0 }} />
-
-              <div>
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 9,
-                    fontWeight: 600,
-                    letterSpacing: "0.16em",
-                    textTransform: "uppercase",
-                    color: MUTED,
-                    marginBottom: 4,
-                  }}
-                >
-                  Collection Name
-                </div>
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 15,
-                    fontWeight: 500,
-                    color: collectionName ? TEXT : MUTED,
-                  }}
-                >
-                  {collectionName || "—"}
-                </div>
+              <div
+                style={{
+                  fontFamily: inter,
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: season ? MUTED : "rgba(136, 128, 120, 0.6)",
+                }}
+              >
+                {season || "Season not set"}
               </div>
             </div>
 
-            {/* MSRP + Margin card */}
             <div
               style={{
                 background: "white",
-                border: `1px solid ${BORDER}`,
-                borderRadius: 12,
-                padding: "22px 24px",
-                marginBottom: 20,
+                borderRadius: 14,
+                padding: "22px 24px 18px",
+                marginBottom: brandDnaChips.length > 0 ? 18 : 0,
+                boxShadow: "0 8px 24px rgba(67, 67, 43, 0.05)",
               }}
             >
+              <div style={{ marginBottom: 16 }}>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 9,
+                    fontWeight: 600,
+                    letterSpacing: "0.16em",
+                    textTransform: "uppercase",
+                    color: MUTED,
+                    marginBottom: 5,
+                  }}
+                >
+                  Commercial Frame
+                </div>
+                <div style={{ fontFamily: inter, fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
+                  Set the price architecture that defines how far the collection can stretch.
+                </div>
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
                 <div>
                   <FieldLabel>Target MSRP ($)</FieldLabel>
@@ -740,13 +733,11 @@ export default function IntentCalibrationPage() {
                     placeholder="e.g. 450"
                     value={targetMsrp || ""}
                     min={0}
-                    onChange={(e) =>
-                      handleTargetMsrp(e.target.value ? Number(e.target.value) : 0)
-                    }
+                    onChange={(e) => handleTargetMsrp(e.target.value ? Number(e.target.value) : 0)}
                   />
                 </div>
 
-                <div style={{ borderLeft: `1px solid ${BG2}`, paddingLeft: 16 }}>
+                <div style={{ borderLeft: "1px solid rgba(67, 67, 43, 0.08)", paddingLeft: 18 }}>
                   <FieldLabel>Target Margin (%)</FieldLabel>
                   <input
                     className="intent-card-field"
@@ -755,24 +746,66 @@ export default function IntentCalibrationPage() {
                     value={targetMargin || ""}
                     min={0}
                     max={100}
-                    onChange={(e) =>
-                      handleTargetMargin(e.target.value ? Number(e.target.value) : 0)
-                    }
+                    onChange={(e) => handleTargetMargin(e.target.value ? Number(e.target.value) : 0)}
                   />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 18,
+                  paddingTop: 14,
+                  borderTop: "1px solid rgba(67, 67, 43, 0.08)",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "12px 28px",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 9,
+                      fontWeight: 600,
+                      letterSpacing: "0.14em",
+                      textTransform: "uppercase",
+                      color: MUTED,
+                      marginBottom: 4,
+                    }}
+                  >
+                    Cost ceiling
+                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 12, color: cogsCeiling !== null ? TEXT : MUTED }}>
+                    {cogsCeiling !== null
+                      ? `${Math.round(targetMargin)}% margin keeps COGS near $${cogsCeiling}`
+                      : "Add price and margin to set the ceiling."}
+                  </div>
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 9,
+                      fontWeight: 600,
+                      letterSpacing: "0.14em",
+                      textTransform: "uppercase",
+                      color: MUTED,
+                      marginBottom: 4,
+                    }}
+                  >
+                    Delivery window
+                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 12, color: weeksOut !== null ? TEXT : MUTED }}>
+                    {weeksOut !== null
+                      ? `${weeksOut} weeks to ${season} delivery`
+                      : "Select a season to understand the delivery window."}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Brand DNA chip card */}
             {brandDnaChips.length > 0 && (
-              <div
-                style={{
-                  background: "white",
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 12,
-                  padding: "16px 20px",
-                }}
-              >
+              <div style={{ paddingTop: 4 }}>
                 <div
                   style={{
                     fontFamily: inter,
@@ -792,9 +825,8 @@ export default function IntentCalibrationPage() {
                       key={chip}
                       style={{
                         borderRadius: 100,
-                        border: `1px solid ${BORDER}`,
-                        background: BG,
-                        padding: "5px 13px",
+                        background: "rgba(242, 239, 233, 0.72)",
+                        padding: "6px 12px",
                         fontSize: 11,
                         fontWeight: 500,
                         fontFamily: inter,
@@ -811,12 +843,10 @@ export default function IntentCalibrationPage() {
 
           <BeatDivider />
 
-          {/* ── Beat 2: Success priorities ── */}
           <section style={{ marginBottom: 52 }}>
             <BeatHeader
-              eyebrow="Priorities"
-              title="Set your priorities."
-              description="Choose up to 3. These set what Muko optimizes toward when scoring and giving guidance."
+              title="What matters most this season?"
+              description="Choose up to 3 guiding priorities. Think of them as the stance the collection should defend."
             />
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -830,12 +860,12 @@ export default function IntentCalibrationPage() {
                     disabled={disabled}
                     onClick={() => togglePriority(opt.id)}
                   >
-                    <div style={{ flex: 1, paddingLeft: selected ? 21 : 4 }}>
+                    <div style={{ flex: 1, paddingLeft: 2 }}>
                       <div
                         style={{
                           fontFamily: sohne,
-                          fontSize: 15,
-                          fontWeight: 700,
+                          fontSize: 16,
+                          fontWeight: 600,
                           color: TEXT,
                           marginBottom: 3,
                           lineHeight: 1.2,
@@ -848,39 +878,26 @@ export default function IntentCalibrationPage() {
                           fontFamily: inter,
                           fontSize: 11,
                           color: MUTED,
-                          lineHeight: 1.5,
+                          lineHeight: 1.55,
+                          maxWidth: 520,
                         }}
                       >
                         {opt.description}
                       </div>
                     </div>
-                    <div
+                    <span
                       style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: "50%",
+                        fontFamily: inter,
+                        fontSize: 10,
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
                         flexShrink: 0,
-                        marginLeft: 16,
-                        border: selected ? "none" : `1.5px solid ${BORDER}`,
-                        background: selected ? CHARTREUSE : "transparent",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "background 0.12s",
+                        color: selected ? CHARTREUSE : "transparent",
+                        marginTop: 2,
                       }}
                     >
-                      {selected && (
-                        <svg width="9" height="7" viewBox="0 0 10 8" fill="none">
-                          <path
-                            d="M1.5 4L3.5 6.5L8.5 1"
-                            stroke="white"
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      )}
-                    </div>
+                      {selected ? "Selected" : " "}
+                    </span>
                   </button>
                 );
               })}
@@ -889,15 +906,13 @@ export default function IntentCalibrationPage() {
 
           <BeatDivider />
 
-          {/* ── Beat 3: Sliders ── */}
           <section>
             <BeatHeader
-              eyebrow="Tradeoffs"
-              title="Set the balance."
-              description="These weight what Muko emphasizes in scoring and guidance. They travel with every piece you build."
+              title="Set the tension."
+              description="Position the collection across a few core tensions so the direction feels intentional rather than accidental."
             />
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
               {SLIDERS.map((s) => (
                 <IntentSlider
                   key={s.key}
@@ -914,14 +929,13 @@ export default function IntentCalibrationPage() {
             </div>
           </section>
 
-          {/* ── Continue button — sticky to bottom of scroll area ── */}
           <div
             style={{
               position: "sticky",
               bottom: 0,
               background: `linear-gradient(to top, ${BG} 80%, transparent)`,
-              padding: "24px 0 0",
-              marginTop: 52,
+              padding: "28px 0 0",
+              marginTop: 56,
               display: "flex",
               justifyContent: "flex-end",
             }}
@@ -947,192 +961,6 @@ export default function IntentCalibrationPage() {
               Continue to Direction →
             </button>
           </div>
-        </div>
-
-        {/* ── Right rail: Intent Preview ── */}
-        <div
-          style={{
-            width: 320,
-            flexShrink: 0,
-            overflowY: "auto",
-            padding: "28px 28px",
-            background: BG,
-            borderLeft: `1px solid ${BORDER}`,
-          }}
-        >
-          <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, marginBottom: 20 }}>Intent Preview</div>
-
-          {/* Margin Gate */}
-          <RailCard>
-            <div
-              style={{
-                fontFamily: inter,
-                fontSize: 9,
-                fontWeight: 600,
-                letterSpacing: "0.16em",
-                textTransform: "uppercase",
-                color: MUTED,
-                marginBottom: 6,
-              }}
-            >
-              Margin Gate
-            </div>
-            <div
-              style={{
-                fontFamily: inter,
-                fontSize: 22,
-                fontWeight: 600,
-                color: TEXT,
-              }}
-            >
-              {cogsCeiling !== null ? `$${cogsCeiling}` : "—"}
-            </div>
-            <div
-              style={{
-                fontFamily: inter,
-                fontSize: 11,
-                color: MUTED,
-                marginTop: 2,
-              }}
-            >
-              COGS ceiling at {targetMargin}% margin
-            </div>
-            {targetMsrp > 0 && (
-              <div
-                style={{
-                  marginTop: 8,
-                  height: 3,
-                  borderRadius: 2,
-                  background: BORDER,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    width: `${Math.min(Math.max(targetMargin, 0), 100)}%`,
-                    height: "100%",
-                    background: CHARTREUSE,
-                    borderRadius: 2,
-                    transition: "width 0.2s",
-                  }}
-                />
-              </div>
-            )}
-          </RailCard>
-
-          {/* Delivery Window */}
-          <RailCard>
-            <div
-              style={{
-                fontFamily: inter,
-                fontSize: 9,
-                fontWeight: 600,
-                letterSpacing: "0.16em",
-                textTransform: "uppercase",
-                color: MUTED,
-                marginBottom: 6,
-              }}
-            >
-              Delivery Window
-            </div>
-            <div
-              style={{
-                fontFamily: inter,
-                fontSize: 22,
-                fontWeight: 600,
-                color: TEXT,
-              }}
-            >
-              {weeksOut !== null ? `${weeksOut}w` : "—"}
-            </div>
-            <div
-              style={{
-                fontFamily: inter,
-                fontSize: 11,
-                color: MUTED,
-                marginTop: 2,
-              }}
-            >
-              {weeksOut !== null
-                ? `${weeksOut} weeks to ${season} delivery`
-                : "Select a season to see delivery window"}
-            </div>
-          </RailCard>
-
-          <div style={{ height: 1, background: BORDER, margin: "0 0 24px" }} />
-
-          {/* Collection Stance */}
-          <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, marginBottom: 12 }}>Collection Stance</div>
-
-          {[
-            { label: "Trend", value: sliderLabels.trend, color: CHARTREUSE },
-            { label: "Creative", value: sliderLabels.creative, color: STEEL },
-            { label: "Elevated", value: sliderLabels.elevated, color: CAMEL },
-            { label: "Novelty", value: sliderLabels.novelty, color: ROSE },
-          ].map((row) => (
-            <div
-              key={row.label}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                background: BG2,
-                borderRadius: 8,
-                padding: "8px 10px",
-                marginBottom: 4,
-              }}
-            >
-              <span style={{ fontFamily: inter, fontSize: 11, color: MUTED }}>
-                {row.label}
-              </span>
-              <span
-                style={{
-                  fontFamily: inter,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: row.color,
-                }}
-              >
-                {row.value}
-              </span>
-            </div>
-          ))}
-
-          {/* Priorities */}
-          {successPriorities.length > 0 && (
-            <>
-              <div style={{ height: 1, background: BORDER, margin: "16px 0 24px" }} />
-              <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: MUTED, marginBottom: 12 }}>Priorities</div>
-              {successPriorities.map((id) => {
-                const opt = SUCCESS_OPTIONS.find((o) => o.id === id);
-                if (!opt) return null;
-                return (
-                  <div
-                    key={id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 5,
-                        height: 5,
-                        borderRadius: "50%",
-                        background: CHARTREUSE,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span style={{ fontFamily: inter, fontSize: 11, color: TEXT }}>
-                      {opt.title}
-                    </span>
-                  </div>
-                );
-              })}
-            </>
-          )}
         </div>
       </div>
     </div>

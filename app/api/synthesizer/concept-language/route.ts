@@ -15,6 +15,12 @@ interface ConceptLanguageRequest {
   tension_context?: string | null;
   reference_brands?: string[];
   excluded_brands?: string[];
+  strategy_summary?: string | null;
+  brand_interpretation?: string | null;
+  selected_silhouettes?: string[];
+  selected_palette?: string | null;
+  collection_language?: string[];
+  expression_signals?: string[];
 }
 
 function sse(event: string, data: unknown): string {
@@ -49,6 +55,12 @@ export async function POST(req: NextRequest) {
     tension_context: payload.tension_context ?? null,
     reference_brands: payload.reference_brands ?? [],
     excluded_brands: payload.excluded_brands ?? [],
+    strategy_summary: payload.strategy_summary ?? null,
+    brand_interpretation: payload.brand_interpretation ?? null,
+    selected_silhouettes: payload.selected_silhouettes ?? [],
+    selected_palette: payload.selected_palette ?? null,
+    collection_language: payload.collection_language ?? [],
+    expression_signals: payload.expression_signals ?? [],
   });
 
   const encoder = new TextEncoder();

@@ -12,6 +12,7 @@ export function AuthBrand() {
 
   useEffect(() => {
     const currentWord = AUTH_TYPED_WORDS[activeWordIndex]
+    let frameId = 0
 
     if (!isDeleting && displayedText === currentWord) {
       const timeoutId = window.setTimeout(() => {
@@ -22,9 +23,11 @@ export function AuthBrand() {
     }
 
     if (isDeleting && displayedText === '') {
-      setIsDeleting(false)
-      setActiveWordIndex((current) => (current + 1) % AUTH_TYPED_WORDS.length)
-      return
+      frameId = window.requestAnimationFrame(() => {
+        setIsDeleting(false)
+        setActiveWordIndex((current) => (current + 1) % AUTH_TYPED_WORDS.length)
+      })
+      return () => window.cancelAnimationFrame(frameId)
     }
 
     const timeoutId = window.setTimeout(

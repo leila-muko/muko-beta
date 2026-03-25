@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
@@ -47,6 +47,7 @@ export interface PulseScoreRowProps {
   /** 'default' = full card with expand; 'strip' = slim bar-chart row */
   variant?: "default" | "strip";
   rowOpacity?: number;
+  isChanged?: boolean;
 }
 
 export function PulseScoreRow({
@@ -64,8 +65,56 @@ export function PulseScoreRow({
   onToggleExpand,
   variant = "default",
   rowOpacity = 1,
+  isChanged = false,
 }: PulseScoreRowProps) {
-  const pillStyle = pill ? PILL_COLORS[pill.variant] : null;
+  const previousPercentRef = useRef(numericPercent);
+  const [animatedPercent, setAnimatedPercent] = useState(numericPercent);
+  const [highlightActive, setHighlightActive] = useState(false);
+
+  useEffect(() => {
+    const from = previousPercentRef.current;
+    const to = numericPercent;
+    previousPercentRef.current = to;
+    let frameId = 0;
+
+    if (from === to) {
+      frameId = window.requestAnimationFrame(() => setAnimatedPercent(to));
+      return () => window.cancelAnimationFrame(frameId);
+    }
+
+    const startedAt = performance.now();
+    const duration = 360;
+    const easeOut = (value: number) => 1 - Math.pow(1 - value, 3);
+
+    const tick = (now: number) => {
+      const progress = Math.min((now - startedAt) / duration, 1);
+      setAnimatedPercent(from + (to - from) * easeOut(progress));
+      if (progress < 1) {
+        frameId = window.requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [numericPercent]);
+
+  useEffect(() => {
+    if (!isChanged) return;
+    const frameId = window.requestAnimationFrame(() => setHighlightActive(true));
+    const timeoutId = window.setTimeout(() => setHighlightActive(false), 900);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [isChanged]);
+
+  const animatedDisplayScore = useMemo(() => {
+    if (isPending) return "—";
+    const parsed = Number(displayScore);
+    if (!Number.isFinite(parsed)) return displayScore;
+    return String(Math.round(animatedPercent));
+  }, [animatedPercent, displayScore, isPending]);
 
   /* ── Strip variant ─────────────────────────────────────────────────────── */
   if (variant === "strip") {
@@ -141,7 +190,7 @@ export function PulseScoreRow({
                 textAlign: "right",
               }}
             >
-              {isPending ? "—" : displayScore}
+              {animatedDisplayScore}
             </span>
           </div>
         </div>
@@ -161,7 +210,7 @@ export function PulseScoreRow({
                 height: 3,
                 borderRadius: 2,
                 background: scoreColor,
-                width: `${numericPercent}%`,
+                width: `${animatedPercent}%`,
                 transition: "width 500ms ease, background 300ms ease",
               }}
             />
@@ -190,8 +239,18 @@ export function PulseScoreRow({
   const canExpand = Boolean(onToggleExpand);
 
   return (
-    <div style={{ borderBottom: "1px solid #E2DDD6", paddingBottom: 16, marginBottom: 16, opacity: rowOpacity }}>
-      {/* Top row: icon + label + pill ... score + chevron */}
+    <div
+      style={{
+        borderBottom: "1px solid #E2DDD6",
+        paddingBottom: 16,
+        marginBottom: 16,
+        opacity: rowOpacity,
+        position: "relative",
+        background: highlightActive ? "linear-gradient(90deg, rgba(168,180,117,0.05) 0%, rgba(168,180,117,0.12) 38%, rgba(168,180,117,0.04) 100%)" : "transparent",
+        transition: "background 420ms ease",
+      }}
+    >
+      {/* Top row: icon + label ... score + chevron */}
       <button
         onClick={onToggleExpand}
         style={{
@@ -220,22 +279,6 @@ export function PulseScoreRow({
           >
             {label}
           </span>
-          {pill && pillStyle && (
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                fontFamily: inter,
-                color: pillStyle.color,
-                background: pillStyle.bg,
-                border: `1px solid ${pillStyle.border}`,
-                borderRadius: 999,
-                padding: "4px 12px",
-              }}
-            >
-              {pill.label}
-            </span>
-          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span
@@ -247,9 +290,10 @@ export function PulseScoreRow({
               lineHeight: 1,
               display: "flex",
               alignItems: "center",
+              transition: "color 240ms ease",
             }}
           >
-            {isPending ? <LockIcon size={20} color="rgba(67,67,43,0.30)" /> : displayScore}
+            {isPending ? <LockIcon size={20} color="rgba(67,67,43,0.30)" /> : animatedDisplayScore}
           </span>
           {canExpand && (
             <svg
@@ -283,7 +327,7 @@ export function PulseScoreRow({
             height: 3,
             borderRadius: 2,
             background: isPending ? "transparent" : scoreColor,
-            width: `${numericPercent}%`,
+            width: `${animatedPercent}%`,
             transition: "width 500ms ease, background 300ms ease",
           }}
         />

@@ -10,6 +10,7 @@ import { BRAND } from '@/lib/concept-studio/constants';
 const OLIVE = BRAND.oliveInk; // #43432B
 const CHARTREUSE = '#A8B475';
 const STEEL = BRAND.steelBlue; // #7D96AC
+const FLOW_BG = '#FAF9F6';
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
 
@@ -198,7 +199,7 @@ export default function EntryScreen() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#FAF9F6',
+        background: FLOW_BG,
         display: 'flex',
         position: 'relative',
         overflow: 'hidden',
@@ -209,7 +210,7 @@ export default function EntryScreen() {
         style={{
           width: 272,
           minWidth: 272,
-          background: 'rgba(250,249,246,0.98)',
+          background: FLOW_BG,
           borderRight: '1px solid rgba(67,67,43,0.09)',
           padding: '40px 28px',
           display: 'flex',

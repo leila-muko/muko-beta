@@ -16,6 +16,9 @@ interface PieceReadRequest {
     paletteName?: string;
     resonanceScore?: number | null;
     interpretationSummary?: string | null;
+    collectionDirection?: string | null;
+    collectionLanguage?: string[];
+    expressionSignals?: string[];
     isStartingPiece?: boolean;
   };
 }
@@ -65,6 +68,15 @@ export async function POST(req: NextRequest) {
     context?.interpretationSummary?.trim()
       ? `\nDirection summary: ${context.interpretationSummary.trim()}`
       : "";
+  const collectionDirectionLine = context?.collectionDirection?.trim()
+    ? `\nCollection direction: ${context.collectionDirection.trim()}`
+    : "";
+  const collectionLanguageLine = context?.collectionLanguage?.length
+    ? `\nCollection language: ${context.collectionLanguage.join(", ")}`
+    : "";
+  const expressionSignalsLine = context?.expressionSignals?.length
+    ? `\nExpression signals: ${context.expressionSignals.join(", ")}`
+    : "";
   const framingLine = context?.isStartingPiece
     ? "\nThis is the starting piece - frame the body as early assortment guidance, not a confirmed read. Use language like 'currently carries' and 'collection language taking shape'."
     : "\nThis is an active selected piece - frame the body as a direct commercial and aesthetic assessment.";
@@ -74,12 +86,12 @@ export async function POST(req: NextRequest) {
 Piece signal: ${piece?.signal?.trim() || "unknown"}
 Piece note: ${piece?.note?.trim() || "none"}
 Collection role bucket: ${piece?.bucket?.trim() || "unknown"}
-Market resonance: ${context?.resonanceScore ?? "unknown"}/100${interpretationLine}${framingLine}
+Market resonance: ${context?.resonanceScore ?? "unknown"}/100${interpretationLine}${collectionDirectionLine}${collectionLanguageLine}${expressionSignalsLine}${framingLine}
 
 Return JSON: { "title": "${pieceItem}", "body": "[one paragraph, max 60 words, advisor voice]" }`;
 
   const systemPrompt =
-    "You are a senior fashion strategy consultant advising a design team. You write precise, commercially grounded piece assessments - one clear title and one paragraph. Never mention brand keywords by name. Never use the word 'keywords'. Speak through market and aesthetic judgment. Return valid JSON only. No preamble, no markdown, no explanation.";
+    "You are a senior fashion strategy consultant advising a design team. You write precise, commercially grounded piece assessments - one clear title and one paragraph. Treat collection language as the identity anchor and expression signals as execution cues; reason about the interaction between them rather than listing them. Never mention brand keywords by name. Never use the word 'keywords'. Speak through market and aesthetic judgment. Return valid JSON only. No preamble, no markdown, no explanation.";
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

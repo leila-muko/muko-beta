@@ -13,6 +13,26 @@ interface ResizableSplitPanelProps {
   className?: string;
 }
 
+function getInitialLeftPercent(
+  storageKey: string,
+  defaultLeftPercent: number,
+  minLeftPercent: number,
+  maxLeftPercent: number
+) {
+  if (typeof window === "undefined") return defaultLeftPercent;
+
+  try {
+    const stored = window.localStorage.getItem(storageKey);
+    if (!stored) return defaultLeftPercent;
+    const value = parseFloat(stored);
+    if (!isNaN(value) && value >= minLeftPercent && value <= maxLeftPercent) {
+      return value;
+    }
+  } catch {}
+
+  return defaultLeftPercent;
+}
+
 export function ResizableSplitPanel({
   defaultLeftPercent,
   minLeftPercent = 35,
@@ -23,27 +43,13 @@ export function ResizableSplitPanel({
   topOffset = 72,
   className,
 }: ResizableSplitPanelProps) {
-  const [leftPercent, setLeftPercent] = useState(defaultLeftPercent);
-  const [hydrated, setHydrated] = useState(false);
+  const [leftPercent, setLeftPercent] = useState(() =>
+    getInitialLeftPercent(storageKey, defaultLeftPercent, minLeftPercent, maxLeftPercent)
+  );
   const [isMobile, setIsMobile] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
-
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(storageKey);
-      if (!stored) return;
-      const value = parseFloat(stored);
-      if (!isNaN(value) && value >= minLeftPercent && value <= maxLeftPercent) {
-        setLeftPercent(value);
-      }
-    } catch {}
-  }, [storageKey, minLeftPercent, maxLeftPercent]);
 
   // Listen for mobile breakpoint
   useEffect(() => {
@@ -152,7 +158,7 @@ export function ResizableSplitPanel({
       {/* Left panel */}
       <div
         style={{
-          width: `${hydrated ? leftPercent : defaultLeftPercent}%`,
+          width: `${leftPercent}%`,
           height: "100%",
           overflowY: "auto",
           overflowX: "hidden",

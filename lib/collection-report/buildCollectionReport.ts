@@ -48,8 +48,9 @@ function inferRole(piece: CollectionReportInputPiece): CollectionPieceRole {
   if (piece.role) return piece.role;
   const score = piece.score ?? 0;
   if (score >= 82) return 'hero';
-  if (score >= 64) return 'core';
-  return 'support';
+  if (score >= 68) return 'directional';
+  if (score >= 56) return 'core-evolution';
+  return 'volume-driver';
 }
 
 function inferComplexity(piece: CollectionReportInputPiece): CollectionComplexity {
@@ -108,7 +109,7 @@ function getStrategyProfile(intent?: CollectionReportIntentInput | null): Strate
   const primaryGoal = normalizeToken(getPrimaryGoal(intent));
 
   const profile: StrategyProfile = {
-    roleTargets: { hero: 0.2, core: 0.5, support: 0.3 },
+    roleTargets: { hero: 0.18, directional: 0.22, 'core-evolution': 0.32, 'volume-driver': 0.28 },
     complexityCeiling: 58,
     silhouetteTarget: 60,
     redundancyTolerance: 42,
@@ -125,7 +126,7 @@ function getStrategyProfile(intent?: CollectionReportIntentInput | null): Strate
     creative >= 66 ||
     novelty >= 64
   ) {
-    profile.roleTargets = { hero: 0.34, core: 0.38, support: 0.28 };
+    profile.roleTargets = { hero: 0.3, directional: 0.28, 'core-evolution': 0.24, 'volume-driver': 0.18 };
     profile.complexityCeiling = 66;
     profile.silhouetteTarget = 72;
     profile.redundancyTolerance = 50;
@@ -142,7 +143,7 @@ function getStrategyProfile(intent?: CollectionReportIntentInput | null): Strate
     tradeoff.includes('longevity') ||
     creative <= 38
   ) {
-    profile.roleTargets = { hero: 0.12, core: 0.44, support: 0.44 };
+    profile.roleTargets = { hero: 0.12, directional: 0.14, 'core-evolution': 0.32, 'volume-driver': 0.42 };
     profile.complexityCeiling = 42;
     profile.silhouetteTarget = 50;
     profile.redundancyTolerance = 34;
@@ -178,13 +179,13 @@ function summarizeIntent(intent?: CollectionReportIntentInput | null) {
 function buildGapRecommendation(args: {
   dominantCategory?: string;
   topMaterial?: string;
-  supportShare: number;
+  foundationShare: number;
   heroShare: number;
   silhouetteDiversity: CollectionHealthDetail;
   complexityLoad: CollectionHealthDetail;
 }) {
-  if (args.supportShare < 28) {
-    return `Add a support-led ${args.dominantCategory ? args.dominantCategory.toLowerCase().replace(/s$/, '') : 'piece'} in ${args.topMaterial?.toLowerCase() ?? 'a simpler material'} to make the headline ideas easier to merchandise.`;
+  if (args.foundationShare < 45) {
+    return `Add a clearer core or volume-driving ${args.dominantCategory ? args.dominantCategory.toLowerCase().replace(/s$/, '') : 'piece'} in ${args.topMaterial?.toLowerCase() ?? 'a simpler material'} to make the headline ideas easier to merchandise.`;
   }
 
   if (args.silhouetteDiversity.label === 'Low') {
@@ -208,12 +209,12 @@ function describeRoleBalance(
   strategy: StrategyProfile,
   intentSummary: string
 ) {
-  const dominantRole = (Object.entries(roles).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'core') as CollectionPieceRole;
+  const dominantRole = (Object.entries(roles).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'core-evolution') as CollectionPieceRole;
 
   if (score >= 75) {
     return {
       label: 'Balanced',
-      interpretation: 'Hero, core, and support pieces are carrying distinct roles without one tier overpowering the edit.',
+      interpretation: 'Hero, directional, core evolution, and volume-driving pieces are carrying distinct jobs without one tier overpowering the edit.',
       basis: intentSummary || `Benchmarked against a ${strategy.framing}.`,
     };
   }
@@ -221,15 +222,23 @@ function describeRoleBalance(
   if (dominantRole === 'hero') {
     return {
       label: 'Hero-led',
-      interpretation: 'The collection is currently over-concentrated in hero concepts and needs a steadier support layer around them.',
+      interpretation: 'The collection is currently over-concentrated in hero concepts and needs a steadier core and volume-driving layer around them.',
       basis: intentSummary || `Benchmarked against a ${strategy.framing}.`,
     };
   }
 
-  if (dominantRole === 'support') {
+  if (dominantRole === 'volume-driver') {
     return {
-      label: 'Support-heavy',
-      interpretation: 'The base is present, but the collection needs more signature energy to hold the assortment together.',
+      label: 'Volume-led',
+      interpretation: 'The collection has commercial grounding, but it needs more lift and distinction to hold the assortment together.',
+      basis: intentSummary || `Benchmarked against a ${strategy.framing}.`,
+    };
+  }
+
+  if (dominantRole === 'directional') {
+    return {
+      label: 'Directional-heavy',
+      interpretation: 'Forward ideas are doing most of the work, and the line needs more stabilizing roles around them.',
       basis: intentSummary || `Benchmarked against a ${strategy.framing}.`,
     };
   }
@@ -342,7 +351,7 @@ function getScoreExplanation(
     dominantCategory?: string;
     topMaterial?: string;
     heroShare: number;
-    supportShare: number;
+    foundationShare: number;
     complexityLoad: number;
     redundancyRisk: number;
   }
@@ -376,7 +385,7 @@ function getScoreExplanation(
   }
 
   if (score >= 65) {
-    return `Execution is workable, though complexity concentration and a ${context.supportShare < 25 ? 'thin support layer' : 'few demanding hero pieces'} create pressure points against the current intent.`;
+    return `Execution is workable, though complexity concentration and a ${context.foundationShare < 45 ? 'thin commercial foundation' : 'few demanding lead pieces'} create pressure points against the current intent.`;
   }
 
   return 'Execution risk is elevated, with too much complexity or concentration for the collection to move cleanly into sampling without edits.';
@@ -433,7 +442,7 @@ function buildRisks(args: {
   redundancyRisk: CollectionHealthDetail;
   dominantCategory?: string;
   topMaterial?: string;
-  supportShare: number;
+  foundationShare: number;
   heroShare: number;
 }): CollectionRisk[] {
   const risks: CollectionRisk[] = [];
@@ -452,10 +461,10 @@ function buildRisks(args: {
     });
   }
 
-  if (args.roleBalance.label === 'Hero-led' || args.supportShare < 22) {
+  if (args.roleBalance.label === 'Hero-led' || args.foundationShare < 40) {
     risks.push({
-      title: 'Underbuilt support layer',
-      detail: 'The collection has direction, but it needs more support pieces to make the heroes commercially legible.',
+      title: 'Underbuilt commercial base',
+      detail: 'The collection has direction, but it needs more core and volume-driving pieces to make the lead ideas commercially legible.',
     });
   }
 
@@ -526,7 +535,7 @@ function summarizeInsight(args: {
   redundancyRisk: CollectionHealthDetail;
   dominantCategory?: string;
   heroShare: number;
-  supportShare: number;
+  foundationShare: number;
   topMaterial?: string;
 }) {
   const working: string[] = [];
@@ -536,7 +545,7 @@ function summarizeInsight(args: {
   if (args.heroShare >= 18) {
     working.push(`The collection has enough hero energy to anchor the line, so the lead story is legible instead of diffused across too many ideas.`);
   } else {
-    working.push('Core pieces are carrying the line consistently, which gives the assortment a stable commercial base to build on.');
+    working.push('Core and volume-driving pieces are carrying the line consistently, which gives the assortment a stable commercial base to build on.');
   }
 
   if (args.roleBalance.label === 'Balanced') {
@@ -555,8 +564,8 @@ function summarizeInsight(args: {
     watch.push('Complexity is stacking into too few pieces, which could slow development disproportionate to assortment size.');
   }
 
-  if (args.supportShare < 22) {
-    watch.push('The support architecture is thin, so hero ideas may arrive without enough surrounding clarity.');
+  if (args.foundationShare < 40) {
+    watch.push('The commercial foundation is thin, so lead ideas may arrive without enough surrounding clarity.');
   }
 
   if (args.redundancyRisk.score <= 42 && args.dominantCategory) {
@@ -565,8 +574,8 @@ function summarizeInsight(args: {
 
   recommendations.push(buildGapRecommendation(args));
 
-  if (args.supportShare < 28) {
-    recommendations.push(`Add or strengthen support pieces that make the hero concepts easier to merchandise${args.topMaterial ? `, ideally in ${args.topMaterial.toLowerCase()} or an adjacent easier fabric` : ''}.`);
+  if (args.foundationShare < 45) {
+    recommendations.push(`Add or strengthen core and volume-driving pieces that make the lead concepts easier to merchandise${args.topMaterial ? `, ideally in ${args.topMaterial.toLowerCase()} or an adjacent easier fabric` : ''}.`);
   }
 
   if (args.complexityLoad.score <= 48) {
@@ -610,12 +619,13 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
 
   const roles: Record<CollectionPieceRole, number> = {
     hero: roleCounts.hero ?? 0,
-    core: roleCounts.core ?? 0,
-    support: roleCounts.support ?? 0,
+    directional: roleCounts['directional'] ?? 0,
+    'core-evolution': roleCounts['core-evolution'] ?? 0,
+    'volume-driver': roleCounts['volume-driver'] ?? 0,
   };
 
   const heroShare = percentage(roles.hero, total);
-  const supportShare = percentage(roles.support, total);
+  const foundationShare = percentage(roles['core-evolution'] + roles['volume-driver'], total);
 
   const roleBalanceScore = (() => {
     const variance = (Object.keys(strategy.roleTargets) as CollectionPieceRole[]).reduce((sum, key) => {
@@ -686,7 +696,7 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     rawResonance + (redundancyRiskScore <= 30 ? 3 : 0) - (dominantCategoryShare >= 55 ? 4 : 0)
   );
   const execution = clamp(
-    rawExecution + (complexityLoadScore >= 70 ? 4 : 0) - (supportShare < 22 ? 3 : 0)
+    rawExecution + (complexityLoadScore >= 70 ? 4 : 0) - (foundationShare < 40 ? 3 : 0)
   );
 
   const dominantCategory = dominantCategoryToken ? titleCase(dominantCategoryToken) : undefined;
@@ -706,7 +716,7 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     dominantCategory,
     topMaterial: topMaterialLabel,
     heroShare,
-    supportShare,
+    foundationShare,
     complexityLoad: complexityLoadScore,
     redundancyRisk: redundancyRiskScore,
   };
@@ -735,7 +745,7 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     redundancyRisk,
     dominantCategory,
     heroShare,
-    supportShare,
+    foundationShare,
     topMaterial: topMaterialLabel,
   });
 
@@ -746,7 +756,7 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     redundancyRisk,
     dominantCategory,
     topMaterial: topMaterialLabel,
-    supportShare,
+    foundationShare,
     heroShare,
   });
 
@@ -775,8 +785,8 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     silhouetteDiversity.label === 'Low'
       ? 'Edit duplicate silhouettes so adjacent pieces are not competing for the same role in the assortment.'
       : 'Review the line for any pieces whose role or silhouette is still too close to an existing style.',
-    supportShare < 28
-      ? 'Strengthen the support layer so the collection can sell through more than its headline concepts.'
+    foundationShare < 45
+      ? 'Strengthen the core and volume-driving layer so the collection can sell through more than its headline concepts.'
       : 'Lock materials and trims on the strongest pieces to protect coherence as development continues.',
   ].slice(0, 3);
 

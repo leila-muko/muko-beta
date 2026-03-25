@@ -38,6 +38,9 @@ export interface AskMukoContext {
   pieceRole?: string;
   silhouette?: string;
   constructionTier?: string;
+  collectionLanguage?: string[];
+  expressionSignals?: string[];
+  brandInterpretation?: string;
 }
 
 const FALLBACK_SUGGESTIONS: Record<"concept" | "spec", string[]> = {

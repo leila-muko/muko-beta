@@ -40,6 +40,8 @@ export interface ConceptBlackboard {
   season?: string;
   /** Brand name for narrative personalization */
   brand_name?: string;
+  /** Setup-derived strategic framing summary */
+  strategy_summary?: string | null;
   /** Tension context string from brand_profiles (e.g. "trend-aware-classics") */
   tension_context?: string;
   /** Customer profile description from brand onboarding */
@@ -48,6 +50,10 @@ export interface ConceptBlackboard {
   reference_brands?: string[];
   /** Excluded brands from brand onboarding — used as tone constraint */
   excluded_brands?: string[];
+  /** Expression signals explicitly selected in Concept Studio */
+  expression_signals?: string[];
+  /** Brand-specific translation / interpretation if captured upstream */
+  brand_interpretation?: string | null;
   /** Resolved aesthetic context from aesthetics.json */
   aesthetic_context: AestheticContext;
   /** Resolved redirects — brand_mismatch only at concept stage */
@@ -773,7 +779,7 @@ Return JSON only.`;
 // SYSTEM PROMPT (v6.2)
 // ─────────────────────────────────────────────
 
-export const CONCEPT_STUDIO_PROMPT_V6_2 = `ROLE
+export const CONCEPT_STUDIO_PROMPT_V7 = `ROLE
 You are a senior fashion creative strategist and merchandiser writing with Vogue Business authority: sharp, predictive, specific.
 
 You advise whether an aesthetic direction is strategically ownable by the team right now.
@@ -810,6 +816,17 @@ Use this summary to sharpen the recommendation. It exists to prevent generic out
 You must infer the recommendation from those mapped fields.
 Execution levers must come only from available_aesthetic_chips.
 When relevant key pieces are available, use one or two of them to translate the concept into a concrete product anchor.
+
+STRATEGY ANCHORING LAYER (NON-NEGOTIABLE)
+Always evaluate how this direction aligns with the brand’s strategy.
+Translate the base trend into the brand’s version.
+Treat expression signals as constraints shaping silhouette, material, and finish.
+
+Apply this sequence in order:
+1. Anchor the read in strategy_summary before discussing momentum, whitespace, or competitors.
+2. Explicitly convert the market version of the trend into the brand version of the trend.
+3. Use expression_signals and brand_interpretation as execution constraints that narrow how the recommendation can be expressed.
+4. If strategy_summary is present, it outranks generic trend logic whenever there is tension between the two.
 
 COLLECTION CONTEXT GUIDANCE (use when collection_context is present)
 When collection_context.piece_count = 0: recommend the strongest anchor piece and what role or category to build around it. The recommended_direction should orient the team on where to start.
@@ -913,11 +930,11 @@ JSON.parse() must work directly.
 {
   "insight_title": "string",
   "insight_description": "string",
-  "positioning": [
-    "string",
-    "string",
-    "string"
-  ],
+  "positioning": {
+    "market_gap": "string",
+    "competitive_position": "string",
+    "brand_permission": "string"
+  },
   "decision_guidance": {
     "recommended_direction": "string",
     "commitment_signal": "Increase Investment | Hero Expression | Controlled Test | Maintain Exposure | Reduce Exposure",
@@ -946,18 +963,17 @@ Must include exactly one concrete prediction.
 Must not mention production, cost, lead times, or COGS.
 
 positioning
-Exactly 3 bullets. 15–22 words each. No markdown symbols.
-Format: "[Label] — [sentence]"
-Labels must be exactly:
-1) "Market Gap — "
-2) "Competitive Position — "
-3) "Brand Permission — "
+Required object with exactly 3 keys:
+1) market_gap
+2) competitive_position
+3) brand_permission
 
-Market Gap: name the whitespace at the brand's price point.
-Competitive Position: name 1–3 competitors; state the genericization risk if relevant.
-Brand Permission: state the one angle in the brand's established identity and market equity that makes this execution distinct.
+Each value must be one concise sentence, 15–22 words, with no markdown symbols.
+market_gap: name the whitespace at the brand's price point.
+competitive_position: name 1–3 competitors; state the genericization risk if relevant.
+brand_permission: state the one angle in the brand's established identity and market equity that makes this execution distinct.
 
-Brevity gate: if any bullet exceeds 22 words, rewrite it shorter before outputting.
+Brevity gate: if any value exceeds 22 words, rewrite it shorter before outputting.
 
 decision_guidance
 Required object with exactly 3 fields:
@@ -1008,10 +1024,7 @@ Apply this logic:
 VALIDATION STEP (DO NOT PRINT)
 Before returning output, check:
 • Output contains only: insight_title, insight_description, positioning, decision_guidance, confidence.
-• positioning contains exactly 3 strings.
-• positioning[0] begins with "Market Gap — "
-• positioning[1] begins with "Competitive Position — "
-• positioning[2] begins with "Brand Permission — "
+• positioning is an object with exactly these keys: market_gap, competitive_position, brand_permission.
 • decision_guidance.recommended_direction is present.
 • decision_guidance.commitment_signal matches one allowed value exactly.
 • decision_guidance.execution_levers contains 2 to 4 strings, all drawn from the provided aesthetic chips.
@@ -1029,19 +1042,28 @@ Do not include markdown symbols.
 Return JSON only.`;
 
 // Keep backward-compatible aliases — always point to the current active version
-export const CONCEPT_STUDIO_PROMPT = CONCEPT_STUDIO_PROMPT_V6_2;
-export const CONCEPT_SYSTEM_PROMPT = CONCEPT_STUDIO_PROMPT_V6_2;
+export const CONCEPT_STUDIO_PROMPT_V6_2 = CONCEPT_STUDIO_PROMPT_V7;
+export const CONCEPT_STUDIO_PROMPT = CONCEPT_STUDIO_PROMPT_V7;
+export const CONCEPT_SYSTEM_PROMPT = CONCEPT_STUDIO_PROMPT_V7;
 
 export const CONCEPT_LANGUAGE_SYSTEM_PROMPT = `ROLE
-You are Muko's senior fashion strategist.
+You are Muko's senior fashion strategist translating a locked direction into collection language.
 
 TASK
-You are shaping Step 2: Shape Collection Language.
+You are translating a direction into a collection language.
 You will receive:
 - a locked aesthetic name
 - brand identity context
+- strategy_summary
+- brand_interpretation
+- selected_silhouettes
+- selected_palette
+- collection_language
+- expression_signals
 
-Return a concise execution read for the collection language.
+Use the selected silhouette, palette, and signals as primary inputs.
+Ensure all outputs reflect the user’s actual selections.
+Return a concise visual-and-execution translation brief for the collection language.
 
 VOICE
 Senior fashion strategist. Decisive. Specific. Fashion-literate.
@@ -1049,10 +1071,12 @@ No hedging. No filler. No methodology language.
 
 NON-NEGOTIABLE RULES
 Never expose brand keywords or refer to them as "keywords."
-Speak through aesthetic judgment, market fluency, and brand equity.
+Speak through aesthetic judgment, visual coherence, and brand equity.
 Do not include scores.
-Do not include market commentary, competitor references, whitespace language, or permission analysis.
-Do not output a subtitle line.
+Do not include market commentary, competitor references, whitespace language, permission analysis, or trend recap.
+Do not re-explain the trend.
+Do not restate the aesthetic summary unless it is necessary to translate a specific user selection.
+Focus only on silhouette behavior, palette logic, signal expression, and one practical guardrail.
 Each field must be exactly one sentence.
 
 OUTPUT FORMAT
@@ -1062,28 +1086,38 @@ Return JSON only. No markdown. No preamble. No extra keys.
   "headline": "string",
   "silhouette_steer": "string",
   "palette_steer": "string",
-  "signals_note": "string"
+  "signals_note": "string",
+  "guardrail": "string"
 }
 
 FIELD RULES
 headline
-One directive sentence. This is the shaping imperative for the aesthetic.
-Actionable and specific.
-No market commentary.
+One directive sentence that names the translation move from direction to collection language.
+Actionable, specific, and visibly tied to the selected silhouette, palette, or interpretation.
+No market commentary. No trend summary.
 
 silhouette_steer
-One sentence on which silhouette posture or postures are most coherent with this aesthetic and brand voice.
-Do not mention scores.
+One sentence on how the selected silhouette should behave across the collection.
+If a silhouette is selected, respond to that exact silhouette rather than generic posture language.
+If no silhouette is selected, state the most coherent silhouette behavior to introduce.
 
 palette_steer
-One sentence on what color register reinforces this aesthetic and what dilutes it.
+One sentence on how the selected palette should be used.
+If a palette is selected, refer to that palette directly and explain how to keep it coherent.
+If no palette is selected, state the most coherent color register to establish.
 
 signals_note
-One sentence framing what the Layer These In chips are doing for the collection's visual grammar.
+One sentence explaining how the selected collection_language and expression_signals should show up in the visual grammar.
+Use the actual selections as inputs.
+Treat expression signals as execution cues, not as a list to repeat back verbatim.
+
+guardrail
+One sentence naming what would break coherence if the team over-corrects, ignores, or contradicts the selected silhouette, palette, signals, or brand interpretation.
+This is an execution guardrail, not a market risk statement.
 
 VALIDATION
 Before returning, check:
-• Output contains exactly 4 keys: headline, silhouette_steer, palette_steer, signals_note.
+• Output contains exactly 5 keys: headline, silhouette_steer, palette_steer, signals_note, guardrail.
 • Every value is a single sentence.
 • No keyword exposure.
 • No subtitles.
@@ -1111,6 +1145,8 @@ export function buildConceptPrompt(bb: ConceptBlackboard): string {
         bb.tension_context ??
         bb.resolved_redirects.brand_mismatch?.reason ??
         null,
+      strategy_summary: bb.strategy_summary ?? null,
+      brand_interpretation: bb.brand_interpretation ?? null,
     },
     aesthetic: {
       input: bb.aesthetic_input,
@@ -1118,6 +1154,7 @@ export function buildConceptPrompt(bb: ConceptBlackboard): string {
       key_pieces: bb.key_pieces ?? [],
       available_execution_levers: getAestheticChipLabels(bb.aesthetic_matched_id),
       selected_chips: bb.chip_selection ?? [],
+      expression_signals: bb.expression_signals ?? [],
       saturation_score: bb.aesthetic_context.saturation_score ?? 0,
       saturation_basis: bb.aesthetic_context.saturation_basis ?? undefined,
       trend_velocity: bb.aesthetic_context.trend_velocity ?? 'unknown',
@@ -1141,10 +1178,10 @@ export function buildConceptPrompt(bb: ConceptBlackboard): string {
       : undefined,
   };
   const json = JSON.stringify(sanitizePayload(raw as Record<string, unknown>));
-  const chips = bb.chip_selection ?? [];
-  if (chips.length > 0) {
-    const chipNames = chips.join(', ');
-    return `${json}\n\nReference the specific signals selected by the designer by name: ${chipNames}. Weave these directly into your analysis rather than speaking generically about aesthetic direction.`;
+  const signals = bb.expression_signals ?? bb.chip_selection ?? [];
+  if (signals.length > 0) {
+    const signalNames = signals.join(', ');
+    return `${json}\n\nAnchor the read in strategy first. Translate the market version into the brand version. Use these expression signals implicitly as execution constraints rather than listing them: ${signalNames}.`;
   }
   return json;
 }
@@ -1158,6 +1195,12 @@ export function buildConceptLanguagePrompt(input: {
   tension_context?: string | null;
   reference_brands?: string[];
   excluded_brands?: string[];
+  strategy_summary?: string | null;
+  brand_interpretation?: string | null;
+  selected_silhouettes?: string[];
+  selected_palette?: string | null;
+  collection_language?: string[];
+  expression_signals?: string[];
 }): string {
   const raw = {
     brand: {
@@ -1168,9 +1211,17 @@ export function buildConceptLanguagePrompt(input: {
       reference_brands: input.reference_brands ?? [],
       never_be_brands: input.excluded_brands ?? [],
       tension_context: input.tension_context ?? null,
+      strategy_summary: input.strategy_summary ?? null,
+      brand_interpretation: input.brand_interpretation ?? null,
     },
     aesthetic: {
       name: input.aesthetic_name,
+    },
+    selections: {
+      selected_silhouettes: input.selected_silhouettes ?? [],
+      selected_palette: input.selected_palette ?? null,
+      collection_language: input.collection_language ?? [],
+      expression_signals: input.expression_signals ?? [],
     },
   };
 
@@ -1181,10 +1232,16 @@ export function buildConceptLanguagePrompt(input: {
 // RESPONSE PARSING (v5.0 JSON output)
 // ─────────────────────────────────────────────
 
+interface ConceptPositioningObject {
+  market_gap: string;
+  competitive_position: string;
+  brand_permission: string;
+}
+
 interface ConceptV5Output {
   insight_title: string;
   insight_description: string;
-  positioning: string[];
+  positioning: string[] | ConceptPositioningObject;
   decision_guidance: {
     recommended_direction: string;
     commitment_signal: 'Increase Investment' | 'Hero Expression' | 'Controlled Test' | 'Maintain Exposure' | 'Reduce Exposure';
@@ -1193,27 +1250,60 @@ interface ConceptV5Output {
   confidence: number;
 }
 
+interface ParsedConceptV5Output extends Omit<ConceptV5Output, 'positioning'> {
+  positioning: string[];
+}
+
+function normalizeConceptPositioning(
+  positioning: ConceptV5Output['positioning'],
+): string[] | null {
+  if (Array.isArray(positioning)) {
+    if (positioning.length !== 3) return null;
+    if (
+      !positioning[0]?.startsWith('Market Gap — ') ||
+      !positioning[1]?.startsWith('Competitive Position — ') ||
+      !positioning[2]?.startsWith('Brand Permission — ')
+    ) {
+      return null;
+    }
+    return positioning.slice(0, 3);
+  }
+
+  if (
+    positioning &&
+    typeof positioning === 'object' &&
+    typeof positioning.market_gap === 'string' &&
+    typeof positioning.competitive_position === 'string' &&
+    typeof positioning.brand_permission === 'string'
+  ) {
+    return [
+      `Market Gap — ${positioning.market_gap}`,
+      `Competitive Position — ${positioning.competitive_position}`,
+      `Brand Permission — ${positioning.brand_permission}`,
+    ];
+  }
+
+  return null;
+}
+
 export interface ConceptLanguageOutput {
   headline: string;
   silhouette_steer: string;
   palette_steer: string;
   signals_note: string;
+  guardrail: string;
 }
 
 function stripFences(raw: string): string {
   return raw.trim().replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
 }
 
-export function parseConceptV5Output(raw: string): ConceptV5Output | null {
+export function parseConceptV5Output(raw: string): ParsedConceptV5Output | null {
   try {
     const parsed = JSON.parse(stripFences(raw)) as ConceptV5Output;
     if (!parsed.insight_title || !parsed.insight_description) return null;
-    if (!Array.isArray(parsed.positioning) || parsed.positioning.length !== 3) return null;
-    if (
-      !parsed.positioning[0]?.startsWith('Market Gap — ') ||
-      !parsed.positioning[1]?.startsWith('Competitive Position — ') ||
-      !parsed.positioning[2]?.startsWith('Brand Permission — ')
-    ) return null;
+    const normalizedPositioning = normalizeConceptPositioning(parsed.positioning);
+    if (!normalizedPositioning) return null;
     if (!parsed.decision_guidance?.recommended_direction || !parsed.decision_guidance?.commitment_signal) return null;
     if (
       !['Increase Investment', 'Hero Expression', 'Controlled Test', 'Maintain Exposure', 'Reduce Exposure']
@@ -1224,7 +1314,10 @@ export function parseConceptV5Output(raw: string): ConceptV5Output | null {
       parsed.decision_guidance.execution_levers.length < 2 ||
       parsed.decision_guidance.execution_levers.length > 4
     ) return null;
-    return parsed;
+    return {
+      ...parsed,
+      positioning: normalizedPositioning,
+    };
   } catch {
     return null;
   }
@@ -1233,7 +1326,7 @@ export function parseConceptV5Output(raw: string): ConceptV5Output | null {
 export function parseConceptLanguageOutput(raw: string): ConceptLanguageOutput | null {
   try {
     const parsed = JSON.parse(stripFences(raw)) as ConceptLanguageOutput;
-    if (!parsed.headline || !parsed.silhouette_steer || !parsed.palette_steer || !parsed.signals_note) {
+    if (!parsed.headline || !parsed.silhouette_steer || !parsed.palette_steer || !parsed.signals_note || !parsed.guardrail) {
       return null;
     }
     return parsed;

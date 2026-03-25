@@ -2,7 +2,10 @@ import { describe, expect, test } from 'vitest';
 
 import {
   buildConceptPrompt,
+  buildConceptLanguagePrompt,
   buildFallbackDecisionGuidance,
+  parseConceptLanguageOutput,
+  parseConceptV5Output,
   summarizeCollectionGuidanceContext,
   type ConceptBlackboard,
 } from '@/lib/synthesizer/conceptInsight';
@@ -17,9 +20,12 @@ function makeBlackboard(overrides?: Partial<ConceptBlackboard>): ConceptBlackboa
     resonance_score: 71,
     season: 'fw26',
     brand_name: 'Muko Test Brand',
+    strategy_summary: 'Muko Test Brand operates at Contemporary with a customer who buys fewer, sharper pieces.',
     customer_profile: 'A design-led customer who buys fewer, sharper pieces.',
     reference_brands: ['The Row'],
     excluded_brands: ['Zara'],
+    expression_signals: ['Knife-Pleated', 'Powder-Matte'],
+    brand_interpretation: 'Sharper restraint with controlled volume.',
     aesthetic_context: {
       consumer_insight: 'Consumers are consolidating around restraint with sharper proportion.',
       risk_factors: ['Can flatten into generic minimalism'],
@@ -149,6 +155,8 @@ describe('Decision Guidance collection progression', () => {
 
   test('concept prompt includes the derived collection summary for the model', () => {
     const bb = makeBlackboard({
+      chip_selection: [],
+      expression_signals: [],
       collection_context: {
         brand: {
           name: 'Muko Test Brand',
@@ -165,5 +173,89 @@ describe('Decision Guidance collection progression', () => {
 
     expect(prompt.collection_context?.summary?.stage).toBe('comparative');
     expect(prompt.collection_context?.summary?.missing_role).toBeTruthy();
+  });
+
+  test('concept prompt includes strategy, expression signals, and brand interpretation', () => {
+    const bb = makeBlackboard({
+      chip_selection: [],
+      expression_signals: [],
+    });
+
+    const prompt = JSON.parse(buildConceptPrompt(bb)) as {
+      brand?: { strategy_summary?: string | null; brand_interpretation?: string | null };
+      aesthetic?: { expression_signals?: string[] };
+    };
+
+    expect(prompt.brand?.strategy_summary).toContain('Contemporary');
+    expect(prompt.brand?.brand_interpretation).toBe('Sharper restraint with controlled volume.');
+    expect(prompt.aesthetic?.expression_signals).toEqual([]);
+  });
+
+  test('parser accepts positioning object and normalizes it for existing UI mapping', () => {
+    const parsed = parseConceptV5Output(JSON.stringify({
+      insight_title: 'Quiet Structure has a narrow opening before the lane turns generic.',
+      insight_description: 'Refined restraint is consolidating quickly and sharper minimalism will be harder to differentiate within two seasons. Muko Test Brand can hold the lane by turning restraint into a more architectural proposition. The Row defines the upper register, but the contemporary gap is still under-authored. If the team hesitates, the category will flatten into safer minimalism by FW26.',
+      positioning: {
+        market_gap: 'Contemporary minimalism still lacks a sharper architectural register that feels directional without reading cold.',
+        competitive_position: 'The Row and Toteme anchor the reference set, but the middle market is still drifting toward generic restraint.',
+        brand_permission: 'The brand can translate restraint into a more precise, structured attitude that feels owned rather than merely adjacent.',
+      },
+      decision_guidance: {
+        recommended_direction: 'Use Quiet Structure as a hero anchor through the Column coat, then build a tighter support layer behind it.',
+        commitment_signal: 'Hero Expression',
+        execution_levers: ['Sharp Shoulders', 'Longline'],
+      },
+      confidence: 0.82,
+    }));
+
+    expect(parsed?.positioning).toEqual([
+      expect.stringMatching(/^Market Gap — /),
+      expect.stringMatching(/^Competitive Position — /),
+      expect.stringMatching(/^Brand Permission — /),
+    ]);
+  });
+
+  test('concept language prompt includes actual selection inputs', () => {
+    const prompt = JSON.parse(buildConceptLanguagePrompt({
+      aesthetic_name: 'Quiet Structure',
+      brand_keywords: ['architectural', 'refined', 'restraint'],
+      brand_name: 'Muko Test Brand',
+      customer_profile: 'A design-led customer who buys fewer, sharper pieces.',
+      price_tier: 'Contemporary',
+      tension_context: 'restraint-with-presence',
+      strategy_summary: 'Muko Test Brand operates at Contemporary and wins through sharper restraint.',
+      brand_interpretation: 'Sharper restraint with controlled volume.',
+      selected_silhouettes: ['structured'],
+      selected_palette: 'Stone Neutrals',
+      collection_language: ['controlled volume', 'architectural restraint'],
+      expression_signals: ['Knife-Pleated', 'Powder-Matte'],
+    })) as {
+      brand?: { strategy_summary?: string | null; brand_interpretation?: string | null };
+      selections?: {
+        selected_silhouettes?: string[];
+        selected_palette?: string | null;
+        collection_language?: string[];
+        expression_signals?: string[];
+      };
+    };
+
+    expect(prompt.brand?.strategy_summary).toContain('Contemporary');
+    expect(prompt.brand?.brand_interpretation).toBe('Sharper restraint with controlled volume.');
+    expect(prompt.selections?.selected_silhouettes).toEqual(['structured']);
+    expect(prompt.selections?.selected_palette).toBe('Stone Neutrals');
+    expect(prompt.selections?.collection_language).toEqual(['controlled volume', 'architectural restraint']);
+    expect(prompt.selections?.expression_signals).toEqual(['Knife-Pleated', 'Powder-Matte']);
+  });
+
+  test('concept language parser requires guardrail', () => {
+    const parsed = parseConceptLanguageOutput(JSON.stringify({
+      headline: 'Translate Quiet Structure through a structured line with sharper restraint.',
+      silhouette_steer: 'Keep the structured silhouette disciplined through longline shapes and held volume rather than soft collapse.',
+      palette_steer: 'Use Stone Neutrals tonally so the palette reads precise rather than decorative.',
+      signals_note: 'The signals should surface through crisp spacing and matte finish so the language feels controlled, not overworked.',
+      guardrail: 'Do not soften the line with fluid drift or high-contrast color that breaks the controlled restraint of the chosen setup.',
+    }));
+
+    expect(parsed?.guardrail).toContain('Do not');
   });
 });

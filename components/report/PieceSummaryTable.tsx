@@ -37,6 +37,12 @@ function getStatusTone(status?: string) {
   return ['rgba(169,123,143,0.14)', reportPalette.rose] as const;
 }
 
+function formatToken(value: string) {
+  return value
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export function PieceSummaryTable({
   pieces,
 }: {
@@ -124,7 +130,7 @@ export function PieceSummaryTable({
                       {piece.category}
                     </p>
                   </div>
-                  <span style={{ fontFamily: fonts.body, fontSize: 13, color: reportPalette.olive }}>{piece.role}</span>
+                  <span style={{ fontFamily: fonts.body, fontSize: 13, color: reportPalette.olive }}>{formatToken(piece.role)}</span>
                   <span style={{ fontFamily: fonts.body, fontSize: 13, color: reportPalette.olive }}>{piece.complexity}</span>
                   <span style={{ fontFamily: fonts.body, fontSize: 13, color: reportPalette.olive }}>{piece.direction_tag}</span>
                   <span style={{ fontFamily: fonts.body, fontSize: 13, color: reportPalette.olive }}>{piece.material}</span>

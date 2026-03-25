@@ -1,4 +1,4 @@
-export type CollectionPieceRole = 'hero' | 'core' | 'support';
+export type CollectionPieceRole = 'hero' | 'volume-driver' | 'core-evolution' | 'directional';
 export type CollectionComplexity = 'high' | 'medium' | 'low';
 export type CollectionPieceStatus = 'strong' | 'watch' | 'revise';
 export type CollectionReportSource = 'synthesizer' | 'fallback';

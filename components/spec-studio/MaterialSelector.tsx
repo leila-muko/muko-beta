@@ -1,5 +1,6 @@
 'use client';
 
+import { getMaterialProperties } from '@/lib/spec-studio/material-properties';
 import type { Material } from '@/lib/types/spec-studio';
 
 // Visual indicators for material character
@@ -39,7 +40,7 @@ export default function MaterialSelector({
   onSwapToAlternative,
 }: MaterialSelectorProps) {
   const sharedProps = selectedMaterial && alternativeMaterial
-    ? selectedMaterial.properties.filter(p => alternativeMaterial.properties.includes(p))
+    ? getMaterialProperties(selectedMaterial).filter((property) => getMaterialProperties(alternativeMaterial).includes(property))
     : [];
 
   return (

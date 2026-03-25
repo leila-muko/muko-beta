@@ -72,10 +72,11 @@ export interface MukoInsightSectionProps {
     silhouette_steer: string;
     palette_steer: string;
     signals_note: string;
+    guardrail: string;
   } | null;
   /** Streaming state for language stage */
   languageStreamingText?: string;
-  languageStreamingRows?: { silhouette: string; palette: string; signals: string };
+  languageStreamingRows?: { silhouette: string; palette: string; signals: string; guardrail: string };
   isLanguageStreaming?: boolean;
   /** Streaming state for product/piece stage */
   pieceStreamingTitle?: string;
@@ -377,7 +378,7 @@ function ConceptDecisionRail({
   streamingParagraph?: string;
   isParagraphStreaming?: boolean;
   languageStreamingText?: string;
-  languageStreamingRows?: { silhouette: string; palette: string; signals: string };
+  languageStreamingRows?: { silhouette: string; palette: string; signals: string; guardrail: string };
   isLanguageStreaming?: boolean;
   pieceStreamingTitle?: string;
   pieceStreamingBody?: string;
@@ -396,6 +397,7 @@ function ConceptDecisionRail({
     silhouette_steer: string;
     palette_steer: string;
     signals_note: string;
+    guardrail: string;
   } | null;
   productPieceRead?: { title?: string; body: string } | null;
   productStrategicImplication?: {
@@ -410,8 +412,6 @@ function ConceptDecisionRail({
   hasSelectedProductPiece?: boolean;
   showBrandContextLabel?: boolean;
 }) {
-  const [analysisExpanded, setAnalysisExpanded] = useState(false);
-
   // ── Crossfade: pre-read → LLM headline ──────────────────────────────────
   const [headlineFadedOut, setHeadlineFadedOut] = useState(false);
   const [displayedHeadline, setDisplayedHeadline] = useState<string | null>(null);
@@ -425,21 +425,28 @@ function ConceptDecisionRail({
   useEffect(() => {
     const wasStreaming = prevIsStreamingRef.current;
     prevIsStreamingRef.current = isStreaming;
+    let frameId = 0;
 
     if (isStreaming) {
       // New fetch cycle — reset so next settle can crossfade
-      setDisplayedHeadline(null);
-      setHeadlineFadedOut(false);
+      frameId = window.requestAnimationFrame(() => {
+        setDisplayedHeadline(null);
+        setHeadlineFadedOut(false);
+      });
+      return () => window.cancelAnimationFrame(frameId);
     } else if (wasStreaming && paragraphsRef.current[0]) {
       const match = paragraphsRef.current[0].match(/^[^.!?]*[.!?]/);
       const newText = (match ? match[0] : paragraphsRef.current[0]).trim();
       if (newText !== headlineRef.current) {
-        setHeadlineFadedOut(true);
+        frameId = window.requestAnimationFrame(() => setHeadlineFadedOut(true));
         const timer = setTimeout(() => {
           setDisplayedHeadline(newText);
           setHeadlineFadedOut(false);
         }, 150);
-        return () => clearTimeout(timer);
+        return () => {
+          window.cancelAnimationFrame(frameId);
+          clearTimeout(timer);
+        };
       }
     }
   }, [isStreaming]);
@@ -493,6 +500,7 @@ function ConceptDecisionRail({
           { label: "Silhouette", value: languageRead.silhouette_steer },
           { label: "Palette", value: languageRead.palette_steer },
           { label: "Signals", value: languageRead.signals_note },
+          { label: "Guardrail", value: languageRead.guardrail },
         ]
       : [];
     const streamingRowList = isLanguageStreaming && languageStreamingRows
@@ -500,6 +508,7 @@ function ConceptDecisionRail({
           { label: "Silhouette", value: languageStreamingRows.silhouette },
           { label: "Palette", value: languageStreamingRows.palette },
           { label: "Signals", value: languageStreamingRows.signals },
+          { label: "Guardrail", value: languageStreamingRows.guardrail },
         ]
       : [];
     const displayRows = settledRows.length > 0 ? settledRows : streamingRowList;
@@ -576,7 +585,7 @@ function ConceptDecisionRail({
           ) : isStreaming ? (
             <span style={{ opacity: 0.35, animation: "mukoCardPulse 1.2s ease-in-out infinite" }}>{headline}</span>
           ) : (
-            (displayedHeadline && displayedHeadline !== headlineRef.current)
+            (displayedHeadline && displayedHeadline !== headline)
               ? displayedHeadline
               : leadInsight
           )}
@@ -607,40 +616,6 @@ function ConceptDecisionRail({
           {showBrandContextLabel && (
             <div style={{ marginTop: 8, fontFamily: inter, fontSize: 11, color: "#9C9690" }}>
               Shaped by your brand context
-            </div>
-          )}
-
-          {bullets.items.length > 0 && (
-            <div style={{ marginTop: 18 }}>
-              <button
-                onClick={() => setAnalysisExpanded(e => !e)}
-                style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: inter, fontSize: 11, fontWeight: 600, color: "#6B7A40" }}
-              >
-                {analysisExpanded ? "Hide analysis" : "See analysis"}
-                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ transform: analysisExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 180ms ease", flexShrink: 0 }}>
-                  <path d="M2 4.5L6 8L10 4.5" stroke="#6B7A40" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-
-              {analysisExpanded && (
-                <div style={{ marginTop: 18, borderTop: "1px solid rgba(67,67,43,0.08)", paddingTop: 14 }}>
-                  {bullets.items.slice(0, 3).map((item, i) => {
-                    const parsedLabel = item.match(/^(.+?)(?:[—–]|\s{2,})/)?.[1]?.trim();
-                    const label = parsedLabel ?? ANALYSIS_LABELS[i] ?? "";
-                    const value = item.replace(/^.+?(?:[—–]|\s{2,})\s*/, '');
-                    return (
-                      <div key={i} style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 8, padding: "7px 0" }}>
-                        <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "#B8876B", paddingTop: 1, lineHeight: 1.5 }}>
-                          {label}
-                        </div>
-                        <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.65)", lineHeight: 1.55 }}>
-                          {value}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           )}
         </div>

@@ -22,6 +22,7 @@ interface AnalysisRow {
   collection_name: string | null;
   season: string | null;
   category: string | null;
+  collection_role?: string | null;
   aesthetic_input: string | null;
   material_id: string | null;
   silhouette: string | null;
@@ -94,9 +95,11 @@ function extractPartialCollectionInsight(raw: string) {
   ].join(' ');
 }
 
-function inferRole(value: string | null | undefined, score: number | null | undefined): CollectionPieceRole | null {
+function inferRole(value: string | null | undefined): CollectionPieceRole | null {
   const token = normalizeToken(value);
-  if (token === 'hero' || token === 'core' || token === 'support') return token;
+  if (token === 'hero' || token === 'volume-driver' || token === 'core-evolution' || token === 'directional') {
+    return token;
+  }
   return null;
 }
 
@@ -146,7 +149,7 @@ function toCollectionInput({
       id: row.id,
       piece_name: getPieceName(row),
       category: row.category,
-      role: inferRole(row.agent_versions?.collection_role, row.score),
+      role: inferRole(row.collection_role ?? row.agent_versions?.collection_role),
       complexity: inferComplexity(row.construction_tier),
       direction_tag: row.aesthetic_input,
       material: row.material_id ? materialNameById.get(row.material_id) ?? row.material_id : null,
@@ -199,9 +202,9 @@ async function fetchCollectionAnalyses(
 ): Promise<AnalysisRow[]> {
   const supabase = createClient();
   const primarySelect =
-    'id, collection_name, season, category, aesthetic_input, material_id, silhouette, construction_tier, score, dimensions, gates_passed, piece_name, narrative, created_at, agent_versions';
+    'id, collection_name, season, category, collection_role, aesthetic_input, material_id, silhouette, construction_tier, score, dimensions, gates_passed, piece_name, narrative, created_at, agent_versions';
   const fallbackSelect =
-    'id, collection_name, season, category, aesthetic_input, material_id, silhouette, construction_tier, score, dimensions, gates_passed, narrative, created_at, agent_versions';
+    'id, collection_name, season, category, collection_role, aesthetic_input, material_id, silhouette, construction_tier, score, dimensions, gates_passed, narrative, created_at, agent_versions';
 
   const primary = await supabase
     .from('analyses')

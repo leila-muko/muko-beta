@@ -8,6 +8,7 @@ const MUTED = "#888078";
 const TEXT = "#191919";
 const BORDER = "#E2DDD6";
 const OLIVE = "#43432B";
+const FLOW_BG = "#FAF9F6";
 
 const sohne = "var(--font-sohne-breit), -ui-sans-serif, sans-serif";
 const inter = "var(--font-inter), -ui-sans-serif, sans-serif";
@@ -58,7 +59,7 @@ export function MukoNav({
         left: 0,
         right: 0,
         height: 72,
-        background: "rgba(250,249,246,0.94)",
+        background: FLOW_BG,
         backdropFilter: "blur(24px) saturate(160%)",
         WebkitBackdropFilter: "blur(24px) saturate(160%)",
         borderBottom: `1px solid ${BORDER}`,
