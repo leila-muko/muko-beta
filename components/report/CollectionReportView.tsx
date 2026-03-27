@@ -55,7 +55,7 @@ export function CollectionReportView({
       </section>
 
       <MukoInsightSection
-        insight={report.muko_insight}
+        intelligence={report.assortment_intelligence}
         streamingParagraph={reportInsightStreaming}
         isParagraphStreaming={reportIsParagraphStreaming}
       />

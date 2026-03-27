@@ -7,12 +7,11 @@ import type {
 } from "@/lib/pulse/microInsight";
 
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
-const inter = "var(--font-inter), system-ui, sans-serif";
 
 const TONE_STYLES: Record<PulseCueTone, { color: string; weight: number }> = {
   positive: { color: "#7D8D4E", weight: 500 },
   warning: { color: "#9D6E58", weight: 500 },
-  neutral: { color: "rgba(67,67,43,0.8)", weight: 400 },
+  neutral: { color: "rgba(67,67,43,0.62)", weight: 500 },
   muted: { color: "rgba(67,67,43,0.4)", weight: 400 },
 };
 
@@ -39,10 +38,10 @@ export function PulseMicroInsight({ insight }: PulseMicroInsightProps) {
       <div
         style={{
           fontFamily: sohne,
-          fontSize: 13.5,
-          lineHeight: 1.22,
-          letterSpacing: "-0.01em",
-          color: "rgba(67,67,43,0.8)",
+          fontSize: 12.5,
+          lineHeight: 1.4,
+          letterSpacing: "0.01em",
+          color: "rgba(67,67,43,0.58)",
           maxWidth: 620,
         }}
       >
@@ -68,8 +67,8 @@ export function PulseMicroInsight({ insight }: PulseMicroInsightProps) {
           flexWrap: "wrap",
           alignItems: "center",
           gap: 0,
-          fontFamily: inter,
-          fontSize: 9.5,
+          fontFamily: sohne,
+          fontSize: 10.5,
           lineHeight: 1.4,
           color: "rgba(67,67,43,0.34)",
         }}

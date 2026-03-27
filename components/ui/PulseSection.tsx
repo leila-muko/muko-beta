@@ -24,7 +24,7 @@ export function PulseSection({
   items,
   collapsedInsight,
   initiallyExpanded = false,
-  summaryPrefix = "View pulse",
+  summaryPrefix = "Pulse",
   helperText,
 }: PulseSectionProps) {
   const [isExpanded, setIsExpanded] = useState(initiallyExpanded);

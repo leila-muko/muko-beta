@@ -121,6 +121,18 @@ export function buildAnalysisRow(
   const aestheticInfl = (bb.session.aestheticInflection as string | null | undefined)
     ?? (bb.session.directionInterpretationText as string | null | undefined)
     ?? null;
+  const selectedKeyPiece = bb.session.selectedKeyPiece as { item?: string | null } | null | undefined;
+  const pieceBuildContext = bb.session.pieceBuildContext as {
+    adaptedTitle?: string | null;
+    originalLabel?: string | null;
+  } | null | undefined;
+  const selectedPieceImage = bb.session.selectedPieceImage;
+  const savedPieceName =
+    pieceBuildContext?.adaptedTitle?.trim()
+    || selectedKeyPiece?.item?.trim()
+    || pieceBuildContext?.originalLabel?.trim()
+    || bb.input.category?.trim()
+    || null;
 
   const row: Record<string, unknown> = {
     user_id:          userId,
@@ -140,6 +152,7 @@ export function buildAnalysisRow(
     construction_tier:          bb.input.construction_tier,
     construction_tier_override: false,
     timeline_weeks:             bb.input.timeline_weeks,
+    piece_name: savedPieceName,
     score: result.score,
     dimensions: {
       identity:  result.dimensions.identity,
@@ -153,7 +166,12 @@ export function buildAnalysisRow(
     narrative: result.narrative,
     redirects: result.redirect ? [result.redirect] : [],
     data_version:   process.env.NEXT_PUBLIC_DATA_VERSION ?? 'unknown',
-    agent_versions: result.agent_versions,
+    agent_versions: {
+      ...result.agent_versions,
+      collection_role: bb.session.collectionRole ?? null,
+      saved_piece_name: savedPieceName,
+      selected_piece_image: selectedPieceImage ? JSON.stringify(selectedPieceImage) : null,
+    },
     intent_success_goals:    intent?.primary_goals ?? [],
     intent_tradeoff:         intent?.tradeoff ?? null,
     intent_tension_trend:    intent?.tension_sliders?.trend_forward ?? null,

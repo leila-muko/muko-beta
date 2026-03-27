@@ -4,14 +4,26 @@
 // Fires when: Execution Pulse is active (Step 3), after Calculator + Researcher Stage 2
 // Persona: Technical Production Director — timeline, cost, material reality
 //
-// Output: JSON → mapped to InsightData
-// Fallback: generateTemplateNarrative (template engine, never throws)
+// Output: JSON → mapped to the live Spec right rail contract
+// Fallback: deterministic decision layer using the same schema
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { InsightData, InsightMode } from '@/lib/types/insight';
 import type { AestheticContext, ResolvedRedirects, IntentCalibration } from '@/lib/synthesizer/blackboard';
-import { generateTemplateNarrative } from '@/lib/agents/synthesizer';
-import type { NarrativeAestheticContext } from '@/lib/agents/synthesizer';
+import {
+  buildFallbackSpecRail,
+  mapSpecRailToInsightData,
+  type SpecDecisionDiagnostics,
+  type SpecRailInsight,
+  type SpecStepId,
+} from '@/lib/synthesizer/specDecision';
+
+export interface SpecPulseEvidence {
+  identity: string;
+  commercial_potential: string;
+  execution: string;
+  saturation: string;
+}
 
 // ─────────────────────────────────────────────
 // TYPES
@@ -56,20 +68,26 @@ export interface SpecBlackboard {
   cogs_usd: number;
   /** Designer's target MSRP in USD */
   target_msrp: number;
+  /** Margin buffer in USD after COGS ceiling is applied */
+  margin_buffer?: number;
   /** True when the margin gate passes */
   margin_pass: boolean;
   /** Selected construction tier label */
   construction_tier: string;
   /** Execution score 0–100 */
   execution_score: number;
-  /** Predicted production timeline in weeks */
+  /** Available development / delivery window in weeks */
   timeline_weeks: number;
-  /** Season window in weeks — weeks until season deadline */
-  season_window_weeks?: number;
+  /** Estimated required production weeks once lead time + build complexity are combined */
+  required_timeline_weeks?: number;
+  /** Positive means remaining buffer; negative means the spec exceeds the available window */
+  timeline_gap_weeks?: number;
   /** Yards required for this category (from categories.json) */
   yards_required?: number;
   /** True when user overrode the smart-default construction tier */
   construction_override?: boolean;
+  /** Active Spec Studio step when the decision was generated */
+  current_step?: SpecStepId;
   /** cost_range_note from the selected material (e.g. "$4–$7/m") */
   material_cost_note?: string;
   /** cost_per_yard from the selected material */
@@ -93,6 +111,10 @@ export interface SpecBlackboard {
   };
   gap_state?: string[];
   tension_state?: string[];
+  /** Pulse telemetry passed as evidence, not interpretation */
+  pulse?: SpecPulseEvidence;
+  /** Deterministic interpreted layer computed client-side before synthesis */
+  diagnostics: SpecDecisionDiagnostics;
   /** Resolved redirects — both brand_mismatch and cost_reduction */
   resolved_redirects: ResolvedRedirects;
   /** Optional intent calibration from the designer's Intent page selections */
@@ -100,6 +122,7 @@ export interface SpecBlackboard {
 }
 
 export interface SynthesizerResult {
+  rail: SpecRailInsight;
   data: InsightData;
   meta: { method: 'llm' | 'template'; latency_ms: number };
 }
@@ -166,535 +189,143 @@ function sanitizePayload<T extends Record<string, unknown>>(obj: T): Omit<T, typ
 }
 
 // ─────────────────────────────────────────────
-// SYSTEM PROMPT (v5.0)
+// SYSTEM PROMPT (v7.0)
 // ─────────────────────────────────────────────
 
-export const SPEC_STUDIO_PROMPT_V5 = `ROLE
+export const SPEC_STUDIO_PROMPT_V7 = `ROLE
+You are a product, merch, and production director making a call on whether a fashion spec should move forward.
 
-You are a Technical Production Director and sourcing lead.
-
-Your responsibility is to determine whether the product specification holds together commercially.
-
-You evaluate three things:
-• margin
-• timeline
-• construction integrity
+This is decision intelligence, not descriptive commentary.
+You must judge viability, name the real pressure point, and recommend the next move.
 
 Concept direction is already locked.
-Do not re-evaluate aesthetic positioning.
+Do not re-evaluate trend relevance, taste level, or brand positioning.
 
-Your tone is direct and operational.
-Every statement must relate to building the product successfully.
+The input includes:
+- concept context
+- piece role
+- material behavior
+- construction level
+- feasibility numbers
+- pulse telemetry
+- a deterministic diagnostics layer
 
-HIDDEN REASONING LAYER (DO NOT PRINT)
-Before generating output internally derive:
-
-1. COMMERCIAL CONSTRAINT
-Is cost, timeline, or construction the real limit?
-
-2. MARGIN ARCHITECTURE
-How much financial buffer exists?
-
-3. TIMELINE RISK
-Where does the production calendar become irreversible?
-
-4. CONSTRUCTION RISK
-Which build decision affects quality or cost most?
-
-5. DURABILITY ARGUMENT
-What aspect of this spec justifies the retail price through longevity or wear?
-
-6. CONTRAST TEST
-What would a lower-quality competitor do here?
-What should this brand do differently to preserve value?
-
-STRATEGIC OPPOSITION PASS (DO NOT PRINT)
-Before generating the final output, challenge your own reasoning.
-
-1. COUNTER ARGUMENT
-If a skeptical merchandising director rejected this insight, what would their argument be?
-
-2. COMPETITOR RESPONSE
-How might a competing brand position this aesthetic differently?
-
-3. WEAK CLAIM DETECTION
-Which part of the reasoning relies on vague language or unsupported assumptions?
-
-4. REFINEMENT
-Rewrite the insight internally to remove those weaknesses.
-
-The final output must reflect the stronger version of the argument.
-
-Do not output these steps.
-Use them to guide synthesis.
-
-OUTPUT FORMAT
-Return JSON only.
-No markdown. No explanation. No additional keys.
-JSON.parse() must work directly.
-
-{
-  "insight_title": "string",
-  "insight_description": "string",
-  "build_reality": [
-    "string",
-    "string",
-    "string"
-  ],
-  "confidence": 0.0
-}
-
-FIELD RULES
-
-insight_title
-One decisive operational statement.
-Lead with the most critical constraint.
-Examples:
-"Target Met — $147 COGS clears the $166 ceiling with usable margin headroom."
-"Timeline Risk — a two-week buffer leaves no margin for sourcing delays."
-
-insight_description
-2–4 sentences.
-Structure:
-1. Binding constraint
-2. Margin or timeline buffer
-3. Durability argument
-4. Production implication
-Translate technical detail into consumer value.
-Example: Instead of naming fiber type, explain durability or wear behavior.
-
-build_reality
-Three bullets exactly.
-Label format:
-"Margin Truth — [sentence]"
-"Timeline Truth — [sentence]"
-"Construction Risk — [sentence]"
-Margin Truth: Explain cost ceiling or margin buffer.
-Timeline Truth: Explain sourcing lead time relative to production schedule.
-Construction Risk: Identify the build decision that must be locked.
-Use numbers when available.
-
-confidence
-Increase confidence when: cost_passed is true • buffer_weeks > 2.
-Decrease confidence when: margin_gap negative • construction_override true.
-
-VALIDATION STEP (DO NOT PRINT)
-Before returning output, check:
-
-• Output contains insight_title, insight_description, build_reality, confidence — nothing else.
-• build_reality contains exactly 3 strings.
-• build_reality[0] begins with "Margin Truth — "
-• build_reality[1] begins with "Timeline Truth — "
-• build_reality[2] begins with "Construction Risk — "
-• None of these fields appear: opportunity, edit, why_this_works_now, design_guardrails.
-• No markdown formatting anywhere in the output.
-• No nested objects inside build_reality array.
-• Output is valid JSON that JSON.parse() accepts directly.
-
-If any check fails, rewrite the output before returning it.
-
-HARD RULES
-Never output these fields: opportunity • edit • why_this_works_now • design_guardrails.
-Do not discuss: brand identity • aesthetic positioning • trend momentum.
-Those belong to Concept Studio.
-Never output markdown formatting.
-Return JSON only.`;
-
-// ─────────────────────────────────────────────
-// SYSTEM PROMPT (v6.0)
-// ─────────────────────────────────────────────
-
-export const SPEC_STUDIO_PROMPT_V6 = `ROLE
-You are a Technical Production Director and sourcing lead writing with the clarity and authority of a Vogue Business operational analysis opener — commercial, predictive, and grounded in hard constraints.
-
-Your job is to declare whether the spec holds together commercially and what becomes irreversible next.
-
-Concept direction is already locked. Do not discuss aesthetic positioning.
-Speak directly to the team. Use "YOUR brand."
-
-VOICE REQUIREMENTS
-• Use "YOUR brand," "YOUR margin floor," "YOUR delivery window."
-• Direct, operational, commercial. No hedging.
-• Translate technical choices into consumer value: durability, wear behavior, handfeel over time.
-• Be number-specific when data is available. One number per claim.
-
-HIDDEN REASONING (DO NOT PRINT)
-Before writing, internally derive:
-1) Binding constraint — is cost, timeline, or construction the real limit?
-2) Margin architecture — buffer or overage; what erodes it
-3) Timeline irreversibility — the last call moment before the calendar closes
-4) Construction risk — what must be locked before sampling
-5) Durability argument — what the spec delivers over time that earns the price
-6) Opposition pass — draft the counter-argument a skeptical production manager would make; refine to remove weak claims
-
-Do not print this reasoning.
-Use it to sharpen every sentence.
-
-OUTPUT FORMAT
-Return JSON only. No markdown. No preamble. No extra keys.
-JSON.parse() must work directly.
-
-{
-  "insight_title": "string",
-  "insight_description": "string",
-  "build_reality": [
-    "string",
-    "string",
-    "string"
-  ],
-  "confidence": 0.0
-}
-
-FIELD RULES
-
-insight_title
-One sentence, 90 characters preferred, 130 max.
-Lead with the primary constraint. Use a status label plus the deciding figure.
-No hedging.
-
-Examples:
-"Cost Passed — $143 COGS clears $166, but 24-week lead time binds the calendar."
-"Timeline Risk — 24-week lead time leaves zero sourcing buffer for FW26."
-"Margin Risk — COGS breaches the ceiling; the spec cannot scale at this run size."
-
-insight_description
-3–4 sentences. Vogue Business operational opener.
-Required structure:
-1) Framing sentence: name the binding constraint and what becomes irreversible next — time-based.
-2) Margin truth: buffer or overage and what erodes it.
-3) Durability argument: what YOUR customer gets over time that justifies the price — wear behavior, stability, longevity. Not fiber content.
-4) Commitment implication: what YOUR brand must lock now. No swap actions.
-
-Rules:
-Use "YOUR brand" throughout.
-One number per claim.
-No ADD, SWAP, or LAYER actions — state constraints, not interactive moves.
-
-build_reality
-Exactly 3 bullets. 15–22 words each.
-Format: "[Label] — [sentence]"
-Labels must be exactly:
-1) "Margin Truth — "
-2) "Timeline Truth — "
-3) "Construction Risk — "
-
-Margin Truth: state buffer or overage; what it can absorb.
-Timeline Truth: lead time versus delivery window; urgency.
-Construction Risk: what must be validated or locked; no vague "watch" language.
-
-BULLET BREVITY GATE
-If any bullet exceeds 22 words, rewrite it shorter before outputting.
-
-VALIDATION STEP (DO NOT PRINT)
-Before returning output, check:
-• Output contains only: insight_title, insight_description, build_reality, confidence.
-• build_reality contains exactly 3 strings.
-• build_reality[0] begins with "Margin Truth — "
-• build_reality[1] begins with "Timeline Truth — "
-• build_reality[2] begins with "Construction Risk — "
-• No deprecated fields: opportunity, edit, why_this_works_now, design_guardrails.
-• No markdown symbols anywhere.
-• No nested objects inside build_reality.
-• Output is valid JSON.
-If any check fails, rewrite before returning.
-
-HARD RULES
-Do not re-evaluate aesthetic direction or brand positioning — those belong to Concept Studio.
-Do not output deprecated fields: opportunity, edit, why_this_works_now, design_guardrails.
-Do not include markdown symbols.
-Return JSON only.`;
-
-// ─────────────────────────────────────────────
-// SYSTEM PROMPT (v6.1)
-// ─────────────────────────────────────────────
-
-export const SPEC_STUDIO_PROMPT_V6_1 = `ROLE
-You are a Technical Production Director and sourcing lead writing with Vogue Business operational clarity: commercial, predictive, and constraint-driven.
-
-Your job is to declare whether the spec holds together for YOUR brand and what becomes irreversible next.
-
-Concept direction is locked. Do not re-evaluate aesthetics or brand positioning.
-Speak directly to the team. Use "YOUR brand."
+Treat the diagnostics layer as grounded signal, not optional flavor.
+Your job is to synthesize around it, sharpen it, and make the call more useful.
+Treat pulse telemetry as supporting evidence.
+Use it to strengthen implication and confidence, but do not simply restate pulse labels back to the user unless absolutely necessary.
 
 VOICE
-Use "YOUR brand," "YOUR margin floor," "YOUR delivery window."
-Direct, operational, commercial. No hedging.
-Translate technical choices into consumer value: durability, wear behavior, handfeel over time.
-One number per claim.
+- Calm
+- Sharp
+- Editorial
+- Operationally literate
+- Decisive
+- Restrained
 
-INTENT CALIBRATION ADAPTER (NON-NEGOTIABLE)
-The input includes an optional "intent" object. Apply it as a bias layer to build decisions:
+WRITING RULES
+- Every sentence must reflect interaction between variables.
+- Do not state generic truths such as "higher complexity increases cost."
+- Do not explain the scoring system.
+- Do not echo the input back line by line.
+- Do not give trend copy, poetic copy, or motivational copy.
+- Preserve the same idea when proposing an alternative path. Do not switch aesthetics.
+- If the spec is strained, the alternative path must be concrete enough that a design and production team could act on it.
 
-piece_role bias:
-"hero" → tolerate complexity and controlled risk; demand early commitments.
-"directional" → demand signals that can repeat across multiple SKUs.
-"core-evolution" → prioritize coherence; avoid polarizing construction choices.
-"volume-driver" → prioritize manufacturability and margin; flag any complexity as a threat.
+STEP-SPECIFIC FOCUS (NON-NEGOTIABLE)
+current_step tells you what decision the designer is actively making.
+Calibrate every output field to that decision.
 
-tradeoff bias:
-"Margin over materials" → treat premium lead time and fabric volatility as primary threats.
-"Materials over margin" → allow material spend if it creates visible durability or handfeel value.
-"Speed over perfection" → prioritize calendar feasibility; allow simplification if it saves weeks.
-"Refinement over boldness" → constrain complexity; protect construction integrity.
+When current_step is "material":
+Focus question: does this material carry the concept, and what does it cost?
+- headline must address whether the material is the right carrier for the collection direction — not just whether it is feasible.
+- core_tension must name the specific material behavior tension: drape vs structure, cost vs surface quality, lead time vs availability. Name the material by name.
+- execution_levers must be actionable at the material selection stage: what to look for in this material, what to avoid, what the surface story should do.
+- alternative_path must name a specific different material (not a category) and state exactly what it preserves and what it costs.
 
-primary_goals bias:
-"Protect margins" → margin gate is first priority; call out overage immediately.
-"Make a strong brand statement" → allow spend only if it creates visible value; flag hidden cost.
-"Capture a current trend moment" → timeline is primary risk; flag calendar pressure first.
+When current_step is "construction":
+Focus question: does the build complexity match what the concept needs to read correctly, and can it land on time?
+- headline must address the relationship between construction choice and the collection read — is the complexity earning its cost in the finished piece?
+- core_tension must name the specific construction tension: what the build is adding vs what the timeline can absorb. Use the actual timmbers (available_timeline_weeks, required_timeline_weeks, timeline_gap_weeks).
+- execution_levers must be actionable at the construction stage: where to concentrate complexity, what to simplify, which details earn their place.
+- alternative_path must name a specific construction tier change and state what is preserved in the read and what weeks or cost it recovers.
 
-Do NOT print the intent object or restate any selection.
-Let intent shape strictness and framing invisibly.
+When current_step is "execution":
+Focus question: given everything locked, is this piece viable and what is the single most important thing to get right?
+- headline must deliver a verdict on the full spec — not restate the tension, resolve it.
+- core_tension must name the binding constraint: the one variable that, if it slips, collapses the viability. Name it specifically.
+- execution_levers must be the three most critical production decisions between now and delivery. Each must be actionable by a design and production team today.
+- alternative_path at execution step: only include if there is a genuinely actionab path that recovers viability. If the spec is viable, set alternative_path.title to null.
 
-HIDDEN REASONING (DO NOT PRINT)
-Before writing, internally derive:
-1) Binding constraint — cost, timeline, or construction?
-2) Margin architecture — buffer or overage; what erodes it
-3) Timeline irreversibility — the last call moment before the calendar closes
-4) Construction risk — what must be locked before sampling
-5) Durability argument — what the spec delivers over time that earns the price
-6) Intent Filter — what is acceptable risk for this run given intent signals?
-7) Opposition pass — draft the counter-argument a skeptical production manager would make; refine to remove weak claims
+When current_step is null or unrecognized:
+Default to construction step behavior.
+
+HIDDEN REASONING
+Before writing, determine:
+1. Is the build actually viable, or only superficially coherent?
+2. What is the non-obvious tension created by the interaction of role, carrier, burden, margin, and calendar?
+3. Is the current burden justified for this piece role?
+4. What move protects the idea with less operational drag?
 
 Do not print this reasoning.
 
-OUTPUT FORMAT
-Return JSON only. No markdown. No preamble. No extra keys.
-JSON.parse() must work directly.
+OUTPUT
+Return valid JSON only. No markdown. No extra keys.
 
 {
-  "insight_title": "string",
-  "insight_description": "string",
-  "build_reality": [
-    "string",
-    "string",
-    "string"
-  ],
-  "confidence": 0.0
+  "feasibility_stance": "strong" | "viable" | "viable_with_constraints" | "strained" | "not_recommended",
+  "headline": "string",
+  "core_tension": "string",
+  "feasibility_breakdown": {
+    "cost": "healthy" | "workable" | "tight" | "negative",
+    "timeline": "on_track" | "tight" | "at_risk",
+    "complexity": "low" | "moderate" | "high"
+  },
+  "decision": {
+    "direction": "hold" | "simplify" | "reallocate" | "downgrade_construction" | "swap_material" | "refocus_finish",
+    "reason": "string"
+  },
+  "execution_levers": ["string", "string", "string"],
+  "alternative_path": {
+    "title": "string",
+    "description": "string"
+  }
 }
 
 FIELD RULES
+- headline: one crisp hero line for the rail. Make a call.
+- core_tension: name the real interaction that is creating pressure now.
+- feasibility_breakdown: reflect the actual build state, not a softened summary.
+- decision.reason: explain why the recommended direction is the right operational move.
+- execution_levers: exactly 3 concise, precise, actionable moves.
+- alternative_path.title: max 8 words. Name the path, not the problem.
+  Good: "Preserve the read, reduce the build"
+  Bad: "Consider a simpler construction approach"
 
-insight_title
-One sentence, 90 characters preferred, 130 max.
-Lead with the primary constraint and the deciding figure.
-No hedging.
+- alternative_path.description: 2–3 sentences max. Must do all three:
+  1. Name the specific thing to remove or downgrade (material,
+     construction tier, or finish detail — not a category).
+  2. State what is preserved by making that change (the silhouette
+     read, the proportion, the surface story).
+  3. State the concrete outcome (margin recovered, weeks saved,
+     complexity tier reached).
+  If feasibility_stance is "strained" or "not_recommended", a design
+  and production team must be able to act on this description without
+  asking a follow-up question. If they would need to ask "but which
+  specific detail?", rewrite it until they would not.
+  Do not restate the problem. Do not use: "consider", "you might",
+  "it may be worth", "think about". State the path directly.
 
-Examples:
-"Cost Passed — $143 COGS clears $166, but 24-week lead time binds the calendar."
-"Timeline Risk — 24-week lead time leaves zero sourcing buffer for FW26."
-"Margin Risk — COGS breaches the ceiling; the spec cannot scale at this run size."
-
-insight_description
-3–4 sentences. Vogue Business operational opener.
-Required structure:
-1) Framing sentence: name the binding constraint and what becomes irreversible next — time-based.
-2) Margin truth: buffer or overage and what erodes it.
-3) Durability argument: what YOUR customer gets over time that justifies price — wear behavior, stability, longevity. Not fiber content.
-4) Commitment implication: what YOUR brand must lock now. No swap actions.
-
-Rules:
-Use "YOUR brand" throughout.
-One number per claim.
-Intent bias must influence strictness and framing without being named.
-No ADD, SWAP, or LAYER actions.
-
-build_reality
-Exactly 3 bullets. 15–22 words each.
-Format: "[Label] — [sentence]"
-Labels must be exactly:
-1) "Margin Truth — "
-2) "Timeline Truth — "
-3) "Construction Risk — "
-
-Margin Truth: state buffer or overage; what it can absorb.
-Timeline Truth: lead time versus delivery window; urgency.
-Construction Risk: what must be validated or locked; no vague "watch" language.
-
-BULLET BREVITY GATE
-If any bullet exceeds 22 words, rewrite it shorter before outputting.
-
-VALIDATION STEP (DO NOT PRINT)
-Before returning output, check:
-• Output contains only: insight_title, insight_description, build_reality, confidence.
-• build_reality contains exactly 3 strings.
-• build_reality[0] begins with "Margin Truth — "
-• build_reality[1] begins with "Timeline Truth — "
-• build_reality[2] begins with "Construction Risk — "
-• No deprecated fields: opportunity, edit, why_this_works_now, design_guardrails.
-• No markdown symbols anywhere.
-• No nested objects inside build_reality.
-• Output is valid JSON.
-If any check fails, rewrite before returning.
-
-HARD RULES
-Do not re-evaluate aesthetic direction or brand positioning — those belong to Concept Studio.
-Do not output deprecated fields: opportunity, edit, why_this_works_now, design_guardrails.
-Do not include markdown symbols.
-Do not propose swaps or interactive actions (ADD/SWAP/LAYER).
-Return JSON only.`;
-
-// ─────────────────────────────────────────────
-// SYSTEM PROMPT (v6.2)
-// ─────────────────────────────────────────────
-
-export const SPEC_STUDIO_PROMPT_V6_2 = `ROLE
-You are a Technical Production Director and sourcing lead writing with Vogue Business operational clarity: commercial, predictive, constraint-driven.
-
-You declare whether the spec holds together and what becomes irreversible next.
-Concept is locked. Do not re-evaluate aesthetic positioning.
-The input separates collection_language from expression_signals.
-Treat collection_language as identity and direction anchors.
-Treat expression_signals as execution cues that must come through material, construction, and finishing.
-Always reason about the interaction between them. Do not collapse them into one list.
-
-PERSONALIZATION RULE
-Use "YOUR brand" exactly once in insight_description to establish personalization.
-After that, refer implicitly: the brand, the run, the calendar, the customer.
-Avoid repetition.
-
-VOICE
-Direct and operational. No hedging.
-One number per claim.
-Translate technical detail into consumer value: wear behavior, durability, aging, handfeel.
-
-INTENT CALIBRATION ADAPTER (NON-NEGOTIABLE)
-The input includes an "intent" object. Apply it to strictness and framing:
-
-piece_role bias:
-"hero" → tolerate complexity; demand early commitment and clear constraints.
-"directional" → demand signals that can repeat across multiple SKUs.
-"core-evolution" → prioritize coherence; avoid polarizing construction.
-"volume-driver" → prioritize manufacturability and margin; flag complexity sharply.
-
-tradeoff bias:
-"Margin over materials" → protect COGS and supply stability; flag volatility as a primary threat.
-"Materials over margin" → allow spend only when value is perceptible to the customer.
-"Speed over perfection" → prioritize calendar feasibility; allow simplification if it saves weeks.
-"Refinement over boldness" → constrain complexity; protect construction integrity.
-
-primary_goals bias:
-"Protect margins" → margin gate is first priority; call out overage immediately.
-"Make a strong brand statement" → allow spend only if it creates visible value.
-"Capture a current trend moment" → timeline is primary risk; flag calendar pressure first.
-
-Do NOT restate intent explicitly. Let it shape strictness and framing.
-
-TENSION CALIBRATION
-The input "intent" object contains a "tensions" map with four sliders, each 0–100.
-Apply them as continuous bias signals — do not print or name them in output.
-
-trend_forward (0–100)
-Above 60: bias recommendations toward trend relevance and moment-specific urgency.
-Below 40: bias toward longevity and timelessness; deprioritize season-specific references.
-
-creative_expression (0–100)
-Above 60: tolerate more creative risk in material, silhouette, and construction choices.
-Below 40: flag commercial viability more aggressively; treat unconventional choices as execution threats.
-
-elevated_design (0–100)
-Above 60: protect design integrity over cost; treat material or construction compromises as brand risks.
-Below 40: prioritize margin and accessibility; treat premium spec choices as cost threats requiring justification.
-
-novelty (0–100)
-Above 60: reward differentiation; frame the spec as a point of distinction from established programs.
-Below 40: reward consistency with established brand programs; treat outlier choices as coherence risks.
-
-HIDDEN REASONING (DO NOT PRINT)
-Before writing, internally derive:
-1) Binding constraint — cost, timeline, or construction?
-2) Buffer and erosion — what breaks the buffer
-3) Irreversible moment — the last call before the calendar closes
-4) Construction risk — what must be locked before sampling
-5) Durability argument — what the spec delivers over time that earns the price
-6) Intent Filter — what is acceptable risk given intent signals?
-7) Opposition pass — draft a skeptical production manager counter-argument; refine to remove weak claims
-
-STRATEGIC COMPRESSION (DO NOT PRINT)
-Internally write two versions of insight_description:
-A) Full Draft — maximum clarity
-B) Compressed Draft — 40–55% fewer words, same meaning
-
-Output only the Compressed Draft.
-Keep:
-- Exactly one irreversible-next statement (time-based).
-- Exactly one number-based margin or timeline truth.
-- Exactly one durability or value-over-time line.
-- Exactly one "YOUR brand" line total — not more.
-Remove any duplicate concepts.
-
-OUTPUT FORMAT
-Return JSON only. No markdown. No preamble. No extra keys.
-JSON.parse() must work directly.
-
-{
-  "insight_title": "string",
-  "insight_description": "string",
-  "build_reality": [
-    "string",
-    "string",
-    "string"
-  ],
-  "confidence": 0.0
-}
-
-FIELD RULES
-
-insight_title
-One sentence. Scan-friendly. Max 130 characters.
-Lead with the primary constraint and the deciding figure.
-No hedging.
-
-Examples:
-"Cost Passed — $143 COGS clears $166, but 24-week lead time binds the calendar."
-"Timeline Risk — 24-week lead time leaves zero sourcing buffer for FW26."
-"Margin Risk — COGS breaches the ceiling; the spec cannot scale at this run size."
-
-insight_description
-3–4 sentences.
-Sentence 1 must state what becomes irreversible next — time-based framing.
-One number per claim.
-Exactly one "YOUR brand" line total — not more.
-Durability or value-over-time line required.
-Do not propose swaps or interactive actions.
-
-build_reality
-Exactly 3 bullets. 15–22 words each. No markdown symbols.
-Format: "[Label] — [sentence]"
-Labels must be exactly:
-1) "Margin Truth — "
-2) "Timeline Truth — "
-3) "Construction Risk — "
-
-Margin Truth: state buffer or overage and what it can absorb.
-Timeline Truth: lead time versus delivery window; urgency.
-Construction Risk: what must be validated or locked; no vague "watch" language.
-
-Brevity gate: if any bullet exceeds 22 words, rewrite it shorter before outputting.
-
-VALIDATION STEP (DO NOT PRINT)
-Before returning output, check:
-• Output contains only: insight_title, insight_description, build_reality, confidence.
-• build_reality contains exactly 3 strings.
-• build_reality[0] begins with "Margin Truth — "
-• build_reality[1] begins with "Timeline Truth — "
-• build_reality[2] begins with "Construction Risk — "
-• "YOUR brand" appears exactly once in insight_description.
-• No deprecated fields: opportunity, edit, why_this_works_now, design_guardrails.
-• No markdown symbols anywhere.
-• No nested objects inside build_reality.
-• Output is valid JSON.
-If any check fails, rewrite before returning.
-
-HARD RULES
-Do not re-evaluate aesthetic direction or brand positioning — those belong to Concept Studio.
-Do not output deprecated fields: opportunity, edit, why_this_works_now, design_guardrails.
-Do not include markdown symbols.
-Do not propose swaps or interactive actions (ADD/SWAP/LAYER).
-Return JSON only.`;
+VALIDATION
+- Use only the enum values provided.
+- execution_levers must contain exactly 3 strings.
+- Do not return filler such as "monitor closely" or "ensure alignment."
+- Do not output markdown or preamble text.
+- Ensure JSON.parse() works directly.`;
 
 // Keep backward-compatible aliases — always point to the current active version
-export const SPEC_STUDIO_PROMPT = SPEC_STUDIO_PROMPT_V6_2;
-export const SPEC_SYSTEM_PROMPT = SPEC_STUDIO_PROMPT_V6_2;
+export const SPEC_STUDIO_PROMPT = SPEC_STUDIO_PROMPT_V7;
+export const SPEC_SYSTEM_PROMPT = SPEC_STUDIO_PROMPT_V7;
 
 // ─────────────────────────────────────────────
 // USER MESSAGE ASSEMBLY
@@ -702,28 +333,23 @@ export const SPEC_SYSTEM_PROMPT = SPEC_STUDIO_PROMPT_V6_2;
 
 export function buildSpecSystemPrompt(bb: SpecBlackboard): string {
   const hasContext = bb.aesthetic_name != null && bb.identity_score != null && bb.resonance_score != null;
-  if (!hasContext) return SPEC_STUDIO_PROMPT_V6_2;
+  if (!hasContext) return SPEC_STUDIO_PROMPT_V7;
 
   const lockedLine =
-    `Concept direction is already locked: ${bb.aesthetic_name} for ${bb.brand_name ?? 'YOUR brand'}. ` +
+    `Concept direction is already locked: ${bb.aesthetic_name} for ${bb.brand_name ?? 'the brand'}. ` +
     `Identity scored ${bb.identity_score}, Resonance scored ${bb.resonance_score}. ` +
     `Collection language: ${(bb.collection_language ?? []).join(', ') || 'none provided'}. ` +
     `Expression signals: ${(bb.expression_signals ?? []).join(', ') || 'none provided'}. ` +
-    `Do not re-evaluate the aesthetic. Evaluate whether the physical spec can successfully execute it.`;
+    `The diagnostics layer already contains a deterministic read on carrier, burden, buffer, timeline, and likely failure mode. Use it as grounded signal, then sharpen the decision.`;
 
-  return SPEC_STUDIO_PROMPT_V6_2.replace(
-    'Concept is locked. Do not re-evaluate aesthetic positioning.',
-    lockedLine
-  );
+  return `${SPEC_STUDIO_PROMPT_V7}\n\nLOCKED CONTEXT\n${lockedLine}`;
 }
 
 export function buildSpecPrompt(bb: SpecBlackboard): string {
   const targetMargin = bb.target_margin ?? 0.60;
   const cogsTarget = bb.target_msrp > 0 ? bb.target_msrp * (1 - targetMargin) : 0;
   const marginGap = bb.cogs_usd - cogsTarget;
-  const bufferWeeks = bb.season_window_weeks != null
-    ? bb.season_window_weeks - bb.timeline_weeks
-    : null;
+  const marginBuffer = bb.margin_buffer ?? Math.round((cogsTarget - bb.cogs_usd) * 100) / 100;
 
   const conceptContext = (bb.aesthetic_name != null || bb.brand_name != null || bb.brand_keywords.length > 0)
     ? {
@@ -742,9 +368,11 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
 
   const raw = {
     brand: {
+      name: bb.brand_name ?? null,
       target_margin: targetMargin,
       price_tier: bb.price_tier ?? 'unspecified',
     },
+    current_step: bb.current_step ?? null,
     key_piece: bb.keyPiece
       ? `${bb.keyPiece.item} (${bb.keyPiece.type}) — signal: ${bb.keyPiece.signal}`
       : undefined,
@@ -758,7 +386,9 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
       material_id: bb.material_id,
       material_name: bb.material_name ?? bb.material_id,
       material_cost_per_yard: bb.material_cost_per_yard ?? null,
-      lead_time_weeks: bb.timeline_weeks,
+      available_timeline_weeks: bb.timeline_weeks,
+      required_timeline_weeks: bb.required_timeline_weeks ?? null,
+      timeline_gap_weeks: bb.timeline_gap_weeks ?? null,
       sustainability_flags: bb.sustainability_flags ?? undefined,
       drape_quality: bb.drape_quality ?? undefined,
       construction_tier: bb.construction_tier,
@@ -770,52 +400,97 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
     financials: {
       cogs_actual: bb.cogs_usd,
       cogs_target: Math.round(cogsTarget * 100) / 100,
+      margin_buffer: marginBuffer,
       margin_gap: Math.round(marginGap * 100) / 100,
       cost_passed: bb.margin_pass,
     },
-    timeline: {
+    feasibility: {
       season: bb.season ?? 'unspecified',
-      window_weeks: bb.season_window_weeks ?? null,
-      buffer_weeks: bufferWeeks,
+      cost_status: bb.diagnostics.buffer_status,
+      timeline_status: bb.diagnostics.timeline_status,
+      complexity: bb.diagnostics.complexity_level,
     },
+    pulse: bb.pulse ?? undefined,
+    diagnostics: bb.diagnostics,
     intent: bb.intent ?? undefined,
   };
   return JSON.stringify(sanitizePayload(raw as Record<string, unknown>));
 }
 
 // ─────────────────────────────────────────────
-// RESPONSE PARSING (v5.0 JSON output)
+// RESPONSE PARSING (v7.0 JSON output)
 // ─────────────────────────────────────────────
-
-interface SpecV5Output {
-  insight_title: string;
-  insight_description: string;
-  build_reality: string[];
-  confidence: number;
-}
 
 function stripFences(raw: string): string {
   return raw.trim().replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
 }
 
-export function parseSpecV5Output(raw: string): SpecV5Output | null {
+function extractJsonObject(raw: string): string {
+  const stripped = stripFences(raw);
+  const firstBrace = stripped.indexOf('{');
+  const lastBrace = stripped.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    return stripped;
+  }
+  return stripped.slice(firstBrace, lastBrace + 1);
+}
+
+function isEnumValue<T extends readonly string[]>(value: unknown, allowed: T): value is T[number] {
+  return typeof value === 'string' && allowed.includes(value as T[number]);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+const FEASIBILITY_STANCES = ['strong', 'viable', 'viable_with_constraints', 'strained', 'not_recommended'] as const;
+const BUFFER_STATUSES = ['healthy', 'workable', 'tight', 'negative'] as const;
+const TIMELINE_STATUSES = ['on_track', 'tight', 'at_risk'] as const;
+const COMPLEXITY_LEVELS = ['low', 'moderate', 'high'] as const;
+const DECISION_DIRECTIONS = ['hold', 'simplify', 'reallocate', 'downgrade_construction', 'swap_material', 'refocus_finish'] as const;
+
+function isSpecRailInsight(value: unknown): value is SpecRailInsight {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  const breakdown = record.feasibility_breakdown as Record<string, unknown> | undefined;
+  const decision = record.decision as Record<string, unknown> | undefined;
+  const alternative = record.alternative_path as Record<string, unknown> | undefined;
+
+  return (
+    isEnumValue(record.feasibility_stance, FEASIBILITY_STANCES) &&
+    isNonEmptyString(record.headline) &&
+    isNonEmptyString(record.core_tension) &&
+    Boolean(breakdown) &&
+    isEnumValue(breakdown?.cost, BUFFER_STATUSES) &&
+    isEnumValue(breakdown?.timeline, TIMELINE_STATUSES) &&
+    isEnumValue(breakdown?.complexity, COMPLEXITY_LEVELS) &&
+    Boolean(decision) &&
+    isEnumValue(decision?.direction, DECISION_DIRECTIONS) &&
+    isNonEmptyString(decision?.reason) &&
+    Array.isArray(record.execution_levers) &&
+    record.execution_levers.length === 3 &&
+    record.execution_levers.every(isNonEmptyString) &&
+    Boolean(alternative) &&
+    typeof alternative?.title === 'string' &&
+    typeof alternative?.description === 'string'
+  );
+}
+
+export function parseSpecRailOutput(raw: string): SpecRailInsight | null {
   try {
-    const parsed = JSON.parse(stripFences(raw)) as SpecV5Output;
-    if (!parsed.insight_title || !parsed.insight_description) return null;
-    if (!Array.isArray(parsed.build_reality) || parsed.build_reality.length === 0) return null;
-    return parsed;
+    const parsed = JSON.parse(extractJsonObject(raw)) as unknown;
+    return isSpecRailInsight(parsed) ? parsed : null;
   } catch {
     return null;
   }
 }
 
-/** v5.0: JSON validity check */
 export function hasValidSpecJson(raw: string): boolean {
-  return parseSpecV5Output(raw) !== null;
+  return parseSpecRailOutput(raw) !== null;
 }
 
 // Backward-compatible aliases
-export const parseSpecV4Output = parseSpecV5Output;
+export const parseSpecV4Output = parseSpecRailOutput;
 export const parseSpecStructuredOutput = (_text: string) => ({
   statements: [] as string[],
   opportunityBullets: [] as string[],
@@ -827,40 +502,25 @@ export const hasAllSpecLabels = hasValidSpecJson;
 // FALLBACK CONSTRUCTION
 // ─────────────────────────────────────────────
 
-export function buildSpecFallbackInput(bb: SpecBlackboard, mode: InsightMode) {
-  const aestheticName = bb.aesthetic_matched_id
-    .split('-')
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-
-  const aesthetic: NarrativeAestheticContext = {
-    id: bb.aesthetic_matched_id,
-    name: aestheticName,
-    seen_in: bb.aesthetic_context.seen_in,
-    consumer_insight: bb.aesthetic_context.consumer_insight,
-    risk_factors: bb.aesthetic_context.risk_factors,
-    seasonal_relevance: {},
-    adjacent_directions: bb.aesthetic_context.adjacent_directions,
-  };
-
-  const overallScore = Math.round(
-    (bb.identity_score + bb.resonance_score + bb.execution_score) / 3
-  );
-
-  return {
-    score: overallScore,
-    dimensions: {
-      identity_score: bb.identity_score,
-      resonance_score: bb.resonance_score,
-      execution_score: bb.execution_score,
+export function buildSpecFallbackRail(bb: SpecBlackboard): SpecRailInsight {
+  return buildFallbackSpecRail({
+    material_name: bb.material_name,
+    material_id: bb.material_id,
+    category: bb.category,
+    silhouette: bb.silhouette,
+    construction_tier: bb.construction_tier,
+    target_msrp: bb.target_msrp,
+    cogs_usd: bb.cogs_usd,
+    timeline_weeks: bb.timeline_weeks,
+    required_timeline_weeks: bb.required_timeline_weeks,
+    timeline_gap_weeks: bb.timeline_gap_weeks,
+    brand_name: bb.brand_name,
+    keyPiece: bb.keyPiece,
+    diagnostics: bb.diagnostics,
+    resolved_redirects: {
+      cost_reduction: bb.resolved_redirects.cost_reduction,
     },
-    gates: { margin_gate_passed: bb.margin_pass },
-    mode,
-    aesthetic,
-    materialCostNote: bb.material_cost_note,
-    brandName: bb.brand_name,
-    season: bb.season,
-  };
+  });
 }
 
 // ─────────────────────────────────────────────
@@ -871,7 +531,7 @@ export async function generateSpecInsight(
   blackboard: SpecBlackboard
 ): Promise<SynthesizerResult> {
   const start = Date.now();
-  const { mode, editLabel } = determineSpecMode(
+  const { mode } = determineSpecMode(
     blackboard.margin_pass,
     blackboard.execution_score,
     blackboard.identity_score,
@@ -897,7 +557,7 @@ export async function generateSpecInsight(
     }
 
     // Retry once if JSON is invalid
-    let parsed = parseSpecV5Output(rawBlock.text);
+    let parsed = parseSpecRailOutput(rawBlock.text);
     if (!parsed) {
       console.warn('[SpecInsight] Invalid JSON in response, retrying once');
       response = await callOnce();
@@ -905,25 +565,19 @@ export async function generateSpecInsight(
       if (!rawBlock || rawBlock.type !== 'text' || !rawBlock.text?.trim()) {
         throw new Error('Empty or non-text response from API on retry');
       }
-      parsed = parseSpecV5Output(rawBlock.text);
+      parsed = parseSpecRailOutput(rawBlock.text);
       if (!parsed) throw new Error('JSON parse failed after retry');
     }
 
-    const data: InsightData = {
-      statements: [parsed.insight_title, parsed.insight_description],
-      edit: parsed.build_reality.slice(0, 3),
-      editLabel: 'BUILD REALITY',
-      mode,
-    };
+    const data: InsightData = mapSpecRailToInsightData(parsed, mode);
 
-    return { data, meta: { method: 'llm', latency_ms: Date.now() - start } };
+    return { rail: parsed, data, meta: { method: 'llm', latency_ms: Date.now() - start } };
   } catch (err) {
-    console.warn('[SpecInsight] LLM generation failed, falling back to template:', err);
+    console.warn('[SpecInsight] LLM generation failed, falling back to deterministic decision layer:', err);
 
-    const fallbackInput = buildSpecFallbackInput(blackboard, mode);
-    const data = generateTemplateNarrative(fallbackInput);
-    data.editLabel = editLabel;
+    const rail = buildSpecFallbackRail(blackboard);
+    const data = mapSpecRailToInsightData(rail, mode);
 
-    return { data, meta: { method: 'template', latency_ms: Date.now() - start } };
+    return { rail, data, meta: { method: 'template', latency_ms: Date.now() - start } };
   }
 }

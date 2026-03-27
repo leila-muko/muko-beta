@@ -16,7 +16,7 @@ export interface PulseMicroInsightPart {
 }
 
 export interface PulseMicroInsightCue {
-  key: PulseSignalKey;
+  key: string;
   label: string;
   value: string;
   tone: PulseCueTone;
@@ -77,13 +77,13 @@ function joinHeadline(parts: PulseMicroInsightPart[]): string {
 function conceptHeadline(input: PulseMicroInsightInput, statuses: Record<PulseSignalKey, NormalizedStatus>): PulseMicroInsightPart[] {
   const silhouetteLocked = Boolean(input.context?.silhouetteSelected);
   const paletteLocked = Boolean(input.context?.paletteSelected);
-  const productDefined = silhouetteLocked && paletteLocked;
+  const directionDefined = silhouetteLocked && paletteLocked;
 
   if (statuses.resonance === "green" && statuses.identity !== "green") {
     return [
-      { text: "Market appetite is strong", tone: "positive" },
+      { text: "The direction has momentum", tone: "positive" },
       { text: ", but " },
-      { text: "the product expression isn't fully anchored in your brand yet.", tone: "warning" },
+      { text: "the brand coherence still needs tightening.", tone: "warning" },
     ];
   }
 
@@ -99,37 +99,37 @@ function conceptHeadline(input: PulseMicroInsightInput, statuses: Record<PulseSi
     return [
       { text: "The direction feels true to brand", tone: "positive" },
       { text: ", but " },
-      { text: "it needs a sharper market angle to stay distinct.", tone: "warning" },
+      { text: "differentiation pressure is starting to build.", tone: "warning" },
     ];
   }
 
   if (statuses.identity === "red" && statuses.resonance === "red") {
     return [
-      { text: "The concept has not found its footing yet" },
+      { text: "The direction has not found its footing yet" },
       { text: ", with " },
-      { text: "both brand alignment and market urgency still under pressure.", tone: "warning" },
+      { text: "both coherence and momentum still under pressure.", tone: "warning" },
     ];
   }
 
-  if (!productDefined) {
+  if (!directionDefined) {
     return [
       { text: "The direction has signal" },
       { text: ", but " },
-      { text: "the product expression still needs to be locked.", tone: "warning" },
+      { text: "it still needs a cleaner edit.", tone: "warning" },
     ];
   }
 
   if (statuses.identity === "green" && statuses.resonance === "green") {
     return [
-      { text: "The concept is landing cleanly across brand and market", tone: "positive" },
+      { text: "Strong resonance with a coherent brand read.", tone: "positive" },
       { text: ", and " },
-      { text: "the product expression is ready to carry that clarity forward.", tone: "neutral" },
+      { text: "the direction is ready to carry forward.", tone: "neutral" },
     ];
   }
 
   if (statuses.identity === "yellow" && statuses.resonance === "yellow") {
     return [
-      { text: "The opportunity is credible" },
+      { text: "The direction is gaining traction" },
       { text: ", but " },
       { text: "the point of view still needs a firmer edit.", tone: "warning" },
     ];
@@ -137,7 +137,7 @@ function conceptHeadline(input: PulseMicroInsightInput, statuses: Record<PulseSi
 
   if (statuses.identity === "red") {
     return [
-      { text: "There is some market interest", tone: "positive" },
+      { text: "There is early traction here", tone: "positive" },
       { text: ", but " },
       { text: "the brand case is still too loose.", tone: "warning" },
     ];
@@ -145,16 +145,16 @@ function conceptHeadline(input: PulseMicroInsightInput, statuses: Record<PulseSi
 
   if (statuses.resonance === "red") {
     return [
-      { text: "The concept reads coherently" },
+      { text: "The direction reads coherently" },
       { text: ", but " },
-      { text: "the commercial window looks narrow.", tone: "warning" },
+      { text: "the timing window looks narrow.", tone: "warning" },
     ];
   }
 
   return [
-    { text: "The concept is taking shape" },
+    { text: "The direction is taking shape" },
     { text: ", with " },
-    { text: "a few signals that still need tighter alignment.", tone: "warning" },
+    { text: "a few signals that still need tighter definition.", tone: "warning" },
   ];
 }
 

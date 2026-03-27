@@ -231,7 +231,8 @@ export function CollectionContextBar({
         style={{
           position: "relative",
           width: "100%",
-          paddingInline: 28,
+          paddingLeft: 28,
+          paddingRight: 64,
           background:
             "linear-gradient(180deg, rgba(252,251,247,0.82) 0%, rgba(250,249,246,0.72) 58%, rgba(246,243,236,0.62) 100%)",
           backdropFilter: "blur(18px) saturate(140%)",
@@ -246,13 +247,15 @@ export function CollectionContextBar({
         <div
           style={{
             display: "flex",
-            gap: 24,
+            gap: 18,
             minWidth: 0,
             alignItems: "start",
             justifyContent: "flex-start",
+            width: "100%",
+            flexWrap: "wrap",
           }}
         >
-          <div style={{ minWidth: 0, display: "grid", gap: isExpanded ? 14 : 6, flex: "1 1 auto" }}>
+          <div style={{ minWidth: 0, display: "grid", gap: isExpanded ? 14 : 6, flex: "0 1 760px" }}>
             <div style={{ minWidth: 0 }}>
               <div
                 style={{
@@ -443,16 +446,14 @@ export function CollectionContextBar({
                 exit={{ opacity: 0, y: -4, width: 0 }}
                 transition={{ duration: 0.2, ease: "easeInOut" }}
                 style={{
-                  flex: "0 1 620px",
-                  minWidth: 280,
+                  flex: "1 1 420px",
+                  minWidth: 320,
                   display: "grid",
                   gridTemplateColumns: `repeat(${previewImages.length}, minmax(0, 1fr))`,
                   gap: 14,
                   alignSelf: "start",
                   paddingTop: 6,
-                  paddingRight: 0,
-                  justifyContent: "center",
-                  marginInline: "auto",
+                  paddingRight: 64,
                   overflow: "hidden",
                 }}
                 aria-hidden="true"

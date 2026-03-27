@@ -10,6 +10,10 @@ import {
   type ConceptBlackboard,
 } from '@/lib/synthesizer/conceptInsight';
 
+function parsePromptJson<T>(prompt: string): T {
+  return JSON.parse(prompt.split('\n\n')[0]) as T;
+}
+
 function makeBlackboard(overrides?: Partial<ConceptBlackboard>): ConceptBlackboard {
   return {
     aesthetic_input: 'Quiet Structure',
@@ -167,9 +171,9 @@ describe('Decision Guidance collection progression', () => {
       },
     });
 
-    const prompt = JSON.parse(buildConceptPrompt(bb)) as {
+    const prompt = parsePromptJson<{
       collection_context?: { summary?: { stage?: string; missing_role?: string } };
-    };
+    }>(buildConceptPrompt(bb));
 
     expect(prompt.collection_context?.summary?.stage).toBe('comparative');
     expect(prompt.collection_context?.summary?.missing_role).toBeTruthy();
@@ -181,10 +185,10 @@ describe('Decision Guidance collection progression', () => {
       expression_signals: [],
     });
 
-    const prompt = JSON.parse(buildConceptPrompt(bb)) as {
+    const prompt = parsePromptJson<{
       brand?: { strategy_summary?: string | null; brand_interpretation?: string | null };
       aesthetic?: { expression_signals?: string[] };
-    };
+    }>(buildConceptPrompt(bb));
 
     expect(prompt.brand?.strategy_summary).toContain('Contemporary');
     expect(prompt.brand?.brand_interpretation).toBe('Sharper restraint with controlled volume.');
@@ -247,15 +251,34 @@ describe('Decision Guidance collection progression', () => {
     expect(prompt.selections?.expression_signals).toEqual(['Knife-Pleated', 'Powder-Matte']);
   });
 
-  test('concept language parser requires guardrail', () => {
+  test('concept language parser accepts the simplified editorial schema', () => {
+    const parsed = parseConceptLanguageOutput(JSON.stringify({
+      headline: 'Construction over softness — hold the line and let restraint do the work.',
+      core_read: 'Let the structured silhouette and stone neutrals carry the idea. The expression should land through sharp placement and matte control, not added complexity.',
+      execution_moves: [
+        'Keep the line long, clean, and uninterrupted',
+        'Use matte texture and precise placement instead of added trim',
+        'Concentrate emphasis at the seam, hem, or closure',
+      ],
+      guardrail: 'Avoid: layering on decorative detail that interrupts the controlled read.',
+    }));
+
+    expect(parsed?.execution_moves).toHaveLength(3);
+    expect(parsed?.guardrail).toContain('Avoid:');
+  });
+
+  test('concept language parser maps the legacy schema into the simplified display model', () => {
     const parsed = parseConceptLanguageOutput(JSON.stringify({
       headline: 'Translate Quiet Structure through a structured line with sharper restraint.',
       silhouette_steer: 'Keep the structured silhouette disciplined through longline shapes and held volume rather than soft collapse.',
       palette_steer: 'Use Stone Neutrals tonally so the palette reads precise rather than decorative.',
-      signals_note: 'The signals should surface through crisp spacing and matte finish so the language feels controlled, not overworked.',
-      guardrail: 'Do not soften the line with fluid drift or high-contrast color that breaks the controlled restraint of the chosen setup.',
+      signals_note: 'Bring the signals through crisp spacing and matte finish so the language feels controlled, not overworked.',
+      guardrail: 'Avoid: softening the line with fluid drift or high-contrast color that breaks the setup.',
     }));
 
-    expect(parsed?.guardrail).toContain('Do not');
+    expect(parsed?.core_read).toContain('Stone Neutrals');
+    expect(parsed?.execution_moves).toEqual([
+      'Bring the signals through crisp spacing and matte finish so the language feels controlled, not overworked.',
+    ]);
   });
 });

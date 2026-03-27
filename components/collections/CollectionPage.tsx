@@ -5,35 +5,18 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { getFlatForPiece } from '@/components/flats';
 import { useSessionStore } from '@/lib/store/sessionStore';
-import { parseSelectedPieceImage } from '@/lib/piece-image';
+import { parseSelectedPieceImage, resolvePieceImageType } from '@/lib/piece-image';
+import { buildAssortmentIntelligence } from '@/lib/collection-report/buildAssortmentIntelligence';
 
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
-const PULSE_COLORS = {
-  green: '#A8B475',
-  amber: '#B8876B',
-  red: '#A97B8F',
-} as const;
 
 type PieceRole = 'hero' | 'core' | 'support';
 type ComplexityLevel = 'high' | 'medium' | 'low';
 
-interface CollectionHealthMetric {
-  label: 'Role Balance' | 'Complexity Load' | 'Silhouette Diversity';
-  value: number;
-  tone: string;
-  variant: 'green' | 'amber' | 'red';
-  status: string;
-  statusColor: string;
-}
-
-interface CollectionHealthState {
-  metrics: CollectionHealthMetric[];
-  insight: string;
-}
-
 interface AnalysisRow {
   id: string;
+  piece_name?: string | null;
   category: string | null;
   aesthetic_input: string | null;
   season: string | null;
@@ -69,29 +52,9 @@ function getScore(row: AnalysisRow) {
   return row.score ?? 0;
 }
 
-function getMarginPassed(row: AnalysisRow) {
-  return row.gates_passed?.cost ?? false;
-}
-
 function titleCase(value: string | null | undefined) {
   if (!value) return '';
   return value.replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function getScorePillStyle(score: number): React.CSSProperties {
-  if (score >= 75) {
-    return { background: '#F0F4E8', color: '#6B8F3E' };
-  }
-
-  if (score >= 50) {
-    return { background: '#FAF4EF', color: '#B8876B' };
-  }
-
-  return { background: '#FAF0EF', color: '#C47B6B' };
-}
-
-function clampPercentage(value: number) {
-  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 function getPieceRole(analysis: AnalysisRow): PieceRole {
@@ -118,274 +81,14 @@ function getComplexityLevel(analysis: AnalysisRow): ComplexityLevel {
   return 'medium';
 }
 
-function getSilhouetteKey(analysis: AnalysisRow) {
-  const silhouette = normalizeToken(analysis.silhouette);
-  if (silhouette) return silhouette;
-
-  const category = normalizeToken(analysis.category);
-  if (category) return category;
-
-  return normalizeToken(analysis.agent_versions?.saved_piece_name) || 'unknown';
-}
-
-function getRoleBalanceScore(analyses: AnalysisRow[]) {
-  if (analyses.length === 0) return 0;
-
-  const counts: Record<PieceRole, number> = { hero: 0, core: 0, support: 0 };
-  for (const analysis of analyses) {
-    counts[getPieceRole(analysis)] += 1;
-  }
-
-  const idealRatios: Record<PieceRole, number> = {
-    hero: 0.2,
-    core: 0.5,
-    support: 0.3,
-  };
-
-  let variance = 0;
-  for (const role of Object.keys(counts) as PieceRole[]) {
-    const actual = counts[role] / analyses.length;
-    variance += Math.abs(actual - idealRatios[role]);
-  }
-
-  return clampPercentage((1 - variance / 1.2) * 100);
-}
-
-function getComplexityLoadScore(analyses: AnalysisRow[]) {
-  if (analyses.length === 0) return 0;
-
-  const complexityWeights: Record<ComplexityLevel, number> = {
-    high: 1,
-    medium: 0.6,
-    low: 0.3,
-  };
-
-  const average =
-    analyses.reduce((sum, analysis) => sum + complexityWeights[getComplexityLevel(analysis)], 0) /
-    analyses.length;
-
-  return clampPercentage(average * 100);
-}
-
-function getSilhouetteDiversityScore(analyses: AnalysisRow[]) {
-  if (analyses.length === 0) return 0;
-  const uniqueKeys = new Set(analyses.map(getSilhouetteKey));
-  return clampPercentage((uniqueKeys.size / analyses.length) * 100);
-}
-
-function getCollectionHealthInsight(metrics: CollectionHealthMetric[]) {
-  const roleBalance = metrics.find((metric) => metric.label === 'Role Balance')?.value ?? 0;
-  const complexityLoad = metrics.find((metric) => metric.label === 'Complexity Load')?.value ?? 0;
-  const silhouetteDiversity = metrics.find((metric) => metric.label === 'Silhouette Diversity')?.value ?? 0;
-
-  if (roleBalance < 45) {
-    return 'Collection currently leans too heavily on one piece role.';
-  }
-
-  if (complexityLoad > 72) {
-    return 'Complexity load is elevated relative to assortment size.';
-  }
-
-  if (silhouetteDiversity < 45) {
-    return 'Silhouette repetition may reduce assortment breadth.';
-  }
-
-  return 'Collection architecture is currently balanced.';
-}
-
-function getCollectionHealthMetrics(analyses: AnalysisRow[]): CollectionHealthState {
-  const roleBalance = getRoleBalanceScore(analyses);
-  const complexityLoad = getComplexityLoadScore(analyses);
-  const silhouetteDiversity = getSilhouetteDiversityScore(analyses);
-
-  const metrics: CollectionHealthMetric[] = [
-    {
-      label: 'Role Balance',
-      value: roleBalance,
-      tone: roleBalance >= 70 ? PULSE_COLORS.green : roleBalance >= 45 ? PULSE_COLORS.amber : PULSE_COLORS.red,
-      variant: roleBalance >= 70 ? 'green' : roleBalance >= 45 ? 'amber' : 'red',
-      status: roleBalance >= 70 ? 'Balanced' : roleBalance >= 45 ? 'Skewed' : 'Imbalanced',
-      statusColor:
-        roleBalance >= 70 ? PULSE_COLORS.green : roleBalance >= 45 ? PULSE_COLORS.amber : PULSE_COLORS.red,
-    },
-    {
-      label: 'Complexity Load',
-      value: complexityLoad,
-      tone: complexityLoad >= 72 ? PULSE_COLORS.red : complexityLoad >= 48 ? PULSE_COLORS.amber : PULSE_COLORS.green,
-      variant: complexityLoad >= 72 ? 'red' : complexityLoad >= 48 ? 'amber' : 'green',
-      status: complexityLoad >= 72 ? 'Heavy' : complexityLoad >= 48 ? 'Moderate' : 'Light',
-      statusColor:
-        complexityLoad >= 72 ? PULSE_COLORS.red : complexityLoad >= 48 ? PULSE_COLORS.amber : PULSE_COLORS.green,
-    },
-    {
-      label: 'Silhouette Diversity',
-      value: silhouetteDiversity,
-      tone:
-        silhouetteDiversity >= 70
-          ? PULSE_COLORS.green
-          : silhouetteDiversity >= 45
-          ? PULSE_COLORS.amber
-          : PULSE_COLORS.red,
-      variant: silhouetteDiversity >= 70 ? 'green' : silhouetteDiversity >= 45 ? 'amber' : 'red',
-      status:
-        silhouetteDiversity >= 70 ? 'Diverse' : silhouetteDiversity >= 45 ? 'Narrowing' : 'Repetitive',
-      statusColor:
-        silhouetteDiversity >= 70
-          ? PULSE_COLORS.green
-          : silhouetteDiversity >= 45
-          ? PULSE_COLORS.amber
-          : PULSE_COLORS.red,
-    },
-  ];
-
-  return {
-    metrics,
-    insight: getCollectionHealthInsight(metrics),
-  };
+function getPieceName(analysis: AnalysisRow) {
+  return analysis.piece_name?.trim() || analysis.agent_versions?.saved_piece_name?.trim() || analysis.category?.trim() || 'Untitled Piece';
 }
 
 function getRoleBadgeStyles(role: PieceRole): React.CSSProperties {
   if (role === 'hero') return { background: '#eef2e6', color: '#5a6e2a' };
   if (role === 'core') return { background: '#e8eef2', color: '#2e4a5a' };
   return { background: '#f0eeee', color: '#5a4a4a' };
-}
-
-function CollectionHealthFooter({
-  health,
-  analysesCount,
-  onGenerateReport,
-  reportExists,
-}: {
-  health: CollectionHealthState;
-  analysesCount: number;
-  onGenerateReport: () => void;
-  reportExists: boolean;
-}) {
-  const flagged = health.metrics
-    .filter((metric) => metric.variant !== 'green')
-    .slice(0, 2);
-
-  const flaggedNames =
-    flagged.length === 0
-      ? null
-      : flagged.length === 1
-      ? flagged[0].label
-      : `${flagged[0].label} · ${flagged[1].label}`;
-
-  const needsWord = flagged.length === 1 ? 'needs' : 'need';
-
-  // Approximate last-run date from most recent analysis
-  const lastRunLabel: string | null = null; // Would need stored report date — omit for now
-
-  return (
-    <div
-      style={{
-        flexShrink: 0,
-        borderTop: '1px solid #E2DDD6',
-        padding: '13px 32px',
-        background: '#F9F7F4',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 16,
-        boxSizing: 'border-box',
-      }}
-    >
-      {/* Left: watchlist */}
-      <div style={{ display: 'flex', flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#B8876B', flexShrink: 0 }} />
-        <span style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#B8876B' }}>
-          Watchlist
-        </span>
-        {flaggedNames ? (
-          <>
-            <span style={{ fontFamily: inter, fontSize: 11, color: '#C8C2BA' }}> · </span>
-            <span style={{ fontFamily: inter, fontSize: 11, color: '#888078' }}>
-              {flaggedNames}{' '}
-              <span style={{ color: '#B8876B' }}>{needsWord} attention</span>
-            </span>
-          </>
-        ) : (
-          <>
-            <span style={{ fontFamily: inter, fontSize: 11, color: '#C8C2BA' }}> · </span>
-            <span style={{ fontFamily: inter, fontSize: 11, color: '#888078' }}>
-              see report for guidance
-            </span>
-          </>
-        )}
-      </div>
-
-      {/* Right: report actions */}
-      {analysesCount === 0 ? null : reportExists ? (
-        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          {lastRunLabel && (
-            <span style={{ fontFamily: inter, fontSize: 10, color: '#888078' }}>Last run: {lastRunLabel}</span>
-          )}
-          {lastRunLabel && <span style={{ fontFamily: inter, fontSize: 10, color: '#888078' }}> · </span>}
-          <button
-            onClick={onGenerateReport}
-            style={{
-              fontFamily: inter,
-              fontSize: 10,
-              color: '#191919',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#A8B475'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = '#191919'; }}
-          >
-            Re-run analysis
-          </button>
-        </div>
-      ) : (
-        <span style={{ fontFamily: inter, fontSize: 11, color: '#888078', opacity: 0.5 }}>
-          {analysesCount < 2 ? 'Generate Report — spec all pieces first' : 'Generate Report from header above'}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function getFlatMatch(category: string | null, silhouette: string | null) {
-  const silhouetteKey = normalizeToken(silhouette);
-  const categoryKey = normalizeToken(category);
-
-  const aliases: Record<string, string> = {
-    outerwear: 'trench',
-    tops: 'top',
-    bottoms: 'straight-pant',
-    dresses: 'midi-dress',
-    knitwear: 'knit-sweater',
-    cocoon: 'coat',
-    belted: 'trench',
-    straight: 'straight-pant',
-    cropped: 'jacket',
-    relaxed: categoryKey === 'knitwear' ? 'knit-sweater' : 'top',
-    fitted: categoryKey === 'knitwear' ? 'cardigan' : 'top',
-    oversized: categoryKey === 'knitwear' ? 'knit-sweater' : 'tunic',
-    boxy: 'top',
-    'wide-leg': 'trouser',
-    'straight-leg': 'straight-pant',
-    slim: 'straight-pant',
-    flare: 'trouser',
-    column: 'column-dress',
-    'a-line': 'midi-dress',
-    wrap: 'shirt-dress',
-    shift: 'midi-dress',
-  };
-
-  const candidates = [silhouetteKey, aliases[silhouetteKey], categoryKey, aliases[categoryKey]].filter(
-    Boolean
-  ) as string[];
-
-  for (const candidate of candidates) {
-    const flat = getFlatForPiece(candidate, null);
-    if (flat) return flat;
-  }
-
-  return null;
 }
 
 function PlaceholderFlat() {
@@ -452,17 +155,20 @@ function PieceCard({ analysis, onClick, onDelete }: { analysis: AnalysisRow; onC
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const pieceName = analysis.agent_versions?.saved_piece_name?.trim() ?? '';
+  const pieceName = getPieceName(analysis);
   const score = getScore(analysis);
   const storedPieceImage = parseSelectedPieceImage(analysis.agent_versions?.selected_piece_image);
-  const flat = storedPieceImage?.pieceType
-    ? getFlatForPiece(storedPieceImage.pieceType, storedPieceImage.signal)
-    : getFlatMatch(analysis.category, analysis.silhouette);
+  const resolvedPieceType = resolvePieceImageType({
+    type: storedPieceImage?.pieceType,
+    pieceName,
+    category: analysis.category,
+    silhouette: analysis.silhouette,
+  });
+  const flat = resolvedPieceType ? getFlatForPiece(resolvedPieceType, storedPieceImage?.signal ?? null) : null;
   const materialLabel = titleCase(analysis.material_id) || 'Unknown material';
   const complexityLabel = titleCase(analysis.construction_tier) || 'Unknown';
   const role = getPieceRole(analysis);
   const roleLabel = getRoleLabel(role);
-  const aestheticLabel = analysis.aesthetic_input?.trim() || 'No aesthetic';
   const scoreColor = score >= 80 ? '#A8B475' : '#B8876B';
 
   return (
@@ -580,20 +286,6 @@ function PieceCard({ analysis, onClick, onDelete }: { analysis: AnalysisRow; onC
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 500,
-                background: '#F5F1EA',
-                color: '#A8A09A',
-                borderRadius: 20,
-                padding: '2px 7px',
-                lineHeight: 1.5,
-              }}
-            >
-              {aestheticLabel}
-            </span>
-
             {[materialLabel, complexityLabel].map((tag) => (
               <span
                 key={tag}
@@ -698,6 +390,11 @@ export default function CollectionPage({
   const setActiveCollection = useSessionStore((state) => state.setActiveCollection);
   const setCollectionName = useSessionStore((state) => state.setCollectionName);
   const setSeason = useSessionStore((state) => state.setSeason);
+  const storeCollectionName = useSessionStore((state) => state.collectionName);
+  const collectionAesthetic = useSessionStore((state) => state.collectionAesthetic);
+  const aestheticInflection = useSessionStore((state) => state.aestheticInflection);
+  const directionInterpretationText = useSessionStore((state) => state.directionInterpretationText);
+  const directionInterpretationChips = useSessionStore((state) => state.directionInterpretationChips);
   const [analyses, setAnalyses] = useState<AnalysisRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -709,18 +406,27 @@ export default function CollectionPage({
       setLoading(true);
 
       const supabase = createClient();
-      const { data } = await supabase
+      const primary = await supabase
         .from('analyses')
-        .select(
-          'id, category, aesthetic_input, season, material_id, silhouette, construction_tier, created_at, score, gates_passed, agent_versions, dimensions, narrative'
-        )
+        .select('*')
         .eq('user_id', userId)
         .eq('collection_name', collectionName)
         .order('created_at', { ascending: false });
 
       if (cancelled) return;
 
-      setAnalyses((data as AnalysisRow[] | null) ?? []);
+      if (primary.error) {
+        setAnalyses([]);
+        setLoading(false);
+        return;
+      }
+
+      setAnalyses(
+        ((primary.data as AnalysisRow[] | null) ?? []).map((row) => ({
+          ...row,
+          piece_name: row.piece_name ?? row.agent_versions?.saved_piece_name ?? null,
+        }))
+      );
       setLoading(false);
     };
 
@@ -749,8 +455,6 @@ export default function CollectionPage({
     setToastMessage('Piece removed from collection');
   };
 
-  const collectionHealth = useMemo(() => getCollectionHealthMetrics(analyses), [analyses]);
-
   const seasonLabel = season ?? analyses[0]?.season ?? '';
   const canGenerateReport = analyses.length >= 2;
 
@@ -769,7 +473,49 @@ export default function CollectionPage({
   const avgExecution = reportExists
     ? Math.round(scoredAnalyses.reduce((sum, a) => sum + (a.dimensions?.execution ?? 0), 0) / scoredAnalyses.length)
     : 0;
-  const mukoReadNarrative = scoredAnalyses[0]?.narrative ?? null;
+  const assortmentIntelligence = useMemo(() => {
+    const roleCounts: Record<PieceRole, number> = { hero: 0, core: 0, support: 0 };
+    const complexityCounts: Record<ComplexityLevel, number> = { low: 0, medium: 0, high: 0 };
+    const categories = new Set<string>();
+
+    for (const analysis of scoredAnalyses) {
+      roleCounts[getPieceRole(analysis)] += 1;
+      complexityCounts[getComplexityLevel(analysis)] += 1;
+      const category = normalizeToken(analysis.category);
+      if (category) categories.add(category);
+    }
+
+    return buildAssortmentIntelligence({
+      totalPieces: scoredAnalyses.length,
+      heroCount: roleCounts.hero,
+      coreCount: roleCounts.core,
+      supportCount: roleCounts.support,
+      lowCount: complexityCounts.low,
+      mediumCount: complexityCounts.medium,
+      highCount: complexityCounts.high,
+      uniqueCategoryCount: categories.size,
+      executionScore: avgExecution,
+    });
+  }, [avgExecution, scoredAnalyses]);
+
+  const editorialDirection = useMemo(() => {
+    const preferred = [
+      collectionAesthetic,
+      aestheticInflection,
+      directionInterpretationText,
+      analyses[0]?.aesthetic_input,
+    ].find((value) => value?.trim());
+
+    return preferred?.trim() ?? null;
+  }, [aestheticInflection, analyses, collectionAesthetic, directionInterpretationText]);
+
+  const editorialChips = useMemo(() => {
+    const storeMatchesCollection = storeCollectionName?.trim().toLowerCase() === collectionName.trim().toLowerCase();
+    if (storeMatchesCollection && directionInterpretationChips.length > 0) {
+      return directionInterpretationChips.slice(0, 4);
+    }
+    return [];
+  }, [analyses, collectionName, directionInterpretationChips, storeCollectionName]);
 
   const handleGenerateReport = () => {
     if (!canGenerateReport) return;
@@ -809,217 +555,188 @@ export default function CollectionPage({
         {/* ── Collection header ──────────────────────────────────────────── */}
         <div
           style={{
-            padding: '22px 32px',
-            borderBottom: '1px solid #E2DDD6',
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: 24,
+            padding: 0,
             flexShrink: 0,
             background: '#F9F7F4',
           }}
         >
-          <div>
-            {seasonLabel && (
-              <div style={{ fontFamily: inter, fontSize: 11, color: '#888078', marginBottom: 4 }}>
-                {seasonLabel}
-              </div>
-            )}
-            <h1
-              style={{
-                margin: '0 0 10px 0',
-                fontFamily: sohne,
-                fontSize: 28,
-                fontWeight: 700,
-                letterSpacing: '-0.02em',
-                color: '#191919',
-                lineHeight: 1.1,
-              }}
-            >
-              {collectionName}
-            </h1>
-            {/* Tags row */}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              {analyses[0]?.aesthetic_input && (
-                <span
-                  style={{
-                    background: '#EFF2E5',
-                    color: '#6B7A40',
-                    border: '1px solid #C8D49A',
-                    borderRadius: 100,
-                    fontSize: 9,
-                    fontWeight: 600,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    padding: '4px 10px',
-                    fontFamily: inter,
-                  }}
-                >
-                  ✓ {analyses[0].aesthetic_input}
-                </span>
-              )}
-              <button
-                onClick={() => router.push('/intent')}
+          <div
+            style={{
+              width: '100%',
+              minWidth: 0,
+              padding: '20px 32px 18px',
+              background:
+                'linear-gradient(180deg, rgba(252,251,247,0.82) 0%, rgba(250,249,246,0.72) 58%, rgba(246,243,236,0.62) 100%)',
+              backdropFilter: 'blur(18px) saturate(140%)',
+              WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+              borderTop: '1px solid rgba(255,255,255,0.52)',
+              borderBottom: '1px solid rgba(255,255,255,0.36)',
+              boxShadow: '0 18px 48px rgba(67,67,43,0.06), inset 0 1px 0 rgba(255,255,255,0.34)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+              <div
                 style={{
-                  fontFamily: inter,
-                  fontSize: 11,
-                  color: '#888078',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 24,
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#191919'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = '#888078'; }}
               >
-                Edit Setup →
-              </button>
-            </div>
-          </div>
+                <div style={{ minWidth: 0, flex: '1 1 620px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      gap: 10,
+                      flexWrap: 'wrap',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <h1
+                      style={{
+                        margin: 0,
+                        fontFamily: sohne,
+                        fontSize: 24,
+                        fontWeight: 600,
+                        letterSpacing: '-0.02em',
+                        color: '#191919',
+                        lineHeight: 1.04,
+                        textTransform: 'lowercase',
+                      }}
+                    >
+                      {collectionName}
+                    </h1>
+                    {seasonLabel ? (
+                      <span
+                        style={{
+                          fontFamily: inter,
+                          fontSize: 10,
+                          fontWeight: 600,
+                          letterSpacing: '0.14em',
+                          textTransform: 'uppercase',
+                          color: '#888078',
+                        }}
+                      >
+                        {seasonLabel}
+                      </span>
+                    ) : null}
+                  </div>
 
-          {/* Right CTAs */}
-          <div style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'flex-start', flexShrink: 0 }}>
-            <button
-              onClick={onNewPiece}
-              style={{
-                border: '1px solid #E2DDD6',
-                background: '#FFFFFF',
-                color: '#888078',
-                borderRadius: 100,
-                padding: '8px 16px',
-                fontSize: 11,
-                fontFamily: inter,
-                cursor: 'pointer',
-                transition: 'border-color 150ms ease, color 150ms ease',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#A8B475'; e.currentTarget.style.color = '#A8B475'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E2DDD6'; e.currentTarget.style.color = '#888078'; }}
-            >
-              Add Piece →
-            </button>
+                  {editorialDirection ? (
+                    <div
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 9.5,
+                        fontWeight: 700,
+                        letterSpacing: '0.15em',
+                        textTransform: 'uppercase',
+                        color: '#5F5953',
+                        marginBottom: editorialChips.length > 0 ? 6 : 0,
+                      }}
+                    >
+                      {editorialDirection}
+                    </div>
+                  ) : null}
+
+                  {editorialChips.length > 0 && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                      <span
+                        style={{
+                          fontFamily: inter,
+                          fontSize: 11,
+                          color: '#888078',
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {editorialChips.join(' · ')}
+                      </span>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => router.push('/intent')}
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 10.5,
+                        color: '#888078',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = '#191919'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = '#888078'; }}
+                    >
+                      Edit Setup →
+                    </button>
+                  </div>
+                </div>
+
+              </div>
 
             {reportExists ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                <button
-                  onClick={handleGenerateReport}
-                  style={{
-                    background: '#A8B475',
-                    color: '#3A4020',
-                    borderRadius: 100,
-                    border: 'none',
-                    padding: '9px 20px',
-                    fontSize: 12,
-                    fontWeight: 500,
-                    fontFamily: inter,
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#95A164'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = '#A8B475'; }}
-                >
-                  View Report →
-                </button>
-                <button
-                  onClick={handleGenerateReport}
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 10,
-                    color: '#888078',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: 0,
-                    textAlign: 'right',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#191919'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#888078'; }}
-                >
-                  Re-run analysis
-                </button>
-              </div>
-            ) : (
-              <button
-                disabled
+              <div
                 style={{
-                  background: '#E2DDD6',
-                  color: '#888078',
-                  borderRadius: 100,
-                  border: 'none',
-                  padding: '9px 18px',
-                  fontSize: 12,
-                  fontFamily: inter,
-                  cursor: 'not-allowed',
+                  marginTop: 14,
+                  paddingTop: 12,
+                  borderTop: '1px solid rgba(67,67,43,0.08)',
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0, 1fr)',
+                  gap: 4,
+                  maxWidth: 620,
                 }}
               >
-                Generate Report
-              </button>
-            )}
+                <div style={{ fontFamily: inter, fontSize: 12, fontWeight: 600, lineHeight: 1.4, color: 'rgba(67,67,43,0.72)' }}>
+                  {collectionScore} — {assortmentIntelligence.collection_state}
+                </div>
+
+                <p
+                  style={{
+                    margin: 0,
+                    fontFamily: inter,
+                    fontSize: 11.5,
+                    lineHeight: 1.48,
+                    color: 'rgba(67,67,43,0.62)',
+                    maxWidth: 580,
+                  }}
+                >
+                  {assortmentIntelligence.supporting_line}
+                </p>
+
+                <p
+                  style={{
+                    margin: 0,
+                    fontFamily: inter,
+                    fontSize: 11,
+                    lineHeight: 1.48,
+                    color: 'rgba(67,67,43,0.52)',
+                    maxWidth: 580,
+                  }}
+                >
+                  {assortmentIntelligence.muko_insight}
+                </p>
+
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 9.5,
+                    lineHeight: 1.4,
+                    color: 'rgba(67,67,43,0.36)',
+                    letterSpacing: '0.03em',
+                  }}
+                >
+                  Identity {avgIdentity || '—'} · Resonance {avgResonance || '—'} · Execution {avgExecution || '—'}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
-        {/* ── Score banner (only when report exists) ─────────────────────── */}
-        {reportExists && (
-          <div
-            style={{
-              background: '#FFFFFF',
-              borderBottom: '1px solid #E2DDD6',
-              padding: '16px 32px',
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 28,
-              flexShrink: 0,
-            }}
-          >
-            {/* Overall score */}
-            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-              <span style={{ fontFamily: sohne, fontWeight: 700, fontSize: 48, color: '#191919', lineHeight: 1 }}>
-                {collectionScore}
-              </span>
-              <span style={{ fontFamily: inter, fontSize: 11, color: '#888078' }}>Collection Score</span>
-            </div>
-
-            <div style={{ width: 1, height: 40, background: '#E2DDD6', flexShrink: 0 }} />
-
-            {/* Dimension scores */}
-            <div style={{ display: 'flex', flexDirection: 'row', gap: 24 }}>
-              {([
-                { label: 'Identity', score: avgIdentity, color: '#A8B475' },
-                { label: 'Resonance', score: avgResonance, color: '#B8876B' },
-                {
-                  label: 'Execution',
-                  score: avgExecution,
-                  color: avgExecution >= 70 ? '#7A9E7E' : avgExecution >= 50 ? '#C4955A' : '#B85C5C',
-                },
-              ] as Array<{ label: string; score: number; color: string }>).map(({ label, score, color }) => (
-                <div key={label}>
-                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888078', marginBottom: 2 }}>
-                    {label}
-                  </div>
-                  <div style={{ fontFamily: inter, fontSize: 20, fontWeight: 700, color }}>
-                    {score || '—'}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {mukoReadNarrative && (
-              <>
-                <div style={{ width: 1, height: 40, background: '#E2DDD6', flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: inter, fontSize: 13, fontWeight: 600, color: '#191919', marginBottom: 3 }}>
-                    {mukoReadNarrative.split('.')[0]?.trim()}.
-                  </div>
-                  <div style={{ fontFamily: inter, fontSize: 11, color: '#888078', lineHeight: 1.5 }}>
-                    {mukoReadNarrative.split('.')[1]?.trim() ?? ''}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
         {/* ── Pieces section ─────────────────────────────────────────────── */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: reportExists ? '2px 32px 24px' : '20px 32px 24px' }}>
           {/* Section label */}
           <div
             style={{
@@ -1028,18 +745,6 @@ export default function CollectionPage({
               marginBottom: 16,
             }}
           >
-            <span
-              style={{
-                display: 'inline-block',
-                width: 3,
-                height: 14,
-                background: '#A8B475',
-                borderRadius: 2,
-                marginRight: 10,
-                verticalAlign: 'middle',
-                flexShrink: 0,
-              }}
-            />
             <span
               style={{
                 fontFamily: inter,
@@ -1057,7 +762,7 @@ export default function CollectionPage({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
               gap: 14,
               paddingBottom: 100,
             }}
@@ -1093,17 +798,109 @@ export default function CollectionPage({
             )}
           </div>
         </div>
+      </div>
 
-        {/* ── Watchlist footer ───────────────────────────────────────────── */}
-        {!loading && (
-          <CollectionHealthFooter
-            health={collectionHealth}
-            analysesCount={analyses.length}
-            onGenerateReport={handleGenerateReport}
-            reportExists={reportExists}
-          />
+      <div
+        style={{
+          position: 'fixed',
+          right: 32,
+          bottom: 28,
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          gap: 10,
+          zIndex: 25,
+        }}
+      >
+        <button
+          onClick={onNewPiece}
+          style={{
+            border: '1px solid #D9D3CB',
+            background: 'rgba(255,255,255,0.94)',
+            color: '#6F675F',
+            borderRadius: 999,
+            padding: '10px 18px',
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: inter,
+            cursor: 'pointer',
+            transition: 'border-color 150ms ease, color 150ms ease',
+            minWidth: 136,
+            boxShadow: '0 10px 28px rgba(67,67,43,0.08)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#A8B475'; e.currentTarget.style.color = '#A8B475'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#D9D3CB'; e.currentTarget.style.color = '#6F675F'; }}
+        >
+          Add Piece
+        </button>
+
+        {reportExists ? (
+          <>
+            <button
+              onClick={handleGenerateReport}
+              style={{
+                background: '#A8B475',
+                color: '#3A4020',
+                borderRadius: 999,
+                border: 'none',
+                padding: '10px 18px',
+                fontSize: 12,
+                fontWeight: 600,
+                fontFamily: inter,
+                cursor: 'pointer',
+                minWidth: 136,
+                boxShadow: '0 10px 28px rgba(67,67,43,0.08)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#95A164'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#A8B475'; }}
+            >
+              View Report
+            </button>
+          </>
+        ) : (
+          <button
+            disabled
+            style={{
+              background: '#E2DDD6',
+              color: '#888078',
+              borderRadius: 999,
+              border: 'none',
+              padding: '10px 18px',
+              fontSize: 12,
+              fontFamily: inter,
+              cursor: 'not-allowed',
+              minWidth: 136,
+              boxShadow: '0 10px 28px rgba(67,67,43,0.08)',
+            }}
+          >
+            Generate Report
+          </button>
         )}
       </div>
+
+      {reportExists ? (
+        <button
+          onClick={handleGenerateReport}
+          style={{
+            position: 'fixed',
+            right: 32,
+            bottom: 6,
+            fontFamily: inter,
+            fontSize: 10,
+            color: '#888078',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            textAlign: 'right',
+            zIndex: 25,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#191919'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = '#888078'; }}
+        >
+          Re-run analysis
+        </button>
+      ) : null}
 
       {toastMessage ? <Toast message={toastMessage} /> : null}
 

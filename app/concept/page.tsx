@@ -38,7 +38,7 @@ import {
 import { getFlatForPiece } from "@/components/flats";
 import { combineDirection } from "@/lib/concept-studio/combineDirection";
 import { SUGGESTED_INTERPRETATION_CHIPS } from "@/lib/concept-studio/interpretations";
-import { buildSelectedPieceImage } from "@/lib/piece-image";
+import { buildSelectedPieceImage, resolvePieceImageType } from "@/lib/piece-image";
 import { getCollectionLanguageLabels, getExpressionSignalLabels } from "@/lib/collection-signals";
 import { CollectionReadBar, COLLECTION_READ_BAR_OFFSET } from "@/components/collection/CollectionReadBar";
 import { buildProgressiveStrategySummary, buildStrategySummary } from "@/lib/strategy-summary";
@@ -80,6 +80,8 @@ const PULSE_GREEN = "#A8B475";   // Chartreuse — brand positive
 const PULSE_YELLOW = "#B8876B";  // Camel — brand moderate
 const PULSE_RED = "#A97B8F";     // Rose — brand tension
 const OLIVE = BRAND.oliveInk;
+const TEXT = OLIVE;
+const MUTED = "rgba(67,67,43,0.44)";
 const EDITORIAL_INTERPRETATION_PROMPTS = [
   "sensual fabric tension",
   "restrained emotional depth",
@@ -120,6 +122,21 @@ function extractPartialJsonString(raw: string, key: string): string {
     .replace(/\\"/g, '"')
     .replace(/\\n/g, " ")
     .trim();
+}
+
+function extractPartialJsonStringArray(raw: string, key: string): string[] {
+  const match = raw.match(new RegExp(`"${key}"\\s*:\\s*\\[((?:.|\\n|\\r)*?)\\]`));
+  if (!match) return [];
+
+  return Array.from(match[1].matchAll(/"((?:\\.|[^"\\])*)"/g))
+    .map((entry) =>
+      entry[1]
+        .replace(/\\"/g, '"')
+        .replace(/\\n/g, " ")
+        .trim()
+    )
+    .filter(Boolean)
+    .slice(0, 3);
 }
 
 /* ─── Universal silhouettes ──────────────────────────────────────────────── */
@@ -205,6 +222,9 @@ interface AestheticDataEntry {
   trend_velocity: string;
   saturation_score: number;
   keywords: string[];
+  seen_in?: string[];
+  risk_factors?: string[];
+  seasonal_relevance?: string | Record<string, number>;
   silhouette_affinity?: string[];
   palette_affinity?: string[];
   palette_options?: Array<{ id: string; name: string; swatches: string[]; descriptor: string }>;
@@ -220,9 +240,8 @@ interface ChipMeta {
 
 interface ConceptLanguageRead {
   headline: string;
-  silhouette_steer: string;
-  palette_steer: string;
-  signals_note: string;
+  core_read: string;
+  execution_moves: string[];
   guardrail: string;
 }
 
@@ -233,7 +252,7 @@ type DirectionRecommendation = {
   aesthetic: string;
   role: RecommendationRole;
   descriptor: string;
-  labels: string[];
+  insight: string;
   identityScore: number;
   resonanceScore: number;
   saturationScore: number;
@@ -396,7 +415,7 @@ function getDirectionInsight(
   };
 }
 
-function getRecommendationLabels({
+function buildRecommendationInsight({
   role,
   isRecommended,
   identityScore,
@@ -409,21 +428,35 @@ function getRecommendationLabels({
   resonanceScore: number;
   saturationScore: number;
 }) {
-  const labels: string[] = [];
+  const identityClause =
+    identityScore >= 84
+      ? "Grounded in your brand codes"
+      : identityScore >= 80
+      ? "Close to your brand codes"
+      : "A sharper lens on your brand codes";
 
-  if (isRecommended) labels.push("Strong fit for your strategy");
-  if (identityScore >= 84) labels.push("Strong continuity with your brand codes");
-  if (saturationScore <= 55) labels.push("Growing traction, not yet saturated");
+  const whitespaceClause =
+    saturationScore <= 40
+      ? "with low saturation and room to lead"
+      : saturationScore <= 55
+      ? "with growing traction and room to lead"
+      : saturationScore <= 70
+      ? "with live demand and room to sharpen"
+      : "if you author it decisively";
 
-  if (role === "anchor") labels.push("Safer commercial anchor");
-  if (role === "stretch") {
-    labels.push(identityScore >= 80 ? "Stretch opportunity" : "Higher novelty, more execution risk");
+  if (role === "anchor") {
+    return `${identityClause}, with steadier commercial footing`;
   }
 
-  if (labels.length < 2 && resonanceScore >= 82) labels.push("Live market energy in this window");
-  if (labels.length < 2 && identityScore < 80) labels.push("Requires a sharper point of view");
+  if (role === "stretch") {
+    return `${identityClause}, with room for sharper separation`;
+  }
 
-  return labels.slice(0, 2);
+  if (isRecommended || resonanceScore >= 82) {
+    return `${identityClause}, ${whitespaceClause}`;
+  }
+
+  return `${identityClause}, with a clear directional edge`;
 }
 
 function buildDirectionSelectionRead({
@@ -613,8 +646,10 @@ type ProductPieceSuggestion = {
 };
 
 type ProductPieceRead = {
-  title?: string;
-  body: string;
+  headline: string;
+  core_read: string;
+  move_that_matters: string;
+  start_here: string;
 };
 
 type ProductStrategicImplication = {
@@ -627,8 +662,11 @@ const PRODUCT_PIECE_READ_FALLBACK_BODY =
 
 function buildProductPieceReadFallback(pieceName: string): ProductPieceRead {
   return {
-    title: pieceName,
-    body: PRODUCT_PIECE_READ_FALLBACK_BODY,
+    headline: `${pieceName} is the clearest route into the collection, but it still needs a sharper claim.`,
+    core_read: PRODUCT_PIECE_READ_FALLBACK_BODY,
+    move_that_matters:
+      "If this piece does not establish a distinct proportion and market position now, the collection risks opening with taste instead of product authority.",
+    start_here: `${pieceName} should be the first move because it can set the line’s silhouette role before the assortment starts to drift.`,
   };
 }
 
@@ -805,7 +843,7 @@ function buildStrategicImplication(
 
 function buildCollectionStructureSummary(
   persistedPieces: Array<{
-    piece_name: string;
+    piece_name: string | null;
     collection_role: string | null;
     category: string | null;
     construction_tier: string | null;
@@ -866,6 +904,23 @@ function buildCollectionStructureSummary(
   };
 }
 
+function getPersistedPieceName(piece: {
+  piece_name?: string | null;
+  category: string | null;
+  silhouette: string | null;
+  agent_versions?: {
+    saved_piece_name?: string | null;
+  } | null;
+}) {
+  return (
+    piece.piece_name?.trim()
+    || piece.agent_versions?.saved_piece_name?.trim()
+    || piece.silhouette?.trim()
+    || piece.category?.trim()
+    || "Untitled Piece"
+  );
+}
+
 /* ─── Main component ──────────────────────────────────────────────────────── */
 export default function ConceptStudioPage() {
   const router = useRouter();
@@ -914,6 +969,8 @@ export default function ConceptStudioPage() {
     strategySummary,
     isProxyMatch,
     setIsProxyMatch,
+    preloadedCriticScores,
+    setPreloadedCriticScores,
   } = useSessionStore(
     useShallow((state) => ({
       season: state.season,
@@ -960,6 +1017,8 @@ export default function ConceptStudioPage() {
       strategySummary: state.strategySummary,
       isProxyMatch: state.isProxyMatch,
       setIsProxyMatch: state.setIsProxyMatch,
+      preloadedCriticScores: state.preloadedCriticScores,
+      setPreloadedCriticScores: state.setPreloadedCriticScores,
     }))
   );
 
@@ -1000,7 +1059,7 @@ export default function ConceptStudioPage() {
 
   // Real Critic identity scores for all aesthetics, populated once brandProfileId resolves.
   // Empty until the batch fetch completes — falls back to static scoring in the meantime.
-  const [allCriticScores, setAllCriticScores] = useState<Record<string, number>>({});
+  const [allCriticScores, setAllCriticScores] = useState<Record<string, number>>(preloadedCriticScores);
 
   const { recommendedAesthetic } = useMemo(() => {
     // No real scores yet — fall back to static brand-agnostic ranking
@@ -1192,7 +1251,7 @@ export default function ConceptStudioPage() {
   // ─── Collection context state for Decision Guidance ──────────────────────
   const [collectionPieces, setCollectionPieces] = useState<Array<{
     id: string;
-    piece_name: string;
+    piece_name: string | null;
     score: number;
     dimensions: Record<string, number> | null;
     collection_role: string | null;
@@ -1201,6 +1260,9 @@ export default function ConceptStudioPage() {
     aesthetic_matched_id: string | null;
     aesthetic_inflection: string | null;
     construction_tier: string | null;
+    agent_versions?: {
+      saved_piece_name?: string | null;
+    } | null;
   }>>([]);
   useEffect(() => {
     if (lockedCollectionAesthetic || isAestheticSelectionUnlocked || collectionPieces.length === 0) return;
@@ -1252,7 +1314,7 @@ export default function ConceptStudioPage() {
   const [conceptStreamingParagraph, setConceptStreamingParagraph] = useState('');
   const [conceptIsParagraphStreaming, setConceptIsParagraphStreaming] = useState(false);
   const [step2StreamingText, setStep2StreamingText] = useState('');
-  const [step2StreamingRows, setStep2StreamingRows] = useState<{ silhouette: string; palette: string; signals: string; guardrail: string }>({ silhouette: '', palette: '', signals: '', guardrail: '' });
+  const [step2StreamingRead, setStep2StreamingRead] = useState<{ core_read: string; execution_moves: string[]; guardrail: string }>({ core_read: '', execution_moves: [], guardrail: '' });
   const step2RawRef = useRef<string>('');
   const [pieceStreamingTitle, setPieceStreamingTitle] = useState('');
   const [pieceStreamingBody, setPieceStreamingBody] = useState('');
@@ -1273,7 +1335,7 @@ export default function ConceptStudioPage() {
       setConceptStreamingParagraph('');
       setConceptIsParagraphStreaming(false);
       setStep2StreamingText('');
-      setStep2StreamingRows({ silhouette: '', palette: '', signals: '', guardrail: '' });
+      setStep2StreamingRead({ core_read: '', execution_moves: [], guardrail: '' });
       step2RawRef.current = '';
       setPieceStreamingTitle('');
       setPieceStreamingBody('');
@@ -1340,7 +1402,7 @@ export default function ConceptStudioPage() {
           tension_context: brandProfile3?.tension_context ?? undefined,
         },
         existing_pieces: collectionPieces.map((p) => ({
-          piece_name: p.piece_name,
+          piece_name: p.piece_name ?? "Untitled Piece",
           score: p.score,
           dimensions: p.dimensions,
           collection_role: p.collection_role,
@@ -1668,20 +1730,52 @@ export default function ConceptStudioPage() {
       const collectionPiecesPromise = collectionName
         ? supabase
             .from('analyses')
-            .select('id, piece_name, score, dimensions, collection_role, category, silhouette, aesthetic_matched_id, aesthetic_inflection, construction_tier')
+            .select('*')
             .eq('collection_name', collectionName)
             .eq('user_id', user.id)
         : Promise.resolve({ data: [], error: null });
 
       Promise.all([brandProfilePromise, collectionPiecesPromise]).then(
-        ([{ data, error }, { data: piecesData, error: piecesError }]) => {
+        async ([{ data, error }, { data: piecesData, error: piecesError }]) => {
           console.log('[Muko] brand_profiles query result — data:', data, '| error:', error);
-          if (piecesError) console.warn('[Muko] collection pieces query error:', piecesError);
+          let normalizedPiecesData: Array<{
+            id: string;
+            piece_name?: string | null;
+            score: number;
+            dimensions: Record<string, number> | null;
+            collection_role: string | null;
+            category: string | null;
+            silhouette: string | null;
+            aesthetic_matched_id: string | null;
+            aesthetic_inflection: string | null;
+            construction_tier: string | null;
+            agent_versions?: {
+              saved_piece_name?: string | null;
+            } | null;
+          }> | null = (piecesData as Array<{
+            id: string;
+            piece_name?: string | null;
+            score: number;
+            dimensions: Record<string, number> | null;
+            collection_role: string | null;
+            category: string | null;
+            silhouette: string | null;
+            aesthetic_matched_id: string | null;
+            aesthetic_inflection: string | null;
+            construction_tier: string | null;
+            agent_versions?: {
+              saved_piece_name?: string | null;
+            } | null;
+          }> | null) ?? null;
 
-          if (piecesData) {
-            const filtered = (piecesData as Array<{
+          if (piecesError) {
+            console.warn('[Muko] collection pieces query error:', piecesError);
+          }
+
+          if (normalizedPiecesData) {
+            const normalized = (normalizedPiecesData as Array<{
               id: string;
-              piece_name: string;
+              piece_name?: string | null;
               score: number;
               dimensions: Record<string, number> | null;
               collection_role: string | null;
@@ -1690,9 +1784,15 @@ export default function ConceptStudioPage() {
               aesthetic_matched_id: string | null;
               aesthetic_inflection: string | null;
               construction_tier: string | null;
-            }>).filter((p) => p.piece_name);
-            setCollectionPieces(filtered);
-            console.log('[COLLECTION_CONTEXT_DEBUG] piece_count:', filtered.length, 'first piece_name:', filtered[0]?.piece_name ?? null, 'collection_name used:', collectionName);
+              agent_versions?: {
+                saved_piece_name?: string | null;
+              } | null;
+            }>).map((piece) => ({
+              ...piece,
+              piece_name: getPersistedPieceName(piece),
+            }));
+            setCollectionPieces(normalized);
+            console.log('[COLLECTION_CONTEXT_DEBUG] piece_count:', normalized.length, 'first piece_name:', normalized[0]?.piece_name ?? null, 'collection_name used:', collectionName);
           }
 
           if (data && !error) {
@@ -1721,6 +1821,11 @@ export default function ConceptStudioPage() {
             criticBatchAbortRef.current?.abort();
             criticBatchAbortRef.current = new AbortController();
             const batchController = criticBatchAbortRef.current;
+            if (Object.keys(preloadedCriticScores).length > 0) {
+              setAllCriticScores(preloadedCriticScores);
+              return;
+            }
+
             Promise.allSettled(
               AESTHETICS.map(async (aesthetic) => {
                 const entry = allEntries.find((a) => a.name === aesthetic);
@@ -1747,6 +1852,7 @@ export default function ConceptStudioPage() {
                 }
               }
               setAllCriticScores(scores);
+              setPreloadedCriticScores(scores);
             });
           } else {
             setNoBrandProfile(true);
@@ -1757,7 +1863,12 @@ export default function ConceptStudioPage() {
     return () => {
       criticBatchAbortRef.current?.abort();
     };
-  }, []);
+  }, [preloadedCriticScores, setPreloadedCriticScores]);
+
+  useEffect(() => {
+    if (Object.keys(preloadedCriticScores).length === 0) return;
+    setAllCriticScores(preloadedCriticScores);
+  }, [preloadedCriticScores]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const runCriticAnalysis = useCallback(
@@ -1950,7 +2061,10 @@ export default function ConceptStudioPage() {
   const productPieceEntries = useMemo<PieceRecommendationEntry[]>(() => {
     // Exclude pieces already built in this collection (persisted to Supabase).
     const existingPieceNames = new Set(
-      collectionPieces.map((p) => p.piece_name).filter(Boolean).map((n) => n.toLowerCase())
+      collectionPieces
+        .map((p) => p.piece_name)
+        .filter((name): name is string => Boolean(name))
+        .map((name) => name.toLowerCase())
     );
     const availableKeyPieces = keyPieces.filter(
       (piece) => !existingPieceNames.has((piece.item ?? "").toLowerCase())
@@ -1990,6 +2104,8 @@ export default function ConceptStudioPage() {
     setSelectedPieceImage(
       buildSelectedPieceImage({
         type: activeProductPieceEntry.piece.type,
+        pieceName: activeProductPieceEntry.piece.item,
+        category: activeProductPieceEntry.piece.category,
         signal: activeProductPieceEntry.piece.signal ?? null,
       })
     );
@@ -2020,13 +2136,26 @@ export default function ConceptStudioPage() {
     if (!nextName) return;
     const existing = [...keyPieces, ...customProductPieces].some((piece) => piece.item.toLowerCase() === nextName.toLowerCase());
     if (!existing) {
+      const inferredType = resolvePieceImageType({ pieceName: nextName });
+      const inferredCategory =
+        inferredType === "straight-pant" || inferredType === "trouser" || inferredType === "skirt" || inferredType === "mini-skirt"
+          ? "bottoms"
+          : inferredType?.includes("dress")
+            ? "dresses"
+            : inferredType === "jacket" || inferredType === "trench" || inferredType === "coat" || inferredType === "parka" || inferredType === "puffer" || inferredType === "raincoat"
+              ? "outerwear"
+              : inferredType === "knit-sweater" || inferredType === "cardigan"
+                ? "knitwear"
+                : inferredType
+                  ? "tops"
+                  : null;
       setCustomProductPieces((prev) => [
         ...prev,
         {
           item: nextName,
           signal: null,
-          category: null,
-          type: null,
+          category: inferredCategory,
+          type: inferredType,
           recommended_material_id: null,
           redirect_material_id: null,
           custom: true,
@@ -2058,6 +2187,14 @@ export default function ConceptStudioPage() {
     if (primaryPiece) {
       setSelectedKeyPieceLocal(primaryPiece);
       setSelectedKeyPiece(primaryPiece);
+      setSelectedPieceImage(
+        buildSelectedPieceImage({
+          type: primaryPiece.type,
+          pieceName: primaryPiece.item,
+          category: primaryPiece.category,
+          signal: primaryPiece.signal ?? null,
+        })
+      );
       setActiveProductPieceId(primaryPiece.item);
       setCollectionRole(primaryRole);
     }
@@ -2124,6 +2261,7 @@ export default function ConceptStudioPage() {
     setDecisionGuidanceState,
     setCollectionAesthetic,
     setSelectedKeyPiece,
+    setSelectedPieceImage,
     aestheticInflection,
     collectionPieces.length,
     isAestheticSelectionUnlocked,
@@ -2270,7 +2408,7 @@ export default function ConceptStudioPage() {
       useSessionStore.setState({
         resonancePulse: {
           score: newResonance,
-          status: newResonance >= 80 ? "green" : newResonance >= 60 ? "yellow" : "red",
+          status: saturation.status,
           message: saturation.message,
         },
       });
@@ -2314,7 +2452,7 @@ export default function ConceptStudioPage() {
     setStep2ReadLoading(false);
     setConceptStreamingText('');
     setStep2StreamingText('');
-    setStep2StreamingRows({ silhouette: '', palette: '', signals: '', guardrail: '' });
+    setStep2StreamingRead({ core_read: '', execution_moves: [], guardrail: '' });
     step2RawRef.current = '';
     conceptLanguageRequestKeyRef.current = null;
     clearConceptInsight();
@@ -2343,6 +2481,19 @@ export default function ConceptStudioPage() {
     try { lockConcept?.(); } catch {}
     setTimeout(() => { yourConceptRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
   };
+
+  const handleBackToDirection = useCallback(() => {
+    setIsAestheticSelectionUnlocked(true);
+    setLockedCollectionAesthetic(null);
+    setCollectionAesthetic(null);
+    setAestheticInput("");
+    setDirectionInterpretationModifiers([]);
+    try {
+      window.localStorage.removeItem(COLLECTION_AESTHETIC_STORAGE_KEY);
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [setAestheticInput, setCollectionAesthetic, setDirectionInterpretationModifiers]);
 
   /* ─── Sorted base list ────────────────────────────────────────────────────── */
   const aestheticSorter = (rec: string) => (a: string, b: string) => {
@@ -2402,7 +2553,7 @@ export default function ConceptStudioPage() {
         resonanceScore: candidate!.resonanceScore,
         saturationScore: candidate!.saturationScore,
         velocity: candidate!.velocity,
-        labels: getRecommendationLabels({
+        insight: buildRecommendationInsight({
           role: (index === 0 ? "primary" : index === 1 ? "anchor" : "stretch") as RecommendationRole,
           isRecommended: candidate!.aesthetic === recommendedAesthetic,
           identityScore: candidate!.identityScore,
@@ -2431,7 +2582,7 @@ export default function ConceptStudioPage() {
       resonanceScore: content.resonanceScore ?? 0,
       saturationScore: entry.saturation_score ?? 60,
       velocity: entry.trend_velocity ?? "peak",
-      labels: getRecommendationLabels({
+      insight: buildRecommendationInsight({
         role: "stretch",
         isRecommended: hoveredCard === recommendedAesthetic,
         identityScore: content.identityScore ?? 0,
@@ -2497,7 +2648,7 @@ export default function ConceptStudioPage() {
   /* ─── Pulse rows ──────────────────────────────────────────────────────────── */
   const pulseRows = [
     { key: "identity", label: "Identity", icon: (c: string) => <IconIdentity size={14} color={c} />, score: identityScore != null ? `${identityScore}` : "—", scoreNum: identityScore ?? 0, color: idStatus.color, chip: identityScore != null ? { variant: idStatus.color === PULSE_GREEN ? "green" as const : idStatus.color === PULSE_YELLOW ? "amber" as const : idStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: idStatus.label } : null, subLabel: noBrandProfile ? "Complete Brand DNA setup to see identity scores" : idStatus.sublabel, what: `Identity measures how well this direction aligns with your brand DNA — keywords, aesthetic positioning, and customer profile. A high score means this direction reinforces who you already are. A low score signals tension that requires intentional navigation.`, how: `Keyword overlap between your brand profile and this direction's signals, weighted by conflict detection. Intentional tensions acknowledged in onboarding are factored in.`, pending: false },
-    { key: "resonance", label: "Resonance", icon: (c: string) => <IconResonance size={14} color={c} />, score: resonanceLoading ? "—" : resonanceScore != null ? `${resonanceScore}` : "—", scoreNum: resonanceLoading ? 0 : resonanceScore ?? 0, color: resonanceLoading ? "rgba(67,67,43,0.35)" : resonanceScore != null ? scoreColor(resonanceScore) : "rgba(67,67,43,0.35)", chip: resonanceLoading ? { variant: "gray" as const, status: "Matching direction..." } : resonanceScore != null ? { variant: resStatus.color === PULSE_GREEN ? "green" as const : resStatus.color === PULSE_YELLOW ? "amber" as const : resStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: resStatus.label } : null, subLabel: resonanceLoading ? "\u00A0" : resStatus.sublabel || "\u00A0", what: `Resonance measures market timing — how much consumer interest exists for this direction right now, and whether you're entering at the right moment. High resonance with ascending velocity means the window is open. Peak saturation means you're late.`, how: `Based on checkMarketSaturation(): saturation score from our curated aesthetics library, weighted by trend velocity. Resonance = 100 − saturation, with a 15-point penalty for declining velocity.`, pending: false },
+    { key: "resonance", label: "Resonance", icon: (c: string) => <IconResonance size={14} color={c} />, score: resonanceLoading ? "—" : resonanceScore != null ? `${resonanceScore}` : "—", scoreNum: resonanceLoading ? 0 : resonanceScore ?? 0, color: resonanceLoading ? "rgba(67,67,43,0.35)" : resonanceScore != null ? scoreColor(resonanceScore) : "rgba(67,67,43,0.35)", chip: resonanceLoading ? { variant: "gray" as const, status: "Matching direction..." } : resonanceScore != null ? { variant: resStatus.color === PULSE_GREEN ? "green" as const : resStatus.color === PULSE_YELLOW ? "amber" as const : resStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: resStatus.label } : null, subLabel: resonanceLoading ? "\u00A0" : resStatus.sublabel || "\u00A0", what: `Resonance measures market timing — the base market lane plus any lift coming from the piece signal you have chosen. High resonance means the window is open or still building. Peak saturation means the lane is crowded or late.`, how: `Base market state comes from a shared saturation model across concept and spec. Resonance score = 100 − saturation, with a 15-point penalty for declining velocity and a small piece-signal uplift when a key piece strengthens the commercial read.`, pending: false },
     { key: "execution", label: "Execution", icon: (c: string) => <IconExecution size={14} color={c} />, score: "—", scoreNum: 0, color: "rgba(67,67,43,0.35)", chip: null, subLabel: "Unlocks in Spec Studio", what: `Execution measures whether the physical product you're building is feasible given your timeline, materials, and construction complexity. It unlocks in Spec Studio once you define your product inputs.`, how: `Timeline buffer score based on material lead times and construction complexity relative to your season deadline. Negative buffer scores red. Margin gate applied as a 30% score penalty if COGS exceeds target.`, pending: true },
   ];
   const collapsedPulseInsight = useMemo(() => buildPulseMicroInsight({
@@ -2562,7 +2713,6 @@ export default function ConceptStudioPage() {
     });
   }, [combinedDirection, selectedAestheticData?.palette_options]);
   const [showAllInterpretationSuggestions, setShowAllInterpretationSuggestions] = useState(false);
-  const [showAllSignals, setShowAllSignals] = useState(false);
   const [currentStageState, setCurrentStageState] = useState<ConceptStageId>(
     () => (Object.keys(pieceRolesById).length > 0 ? "language" : "direction")
   );
@@ -2578,7 +2728,7 @@ export default function ConceptStudioPage() {
   }, [isSubsequentPiece]);
   const visibleInterpretationSuggestions = showAllInterpretationSuggestions ? interpretationSuggestions : interpretationSuggestions.slice(0, 4);
   const hiddenInterpretationSuggestionCount = Math.max(interpretationSuggestions.length - visibleInterpretationSuggestions.length, 0);
-  const visibleSignals = showAllSignals ? topDisplayChips : topDisplayChips.slice(0, 6);
+  const visibleSignals = topDisplayChips;
   const expressionSelectionCount = topDisplayChips.reduce((count, chip) => {
     const chipKey = `${topAesthetic}::${chip.label}`;
     return selectedElements.has(chipKey) ? count + 1 : count;
@@ -2612,7 +2762,7 @@ export default function ConceptStudioPage() {
     const run = async () => {
       setStep2ReadLoading(true);
       setStep2StreamingText('');
-      setStep2StreamingRows({ silhouette: '', palette: '', signals: '', guardrail: '' });
+      setStep2StreamingRead({ core_read: '', execution_moves: [], guardrail: '' });
       step2RawRef.current = '';
       try {
         const res = await fetch('/api/synthesizer/concept-language', {
@@ -2654,10 +2804,9 @@ export default function ConceptStudioPage() {
               const acc = step2RawRef.current;
               const headlineMatch = acc.match(/"headline"\s*:\s*"([^"]*)/);
               setStep2StreamingText(headlineMatch ? headlineMatch[1] : (acc.length > 10 ? '...' : ''));
-              setStep2StreamingRows({
-                silhouette: extractPartialJsonString(acc, 'silhouette_steer'),
-                palette: extractPartialJsonString(acc, 'palette_steer'),
-                signals: extractPartialJsonString(acc, 'signals_note'),
+              setStep2StreamingRead({
+                core_read: extractPartialJsonString(acc, 'core_read'),
+                execution_moves: extractPartialJsonStringArray(acc, 'execution_moves'),
                 guardrail: extractPartialJsonString(acc, 'guardrail'),
               });
             } catch { /* ignore partial parse errors */ }
@@ -2667,7 +2816,7 @@ export default function ConceptStudioPage() {
               if (!controller.signal.aborted) {
                 setStep2ReadData(result);
                 setStep2StreamingText('');
-                setStep2StreamingRows({ silhouette: '', palette: '', signals: '', guardrail: '' });
+                setStep2StreamingRead({ core_read: '', execution_moves: [], guardrail: '' });
               }
             } catch { /* ignore */ }
           }
@@ -2700,6 +2849,7 @@ export default function ConceptStudioPage() {
         if (!controller.signal.aborted) {
           setStep2ReadLoading(false);
           setStep2StreamingText('');
+          setStep2StreamingRead({ core_read: '', execution_moves: [], guardrail: '' });
         }
       }
     };
@@ -2776,6 +2926,11 @@ export default function ConceptStudioPage() {
     { id: "language" as const, label: "Translate into Product", helper: "Carry the point of view into silhouette, palette, and signals." },
     { id: "product" as const, label: "Build Product Expression", helper: "Evaluate pieces one by one and assign their role in the assortment." },
   ];
+  const conceptStepperSteps = [
+    { id: "direction" as const, label: "Direction" },
+    { id: "language" as const, label: "Language" },
+    { id: "product" as const, label: "Product" },
+  ];
   const completedStages = {
     direction: canAdvanceToStage2,
     language: canAdvanceToStage3,
@@ -2850,6 +3005,7 @@ export default function ConceptStudioPage() {
             },
             context: {
               aestheticName: selectedAesthetic ?? combinedDirection?.dnaLines[0] ?? "this direction",
+              season: season || undefined,
               silhouetteLabel: getConceptSilhouetteLabel(conceptSilhouette),
               paletteName: activePaletteName ?? "unknown",
               resonanceScore: resonanceScore ?? null,
@@ -2859,7 +3015,36 @@ export default function ConceptStudioPage() {
               expressionSignals: Array.from(selectedElements)
                 .filter((key) => key.startsWith(`${topAesthetic}::`))
                 .map((key) => key.replace(`${topAesthetic}::`, "")),
+              priorities: intentGoals,
+              tradeoffs: {
+                trend_exposure: getStrategySliderLabel(sliderTrend, ["low", "balanced", "high"]),
+                expression: getStrategySliderLabel(sliderCreative, ["restrained", "balanced", "assertive"]),
+                value: getStrategySliderLabel(sliderElevated, ["accessible", "balanced", "premium"]),
+                innovation: getStrategySliderLabel(sliderNovelty, ["continuity-aware", "balanced", "novelty-led"]),
+              },
+              commercial: {
+                target_msrp: typeof storeTargetMsrp === "number" && storeTargetMsrp > 0 ? storeTargetMsrp : null,
+                margin: typeof storeTargetMargin === "number" && storeTargetMargin > 0 ? storeTargetMargin : null,
+                cost_ceiling:
+                  typeof storeTargetMsrp === "number" &&
+                  typeof storeTargetMargin === "number" &&
+                  storeTargetMsrp > 0 &&
+                  storeTargetMargin > 0
+                    ? Math.round(storeTargetMsrp * (1 - storeTargetMargin / 100))
+                    : null,
+              },
               isStartingPiece,
+              existingPieces: Object.entries(pieceRolesById)
+                .filter(([name]) => name !== targetEntry.piece.item)
+                .map(([name, roleId]) => {
+                  const allPieces = [...keyPieces, ...customProductPieces];
+                  const found = allPieces.find((p) => p.item === name);
+                  return {
+                    name,
+                    role: ({ hero: 'Hero', 'volume-driver': 'Volume Driver', 'core-evolution': 'Core Evolution', directional: 'Directional Signal' } as Record<string, string>)[roleId] ?? roleId,
+                    category: found?.category ?? '',
+                  };
+                }),
             },
           }),
         });
@@ -2880,17 +3065,18 @@ export default function ConceptStudioPage() {
               const parsed = JSON.parse(data) as { text: string };
               pieceRawRef.current += parsed.text ?? '';
               const acc = pieceRawRef.current;
-              const titleMatch = acc.match(/"title"\s*:\s*"([^"]*)/);
-              setPieceStreamingTitle(titleMatch ? titleMatch[1] : '');
-              setPieceStreamingBody(extractPartialJsonString(acc, 'body'));
+              setPieceStreamingTitle(extractPartialJsonString(acc, 'headline'));
+              setPieceStreamingBody(extractPartialJsonString(acc, 'core_read'));
             } catch { /* ignore partial parse errors */ }
           } else if (event === 'complete') {
             try {
-              const result = JSON.parse(data) as { title: string; body: string };
+              const result = JSON.parse(data) as ProductPieceRead;
               if (!controller.signal.aborted) {
                 setActivePieceRead({
-                  title: result.title ?? targetEntry.piece.item,
-                  body: result.body ?? fallback.body,
+                  headline: result.headline ?? fallback.headline,
+                  core_read: result.core_read ?? fallback.core_read,
+                  move_that_matters: result.move_that_matters ?? fallback.move_that_matters,
+                  start_here: result.start_here ?? fallback.start_here,
                 });
                 setPieceStreamingTitle('');
                 setPieceStreamingBody('');
@@ -2944,10 +3130,21 @@ export default function ConceptStudioPage() {
     combinedDirection?.dnaLines,
     conceptSilhouette,
     currentStage,
+    intentGoals,
     interpretationSummary,
     resonanceScore,
+    season,
     selectedAesthetic,
+    selectedElements,
+    selectedInterpretationChips,
+    sliderCreative,
+    sliderElevated,
+    sliderNovelty,
+    sliderTrend,
+    storeTargetMargin,
+    storeTargetMsrp,
     suggestedStartingPieceEntry,
+    topAesthetic,
   ]);
   const activeStrategicImplication = useMemo(
     () =>
@@ -2957,13 +3154,21 @@ export default function ConceptStudioPage() {
     [activeProductPieceEntry, productSuggestionOptions, collectionBalanceContext]
   );
   const stageAwareHeadline =
-    currentStage === "language"
+    currentStage === "product"
+      ? activePieceRead?.headline || pieceStreamingTitle || buildProductPieceReadFallback(activeProductPieceEntry?.piece.item ?? suggestedStartingPieceEntry?.piece.item ?? "Opening Piece").headline
+      : currentStage === "language"
       ? step2ReadData?.headline ?? `Translate ${combinedDirection?.dnaLines[0] ?? selectedAesthetic ?? recommendedAesthetic} into disciplined product language.`
       : !selectedAesthetic
       ? directionSelectionRead.headline
       : step1ReadData?.statements[0] ?? insightContent.headline;
   const stageAwareParagraphs =
-    currentStage === "language"
+    currentStage === "product"
+      ? [
+          activePieceRead?.core_read || pieceStreamingBody || "",
+          activePieceRead?.move_that_matters ? `Balance: ${activePieceRead.move_that_matters}` : "",
+          activePieceRead?.start_here ? `Start Here: ${activePieceRead.start_here}` : "",
+        ].filter(Boolean)
+      : currentStage === "language"
       ? []
       : !selectedAesthetic
       ? directionSelectionRead.paragraphs
@@ -3177,13 +3382,11 @@ export default function ConceptStudioPage() {
                 <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 10 }}>
                   Concept Studio
                 </div>
-                <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 38, color: OLIVE, letterSpacing: "-0.04em", lineHeight: 0.98, maxWidth: 720 }}>
-                  {selectedAesthetic ? "Shape how this direction should read." : "Given how you want to win, where should you play?"}
+                <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 32, color: OLIVE, letterSpacing: "-0.04em", lineHeight: 0.98, maxWidth: 720 }}>
+                  Choose the lens
                 </h1>
                 <p style={{ margin: "12px 0 0", fontFamily: inter, fontSize: 13.5, color: "rgba(67,67,43,0.56)", lineHeight: 1.62, maxWidth: 620 }}>
-                  {selectedAesthetic
-                    ? "Keep the direction disciplined, then translate it into a collection language that still feels authored once it becomes product."
-                    : "Start inside Muko's strongest frame, then move outside it only if you want a different creative risk profile."}
+                  Start inside Muko&apos;s strongest frame, then move outside it only if you want a different creative risk profile.
                 </p>
               </div>
             </div>
@@ -3191,6 +3394,35 @@ export default function ConceptStudioPage() {
             {selectedAesthetic && (
               <>
                 <div ref={yourConceptRef} />
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    marginBottom: 38,
+                  }}
+                >
+                  {conceptStepperSteps.map((step, index) => (
+                    <React.Fragment key={step.id}>
+                      <div
+                        style={{
+                          fontFamily: inter,
+                          fontSize: 10,
+                          fontWeight: 600,
+                          letterSpacing: "0.16em",
+                          textTransform: "uppercase",
+                          color: currentStage === step.id ? TEXT : MUTED,
+                        }}
+                      >
+                        {step.label}
+                      </div>
+                      {index < conceptStepperSteps.length - 1 && (
+                        <div style={{ width: 34, height: 1, background: "rgba(67,67,43,0.12)" }} />
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
 
                 <div
                   style={{
@@ -3216,7 +3448,7 @@ export default function ConceptStudioPage() {
                       {currentStage === "direction" && (
                         <>
                           <div style={{ paddingTop: 12, marginBottom: 28 }}>
-                            <div style={{ fontFamily: sohne, fontSize: 28, fontWeight: 500, color: OLIVE, marginBottom: 8, letterSpacing: "-0.03em" }}>
+                            <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, color: OLIVE, marginBottom: 8, letterSpacing: "-0.03em" }}>
                               Set the Point of View
                             </div>
                             <div style={{ fontFamily: inter, fontSize: 13.5, color: "rgba(67,67,43,0.56)", lineHeight: 1.62, maxWidth: 500 }}>
@@ -3263,6 +3495,7 @@ export default function ConceptStudioPage() {
                               >
                                 <input
                                   type="text"
+                                  className="point-of-view-input"
                                   value={inflectionDraft}
                                   onChange={(e) => {
                                     setInflectionDraft(e.target.value.slice(0, 100));
@@ -3384,7 +3617,23 @@ export default function ConceptStudioPage() {
                             </div>
                           </div>
 
-                          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                            <button
+                              onClick={handleBackToDirection}
+                              style={{
+                                padding: "12px 18px",
+                                borderRadius: 999,
+                                border: "1px solid rgba(67,67,43,0.14)",
+                                background: "transparent",
+                                color: "rgba(67,67,43,0.62)",
+                                fontFamily: sohne,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Back to Direction
+                            </button>
                             <button
                               onClick={() => navigateStage("language")}
                               disabled={!canAdvanceToStage2}
@@ -3409,7 +3658,7 @@ export default function ConceptStudioPage() {
                       {currentStage === "language" && (
                         <>
                           <div style={{ paddingTop: 12, marginBottom: 30 }}>
-                            <div style={{ fontFamily: sohne, fontSize: 28, fontWeight: 500, color: OLIVE, marginBottom: 8, letterSpacing: "-0.03em" }}>
+                            <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, color: OLIVE, marginBottom: 8, letterSpacing: "-0.03em" }}>
                               Translate into Product
                             </div>
                             <div style={{ fontFamily: inter, fontSize: 13.5, color: "rgba(67,67,43,0.56)", lineHeight: 1.62, maxWidth: 520 }}>
@@ -3423,7 +3672,7 @@ export default function ConceptStudioPage() {
                             <>
                               <div style={{ marginBottom: 38 }}>
                                 <div style={{ marginBottom: 14 }}>
-                                  <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, color: OLIVE, letterSpacing: "-0.03em", marginBottom: 4 }}>
+                                  <div style={{ fontFamily: sohne, fontSize: 18, fontWeight: 500, color: OLIVE, letterSpacing: "-0.03em", marginBottom: 4 }}>
                                     Silhouette
                                   </div>
                                   <div style={{ fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.52)", lineHeight: 1.55 }}>
@@ -3470,7 +3719,7 @@ export default function ConceptStudioPage() {
                               {selectedAestheticData?.palette_options && selectedAestheticData.palette_options.length > 0 && (
                                 <div style={{ marginBottom: 34 }}>
                                   <div style={{ marginBottom: 12 }}>
-                                    <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 500, color: OLIVE, letterSpacing: "-0.02em", marginBottom: 4 }}>
+                                    <div style={{ fontFamily: sohne, fontSize: 18, fontWeight: 500, color: OLIVE, letterSpacing: "-0.02em", marginBottom: 4 }}>
                                       Palette
                                     </div>
                                     <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.48)", lineHeight: 1.55 }}>
@@ -3591,7 +3840,7 @@ export default function ConceptStudioPage() {
                             <>
                               <div style={{ marginBottom: 38 }}>
                                 <div style={{ marginBottom: 14 }}>
-                                  <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, color: OLIVE, letterSpacing: "-0.03em", marginBottom: 4 }}>
+                                  <div style={{ fontFamily: sohne, fontSize: 18, fontWeight: 500, color: OLIVE, letterSpacing: "-0.03em", marginBottom: 4 }}>
                                     Silhouette
                                   </div>
                                   <div style={{ fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.52)", lineHeight: 1.55 }}>
@@ -3638,7 +3887,7 @@ export default function ConceptStudioPage() {
                               {selectedAestheticData?.palette_options && selectedAestheticData.palette_options.length > 0 && (
                                 <div style={{ marginBottom: 34 }}>
                                   <div style={{ marginBottom: 12 }}>
-                                    <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 500, color: OLIVE, letterSpacing: "-0.02em", marginBottom: 4 }}>
+                                    <div style={{ fontFamily: sohne, fontSize: 18, fontWeight: 500, color: OLIVE, letterSpacing: "-0.02em", marginBottom: 4 }}>
                                       Palette
                                     </div>
                                     <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.48)", lineHeight: 1.55 }}>
@@ -3761,14 +4010,6 @@ export default function ConceptStudioPage() {
                                         </button>
                                       );
                                     })}
-                                    {topDisplayChips.length > visibleSignals.length && (
-                                      <button
-                                        onClick={() => setShowAllSignals((value) => !value)}
-                                        style={{ padding: "12px 0", border: "none", borderBottom: "1px solid rgba(67,67,43,0.08)", background: "none", fontSize: 11.5, fontWeight: 600, fontFamily: inter, color: "rgba(67,67,43,0.46)", cursor: "pointer", textAlign: "left" }}
-                                      >
-                                        {showAllSignals ? "Show less" : `See ${topDisplayChips.length - visibleSignals.length} more`}
-                                      </button>
-                                    )}
                                   </div>
                                 </div>
                               )}
@@ -3810,14 +4051,11 @@ export default function ConceptStudioPage() {
               </>
             )}
 
-            {!isAestheticSelectorLocked && (
+            {!selectedAesthetic && !isAestheticSelectorLocked && (
               <>
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(67,67,43,0.36)", marginBottom: 6 }}>
                     Muko Edit
-                  </div>
-                  <div style={{ fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.50)", lineHeight: 1.58, maxWidth: 640 }}>
-                    Three lanes, three different levels of authorship. The question is how much separation you want the collection to carry before it has to sell.
                   </div>
                 </div>
 
@@ -3904,7 +4142,7 @@ export default function ConceptStudioPage() {
                             resonanceScore: content?.resonanceScore ?? 0,
                             saturationScore: entry?.saturation_score ?? 60,
                             velocity: entry?.trend_velocity ?? "peak",
-                            labels: getRecommendationLabels({
+                            insight: buildRecommendationInsight({
                               role: "stretch",
                               isRecommended: aesthetic === recommendedAesthetic,
                               identityScore: content?.identityScore ?? 0,
@@ -3955,7 +4193,7 @@ export default function ConceptStudioPage() {
                 </div>
               ) : (
                 <motion.div
-                  key={`${currentStage}-${activeProductPieceId ?? "none"}-${step1ReadData?.statements?.[0] ?? step2ReadData?.headline ?? stageAwareHeadline}`}
+                  key={`${currentStage}-${activeProductPieceId ?? "none"}-${activePieceRead?.headline ?? step1ReadData?.statements?.[0] ?? step2ReadData?.headline ?? stageAwareHeadline}`}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.24, ease: [0.22, 0.8, 0.2, 1] }}
@@ -3973,7 +4211,7 @@ export default function ConceptStudioPage() {
                     streamingParagraph={conceptStreamingParagraph}
                     isParagraphStreaming={currentStage !== "language" && conceptIsParagraphStreaming && !!conceptStreamingParagraph}
                     languageStreamingText={step2StreamingText}
-                    languageStreamingRows={step2StreamingRows}
+                    languageStreamingRows={step2StreamingRead}
                     isLanguageStreaming={currentStage === "language" && step2ReadLoading && !!step2StreamingText}
                     pageMode="concept"
                     conceptStage={currentStage}
@@ -4040,16 +4278,7 @@ export default function ConceptStudioPage() {
               <button
                 onClick={() => {
                   setShowAestheticChangeModal(false);
-                  setIsAestheticSelectionUnlocked(true);
-                  setLockedCollectionAesthetic(null);
-                  setCollectionAesthetic(null);
-                  setAestheticInput("");
-                  setDirectionInterpretationModifiers([]);
-                  try {
-                    window.localStorage.removeItem(COLLECTION_AESTHETIC_STORAGE_KEY);
-                  } catch {
-                    // Ignore storage failures.
-                  }
+                  handleBackToDirection();
                 }}
                 style={{ padding: "8px 14px", borderRadius: 999, border: "none", background: OLIVE, fontFamily: inter, fontSize: 12, fontWeight: 600, color: "#F5F0E8", cursor: "pointer" }}
               >
@@ -4130,7 +4359,7 @@ function DirectionCard({
       <div style={{ display: "grid", gap: 16 }}>
         <div style={{ display: "grid", gridTemplateColumns: isHovered ? "minmax(0, 1fr)" : "minmax(0, 1fr) 144px", gap: 18, alignItems: "start" }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
             <span
               style={{
                 display: "inline-flex",
@@ -4166,31 +4395,26 @@ function DirectionCard({
               <span style={{ color: chartreuse }}>→</span>
             </span>
           </div>
-          <div style={{ fontFamily: sohne, fontWeight: 500, fontSize: 26, color: "rgba(67,67,43,0.92)", letterSpacing: "-0.04em", lineHeight: 0.98, marginBottom: 8 }}>
+          <div style={{ fontFamily: sohne, fontWeight: 500, fontSize: 24, color: "rgba(67,67,43,0.92)", letterSpacing: "-0.04em", lineHeight: 0.98, marginBottom: 6 }}>
             {aesthetic}
           </div>
-          <div style={{ fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.60)", lineHeight: 1.58, maxWidth: 500, marginBottom: 12 }}>
+          <div style={{ fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.60)", lineHeight: 1.58, maxWidth: 500 }}>
             {recommendation.descriptor}
           </div>
-          {recommendation.labels.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-              {recommendation.labels.slice(0, 2).map((label) => (
-                <span
-                  key={label}
-                  style={{
-                    padding: "4px 9px",
-                    borderRadius: 999,
-                    fontSize: 10.5,
-                    fontWeight: 600,
-                    background: "rgba(250,248,243,0.96)",
-                    border: "1px solid rgba(67,67,43,0.07)",
-                    color: "rgba(67,67,43,0.56)",
-                    fontFamily: inter,
-                  }}
-                >
-                  {label}
-                </span>
-              ))}
+          {recommendation.insight && (
+            <div
+              style={{
+                marginTop: 12,
+                fontFamily: sohne,
+                fontSize: 12.5,
+                fontWeight: 400,
+                color: "rgba(67,67,43,0.78)",
+                lineHeight: 1.42,
+                letterSpacing: "-0.01em",
+                maxWidth: 520,
+              }}
+            >
+              {`— ${recommendation.insight}`}
             </div>
           )}
         </div>

@@ -57,6 +57,12 @@ describe('checkMarketSaturation()', () => {
     expect(result.message).toBe('Growing traction')
   })
 
+  test('2b. collections_count uses collections_analyzed instead of seen_in length', () => {
+    const data = mockAesthetic({ collections_analyzed: 198, seen_in: ['Brand A', 'Brand B', 'Brand C'] })
+    const result = checkMarketSaturation(data)
+    expect(result.collections_count).toBe(198)
+  })
+
   test('3. Red (peak): saturation 75, any velocity', () => {
     const data = mockAesthetic({ saturation_score: 75, trend_velocity: 'peak' })
     const result = checkMarketSaturation(data)

@@ -19,7 +19,7 @@ const STATIC_ACTION_FALLBACK: ActionSuggestion = {
   conflict_label: "No conflicts",
   directive: "This piece is ready. Add it and keep building.",
   explanation:
-    "Identity, Resonance, and Execution are working together. The build clears margin and the timeline is comfortable.",
+    "Identity, Commercial Potential, and Execution are working together. The build clears margin and the timeline is comfortable.",
   show_alternatives: false,
   alternatives: [],
   cta_variant: "add",
@@ -633,7 +633,7 @@ export function ScorecardModal({
           >
             {[
               { label: "Identity",  score: identityScore },
-              { label: "Resonance", score: resonanceScore },
+              { label: "Commercial Potential", score: resonanceScore },
               { label: "Execution", score: executionScore },
             ].map(({ label, score }) => (
               <div

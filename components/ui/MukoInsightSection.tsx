@@ -69,14 +69,13 @@ export interface MukoInsightSectionProps {
   canContinue?: boolean;
   conceptStage?: "direction" | "language" | "product";
   languageRead?: {
-    silhouette_steer: string;
-    palette_steer: string;
-    signals_note: string;
+    core_read: string;
+    execution_moves: string[];
     guardrail: string;
   } | null;
   /** Streaming state for language stage */
   languageStreamingText?: string;
-  languageStreamingRows?: { silhouette: string; palette: string; signals: string; guardrail: string };
+  languageStreamingRows?: { core_read: string; execution_moves: string[]; guardrail: string };
   isLanguageStreaming?: boolean;
   /** Streaming state for product/piece stage */
   pieceStreamingTitle?: string;
@@ -378,7 +377,7 @@ function ConceptDecisionRail({
   streamingParagraph?: string;
   isParagraphStreaming?: boolean;
   languageStreamingText?: string;
-  languageStreamingRows?: { silhouette: string; palette: string; signals: string; guardrail: string };
+  languageStreamingRows?: { core_read: string; execution_moves: string[]; guardrail: string };
   isLanguageStreaming?: boolean;
   pieceStreamingTitle?: string;
   pieceStreamingBody?: string;
@@ -394,9 +393,8 @@ function ConceptDecisionRail({
   pageMode?: "concept" | "spec";
   conceptStage?: "direction" | "language" | "product";
   languageRead?: {
-    silhouette_steer: string;
-    palette_steer: string;
-    signals_note: string;
+    core_read: string;
+    execution_moves: string[];
     guardrail: string;
   } | null;
   productPieceRead?: { title?: string; body: string } | null;
@@ -495,25 +493,20 @@ function ConceptDecisionRail({
   const settledParagraphs = leadBody ? [leadBody, ...paragraphs.slice(1)] : paragraphs.slice(1);
 
   if (conceptStage === "language") {
-    const settledRows = languageRead
-      ? [
-          { label: "Silhouette", value: languageRead.silhouette_steer },
-          { label: "Palette", value: languageRead.palette_steer },
-          { label: "Signals", value: languageRead.signals_note },
-          { label: "Guardrail", value: languageRead.guardrail },
-        ]
-      : [];
-    const streamingRowList = isLanguageStreaming && languageStreamingRows
-      ? [
-          { label: "Silhouette", value: languageStreamingRows.silhouette },
-          { label: "Palette", value: languageStreamingRows.palette },
-          { label: "Signals", value: languageStreamingRows.signals },
-          { label: "Guardrail", value: languageStreamingRows.guardrail },
-        ]
-      : [];
-    const displayRows = settledRows.length > 0 ? settledRows : streamingRowList;
     const displayHeadline = isLanguageStreaming && languageStreamingText ? languageStreamingText : headline;
-    const isCursorOnHeadline = isLanguageStreaming && !!languageStreamingText && streamingRowList.every(r => !r.value);
+    const displayCoreRead = languageRead?.core_read ?? languageStreamingRows?.core_read ?? "";
+    const displayExecutionMoves = (languageRead?.execution_moves ?? languageStreamingRows?.execution_moves ?? []).slice(0, 3);
+    const displayGuardrail = languageRead?.guardrail ?? languageStreamingRows?.guardrail ?? "";
+    const activeStreamIndex =
+      isLanguageStreaming && displayExecutionMoves.length > 0 && !languageRead?.execution_moves?.length
+        ? displayExecutionMoves.length - 1
+        : -1;
+    const isCursorOnHeadline =
+      isLanguageStreaming &&
+      !!languageStreamingText &&
+      !displayCoreRead &&
+      displayExecutionMoves.length === 0 &&
+      !displayGuardrail;
 
     return (
       <div style={{ marginBottom: 52 }}>
@@ -530,35 +523,50 @@ function ConceptDecisionRail({
           </div>
         </div>
 
-        {displayRows.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {displayRows.map((row, idx) => {
-              const isLastRow = idx === displayRows.length - 1;
-              const isStreaming = isLanguageStreaming;
-              const isActiveStreamRow = isStreaming && !!row.value && streamingRowList.slice(idx + 1).every(r => !r.value);
-              return (
-                <div
-                  key={row.label}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "110px minmax(0, 1fr)",
-                    gap: 10,
-                    paddingBottom: 14,
-                    borderBottom: isLastRow ? "none" : "1px solid rgba(67,67,43,0.08)",
-                  }}
-                >
-                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "#B8876B", paddingTop: 2 }}>
-                    {row.label}
-                  </div>
-                  <div style={{ fontFamily: inter, fontSize: 12.5, lineHeight: 1.74, color: "rgba(67,67,43,0.68)" }}>
-                    {row.value}
-                    {isActiveStreamRow && (
-                      <span style={{ display: "inline-block", width: 2, height: "0.85em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+        {(displayCoreRead || displayExecutionMoves.length > 0 || displayGuardrail) && (
+          <div style={{ display: "grid", gap: 18 }}>
+            {displayCoreRead && (
+              <div style={{ fontFamily: inter, fontSize: 13, lineHeight: 1.72, color: "rgba(67,67,43,0.7)" }}>
+                {displayCoreRead}
+                {isLanguageStreaming && !languageRead?.core_read && !displayExecutionMoves.length && (
+                  <span style={{ display: "inline-block", width: 2, height: "0.85em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
+                )}
+              </div>
+            )}
+
+            {displayExecutionMoves.length > 0 && (
+              <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+                {displayExecutionMoves.map((move, idx) => (
+                  <li key={`${move}-${idx}`} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontFamily: inter, fontSize: 12.5, lineHeight: 1.65, color: "#43432B" }}>
+                    <span style={{ color: "#B8876B", flexShrink: 0, marginTop: 1.5 }}>•</span>
+                    <span>
+                      {move}
+                      {idx === activeStreamIndex && (
+                        <span style={{ display: "inline-block", width: 2, height: "0.85em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {displayGuardrail && (
+              <div
+                style={{
+                  paddingTop: 14,
+                  borderTop: "1px solid rgba(67,67,43,0.08)",
+                  fontFamily: inter,
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                  color: "rgba(67,67,43,0.58)",
+                }}
+              >
+                {displayGuardrail}
+                {isLanguageStreaming && !languageRead?.guardrail && !!displayGuardrail && (
+                  <span style={{ display: "inline-block", width: 2, height: "0.85em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

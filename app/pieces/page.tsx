@@ -8,9 +8,20 @@ import { getFlatForPiece } from "@/components/flats";
 import { MukoNav } from "@/components/MukoNav";
 import { createClient } from "@/lib/supabase/client";
 import { getCollectionLanguageLabels, getExpressionSignalLabels } from "@/lib/collection-signals";
+import { resolvePieceImageType } from "@/lib/piece-image";
 import aestheticsData from "@/data/aesthetics.json";
 import categoriesData from "@/data/categories.json";
 import { CollectionContextBar, COLLECTION_CONTEXT_BAR_OFFSET } from "@/components/collection/CollectionContextBar";
+import { buildPiecesReadFallback } from "@/lib/pieces/buildPiecesReadFallback";
+import { buildPiecesReadInput } from "@/lib/pieces/buildPiecesReadInput";
+import {
+  assignStrategicRole,
+  buildDeterministicPieceMicrocopy,
+  buildStrategicReasonTags,
+  getStrategicRoleLabel,
+} from "@/lib/pieces/roleAssignment";
+import { selectRecommendedStartPiece } from "@/lib/pieces/selectRecommendedStartPiece";
+import type { DeterministicSuggestedPiece, PiecesReadOutput, PieceStrategicRole } from "@/lib/pieces/types";
 
 // ── Design tokens ──────────────────────────────────────────────
 const BG = "#FAF9F6";
@@ -51,11 +62,35 @@ const BODY_SMALL_STYLE = {
   color: "rgba(67,67,43,0.62)",
   lineHeight: 1.65,
 };
+const READ_ZONE_LABEL_STYLE = {
+  fontFamily: inter,
+  fontSize: 9,
+  fontWeight: 600,
+  letterSpacing: "0.18em",
+  textTransform: "uppercase" as const,
+  color: "#888078",
+};
+const READ_BODY_STYLE = {
+  margin: 0,
+  fontFamily: inter,
+  fontSize: 12.5,
+  color: "rgba(67,67,43,0.66)",
+  lineHeight: 1.76,
+};
+const READ_HEADLINE_STYLE = {
+  fontFamily: sohne,
+  fontSize: 20,
+  fontWeight: 700,
+  lineHeight: 1.3,
+  color: "#191919",
+  letterSpacing: "-0.01em",
+  width: "100%",
+};
 
 // ── Types ──────────────────────────────────────────────────────
 interface CollectionPiece {
   id: string;
-  piece_name: string;
+  piece_name: string | null;
   score: number | null;
   dimensions: Record<string, number> | null;
   collection_role: string | null;
@@ -64,12 +99,19 @@ interface CollectionPiece {
   aesthetic_matched_id: string | null;
   aesthetic_inflection: string | null;
   construction_tier: string | null;
+  agent_versions?: {
+    saved_piece_name?: string | null;
+  } | null;
 }
 
 interface AestheticDataEntry {
   id?: string;
   name: string;
   keywords?: string[];
+  seen_in?: string[];
+  risk_factors?: string[];
+  trend_velocity?: string;
+  saturation_score?: number;
   key_pieces?: Record<string, KeyPiece[]>;
   palette_options?: Array<{ id: string; name: string }>;
 }
@@ -90,11 +132,23 @@ type StartingPointSuggestion = {
   adapted_title: string;
   intent: string;
   role: CollectionRoleId;
+  strategicRole: PieceStrategicRole;
+  reasonTags: string[];
+  rank: number;
+  shortRationale: string;
   adaptation_summary: string;
   description: string;
   original_label: string;
   version_label: string;
   sourcePiece: KeyPiece;
+};
+
+type CustomPieceRoleLabel = "Hero" | "Volume Driver" | "Core Evolution" | "Directional Signal";
+
+type CustomPieceRefinement = {
+  read: string;
+  refined_expression: string;
+  role: CustomPieceRoleLabel;
 };
 
 const PIECE_ROLE_OPTIONS: Array<{
@@ -126,6 +180,55 @@ const PIECE_ROLE_OPTIONS: Array<{
 
 function getPieceRoleLabel(role: CollectionRoleId) {
   return PIECE_ROLE_OPTIONS.find((option) => option.id === role)?.label ?? role;
+}
+
+function mapRoleLabelToId(role: CustomPieceRoleLabel): CollectionRoleId {
+  if (role === "Hero") return "hero";
+  if (role === "Volume Driver") return "volume-driver";
+  if (role === "Directional Signal") return "directional";
+  return "core-evolution";
+}
+
+function toTitleCase(value: string) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function deriveCustomPieceName(value: string) {
+  const normalized = value
+    .replace(/[.;:,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) return "";
+
+  const token = normalized.toLowerCase();
+
+  if (token.includes("cigarette") && (token.includes("jean") || token.includes("denim"))) return "Cigarette Jean";
+  if (token.includes("straight") && token.includes("jean")) return "Straight Jean";
+  if (token.includes("blazer") && token.includes("soft shoulder")) return "Soft Shoulder Blazer";
+  if (token.includes("blazer")) return "Tailored Blazer";
+  if (token.includes("draped") && token.includes("dress")) return "Draped Dress";
+  if (token.includes("slip") && token.includes("dress")) return "Slip Dress";
+  if (token.includes("trouser")) return token.includes("wide") ? "Wide Trouser" : "Straight Trouser";
+  if (token.includes("jean") || token.includes("denim")) return "Jean";
+  if (token.includes("dress")) return "Dress";
+  if (token.includes("coat")) return "Coat";
+  if (token.includes("jacket")) return "Jacket";
+  if (token.includes("skirt")) return "Skirt";
+  if (token.includes("shirt")) return "Shirt";
+  if (token.includes("knit") || token.includes("sweater")) return "Knit";
+
+  return toTitleCase(normalized.split(" ").slice(0, 3).join(" "));
+}
+
+function getStrategySliderLabel(value: number, labels: [string, string, string]): string {
+  if (value <= 30) return labels[0];
+  if (value <= 69) return labels[1];
+  return labels[2];
 }
 
 const CHIP_SIGNAL_LEXICON: Record<string, string[]> = {
@@ -163,7 +266,7 @@ function tokenizeChipLabel(label: string) {
 function buildPieceCorpus(piece: CollectionPiece) {
   return normalizeToken(
     [
-      piece.piece_name,
+      getDisplayPieceName(piece),
       piece.category,
       piece.silhouette,
       piece.aesthetic_inflection,
@@ -171,6 +274,15 @@ function buildPieceCorpus(piece: CollectionPiece) {
     ]
       .filter(Boolean)
       .join(" ")
+  );
+}
+
+function getDisplayPieceName(piece: Pick<CollectionPiece, "piece_name" | "category" | "silhouette">) {
+  return (
+    piece.piece_name?.trim()
+    || piece.silhouette?.trim()
+    || piece.category?.trim()
+    || "Untitled Piece"
   );
 }
 
@@ -212,56 +324,6 @@ function evaluateSignalExpression(
 
     return { label, state, hits: hitCount, coverage };
   });
-}
-
-function formatChipList(labels: string[]) {
-  if (labels.length === 0) return "";
-  if (labels.length === 1) return labels[0];
-  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
-  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
-}
-
-function getRecommendedPiecePrompt(
-  targetChip: SignalExpression | undefined,
-  suggestedPieces: KeyPiece[],
-  directionName: string,
-  expressionSignal?: string
-) {
-  if (!targetChip) {
-    if (expressionSignal) {
-      return `Add the next piece where ${expressionSignal} can register clearly so the collection does not stay conceptually defined but under-expressed.`;
-    }
-    return "Add the next piece where category coverage is still thin so the collection continues to build with intention.";
-  }
-
-  const terms = tokenizeChipLabel(targetChip.label);
-  const matchedSuggestion = suggestedPieces.find((piece) => {
-    const corpus = normalizeToken([piece.item, piece.category, piece.type, piece.note].filter(Boolean).join(" "));
-    return terms.some((term) => corpus.includes(term));
-  });
-
-  if (matchedSuggestion) {
-    const pieceLabel = matchedSuggestion.item.toLowerCase();
-    return `Add a ${pieceLabel} to carry ${targetChip.label} while giving ${expressionSignal ?? "the collection"} a clearer read inside ${directionName}.`;
-  }
-
-  if (targetChip.label.toLowerCase().includes("fluid")) {
-    return `Add a fluid blouse, draped dress, or soft knit to bring ${targetChip.label} into the assortment and offset the current structure.`;
-  }
-
-  if (targetChip.label.toLowerCase().includes("utility")) {
-    return `Add a utility jacket or pocketed bottom so ${targetChip.label} reads as intentional rather than implied.`;
-  }
-
-  if (targetChip.label.toLowerCase().includes("tailored") || targetChip.label.toLowerCase().includes("structure")) {
-    return `Add a tailored jacket or precise trouser to make ${targetChip.label} feel built into the line rather than left to one piece.`;
-  }
-
-  if (expressionSignal) {
-    return `Add a piece that carries ${expressionSignal} through ${targetChip.label} so the collection reads as expressed rather than only defined.`;
-  }
-
-  return `Add a piece that clearly carries ${targetChip.label} so the collection language resolves across more than one silhouette.`;
 }
 
 function getRoleSuggestion(
@@ -306,6 +368,82 @@ function getRoleSuggestion(
   return {
     role: "core-evolution",
     rationale: "Strengthens continuity so the collection reads as built, not just assembled",
+  };
+}
+
+function inferCustomRoleSuggestion(
+  pieceName: string,
+  category: string,
+  roleCounts: Record<CollectionRoleId, number>
+): { role: CollectionRoleId; rationale: string } | null {
+  const normalizedName = pieceName.trim();
+  const normalizedCategory = category.trim();
+
+  if (!normalizedName && !normalizedCategory) return null;
+
+  const corpus = normalizeToken([normalizedName, normalizedCategory].filter(Boolean).join(" "));
+  const scores: Record<CollectionRoleId, number> = {
+    hero: 0,
+    directional: 0,
+    "core-evolution": 0,
+    "volume-driver": 0,
+  };
+
+  const applyScore = (role: CollectionRoleId, weight: number, terms: string[]) => {
+    if (terms.some((term) => corpus.includes(term))) {
+      scores[role] += weight;
+    }
+  };
+
+  applyScore("hero", 3, ["coat", "outerwear", "dress", "gown", "cape", "statement", "special"]);
+  applyScore("directional", 3, ["asymmetric", "sculptural", "deconstructed", "sheer", "mesh", "cutout", "oversized", "experimental", "draped"]);
+  applyScore("volume-driver", 3, ["tee", "t shirt", "t-shirt", "tank", "shirt", "sweater", "knit", "pant", "trouser", "jean", "denim", "everyday", "easy"]);
+  applyScore("core-evolution", 3, ["blazer", "cardigan", "tailored", "classic", "updated", "refined", "core", "staple", "reworked"]);
+
+  applyScore("hero", 2, ["jacket", "trench", "column"]);
+  applyScore("directional", 2, ["bias", "volume", "layered", "fringe", "raw", "twist"]);
+  applyScore("volume-driver", 2, ["skirt", "mini", "maxi", "short", "poplin"]);
+  applyScore("core-evolution", 2, ["shirting", "wool", "uniform", "essential"]);
+
+  if (normalizedName && !normalizedCategory) scores.directional += 1;
+  if (normalizedCategory) scores["core-evolution"] += 1;
+
+  if (roleCounts["volume-driver"] === 0) scores["volume-driver"] += 0.5;
+  if (roleCounts["core-evolution"] === 0) scores["core-evolution"] += 0.5;
+  if (roleCounts.hero === 0) scores.hero += 0.25;
+
+  const rankedRoles = (Object.entries(scores) as Array<[CollectionRoleId, number]>).sort((a, b) => b[1] - a[1]);
+  const [topRole, topScore] = rankedRoles[0];
+
+  if (topScore <= 0) return null;
+
+  const subject = normalizedName || normalizedCategory;
+  const subjectLabel = subject ? `"${subject}"` : "this piece";
+
+  if (topRole === "hero") {
+    return {
+      role: "hero",
+      rationale: `${subjectLabel} reads like a focal piece that can set the collection's attitude early.`,
+    };
+  }
+
+  if (topRole === "directional") {
+    return {
+      role: "directional",
+      rationale: `${subjectLabel} feels like a forward move, so it should push the collection's edge rather than stabilize it.`,
+    };
+  }
+
+  if (topRole === "volume-driver") {
+    return {
+      role: "volume-driver",
+      rationale: `${subjectLabel} reads as a repeatable piece that can carry the line beyond a single statement.`,
+    };
+  }
+
+  return {
+    role: "core-evolution",
+    rationale: `${subjectLabel} feels like a familiar shape you can sharpen into the collection's language.`,
   };
 }
 
@@ -478,6 +616,7 @@ function buildStartingPointSuggestion({
   targetCollectionLanguage,
   targetExpressionSignal,
   role,
+  rank,
   complexityBias,
   directionText,
   strongestCollectionLanguage,
@@ -488,6 +627,7 @@ function buildStartingPointSuggestion({
   targetCollectionLanguage?: string;
   targetExpressionSignal?: string;
   role: CollectionRoleId;
+  rank: number;
   complexityBias: "reduce" | "steady";
   directionText: string;
   strongestCollectionLanguage?: string;
@@ -525,11 +665,35 @@ function buildStartingPointSuggestion({
       ? `${adaptation.descriptionLead} It gives the assortment a clearer ${getPieceRoleLabel(role).toLowerCase()} position.`
       : `${adaptation.descriptionLead} It protects execution without flattening the collection's point of view.`;
 
+  const strategicRole = assignStrategicRole({
+    piece,
+    collectionRole: role,
+    purpose,
+    complexityBias,
+  });
+  const reasonTags = buildStrategicReasonTags({
+    piece,
+    strategicRole,
+    purpose,
+    collectionRole: role,
+    complexityBias,
+    targetCollectionLanguage,
+    targetExpressionSignal,
+  });
+  const shortRationale = buildDeterministicPieceMicrocopy({
+    role: strategicRole,
+    reasonTags,
+  });
+
   return {
     archetype: piece.item.toLowerCase().replace(/\s+/g, "_"),
     adapted_title: `${piece.item} with ${adaptation.titleModifier}`,
     intent,
     role,
+    strategicRole,
+    reasonTags,
+    rank,
+    shortRationale,
     adaptation_summary: adaptation.descriptionLead,
     description,
     original_label: piece.item,
@@ -565,15 +729,18 @@ function PieceFlat({
   type,
   signal,
   category,
+  pieceName,
   size = 65,
 }: {
   type: string | null;
   signal: string | null;
   category: string | null;
+  pieceName?: string | null;
   size?: number;
 }) {
-  if (type) {
-    const result = getFlatForPiece(type, signal);
+  const resolvedType = resolvePieceImageType({ type, pieceName, category });
+  if (resolvedType) {
+    const result = getFlatForPiece(resolvedType, signal);
     if (result) {
       const { Flat, color } = result as { Flat: React.ComponentType<{ color: string }>; color: string };
       return (
@@ -636,7 +803,7 @@ function ConfirmedPieceCard({
           overflow: "hidden",
         }}
       >
-        <PieceFlat type={null} signal={null} category={piece.category} size={65} />
+        <PieceFlat type={null} signal={null} category={piece.category} pieceName={getDisplayPieceName(piece)} size={65} />
         {/* Score dot */}
         <div
           style={{
@@ -673,7 +840,7 @@ function ConfirmedPieceCard({
             letterSpacing: "-0.02em",
           }}
         >
-          {piece.piece_name}
+          {getDisplayPieceName(piece)}
         </div>
         <div
           style={{
@@ -690,9 +857,11 @@ function ConfirmedPieceCard({
 // ── Suggested piece card ───────────────────────────────────────
 function SuggestedPieceCard({
   piece,
+  microcopy,
   onBuild,
 }: {
   piece: StartingPointSuggestion;
+  microcopy: string;
   onBuild: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -733,6 +902,7 @@ function SuggestedPieceCard({
             type={piece.sourcePiece.type}
             signal={piece.sourcePiece.signal}
             category={piece.sourcePiece.category}
+            pieceName={piece.sourcePiece.item}
             size={65}
           />
         </div>
@@ -747,7 +917,7 @@ function SuggestedPieceCard({
             lineHeight: 1.3,
           }}
         >
-          {piece.intent}
+          {getStrategicRoleLabel(piece.strategicRole)}
         </div>
         <div
           style={{
@@ -763,23 +933,11 @@ function SuggestedPieceCard({
         <div
           style={{
             ...BODY_SMALL_STYLE,
-            marginBottom: 12,
-          }}
-        >
-          {piece.description}
-        </div>
-        <div
-          style={{
-            fontFamily: inter,
-            fontSize: 11.5,
-            color: "rgba(67,67,43,0.54)",
-            lineHeight: 1.6,
             marginBottom: 14,
+            color: "rgba(67,67,43,0.62)",
           }}
         >
-          <span style={{ color: "rgba(67,67,43,0.5)" }}>Original trend:</span> {piece.original_label}
-          <br />
-          <span style={{ color: "rgba(67,67,43,0.5)" }}>Your version:</span> {piece.version_label}
+          {microcopy}
         </div>
 
         {/* Build this piece CTA */}
@@ -809,6 +967,59 @@ function SuggestedPieceCard({
   );
 }
 
+function GlassLoadOrb() {
+  return (
+    <>
+      <style>{`
+        @keyframes mukoGlassOrbRotate {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        @keyframes mukoGlassOrbPulse {
+          0%, 100% { transform: scale(1); opacity: 0.7; }
+          50% { transform: scale(1.06); opacity: 1; }
+        }
+      `}</style>
+      <div
+        style={{
+          width: 56,
+          height: 56,
+          position: "relative",
+          borderRadius: "50%",
+          background: "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0.42) 26%, rgba(232,227,214,0.3) 58%, rgba(232,227,214,0.16) 100%)",
+          border: "1px solid rgba(67,67,43,0.08)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.82), 0 10px 22px rgba(67,67,43,0.08)",
+          backdropFilter: "blur(14px) saturate(120%)",
+          WebkitBackdropFilter: "blur(14px) saturate(120%)",
+          animation: "mukoGlassOrbPulse 1.8s ease-in-out infinite",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            inset: 4,
+            borderRadius: "50%",
+            borderTop: "1.5px solid rgba(67,67,43,0.35)",
+            borderRight: "1.5px solid rgba(67,67,43,0.08)",
+            borderBottom: "1.5px solid rgba(67,67,43,0.08)",
+            borderLeft: "1.5px solid rgba(67,67,43,0.14)",
+            animation: "mukoGlassOrbRotate 1s linear infinite",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 14,
+            borderRadius: "50%",
+            background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.24) 55%, rgba(255,255,255,0) 100%)",
+          }}
+        />
+      </div>
+    </>
+  );
+}
+
 // ── Confirm Drawer ─────────────────────────────────────────────
 function ConfirmDrawer({
   piece,
@@ -816,12 +1027,18 @@ function ConfirmDrawer({
   category,
   categories,
   selectedRole,
-  suggestedRole,
-  suggestedRationale,
-  structureCounts,
+  suggestion,
+  customProposal,
+  customFinalExpression,
+  customRefinement,
+  customRefinementState,
   onPieceNameChange,
   onCategoryChange,
   onRoleSelect,
+  onCustomProposalChange,
+  onCustomFinalExpressionChange,
+  onAcceptRefinedExpression,
+  onContinueWithOriginal,
   onStartBuilding,
   onCancel,
 }: {
@@ -830,12 +1047,18 @@ function ConfirmDrawer({
   category: string;
   categories: Array<{ id: string; name: string }>;
   selectedRole: CollectionRoleId | null;
-  suggestedRole: CollectionRoleId;
-  suggestedRationale: string;
-  structureCounts: Record<CollectionRoleId, number>;
+  suggestion: { role: CollectionRoleId; rationale: string } | null;
+  customProposal: string;
+  customFinalExpression: string;
+  customRefinement: CustomPieceRefinement | null;
+  customRefinementState: "idle" | "loading" | "ready";
   onPieceNameChange: (name: string) => void;
   onCategoryChange: (cat: string) => void;
   onRoleSelect: (role: CollectionRoleId) => void;
+  onCustomProposalChange: (value: string) => void;
+  onCustomFinalExpressionChange: (value: string) => void;
+  onAcceptRefinedExpression: () => void;
+  onContinueWithOriginal: () => void;
   onStartBuilding: () => void;
   onCancel: () => void;
 }) {
@@ -849,13 +1072,26 @@ function ConfirmDrawer({
       : null;
   const metadataTokens = [piece.custom ? "Custom piece" : "Market archetype", fitValue, marketValue].filter(Boolean);
 
-  const flatResult = piece.type
-    ? (getFlatForPiece(piece.type, piece.signal) as {
+  const resolvedType = resolvePieceImageType({
+    type: piece.type,
+    pieceName: customProposal.trim() || pieceName.trim() || piece.item,
+    category,
+  });
+  const flatResult = resolvedType
+    ? (getFlatForPiece(resolvedType, piece.signal) as {
         Flat: React.ComponentType<{ color: string }>;
         color: string;
       } | null)
     : null;
-  const ctaLabel = selectedRole ? `Start Building as ${getPieceRoleLabel(selectedRole)} →` : "Start Building →";
+  const ctaLabel = "Start Building →";
+  const finalName = piece.custom ? customProposal.trim() : pieceName.trim() || piece.item;
+  const canStart = piece.custom ? Boolean(selectedRole && finalName) : Boolean(selectedRole);
+
+  const autoResizeTextarea = (event: React.FormEvent<HTMLTextAreaElement>) => {
+    const target = event.currentTarget;
+    target.style.height = "0px";
+    target.style.height = `${Math.min(target.scrollHeight, 220)}px`;
+  };
 
   return (
     <>
@@ -971,7 +1207,7 @@ function ConfirmDrawer({
               lineHeight: 1.16,
             }}
           >
-            {piece.item}
+            {piece.custom ? pieceName.trim() || customProposal.trim() || "Custom Piece" : piece.item}
           </div>
           <div
             style={{
@@ -982,96 +1218,270 @@ function ConfirmDrawer({
             {metadataTokens.join(" • ")}
           </div>
 
-          {/* 2-col field grid */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 14,
-              marginBottom: 18,
-            }}
-            className="muko-claim-fields"
-          >
-            {/* Name field */}
-            <div>
-              <div
-                style={{
-                  ...EYEBROW_STYLE,
-                  marginBottom: 6,
-                }}
-              >
-                WHAT DO YOU CALL THIS PIECE?
+          {piece.custom ? (
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ marginBottom: 18 }}>
+                <div
+                  style={{
+                    ...EYEBROW_STYLE,
+                    marginBottom: 8,
+                  }}
+                >
+                  DESCRIBE THE PIECE YOU&apos;RE THINKING OF
+                </div>
+                <textarea
+                  value={customProposal}
+                  onChange={(e) => onCustomProposalChange(e.target.value)}
+                  onInput={autoResizeTextarea}
+                  rows={1}
+                  placeholder="cigarette jean, long draped black dress, structured blazer with soft shoulder"
+                  style={{
+                    width: "100%",
+                    minHeight: 54,
+                    resize: "none",
+                    overflow: "hidden",
+                    background: "transparent",
+                    border: "none",
+                    borderBottom: `1px solid ${BORDER}`,
+                    borderRadius: 0,
+                    padding: "0 0 12px",
+                    fontSize: 22,
+                    fontWeight: 500,
+                    color: TEXT,
+                    fontFamily: sohne,
+                    letterSpacing: "-0.03em",
+                    lineHeight: 1.22,
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                  onFocus={(e) => (e.target.style.borderBottomColor = CHARTREUSE)}
+                  onBlur={(e) => (e.target.style.borderBottomColor = BORDER)}
+                />
+                <div
+                  style={{
+                    ...BODY_SMALL_STYLE,
+                    marginTop: 10,
+                    color: "rgba(67,67,43,0.5)",
+                  }}
+                >
+                  Muko sharpens this against your locked collection language, material posture, and market position.
+                </div>
               </div>
-              <input
-                value={pieceName}
-                onChange={(e) => onPieceNameChange(e.target.value)}
-                placeholder={piece.item}
-                style={{
-                  width: "100%",
-                  background: BG,
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 8,
-                  padding: "11px 14px",
-                  fontSize: 13.5,
-                  fontWeight: 500,
-                  color: TEXT,
-                  fontFamily: inter,
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
-                onFocus={(e) => (e.target.style.borderColor = CHARTREUSE)}
-                onBlur={(e) => (e.target.style.borderColor = BORDER)}
-              />
-              <div
-                style={{
-                  ...BODY_SMALL_STYLE,
-                  marginTop: 4,
-                }}
-              >
-                Name it in your own language
-              </div>
-            </div>
 
-            {/* Category field */}
-            <div>
-              <div
-                style={{
-                  ...EYEBROW_STYLE,
-                  marginBottom: 6,
-                }}
-              >
-                CATEGORY
+              <div style={{ marginBottom: 20 }}>
+                <div
+                  style={{
+                    ...EYEBROW_STYLE,
+                    marginBottom: 6,
+                  }}
+                >
+                  PIECE EXPRESSION
+                </div>
+                <textarea
+                  value={customFinalExpression}
+                  onChange={(e) => onCustomFinalExpressionChange(e.target.value)}
+                  onInput={autoResizeTextarea}
+                  rows={2}
+                  placeholder="Accept Muko's refinement or edit it into your own expression"
+                  style={{
+                    width: "100%",
+                    minHeight: 76,
+                    resize: "vertical",
+                    background: BG,
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 8,
+                    padding: "11px 14px",
+                    fontSize: 13.5,
+                    fontWeight: 500,
+                    color: TEXT,
+                    fontFamily: inter,
+                    lineHeight: 1.5,
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = CHARTREUSE)}
+                  onBlur={(e) => (e.target.style.borderColor = BORDER)}
+                />
               </div>
-              <select
-                value={category}
-                onChange={(e) => onCategoryChange(e.target.value)}
-                style={{
-                  width: "100%",
-                  background: BG,
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 8,
-                  padding: "11px 14px",
-                  fontSize: 13.5,
-                  fontWeight: 500,
-                  color: category ? TEXT : MUTED,
-                  fontFamily: inter,
-                  outline: "none",
-                  boxSizing: "border-box",
-                  cursor: "pointer",
-                  appearance: "none",
-                }}
-                onFocus={(e) => (e.target.style.borderColor = CHARTREUSE)}
-                onBlur={(e) => (e.target.style.borderColor = BORDER)}
-              >
-                <option value="">Select category...</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+
+              {customProposal.trim() ? (
+                <div style={{ marginBottom: 22 }}>
+                  {customRefinementState === "loading" ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-start",
+                        padding: "8px 0 12px",
+                        marginBottom: 14,
+                      }}
+                    >
+                      <GlassLoadOrb />
+                    </div>
+                  ) : null}
+
+                  {customRefinement ? (
+                    <div style={{ display: "grid", gap: 14 }}>
+                      <div
+                        style={{
+                          ...EYEBROW_STYLE,
+                          color: "#6E675F",
+                        }}
+                      >
+                        Muko&apos;s Take
+                      </div>
+                      <div>
+                        <div style={BODY_COPY_STYLE}>{customRefinement.read}</div>
+                      </div>
+                      <div>
+                        <div style={{ ...EYEBROW_STYLE, marginBottom: 6 }}>Suggested expression</div>
+                        <div
+                          style={{
+                            fontFamily: sohne,
+                            fontSize: 18,
+                            fontWeight: 400,
+                            color: "#43432B",
+                            letterSpacing: "-0.035em",
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {`— ${customRefinement.refined_expression}`}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                        <button
+                          type="button"
+                          onClick={onAcceptRefinedExpression}
+                          style={{
+                            border: "none",
+                            background: "rgba(168,180,117,0.16)",
+                            color: "#4F5B28",
+                            borderRadius: 999,
+                            padding: "9px 14px",
+                            fontFamily: inter,
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Accept suggestion
+                        </button>
+                        <button
+                          type="button"
+                          onClick={onContinueWithOriginal}
+                          style={{
+                            border: `1px solid ${BORDER}`,
+                            background: "transparent",
+                            color: TEXT,
+                            borderRadius: 999,
+                            padding: "9px 14px",
+                            fontFamily: inter,
+                            fontSize: 11.5,
+                            fontWeight: 500,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Continue with original input
+                        </button>
+                      </div>
+                      <div>
+                        <div style={{ ...EYEBROW_STYLE, marginBottom: 6 }}>Recommended role</div>
+                        <div
+                          style={{
+                            ...BODY_COPY_STYLE,
+                            color: TEXT,
+                            lineHeight: 1.35,
+                            marginBottom: 4,
+                          }}
+                        >
+                          {customRefinement.role}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
-          </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 14,
+                marginBottom: 18,
+              }}
+              className="muko-claim-fields"
+            >
+              <div>
+                <div
+                  style={{
+                    ...EYEBROW_STYLE,
+                    marginBottom: 6,
+                  }}
+                >
+                  WHAT DO YOU CALL THIS PIECE?
+                </div>
+                <input
+                  value={pieceName}
+                  onChange={(e) => onPieceNameChange(e.target.value)}
+                  placeholder={piece.item}
+                  style={{
+                    width: "100%",
+                    background: BG,
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 8,
+                    padding: "11px 14px",
+                    fontSize: 13.5,
+                    fontWeight: 500,
+                    color: TEXT,
+                    fontFamily: inter,
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = CHARTREUSE)}
+                  onBlur={(e) => (e.target.style.borderColor = BORDER)}
+                />
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    ...EYEBROW_STYLE,
+                    marginBottom: 6,
+                  }}
+                >
+                  CATEGORY
+                </div>
+                <select
+                  value={category}
+                  onChange={(e) => onCategoryChange(e.target.value)}
+                  style={{
+                    width: "100%",
+                    background: BG,
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 8,
+                    padding: "11px 14px",
+                    fontSize: 13.5,
+                    fontWeight: 500,
+                    color: category ? TEXT : MUTED,
+                    fontFamily: inter,
+                    outline: "none",
+                    boxSizing: "border-box",
+                    cursor: "pointer",
+                    appearance: "none",
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = CHARTREUSE)}
+                  onBlur={(e) => (e.target.style.borderColor = BORDER)}
+                >
+                  <option value="">Select category...</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           {/* Piece role */}
           <div
@@ -1082,33 +1492,40 @@ function ConfirmDrawer({
           >
             Piece role
           </div>
-          <div style={{ marginBottom: 16, padding: "0 2px" }}>
-            <div
-              style={{
-                ...BODY_COPY_STYLE,
-                color: TEXT,
-              }}
-            >
-              <span
+          {suggestion && !piece.custom && (
+            <div style={{ marginBottom: 16, padding: "0 2px" }}>
+              <div
                 style={{
-                  fontFamily: sohne,
-                  color: "#A97B8F",
-                  fontWeight: 600,
+                  ...BODY_COPY_STYLE,
+                  color: TEXT,
                 }}
               >
-                Muko Suggests:
-              </span>{" "}
-              <span style={{ fontWeight: 600 }}>{getPieceRoleLabel(suggestedRole)}</span>
+                <span
+                  style={{
+                    fontFamily: sohne,
+                    color: "#43432B",
+                    fontWeight: 600,
+                  }}
+                >
+                  Muko Suggests:
+                </span>{" "}
+                <span style={{ fontWeight: 600 }}>{getPieceRoleLabel(suggestion.role)}</span>
+              </div>
+              <div
+                style={{
+                  fontFamily: sohne,
+                  fontSize: 12,
+                  fontWeight: 400,
+                  color: "#43432B",
+                  letterSpacing: "-0.02em",
+                  lineHeight: 1.4,
+                  marginTop: 6,
+                }}
+              >
+                {`— ${suggestion.rationale}`}
+              </div>
             </div>
-            <div
-              style={{
-                ...BODY_SMALL_STYLE,
-                marginTop: 4,
-              }}
-            >
-              {suggestedRationale}
-            </div>
-          </div>
+          )}
 
           <div
             role="radiogroup"
@@ -1186,15 +1603,6 @@ function ConfirmDrawer({
             })}
           </div>
 
-          <div
-            style={{
-              marginTop: 14,
-              ...BODY_SMALL_STYLE,
-            }}
-          >
-            <span style={{ color: "#6F6A63", fontWeight: 500 }}>Collection structure:</span>{" "}
-            Hero {structureCounts.hero} • Volume {structureCounts["volume-driver"]} • Core {structureCounts["core-evolution"]} • Directional {structureCounts.directional}
-          </div>
         </div>
 
         {/* Right: actions */}
@@ -1211,27 +1619,27 @@ function ConfirmDrawer({
         >
           <button
             onClick={onStartBuilding}
-            disabled={!selectedRole}
+            disabled={!canStart}
             style={{
-              background: selectedRole ? CHARTREUSE : "#ECE8E0",
-              color: selectedRole ? "#3A4020" : "#9A9388",
+              background: canStart ? CHARTREUSE : "#ECE8E0",
+              color: canStart ? "#3A4020" : "#9A9388",
               borderRadius: 100,
               padding: "11px 22px",
               fontSize: 11.5,
               fontWeight: 500,
               fontFamily: inter,
               border: "none",
-              cursor: selectedRole ? "pointer" : "not-allowed",
+              cursor: canStart ? "pointer" : "not-allowed",
               whiteSpace: "nowrap" as const,
               letterSpacing: "0.02em",
               transition: "background 160ms ease, color 160ms ease, opacity 160ms ease",
-              opacity: selectedRole ? 1 : 0.86,
+              opacity: canStart ? 1 : 0.86,
             }}
             onMouseEnter={(e) => {
-              if (selectedRole) e.currentTarget.style.background = "#95A164";
+              if (canStart) e.currentTarget.style.background = "#95A164";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = selectedRole ? CHARTREUSE : "#ECE8E0";
+              e.currentTarget.style.background = canStart ? CHARTREUSE : "#ECE8E0";
             }}
           >
             {ctaLabel}
@@ -1276,15 +1684,24 @@ export default function PiecesPage() {
     conceptPalette,
     moodboardImages,
     strategySummary,
+    successPriorities,
+    sliderTrend,
     sliderCreative,
     sliderElevated,
+    sliderNovelty,
+    intentGoals,
+    targetMsrp,
+    targetMargin,
     setSelectedKeyPiece,
     setCollectionRole,
     setCategory,
+    setSubcategory,
+    setMaterial,
     pieceRolesById,
     setPieceRolesById,
     setActiveProductPieceId,
     setPieceBuildContext,
+    setSavedAnalysisId,
   } = useSessionStore();
 
   // Confirmed pieces from Supabase
@@ -1293,19 +1710,25 @@ export default function PiecesPage() {
   useEffect(() => {
     if (!collectionName) return;
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
-      supabase
+
+      const primary = await supabase
         .from("analyses")
-        .select(
-          "id, piece_name, score, dimensions, collection_role, category, silhouette, aesthetic_matched_id, aesthetic_inflection, construction_tier"
-        )
+        .select("*")
         .eq("collection_name", collectionName)
-        .eq("user_id", user.id)
-        .then(({ data, error }) => {
-          if (error) console.warn("[Pieces] fetch error:", error);
-          if (data) setConfirmedPieces(data.filter((p) => p.piece_name));
-        });
+        .eq("user_id", user.id);
+
+      if (primary.error) {
+        console.warn("[Pieces] fetch error:", primary.error);
+        return;
+      }
+
+      const normalized = ((primary.data as CollectionPiece[] | null) ?? []).map((piece) => ({
+        ...piece,
+        piece_name: piece.piece_name ?? piece.agent_versions?.saved_piece_name ?? null,
+      }));
+      setConfirmedPieces(normalized);
     });
   }, [collectionName]);
 
@@ -1333,7 +1756,7 @@ export default function PiecesPage() {
   // Suggested = key pieces not yet confirmed
   const suggestedPieces = useMemo((): KeyPiece[] => {
     const confirmedNames = new Set(
-      confirmedPieces.map((p) => (p.piece_name ?? "").toLowerCase())
+      confirmedPieces.map((p) => getDisplayPieceName(p).toLowerCase())
     );
     return keyPieces.filter((p) => !confirmedNames.has(p.item.toLowerCase()));
   }, [keyPieces, confirmedPieces]);
@@ -1414,126 +1837,6 @@ export default function PiecesPage() {
     return { strong, emerging, missing, strongest };
   }, [expressionSignalExpression]);
 
-  const mukosReadData = useMemo(() => {
-    if (collectionLanguageExpression.length === 0 && expressionSignalExpression.length === 0) {
-      return {
-        headline: "Your collection language will resolve as pieces accumulate.",
-        body: "Lock the direction in Setup, then build pieces that define what the collection is and how it should come alive.",
-      };
-    }
-
-    if (totalConfirmed === 0) {
-      const languageLine = collectionLanguageLabels.length > 0 ? formatChipList(collectionLanguageLabels) : "the collection direction";
-      const expressionLine = expressionSignalLabels.length > 0 ? formatChipList(expressionSignalLabels) : "its expression signals";
-      return {
-        headline: `You’ve defined ${languageLine}, but ${expressionLine} still needs to be realized through the first pieces.`,
-        body: "The opening assortment should establish the collection language and its expression together so the line reads as intentional rather than theoretical.",
-      };
-    }
-
-    const strongLabels = languageStates.strong.map((chip) => chip.label);
-    const missingLabels = languageStates.missing.map((chip) => chip.label);
-    const strongExpressionLabels = expressionStates.strong.map((chip) => chip.label);
-    const missingExpressionLabels = expressionStates.missing.map((chip) => chip.label);
-    const emergingExpressionLabels = expressionStates.emerging.map((chip) => chip.label);
-
-    if (strongLabels.length > 0 && missingExpressionLabels.length > 0) {
-      return {
-        headline: `The collection is clearly defined through ${formatChipList(strongLabels)}, but ${formatChipList(missingExpressionLabels)} has not yet been realized in the current pieces.`,
-        body: emergingExpressionLabels.length > 0
-          ? `${formatChipList(emergingExpressionLabels)} is starting to register, but the next additions need to make the intended tension legible earlier in the assortment.`
-          : "The line is directionally coherent, but it still reads under-expressed rather than fully authored.",
-      };
-    }
-
-    if (strongLabels.length > 0 && strongExpressionLabels.length > 0) {
-      return {
-        headline: `${formatChipList(strongLabels)} is defining the collection, while ${formatChipList(strongExpressionLabels)} is now giving it visible life across the assortment.`,
-        body: missingLabels.length > 0
-          ? `${formatChipList(missingLabels)} still needs to be broadened so the expression does not resolve around too narrow a frame.`
-          : "The assortment is beginning to hold both identity and expression with enough clarity to feel intentional.",
-      };
-    }
-
-    return {
-      headline: `${languageStates.strongest?.label ?? "The collection language"} is establishing the foundation of the line.`,
-      body: expressionStates.strongest?.label
-        ? `${expressionStates.strongest.label} is the clearest expression cue so far, but it still needs more distribution to shape the collection rather than just one piece.`
-        : "The line is beginning to cohere, but the expression signals still need to move from setup intent into visible execution.",
-    };
-  }, [collectionLanguageExpression.length, collectionLanguageLabels, expressionSignalExpression.length, expressionSignalLabels, expressionStates, languageStates, totalConfirmed]);
-
-  const structureBalanceLines = useMemo(() => {
-    if (totalConfirmed === 0) {
-      return "No structure is established yet. The first claimed piece will set the collection’s opening balance.";
-    }
-    if (roleCounts["core-evolution"] === 0) {
-      return "You have shape and direction, but no stabilizing core yet.";
-    }
-    if (roleCounts.hero > 1) {
-      return "The line has more than one focal point, which is diluting the hero read.";
-    }
-    if (roleCounts["volume-driver"] === 0) {
-      return "The assortment still needs a volume anchor to broaden the line.";
-    }
-    if (roleCounts.hero === 0) {
-      return "The collection is building evenly, but it still lacks a clear focal piece.";
-    }
-    return "The current role mix is holding with enough structure to keep the line legible.";
-  }, [roleCounts, totalConfirmed]);
-
-  const gapsAndTensionLines = useMemo(() => {
-    const lines: string[] = [];
-
-    languageStates.missing.forEach((chip) => {
-      lines.push(`${chip.label} is not yet represented in the current pieces.`);
-    });
-
-    expressionStates.missing.forEach((chip) => {
-      if (lines.length < 3) {
-        lines.push(`${chip.label} has not yet been introduced as an expression signal.`);
-      }
-    });
-
-    if (languageStates.strong.length === 1 && languageStates.emerging.length > 0) {
-      lines.push(`${languageStates.strong[0].label} is carrying most of the read, which risks repetition if the next piece follows the same posture.`);
-    }
-
-    if (expressionStates.strong.length === 0 && expressionStates.emerging.length > 0 && lines.length < 3) {
-      lines.push(`${expressionStates.emerging[0].label} is beginning to appear, but it still reads as incidental rather than intentional.`);
-    }
-
-    if (languageStates.strong.length > 0 && expressionStates.missing.length > 0 && lines.length < 3) {
-      lines.push(`${languageStates.strong[0].label} is clear, but the collection still lacks softness or tension in how it is being expressed.`);
-    }
-
-    if (languageStates.emerging.length > 0 && lines.length < 3) {
-      lines.push(`${languageStates.emerging[0].label} is emerging, but not yet anchoring the assortment.`);
-    }
-
-    if (roleCounts["core-evolution"] === 0 && lines.length < 3) {
-      lines.push("The collection lacks a core anchor.");
-    }
-
-    if (roleCounts.hero > 1 && lines.length < 3) {
-      lines.push("Hero pieces are beginning to overlap.");
-    }
-
-    if (highComplexityCount >= 2 && highComplexityCount === totalConfirmed && lines.length < 3) {
-      lines.push("Current pieces skew toward higher complexity.");
-    }
-
-    if (lines.length === 0 && languageStates.strong.length > 0) {
-      lines.push(
-        expressionStates.strong.length > 0
-          ? `${languageStates.strong[0].label} is holding clearly, and ${expressionStates.strong[0].label} is beginning to give the line its intended expression.`
-          : `${languageStates.strong[0].label} is reading clearly without creating obvious tension yet.`
-      );
-    }
-
-    return lines.slice(0, 3);
-  }, [expressionStates, highComplexityCount, languageStates, roleCounts, totalConfirmed]);
-
   const startingPointSuggestions = useMemo((): StartingPointSuggestion[] => {
     if (suggestedPieces.length === 0) return [];
 
@@ -1566,6 +1869,7 @@ export default function PiecesPage() {
           targetCollectionLanguage: missingLanguage ?? emergingLanguage ?? strongestLanguage,
           targetExpressionSignal: missingExpression ?? emergingExpression ?? strongestExpression,
           role: languageCandidate.roleSuggestion.role,
+          rank: suggestions.length + 1,
           complexityBias,
           directionText: directionInterpretationText,
           strongestCollectionLanguage: strongestLanguage,
@@ -1590,6 +1894,7 @@ export default function PiecesPage() {
           piece: roleCandidate.piece,
           purpose: "role-balance",
           role: priorityRole,
+          rank: suggestions.length + 1,
           complexityBias,
           directionText: directionInterpretationText,
           strongestCollectionLanguage: strongestLanguage,
@@ -1614,6 +1919,7 @@ export default function PiecesPage() {
           piece: executionCandidate.piece,
           purpose: "execution-risk",
           role: executionCandidate.roleSuggestion.role,
+          rank: suggestions.length + 1,
           complexityBias,
           directionText: directionInterpretationText,
           strongestCollectionLanguage: strongestLanguage,
@@ -1625,14 +1931,201 @@ export default function PiecesPage() {
     return suggestions.slice(0, 3);
   }, [complexityBias, directionInterpretationText, expressionStates, languageStates, roleCounts, suggestedPieces, totalConfirmed]);
 
-  const recommendedNextPiece = useMemo(() => {
-    const priorityChip =
-      expressionStates.missing[0] ??
-      languageStates.missing[0] ??
-      [...expressionStates.emerging].sort((a, b) => a.coverage - b.coverage)[0] ??
-      [...languageStates.emerging].sort((a, b) => a.coverage - b.coverage)[0];
-    return getRecommendedPiecePrompt(priorityChip, suggestedPieces, directionName, expressionStates.missing[0]?.label ?? expressionStates.emerging[0]?.label);
-  }, [directionName, expressionStates, languageStates, suggestedPieces]);
+  const confirmedPieceNames = useMemo(
+    () => confirmedPieces.map((piece) => getDisplayPieceName(piece)),
+    [confirmedPieces]
+  );
+
+  const confirmedCategories = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          confirmedPieces
+            .map((piece) => piece.category?.trim())
+            .filter((category): category is string => Boolean(category))
+        )
+      ),
+    [confirmedPieces]
+  );
+
+  const coverageGaps = useMemo(() => {
+    const gaps: string[] = [];
+    const categoryCounts = confirmedPieces.reduce<Record<string, number>>((acc, piece) => {
+      const category = piece.category?.trim().toLowerCase();
+      if (!category) return acc;
+      acc[category] = (acc[category] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    if (totalConfirmed === 0 || roleCounts.hero === 0) gaps.push("needs_anchor_piece");
+    if (expressionStates.missing.length > 0 || expressionStates.strong.length === 0) {
+      gaps.push("needs_visible_surface_expression");
+    }
+    if (roleCounts["core-evolution"] === 0 || roleCounts["volume-driver"] === 0) {
+      gaps.push("needs_commercial_base");
+    }
+    if ((categoryCounts.tops ?? 0) > Math.max(1, totalConfirmed / 2)) gaps.push("too_top_heavy");
+    if ((categoryCounts.tops ?? 0) === 0 || (categoryCounts.bottoms ?? 0) === 0) {
+      gaps.push("needs_core_daywear");
+    }
+
+    return gaps;
+  }, [confirmedPieces, expressionStates.missing.length, expressionStates.strong.length, roleCounts, totalConfirmed]);
+
+  const deterministicSuggestedPieces = useMemo<DeterministicSuggestedPiece[]>(
+    () =>
+      startingPointSuggestions.map((piece) => ({
+        name: piece.adapted_title,
+        category: piece.sourcePiece.category ?? undefined,
+        role: piece.strategicRole,
+        rank: piece.rank,
+        reasonTags: piece.reasonTags,
+        shortRationale: piece.shortRationale,
+      })),
+    [startingPointSuggestions]
+  );
+
+  const recommendedStartPiece = useMemo(
+    () =>
+      selectRecommendedStartPiece({
+        suggestedPieces: deterministicSuggestedPieces,
+        confirmedCategories,
+        confirmedPieceNames,
+        coverageGaps,
+      }),
+    [confirmedCategories, confirmedPieceNames, coverageGaps, deterministicSuggestedPieces]
+  );
+
+  const recommendedStartSuggestion = useMemo(
+    () =>
+      recommendedStartPiece
+        ? startingPointSuggestions.find((piece) => piece.adapted_title === recommendedStartPiece.name) ?? null
+        : startingPointSuggestions[0] ?? null,
+    [recommendedStartPiece, startingPointSuggestions]
+  );
+
+  const piecesReadInput = useMemo(
+    () =>
+      buildPiecesReadInput({
+        season,
+        collectionName,
+        movementName: directionName,
+        trendVelocity: collectionEntry?.trend_velocity ?? null,
+        saturationScore: collectionEntry?.saturation_score ?? null,
+        seenIn: collectionEntry?.seen_in ?? [],
+        silhouette: [conceptSilhouette],
+        palette: [paletteName],
+        expression: [...collectionLanguageLabels, ...expressionSignalLabels].slice(0, 6),
+        interpretationText: directionInterpretationText || null,
+        confirmedPieceCount: totalConfirmed,
+        confirmedCategories,
+        coverageGaps,
+        suggestedPieces: deterministicSuggestedPieces,
+        recommendedStartPiece,
+      }),
+    [
+      collectionEntry?.saturation_score,
+      collectionEntry?.seen_in,
+      collectionEntry?.trend_velocity,
+      collectionLanguageLabels,
+      collectionName,
+      conceptSilhouette,
+      confirmedCategories,
+      coverageGaps,
+      deterministicSuggestedPieces,
+      directionInterpretationText,
+      directionName,
+      expressionSignalLabels,
+      paletteName,
+      recommendedStartPiece,
+      season,
+      totalConfirmed,
+    ]
+  );
+
+  const piecesReadFallback = useMemo(
+    () => buildPiecesReadFallback(piecesReadInput),
+    [piecesReadInput]
+  );
+
+  const [synthesizedPiecesRead, setSynthesizedPiecesRead] = useState<PiecesReadOutput | null>(null);
+
+  const piecesReadRequestBody = useMemo(
+    () => JSON.stringify(piecesReadInput),
+    [piecesReadInput]
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setSynthesizedPiecesRead(null);
+
+    if (piecesReadInput.suggestedPieces.length === 0) return () => controller.abort();
+
+    const run = async () => {
+      try {
+        const response = await fetch("/api/pieces-read", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: piecesReadRequestBody,
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Failed to synthesize pieces read");
+        }
+
+        const data = (await response.json()) as PiecesReadOutput & {
+          _meta?: { latency_ms?: number };
+        };
+
+        if (controller.signal.aborted) return;
+
+        React.startTransition(() => {
+          setSynthesizedPiecesRead({
+            read_headline: data.read_headline,
+            read_body: data.read_body,
+            how_to_lean_in: data.how_to_lean_in,
+            start_here_title: data.start_here_title,
+            start_here_body: data.start_here_body,
+            piece_microcopy: data.piece_microcopy,
+          });
+        });
+
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[Pieces Read] synthesized", {
+            latencyMs: data._meta?.latency_ms,
+            input: piecesReadInput,
+          });
+        }
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
+
+        const message = error instanceof Error ? error.message : String(error);
+        setSynthesizedPiecesRead(null);
+
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[Pieces Read] fallback", {
+            error: message,
+            input: piecesReadInput,
+          });
+        }
+      }
+    };
+
+    run();
+    return () => controller.abort();
+  }, [piecesReadInput, piecesReadRequestBody]);
+
+  const piecesReadContent = synthesizedPiecesRead ?? piecesReadFallback;
+
+  const pieceMicrocopyByName = useMemo(
+    () =>
+      Object.fromEntries(
+        (piecesReadContent.piece_microcopy ?? []).map((entry) => [entry.piece_name, entry.microcopy])
+      ),
+    [piecesReadContent.piece_microcopy]
+  );
 
   // Drawer state
   const [drawerPiece, setDrawerPiece] = useState<KeyPiece | null>(null);
@@ -1640,37 +2133,211 @@ export default function PiecesPage() {
   const [drawerPieceName, setDrawerPieceName] = useState("");
   const [drawerCategory, setDrawerCategory] = useState("");
   const [drawerRole, setDrawerRole] = useState<CollectionRoleId | null>(null);
+  const [customProposal, setCustomProposal] = useState("");
+  const [customFinalExpression, setCustomFinalExpression] = useState("");
+  const [customRefinement, setCustomRefinement] = useState<CustomPieceRefinement | null>(null);
+  const [customRefinementState, setCustomRefinementState] = useState<"idle" | "loading" | "ready">("idle");
+  const refinementAbortRef = React.useRef<AbortController | null>(null);
   const inferredDrawerSuggestion = useMemo(() => {
     if (!drawerPiece) return null;
+    if (drawerPiece.custom) {
+      return inferCustomRoleSuggestion(
+        customFinalExpression || customProposal || drawerPieceName,
+        drawerCategory,
+        roleCounts as Record<CollectionRoleId, number>
+      );
+    }
     return getRoleSuggestion(drawerPiece, roleCounts as Record<CollectionRoleId, number>);
-  }, [drawerPiece, roleCounts]);
+  }, [customFinalExpression, customProposal, drawerCategory, drawerPiece, drawerPieceName, roleCounts]);
+
+  const collectionMaterials = useMemo(() => {
+    const materials = (chipSelection?.activatedChips ?? [])
+      .map((chip) => chip.material?.trim())
+      .filter((material): material is string => Boolean(material));
+
+    return Array.from(new Set(materials));
+  }, [chipSelection]);
+
+  const collectionPriorities = useMemo(() => {
+    if (successPriorities.length > 0) return successPriorities;
+    if (intentGoals.length > 0) return intentGoals;
+    return ["brand expression", "commercial performance"];
+  }, [intentGoals, successPriorities]);
+
+  const commercialContext = useMemo(
+    () => ({
+      target_msrp: targetMsrp || null,
+      margin: targetMargin || null,
+      cost_ceiling: (targetMsrp ?? 0) > 0 && targetMargin > 0 ? Math.round((targetMsrp ?? 0) * (1 - targetMargin / 100)) : null,
+    }),
+    [targetMargin, targetMsrp]
+  );
 
   const openDrawer = useCallback((piece: KeyPiece, suggestion: StartingPointSuggestion | null = null) => {
     setDrawerPiece(piece);
     setDrawerSuggestion(suggestion);
-    setDrawerPieceName(piece.item);
+    setDrawerPieceName(piece.custom ? "" : piece.item);
     setDrawerCategory(piece.category ?? "");
     setDrawerRole(null);
+    setCustomProposal(piece.custom ? piece.item : "");
+    setCustomFinalExpression(piece.custom ? piece.item : "");
+    setCustomRefinement(null);
+    setCustomRefinementState("idle");
   }, []);
 
   const closeDrawer = useCallback(() => {
+    refinementAbortRef.current?.abort();
+    refinementAbortRef.current = null;
     setDrawerPiece(null);
     setDrawerSuggestion(null);
     setDrawerPieceName("");
     setDrawerCategory("");
     setDrawerRole(null);
+    setCustomProposal("");
+    setCustomFinalExpression("");
+    setCustomRefinement(null);
+    setCustomRefinementState("idle");
   }, []);
+
+  useEffect(() => {
+    if (!drawerPiece?.custom) return;
+    const proposal = customProposal.trim();
+
+    if (!proposal) {
+      refinementAbortRef.current?.abort();
+      refinementAbortRef.current = null;
+      setCustomRefinement(null);
+      setCustomRefinementState("idle");
+      setDrawerRole(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(async () => {
+      refinementAbortRef.current?.abort();
+      refinementAbortRef.current = controller;
+      setCustomRefinementState("loading");
+
+      try {
+        const response = await fetch("/api/piece-refine", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            collection: {
+              direction: directionInterpretationText || collectionAesthetic || "Collection direction not resolved",
+              silhouette: conceptSilhouette || "controlled proportion",
+              palette: paletteName || "palette not resolved",
+              materials: collectionMaterials,
+              elements: collectionLanguageLabels,
+              priorities: collectionPriorities,
+              tradeoffs: {
+                trend_exposure: getStrategySliderLabel(sliderTrend, ["high", "balanced", "low"]),
+                expression: getStrategySliderLabel(sliderCreative, ["assertive", "balanced", "restrained"]),
+                value: getStrategySliderLabel(sliderElevated, ["premium", "balanced", "accessible"]),
+                innovation: getStrategySliderLabel(sliderNovelty, ["novelty-led", "balanced", "continuity-aware"]),
+              },
+              commercial: commercialContext,
+            },
+            market: {
+              season: season || "current season",
+              direction: collectionAesthetic || directionInterpretationText || "",
+            },
+            user_input: proposal,
+            selected_role: drawerRole ? getPieceRoleLabel(drawerRole) : undefined,
+            existing_pieces: confirmedPieces.map((p) => ({
+              name: getDisplayPieceName(p),
+              role: p.collection_role ? getPieceRoleLabel(p.collection_role as CollectionRoleId) : "",
+              category: p.category ?? "",
+            })),
+          }),
+        });
+
+        if (!response.ok) throw new Error("Failed to refine piece");
+        const data = (await response.json()) as CustomPieceRefinement;
+        if (controller.signal.aborted) return;
+
+        setCustomRefinement(data);
+        setCustomRefinementState("ready");
+        setDrawerRole(mapRoleLabelToId(data.role));
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
+        setCustomRefinement(null);
+        setCustomRefinementState("idle");
+      } finally {
+        if (refinementAbortRef.current === controller) {
+          refinementAbortRef.current = null;
+        }
+      }
+    }, 700);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [
+    collectionAesthetic,
+    collectionLanguageLabels,
+    collectionMaterials,
+    collectionPriorities,
+    commercialContext,
+    conceptSilhouette,
+    customProposal,
+    directionInterpretationText,
+    drawerPiece?.custom,
+    paletteName,
+    season,
+    sliderCreative,
+    sliderElevated,
+    sliderNovelty,
+    sliderTrend,
+  ]);
 
   const handleStartBuilding = useCallback(() => {
     if (!drawerPiece || !drawerRole) return;
-    const finalPieceName = drawerPieceName.trim() || drawerPiece.item;
-    const finalPiece: KeyPiece = { ...drawerPiece, item: finalPieceName };
+    const finalPieceName = drawerPiece.custom
+      ? drawerPieceName.trim() || deriveCustomPieceName(customFinalExpression.trim() || customProposal.trim())
+      : drawerPieceName.trim() || drawerPiece.item;
+    if (!finalPieceName) return;
+    const inferredType = resolvePieceImageType({
+      type: drawerPiece.type,
+      pieceName: finalPieceName,
+      category: drawerCategory,
+    });
+    const inferredCategory =
+      drawerCategory ||
+      (inferredType === "straight-pant" || inferredType === "trouser" || inferredType === "skirt" || inferredType === "mini-skirt"
+        ? "bottoms"
+        : inferredType?.includes("dress")
+          ? "dresses"
+          : inferredType === "jacket" || inferredType === "trench" || inferredType === "coat" || inferredType === "parka" || inferredType === "puffer" || inferredType === "raincoat"
+            ? "outerwear"
+            : inferredType === "knit-sweater" || inferredType === "cardigan"
+              ? "knitwear"
+              : inferredType
+                ? "tops"
+                : drawerPiece.category);
+    const finalPiece: KeyPiece = {
+      ...drawerPiece,
+      item: finalPieceName,
+      category: inferredCategory ?? null,
+      type: inferredType,
+    };
     const pieceBuildContext: PieceBuildContext = {
-      adaptedTitle: drawerSuggestion?.adapted_title ?? finalPieceName,
+      adaptedTitle:
+        drawerPiece.custom
+          ? customFinalExpression.trim() || finalPieceName
+          : drawerSuggestion?.adapted_title ?? finalPieceName,
       role: drawerRole,
-      archetype: drawerSuggestion?.archetype ?? drawerPiece.item.toLowerCase().replace(/\s+/g, "_"),
-      originalLabel: drawerSuggestion?.original_label ?? drawerPiece.item,
-      translation: (drawerSuggestion?.version_label ?? directionInterpretationText) || null,
+      archetype:
+        drawerPiece.custom
+          ? (customFinalExpression.trim() || finalPieceName).toLowerCase().replace(/\s+/g, "_")
+          : drawerSuggestion?.archetype ?? drawerPiece.item.toLowerCase().replace(/\s+/g, "_"),
+      originalLabel: drawerPiece.custom ? customProposal.trim() || finalPieceName : drawerSuggestion?.original_label ?? drawerPiece.item,
+      translation:
+        (drawerPiece.custom
+          ? customRefinement?.read || directionInterpretationText
+          : drawerSuggestion?.version_label ?? directionInterpretationText) || null,
       collectionLanguage: collectionLanguageExpression.map((chip) => ({
         label: chip.label,
         state: chip.state,
@@ -1684,25 +2351,37 @@ export default function PiecesPage() {
     setSelectedKeyPiece(finalPiece);
     setCollectionRole(drawerRole);
     setPieceBuildContext(pieceBuildContext);
+    setSavedAnalysisId(null);
     setPieceRolesById({
       ...pieceRolesById,
       [finalPieceName]: drawerRole,
     });
     setActiveProductPieceId(finalPieceName);
-    if (drawerCategory) setCategory(drawerCategory);
+    if (drawerPiece.custom) {
+      setMaterial("");
+      setSubcategory(inferredType ?? "");
+    } else if (drawerCategory) {
+      setCategory(drawerCategory);
+    }
     router.push("/spec");
   }, [
     drawerPiece,
     drawerPieceName,
     drawerCategory,
     drawerRole,
+    customFinalExpression,
+    customProposal,
+    customRefinement?.read,
     setSelectedKeyPiece,
     setCollectionRole,
     setPieceBuildContext,
+    setSavedAnalysisId,
     pieceRolesById,
     setPieceRolesById,
     setActiveProductPieceId,
     setCategory,
+    setMaterial,
+    setSubcategory,
     router,
     drawerSuggestion,
     directionInterpretationText,
@@ -1792,7 +2471,7 @@ export default function PiecesPage() {
                 marginBottom: 10,
               }}
             >
-              Pieces Studio
+              build piece by piece
             </div>
             <div
               style={{
@@ -1804,7 +2483,7 @@ export default function PiecesPage() {
               <div
                 style={{
                   ...SECTION_TITLE_STYLE,
-                  fontSize: 38,
+                  fontSize: 32,
                   color: "#43432B",
                   letterSpacing: "-0.04em",
                   lineHeight: 0.98,
@@ -1929,7 +2608,7 @@ export default function PiecesPage() {
             <div
               style={{
                 ...SECTION_TITLE_STYLE,
-                fontSize: 28,
+                fontSize: 24,
                 color: "#43432B",
                 lineHeight: 1.1,
                 marginBottom: 8,
@@ -1969,6 +2648,7 @@ export default function PiecesPage() {
                 <SuggestedPieceCard
                   key={piece.original_label}
                   piece={piece}
+                  microcopy={pieceMicrocopyByName[piece.adapted_title] ?? piece.shortRationale}
                   onBuild={() => openDrawer(piece.sourcePiece, piece)}
                 />
               ))}
@@ -1990,156 +2670,97 @@ export default function PiecesPage() {
           {/* Muko's Read */}
           <div
             style={{
-              marginBottom: 22,
+              marginBottom: 20,
             }}
           >
             <div
               style={{
-                ...EYEBROW_STYLE,
-                marginBottom: 10,
+                ...READ_ZONE_LABEL_STYLE,
+                marginBottom: 8,
               }}
             >
               MUKO&apos;S READ
             </div>
             <div
               style={{
-                ...SECTION_TITLE_STYLE,
-                fontSize: 21,
-                color: "#43432B",
-                lineHeight: 1.24,
+                ...READ_HEADLINE_STYLE,
                 marginBottom: 10,
+                fontSize: 18,
+                lineHeight: 1.22,
               }}
             >
-              {mukosReadData.headline}
+              {piecesReadContent.read_headline}
             </div>
-            <div style={BODY_SMALL_STYLE}>
-              {mukosReadData.body}
-            </div>
-          </div>
-
-          <div style={{ height: 1, background: "rgba(67,67,43,0.08)", margin: "0 0 18px" }} />
-
-          <div style={{ marginBottom: 24 }}>
-            <div
-              style={{
-                ...EYEBROW_STYLE,
-                marginBottom: 10,
-              }}
-            >
-              Structure Balance
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 10 }}>
-              {[
-                { label: "Hero", value: roleCounts.hero },
-                { label: "Volume", value: roleCounts["volume-driver"] },
-                { label: "Core", value: roleCounts["core-evolution"] },
-                { label: "Directional", value: roleCounts.directional },
-              ].map((row) => (
+            <div style={{ display: "grid", gap: 16 }}>
+              <div style={{ ...READ_BODY_STYLE, lineHeight: 1.68 }}>{piecesReadContent.read_body}</div>
+              <div>
+                <div style={{ ...READ_ZONE_LABEL_STYLE, marginBottom: 8 }}>How to Lean In</div>
+                <div style={{ ...READ_BODY_STYLE, lineHeight: 1.68 }}>{piecesReadContent.how_to_lean_in}</div>
+              </div>
+              <div>
+                <div style={{ height: 1, background: "rgba(67,67,43,0.08)", margin: "18px 0 18px" }} />
                 <div
-                  key={row.label}
                   style={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    justifyContent: "space-between",
-                    ...BODY_SMALL_STYLE,
-                    color: TEXT,
-                    gap: 12,
+                    ...READ_ZONE_LABEL_STYLE,
+                    marginBottom: 6,
                   }}
                 >
-                  <span style={{ color: MUTED }}>{row.label}</span>
-                  <span style={{ fontWeight: 500 }}>{row.value}</span>
+                  Start Here
                 </div>
-              ))}
-            </div>
-            <div
-              style={{
-                ...BODY_SMALL_STYLE,
-                color: TEXT,
-              }}
-            >
-              {structureBalanceLines}
-            </div>
-          </div>
-
-          <div style={{ height: 1, background: "rgba(67,67,43,0.08)", margin: "0 0 18px" }} />
-
-          <div style={{ marginBottom: 24 }}>
-            <div
-              style={{
-                ...EYEBROW_STYLE,
-                marginBottom: 10,
-              }}
-            >
-              Gaps + Tension
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-              {gapsAndTensionLines.map((line) => (
                 <div
-                  key={line}
                   style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 10,
-                    ...BODY_SMALL_STYLE,
-                    color: TEXT,
+                    ...EYEBROW_STYLE,
+                    marginBottom: 8,
+                    color: "rgba(67,67,43,0.44)",
                   }}
                 >
-                  <span
-                    aria-hidden
-                    style={{
-                      width: 4,
-                      height: 4,
-                      borderRadius: "50%",
-                      background: "rgba(67,67,43,0.34)",
-                      marginTop: 7,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span>{line}</span>
+                  {piecesReadContent.start_here_title}
                 </div>
-              ))}
+                <div
+                  style={{
+                    ...SECTION_TITLE_STYLE,
+                    fontSize: 18,
+                    color: "#43432B",
+                    lineHeight: 1.26,
+                    marginBottom: 8,
+                  }}
+                >
+                  {recommendedStartPiece?.name ?? recommendedStartSuggestion?.adapted_title ?? "Lead with the clearest piece"}
+                </div>
+                <div
+                  style={{
+                    ...READ_BODY_STYLE,
+                    color: TEXT,
+                    marginBottom: 10,
+                    lineHeight: 1.68,
+                  }}
+                >
+                  {piecesReadContent.start_here_body}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!recommendedStartSuggestion?.sourcePiece) return;
+                    openDrawer(recommendedStartSuggestion.sourcePiece, recommendedStartSuggestion);
+                  }}
+                  style={{
+                    padding: 0,
+                    border: "none",
+                    background: "none",
+                    fontFamily: inter,
+                    fontSize: 11.5,
+                    fontWeight: 500,
+                    color: CHARTREUSE,
+                    letterSpacing: "0.01em",
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.76")}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+                >
+                  Build this starting point →
+                </button>
+              </div>
             </div>
-          </div>
-
-          <div style={{ height: 1, background: "rgba(67,67,43,0.08)", margin: "0 0 18px" }} />
-
-          <div style={{ marginBottom: 0 }}>
-            <div
-              style={{
-                ...EYEBROW_STYLE,
-                marginBottom: 10,
-              }}
-            >
-              Recommended Next Piece
-            </div>
-            <div
-              style={{
-                ...BODY_SMALL_STYLE,
-                color: TEXT,
-                marginBottom: 10,
-              }}
-            >
-              {recommendedNextPiece}
-            </div>
-            <button
-              type="button"
-              onClick={() => suggestedPiecesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              style={{
-                padding: 0,
-                border: "none",
-                background: "none",
-                fontFamily: inter,
-                fontSize: 11.5,
-                fontWeight: 500,
-                color: CHARTREUSE,
-                letterSpacing: "0.01em",
-                cursor: "pointer",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.76")}
-              onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-            >
-              Explore starting points →
-            </button>
           </div>
         </div>
       </div>
@@ -2152,15 +2773,36 @@ export default function PiecesPage() {
           category={drawerCategory}
           categories={categories}
           selectedRole={drawerRole}
-          suggestedRole={(drawerSuggestion ?? inferredDrawerSuggestion)?.role ?? "volume-driver"}
-          suggestedRationale={
-            inferredDrawerSuggestion?.rationale ??
-            "Balances your structure and avoids over-indexing on statement pieces"
+          suggestion={
+            drawerPiece.custom
+              ? inferredDrawerSuggestion
+              : drawerSuggestion
+              ? { role: drawerSuggestion.role, rationale: drawerSuggestion.description }
+              : inferredDrawerSuggestion
           }
-          structureCounts={roleCounts as Record<CollectionRoleId, number>}
+          customProposal={customProposal}
+          customFinalExpression={customFinalExpression}
+          customRefinement={customRefinement}
+          customRefinementState={customRefinementState}
           onPieceNameChange={setDrawerPieceName}
           onCategoryChange={setDrawerCategory}
           onRoleSelect={setDrawerRole}
+          onCustomProposalChange={setCustomProposal}
+          onCustomFinalExpressionChange={setCustomFinalExpression}
+          onAcceptRefinedExpression={() => {
+            if (!customRefinement) return;
+            setCustomFinalExpression(customRefinement.refined_expression);
+            setDrawerPieceName(deriveCustomPieceName(customRefinement.refined_expression));
+            setDrawerRole(mapRoleLabelToId(customRefinement.role));
+          }}
+          onContinueWithOriginal={() => {
+            const original = customProposal.trim();
+            if (!original) return;
+            setCustomFinalExpression(original);
+            if (customRefinement) {
+              setDrawerRole(mapRoleLabelToId(customRefinement.role));
+            }
+          }}
           onStartBuilding={handleStartBuilding}
           onCancel={closeDrawer}
         />

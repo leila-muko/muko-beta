@@ -14,6 +14,7 @@ import type { AestheticContext, ResolvedRedirects, IntentCalibration } from '@/l
 import { buildTemplateDecisionGuidance, generateTemplateNarrative } from '@/lib/agents/synthesizer';
 import type { NarrativeAestheticContext } from '@/lib/agents/synthesizer';
 import { getAestheticChipLabels, normalizeExecutionLevers } from '@/lib/concept-studio/decision-guidance';
+import { getSharedMarketSignal } from '@/lib/pulse/marketState';
 
 // ─────────────────────────────────────────────
 // TYPES
@@ -866,6 +867,27 @@ Fashion-specific language: fit integrity, proportion, restraint, finishing, fabr
 Avoid robotic repetition.
 No explanation of methodology. No "based on data."
 
+REGISTER FAILURE MODE (DO NOT PRINT)
+Before finalizing, scan every sentence in insight_description and
+positioning for atmospheric language — phrasing that creates mood or
+implies sophistication but makes no falsifiable claim.
+Atmospheric sentences pass every other rule but say nothing specDelete and rewrite any sentence that matches this pattern.
+Atmospheric (delete):
+- "The mood is shifting toward restraint."
+- "There is a quiet confidence in this direction that aligns with where
+  the market is heading."
+- "This aesthetic carries weight in the current cultural moment."
+Declarative (keep):
+- "The structured-minimalist lane is consolidating at contemporary price
+  points — Toteme and COS have claimed the architectural end, leaving the
+  feminine-proportion angle still open."
+- "At 58% saturation, this direction has one to two seasons before
+  genericization risk becomes the primary constraint."
+- "Reformation's equity in considered, low-impact dressing gives it a
+  narrow but defensible entry into restrained romance — the risk is
+  executing it as a mood rather than a product position."
+Every sentence in the output must survive this test.
+
 HEADLINE RULE
 The insight_title must surface an observation — never issue a directive.
 Do not use imperative verbs in the headline: no "claim," "own," "move," "act," "define," "position."
@@ -1063,10 +1085,11 @@ You will receive:
 
 Use the selected silhouette, palette, and signals as primary inputs.
 Ensure all outputs reflect the user’s actual selections.
-Return a concise visual-and-execution translation brief for the collection language.
+Return a concise editorial directive for how the product expression should come together.
 
 VOICE
 Senior fashion strategist. Decisive. Specific. Fashion-literate.
+Confident, concise, editorial, premium, product-minded.
 No hedging. No filler. No methodology language.
 
 NON-NEGOTIABLE RULES
@@ -1075,52 +1098,53 @@ Speak through aesthetic judgment, visual coherence, and brand equity.
 Do not include scores.
 Do not include market commentary, competitor references, whitespace language, permission analysis, or trend recap.
 Do not re-explain the trend.
-Do not restate the aesthetic summary unless it is necessary to translate a specific user selection.
-Focus only on silhouette behavior, palette logic, signal expression, and one practical guardrail.
-Each field must be exactly one sentence.
+Do not restate every input separately.
+Synthesize silhouette, palette, and signals into one clear read with a strong point of view.
+Avoid academic language, poetic filler, decomposed critique, or post-rationalized explanations.
+Use concrete fashion and product language: proportion, line, placement, finish, texture, restraint, emphasis, behavior.
+The total response should feel fast to scan in under 5 seconds.
 
 OUTPUT FORMAT
 Return JSON only. No markdown. No preamble. No extra keys.
 
 {
   "headline": "string",
-  "silhouette_steer": "string",
-  "palette_steer": "string",
-  "signals_note": "string",
+  "core_read": "string",
+  "execution_moves": ["string", "string"],
   "guardrail": "string"
 }
 
 FIELD RULES
 headline
-One directive sentence that names the translation move from direction to collection language.
-Actionable, specific, and visibly tied to the selected silhouette, palette, or interpretation.
+One strong sentence.
+This is the central thesis of the expression.
+Punchy, specific, directional.
 No market commentary. No trend summary.
 
-silhouette_steer
-One sentence on how the selected silhouette should behave across the collection.
-If a silhouette is selected, respond to that exact silhouette rather than generic posture language.
-If no silhouette is selected, state the most coherent silhouette behavior to introduce.
+core_read
+One or two short sentences max.
+Explain what the expression means in practice.
+Synthesize the selected silhouette, palette, and signals into one coherent read.
+Do not separately label or restate silhouette, palette, and signals.
 
-palette_steer
-One sentence on how the selected palette should be used.
-If a palette is selected, refer to that palette directly and explain how to keep it coherent.
-If no palette is selected, state the most coherent color register to establish.
-
-signals_note
-One sentence explaining how the selected collection_language and expression_signals should show up in the visual grammar.
-Use the actual selections as inputs.
-Treat expression signals as execution cues, not as a list to repeat back verbatim.
+execution_moves
+Two or three short bullets only.
+Each bullet must be crisp, actionable, and product-directional.
+Focus on proportion, texture, placement, finish, behavior, restraint, or emphasis.
+Do not write paragraphs. Do not repeat the headline.
 
 guardrail
-One sentence naming what would break coherence if the team over-corrects, ignores, or contradicts the selected silhouette, palette, signals, or brand interpretation.
+One short line.
+Must begin with "Avoid:"
+Name the failure mode if the team pushes the read too far or interprets it incorrectly.
 This is an execution guardrail, not a market risk statement.
 
 VALIDATION
 Before returning, check:
-• Output contains exactly 5 keys: headline, silhouette_steer, palette_steer, signals_note, guardrail.
-• Every value is a single sentence.
+• Output contains exactly 4 keys: headline, core_read, execution_moves, guardrail.
+• execution_moves contains 2 or 3 strings.
+• No field feels bloated or repetitive.
 • No keyword exposure.
-• No subtitles.
 • No markdown.
 • Valid JSON.
 If any check fails, rewrite before returning.`;
@@ -1161,6 +1185,10 @@ export function buildConceptPrompt(bb: ConceptBlackboard): string {
       seen_in: bb.aesthetic_context.seen_in,
       consumer_insight: bb.aesthetic_context.consumer_insight,
       collections_analyzed: bb.collections_analyzed ?? null,
+      market_state: getSharedMarketSignal({
+        trendVelocity: bb.aesthetic_context.trend_velocity ?? null,
+        saturationScore: bb.aesthetic_context.saturation_score ?? null,
+      }).state,
       risk_factors: bb.aesthetic_context.risk_factors.length > 0
         ? bb.aesthetic_context.risk_factors
         : undefined,
@@ -1181,9 +1209,9 @@ export function buildConceptPrompt(bb: ConceptBlackboard): string {
   const signals = bb.expression_signals ?? bb.chip_selection ?? [];
   if (signals.length > 0) {
     const signalNames = signals.join(', ');
-    return `${json}\n\nAnchor the read in strategy first. Translate the market version into the brand version. Use these expression signals implicitly as execution constraints rather than listing them: ${signalNames}.`;
+    return `${json}\n\nAnchor the read in strategy first. Translate the market version into the brand version. Market whitespace language must stay consistent with aesthetic.market_state: open means whitespace available, building means competition is forming, crowded means the lane is crowded, late means timing is fading. Use these expression signals implicitly as execution constraints rather than listing them: ${signalNames}.`;
   }
-  return json;
+  return `${json}\n\nAnchor the read in strategy first. Market whitespace language must stay consistent with aesthetic.market_state: open means whitespace available, building means competition is forming, crowded means the lane is crowded, late means timing is fading.`;
 }
 
 export function buildConceptLanguagePrompt(input: {
@@ -1288,9 +1316,8 @@ function normalizeConceptPositioning(
 
 export interface ConceptLanguageOutput {
   headline: string;
-  silhouette_steer: string;
-  palette_steer: string;
-  signals_note: string;
+  core_read: string;
+  execution_moves: string[];
   guardrail: string;
 }
 
@@ -1325,11 +1352,50 @@ export function parseConceptV5Output(raw: string): ParsedConceptV5Output | null 
 
 export function parseConceptLanguageOutput(raw: string): ConceptLanguageOutput | null {
   try {
-    const parsed = JSON.parse(stripFences(raw)) as ConceptLanguageOutput;
-    if (!parsed.headline || !parsed.silhouette_steer || !parsed.palette_steer || !parsed.signals_note || !parsed.guardrail) {
-      return null;
+    const parsed = JSON.parse(stripFences(raw)) as Partial<ConceptLanguageOutput> & {
+      silhouette_steer?: string;
+      palette_steer?: string;
+      signals_note?: string;
+    };
+
+    if (
+      typeof parsed.headline === 'string' &&
+      typeof parsed.core_read === 'string' &&
+      Array.isArray(parsed.execution_moves) &&
+      parsed.execution_moves.length > 0 &&
+      typeof parsed.guardrail === 'string'
+    ) {
+      const executionMoves = parsed.execution_moves
+        .map((move) => (typeof move === 'string' ? move.trim() : ''))
+        .filter(Boolean)
+        .slice(0, 3);
+      if (!parsed.headline.trim() || !parsed.core_read.trim() || !parsed.guardrail.trim() || executionMoves.length === 0) {
+        return null;
+      }
+      return {
+        headline: parsed.headline.trim(),
+        core_read: parsed.core_read.trim(),
+        execution_moves: executionMoves,
+        guardrail: parsed.guardrail.trim(),
+      };
     }
-    return parsed;
+
+    if (
+      typeof parsed.headline === 'string' &&
+      typeof parsed.silhouette_steer === 'string' &&
+      typeof parsed.palette_steer === 'string' &&
+      typeof parsed.signals_note === 'string' &&
+      typeof parsed.guardrail === 'string'
+    ) {
+      return {
+        headline: parsed.headline.trim(),
+        core_read: [parsed.silhouette_steer, parsed.palette_steer].map((value) => value.trim()).filter(Boolean).join(' '),
+        execution_moves: [parsed.signals_note.trim()].filter(Boolean),
+        guardrail: parsed.guardrail.trim(),
+      };
+    }
+
+    return null;
   } catch {
     return null;
   }

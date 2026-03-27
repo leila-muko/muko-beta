@@ -237,8 +237,8 @@ export function ResizableSplitPanel({
         style={{
           flex: 1,
           height: "100%",
-          overflowY: "auto",
-          overflowX: "hidden",
+          minHeight: 0,
+          overflow: "hidden",
           minWidth: 0,
           borderLeft: "none",
           background: "rgba(250,249,246,0.60)",

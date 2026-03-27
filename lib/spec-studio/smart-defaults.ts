@@ -34,6 +34,64 @@ export interface SubcategoryEntry {
   complexity_affinity: 'low' | 'moderate' | 'high';
 }
 
+const SUBCATEGORY_ID_NORMALIZATION: Record<string, string> = {
+  trench: 'trench',
+  blazer: 'blazer',
+  bomber: 'bomber',
+  jacket: 'trucker',
+  coat: 'overcoat',
+  overcoat: 'overcoat',
+  puffer: 'puffer',
+  parka: 'anorak',
+  raincoat: 'anorak',
+  tshirt: 'tshirt',
+  't-shirt': 'tshirt',
+  tank: 'tank',
+  blouse: 'blouse',
+  shirt: 'shirt',
+  top: 'shirt',
+  tunic: 'tunic',
+  'corset-top': 'crop_top',
+  vest: 'crop_top',
+  trouser: 'trouser',
+  'straight-pant': 'trouser',
+  'wide-leg': 'wide_leg',
+  'wide-leg-pant': 'wide_leg',
+  'wide-leg-pants': 'wide_leg',
+  'wide-leg-trouser': 'wide_leg',
+  'wide-leg-trousers': 'wide_leg',
+  cargo: 'cargo',
+  jogger: 'jogger',
+  shorts: 'shorts',
+  skirt: 'skirt_midi',
+  'mini-skirt': 'skirt_mini',
+  'maxi-skirt': 'skirt_maxi',
+  'midi-dress': 'midi_dress',
+  dress: 'midi_dress',
+  'mini-dress': 'mini_dress',
+  'maxi-dress': 'maxi_dress',
+  'shirt-dress': 'shirt_dress',
+  'slip-dress': 'slip_dress',
+  'wrap-dress': 'wrap_dress',
+  'column-dress': 'maxi_dress',
+  'babydoll-dress': 'mini_dress',
+  sundress: 'mini_dress',
+  sweater: 'sweater',
+  'knit-sweater': 'sweater',
+  cardigan: 'cardigan',
+  hoodie: 'hoodie',
+  pullover: 'pullover',
+  turtleneck: 'turtleneck',
+  'knit-vest': 'knit_vest',
+  'knit-polo': 'knit_polo',
+  cape: 'cape',
+};
+
+export function normalizeSpecSubcategoryId(subcategoryId?: string | null): string | undefined {
+  if (!subcategoryId) return undefined;
+  return SUBCATEGORY_ID_NORMALIZATION[subcategoryId] ?? subcategoryId;
+}
+
 /**
  * Get smart default complexity using subcategory complexity_affinity as base,
  * with silhouette as a modifier. Silhouette can push complexity up but not down.
@@ -65,6 +123,19 @@ export function getSmartDefault(
   }
 
   return base;
+}
+
+export function getSmartDefaultForSubcategory(
+  categoryId: string,
+  conceptSilhouette?: string,
+  subcategoryId?: string | null,
+  subcategories?: SubcategoryEntry[]
+): ConstructionTier {
+  const normalizedSubcategoryId = normalizeSpecSubcategoryId(subcategoryId);
+  const affinity = normalizedSubcategoryId
+    ? subcategories?.find((entry) => entry.id === normalizedSubcategoryId)?.complexity_affinity
+    : undefined;
+  return getSmartDefault(categoryId, conceptSilhouette, affinity);
 }
 
 // Descriptions shown in tooltips

@@ -182,6 +182,10 @@
   animation: muko-dot-pulse 2.2s ease-out infinite;
 }
 
+.point-of-view-input::placeholder {
+  font-size: 18px;
+}
+
 @keyframes auth-page-bloom-primary {
   0%, 100% {
     opacity: 0.42;

@@ -1,4 +1,5 @@
 import aestheticsData from '@/data/aesthetics.json'
+import { getSharedMarketSignal } from '@/lib/pulse/marketState'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -73,29 +74,16 @@ function normalize(s: string): string {
  */
 export function checkMarketSaturation(aesthetic_data: Aesthetic): SaturationResult {
   const { saturation_score, trend_velocity } = aesthetic_data
-
-  let status: PulseStatus = 'green'
-  let message = 'Emerging opportunity'
-
-  if (saturation_score >= 70) {
-    status = 'red'
-    message = 'Peak saturation'
-  } else if (saturation_score >= 40) {
-    status = 'yellow'
-    message = 'Growing traction'
-  }
-
-  // Adjust based on velocity
-  if (trend_velocity === 'declining' && saturation_score < 50) {
-    status = 'red'
-    message = 'Declining interest'
-  }
+  const signal = getSharedMarketSignal({
+    trendVelocity: trend_velocity,
+    saturationScore: saturation_score,
+  })
 
   return {
     saturation_score,
-    status,
-    message,
-    collections_count: aesthetic_data.seen_in.length,
+    status: signal.status,
+    message: signal.message,
+    collections_count: aesthetic_data.collections_analyzed,
   }
 }
 

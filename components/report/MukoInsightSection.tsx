@@ -2,10 +2,6 @@ import type { CollectionReportPayload } from '@/lib/collection-report/types';
 import { MukoStreamingParagraph } from '@/components/ui/MukoStreamingParagraph';
 import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
 
-function flattenInsight(insight: CollectionReportPayload['muko_insight']) {
-  return [...insight.working, ...insight.watch, ...insight.recommendations].filter(Boolean).join(' ');
-}
-
 function InsightBlock({
   title,
   items,
@@ -75,20 +71,20 @@ function InsightBlock({
 }
 
 export function MukoInsightSection({
-  insight,
+  intelligence,
   streamingParagraph,
   isParagraphStreaming = false,
 }: {
-  insight: CollectionReportPayload['muko_insight'];
+  intelligence: CollectionReportPayload['assortment_intelligence'];
   streamingParagraph?: string;
   isParagraphStreaming?: boolean;
 }) {
   return (
     <section style={{ ...sectionCard, padding: '28px 30px' }}>
-      <p style={sectionEyebrow}>Muko Insight</p>
+      <p style={sectionEyebrow}>Assortment Intelligence</p>
 
       <MukoStreamingParagraph
-        text={flattenInsight(insight)}
+        text={intelligence.collection_insight}
         streamingText={streamingParagraph}
         isStreaming={isParagraphStreaming}
         containerStyle={{ marginTop: 18 }}
@@ -108,9 +104,9 @@ export function MukoInsightSection({
           marginTop: 18,
         }}
       >
-        <InsightBlock title="What’s Working" items={insight.working} tone={reportPalette.chartreuse} />
-        <InsightBlock title="What to Watch" items={insight.watch} tone={reportPalette.camel} />
-        <InsightBlock title="Recommendations" items={insight.recommendations} tone={reportPalette.steel} />
+        <InsightBlock title="Breakdown" items={intelligence.breakdown} tone={reportPalette.chartreuse} />
+        <InsightBlock title="Recommended Actions" items={intelligence.recommended_actions} tone={reportPalette.steel} />
+        <InsightBlock title="Watchlist" items={intelligence.watchlist} tone={reportPalette.camel} />
       </div>
     </section>
   );

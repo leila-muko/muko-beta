@@ -272,7 +272,6 @@ export function combineDirection(options: {
 
   const signals = Array.from(signalMap.entries())
     .sort((a, b) => b[1].score - a[1].score)
-    .slice(0, 6)
     .map(([label, meta]) => ({
       label,
       source: meta.source,

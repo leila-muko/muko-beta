@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useSessionStore } from '@/lib/store/sessionStore';
 import { BRAND } from '@/lib/concept-studio/constants';
 import ProgressIndicator from './ProgressIndicator';
 import Step1BrandName from './steps/Step1BrandName';
@@ -37,6 +38,7 @@ type FormFieldValue = FormData[keyof FormData];
 export default function OnboardingWizard() {
   const router = useRouter();
   const supabase = createClient();
+  const setSessionTargetMargin = useSessionStore((state) => state.setTargetMargin);
   const [currentStep, setCurrentStep] = useState(1);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -71,6 +73,9 @@ export default function OnboardingWizard() {
 
   const updateFormData = (field: keyof FormData, value: FormFieldValue) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    if (field === 'targetMargin' && typeof value === 'number') {
+      setSessionTargetMargin(value);
+    }
   };
 
   const handleNext = () => {
@@ -138,6 +143,7 @@ export default function OnboardingWizard() {
       }
 
       console.log('Brand profile created successfully:', data);
+      setSessionTargetMargin(formData.targetMargin);
       router.push('/entry');
     } catch (error: unknown) {
       console.error('Full error object:', error);

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { parseJSONResponse } from "@/lib/claude/client";
+import aestheticsData from "@/data/aesthetics.json";
 
 interface PieceReadRequest {
   piece?: {
@@ -12,6 +13,7 @@ interface PieceReadRequest {
   };
   context?: {
     aestheticName?: string;
+    season?: string;
     silhouetteLabel?: string;
     paletteName?: string;
     resonanceScore?: number | null;
@@ -19,14 +21,66 @@ interface PieceReadRequest {
     collectionDirection?: string | null;
     collectionLanguage?: string[];
     expressionSignals?: string[];
+    priorities?: string[];
+    tradeoffs?: {
+      trend_exposure?: string;
+      expression?: string;
+      value?: string;
+      innovation?: string;
+    };
+    commercial?: {
+      target_msrp?: number | null;
+      margin?: number | null;
+      cost_ceiling?: number | null;
+    };
+    existingPieces?: Array<{
+      name: string;
+      role: string;
+      category: string;
+    }>;
     isStartingPiece?: boolean;
   };
 }
 
+interface PieceReadResponse {
+  headline: string;
+  core_read: string;
+  move_that_matters: string;
+  start_here: string;
+}
+
+interface AestheticEntry {
+  id: string;
+  name: string;
+  trend_velocity?: string;
+  saturation_score?: number;
+  seen_in?: string[];
+  risk_factors?: string[];
+  seasonal_relevance?: string | Record<string, number>;
+}
+
+const aesthetics = aestheticsData as AestheticEntry[];
+
+function normalizeToken(value: string) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function getAestheticEntry(name?: string | null) {
+  if (!name) return null;
+  const token = normalizeToken(name);
+  return aesthetics.find((entry) => normalizeToken(entry.id) === token || normalizeToken(entry.name) === token) ?? null;
+}
+
 function buildStaticFallback(pieceItem: string) {
+  const safeItem = pieceItem || "The opening piece";
   return {
-    title: pieceItem,
-    body: "This piece carries the clearest expression of the collection direction. Assign its role before moving to specs.",
+    headline: `${safeItem} is the clearest route into the collection, but it still needs a sharper market claim.`,
+    core_read:
+      "The silhouette direction is readable and the collection language is starting to hold, but the product story is not specific enough yet to cut through a crowded market.",
+    move_that_matters:
+      "If this does not become a precise expression of the collection’s proportion and surface, the line risks opening with mood instead of product authority.",
+    start_here:
+      `${safeItem} should carry the first claim because it can set the collection’s weight, silhouette role, and commercial posture in one move.`,
   };
 }
 
@@ -62,36 +116,119 @@ export async function POST(req: NextRequest) {
   }
 
   const aestheticName = context?.aestheticName?.trim() || "this direction";
-  const silhouetteLabel = context?.silhouetteLabel?.trim() || "refined";
-  const paletteName = context?.paletteName?.trim() || "unknown";
-  const interpretationLine =
-    context?.interpretationSummary?.trim()
-      ? `\nDirection summary: ${context.interpretationSummary.trim()}`
-      : "";
-  const collectionDirectionLine = context?.collectionDirection?.trim()
-    ? `\nCollection direction: ${context.collectionDirection.trim()}`
-    : "";
-  const collectionLanguageLine = context?.collectionLanguage?.length
-    ? `\nCollection language: ${context.collectionLanguage.join(", ")}`
-    : "";
-  const expressionSignalsLine = context?.expressionSignals?.length
-    ? `\nExpression signals: ${context.expressionSignals.join(", ")}`
-    : "";
-  const framingLine = context?.isStartingPiece
-    ? "\nThis is the starting piece - frame the body as early assortment guidance, not a confirmed read. Use language like 'currently carries' and 'collection language taking shape'."
-    : "\nThis is an active selected piece - frame the body as a direct commercial and aesthetic assessment.";
+  const aestheticEntry = getAestheticEntry(aestheticName);
+  const saturation =
+    aestheticEntry?.saturation_score != null
+      ? aestheticEntry.saturation_score >= 70
+        ? "crowded"
+        : aestheticEntry.saturation_score <= 40
+          ? "emerging"
+          : "open"
+      : "open";
+  const momentum =
+    aestheticEntry?.trend_velocity === "ascending"
+      ? "rising"
+      : aestheticEntry?.trend_velocity === "declining"
+        ? "declining"
+        : aestheticEntry?.trend_velocity ?? "peak";
+  const structuredPayload = {
+    collection: {
+      direction: context?.collectionDirection?.trim() || aestheticName,
+      silhouette: context?.silhouetteLabel?.trim() || "refined proportions",
+      palette: context?.paletteName?.trim() || "palette not yet resolved",
+      materials: context?.expressionSignals?.length ? context.expressionSignals : ["material signals not yet resolved"],
+      elements: context?.collectionLanguage?.length ? context.collectionLanguage : [context?.interpretationSummary?.trim() || "direction not yet articulated"],
+      priorities: context?.priorities?.length ? context.priorities : ["brand expression", "commercial performance"],
+      existing_pieces: context?.existingPieces ?? [],
+      piece_count: context?.existingPieces?.length ?? 0,
+      tradeoffs: {
+        trend_exposure: context?.tradeoffs?.trend_exposure ?? "balanced",
+        expression: context?.tradeoffs?.expression ?? "balanced",
+        value: context?.tradeoffs?.value ?? "balanced",
+        innovation: context?.tradeoffs?.innovation ?? "continuity-aware",
+      },
+      commercial: {
+        target_msrp: context?.commercial?.target_msrp ?? null,
+        margin: context?.commercial?.margin ?? null,
+        cost_ceiling: context?.commercial?.cost_ceiling ?? null,
+      },
+    },
+    market: {
+      momentum,
+      saturation,
+      ownership: aestheticEntry?.seen_in?.slice(0, 5) ?? [],
+      whitespace:
+        aestheticEntry?.risk_factors?.[0]
+          ? `the market still has not resolved ${aestheticEntry.risk_factors[0].charAt(0).toLowerCase()}${aestheticEntry.risk_factors[0].slice(1)}`
+          : "an opening for a more precise interpretation at this price level",
+      season: context?.season ?? "current season",
+      seasonal_timing:
+        typeof aestheticEntry?.seasonal_relevance === "string"
+          ? aestheticEntry.seasonal_relevance
+          : aestheticEntry?.seasonal_relevance ?? context?.season ?? "current season",
+    },
+    piece: {
+      item: pieceItem,
+      type: piece?.type?.trim() || "piece type unresolved",
+      signal: piece?.signal?.trim() || "unknown",
+      note: piece?.note?.trim() || "none",
+      bucket: piece?.bucket?.trim() || "unknown",
+      stage: context?.isStartingPiece ? "starting piece" : "selected piece",
+    },
+  };
 
-  const userMessage = `Write a piece read for ${pieceItem} in a ${aestheticName} collection with ${silhouetteLabel} silhouette and ${paletteName} palette.
+  const userMessage = `Use this structured payload and return only the final answer as JSON:
+${JSON.stringify(structuredPayload, null, 2)}
 
-Piece signal: ${piece?.signal?.trim() || "unknown"}
-Piece note: ${piece?.note?.trim() || "none"}
-Collection role bucket: ${piece?.bucket?.trim() || "unknown"}
-Market resonance: ${context?.resonanceScore ?? "unknown"}/100${interpretationLine}${collectionDirectionLine}${collectionLanguageLine}${expressionSignalsLine}${framingLine}
+Return exactly:
+{
+  "headline": "1-2 sentences max",
+  "core_read": "short paragraph",
+  "move_that_matters": "short paragraph",
+  "start_here": "short paragraph"
+}`;
 
-Return JSON: { "title": "${pieceItem}", "body": "[one paragraph, max 60 words, advisor voice]" }`;
+  const systemPrompt = `You are Muko — a fashion collection intelligence system writing with the authority of a senior merchant and the precision of a design director.
 
-  const systemPrompt =
-    "You are a senior fashion strategy consultant advising a design team. You write precise, commercially grounded piece assessments - one clear title and one paragraph. Treat collection language as the identity anchor and expression signals as execution cues; reason about the interaction between them rather than listing them. Never mention brand keywords by name. Never use the word 'keywords'. Speak through market and aesthetic judgment. Return valid JSON only. No preamble, no markdown, no explanation.";
+You are not summarizing the collection. You are making a call about whether this piece is the right first move and why.
+
+Every sentence must make a falsifiable claim. If a sentence would still be true for a different collection with a different direction and a different piece, delete it and rewrite it until it cannot.
+
+REGISTER FAILURE MODE — before finalizing, scan every sentence for atmospheric language: evocative phrasing that creates mood but makes no concrete claim.
+Atmospheric sentences pass every rule but say nothing specific.
+Examples of atmospheric (delete and rewrite):
+- "The collection carries a quiet confidence that anchors the direction."
+- "This piece brings presence and intention to the opening move."
+- "The silhouette reads with restraint and purpose."
+Examples of declarative (keep):
+- "Opening with a shell instead of a trouser locks proportion before color enters — the collection reads as a surface story, not a shape story."
+- "The column silhouette sets the collection's vertical line early, which means every subsequent piece either reinforces or disrupts it."
+- "At 65% saturation, the structured-minimalist lane still has room at this price point, but only if the first piece claims a specific proportion — not just the aesthetic."
+
+FIELD RULES
+headline: 1–2 sentences. Must name the collection direction and state a specific consequence of the first move. No atmospheric openers.
+
+core_read: 3–5 sentences. Must name the specific tensiis navigating — not the general aesthetic. Must include one concrete market claim (saturation level, timing window, or competitive adjacency). Must name what would cause this collection to fail in market.
+
+move_that_matters: 2–3 sentences. Must include a conditional consequence structured as: if [specific decision] → [specific outcome]. The condition and consequence must both be specific to this collection's direction, silhouette, and palette — not the category generally.
+
+start_here: 2–3 sentences. Must name why this specific piece (not a piece like it) is the right opening move. Must reference material behavior or silhouette role as the mechanism, not the result. Must end with what this piece makes possible for the pieces that follow it.
+
+ASSORTMENT CONTEXT RULES
+When existing_pieces is present and non-empty:
+- The core_read must reference the collection's current composition directly. Name what roles are already present and what is missing.
+- The start_here must explain why this piece specifically fills a gap in the existing assortment — not why it is generically good.
+- If piece_count is 0, treat this as the opening move and focus on what this piece makes possible for pieces that follow.
+
+When existing_pieces is empty or absent:
+- Treat this as piece one. Focus on what this piece establishes and what it constrains for the collection that follows.
+
+HARD RULES
+- No bullets anywhere.
+- No filler. Every sentence earns its place or is cut.
+- Do not use: "based on", "this suggests", "strong alignment", "elevated", "curated", "quiet confidence", "speaks to", "brings presence", "carries intention"ith restraint".
+- Do not restate the collection inputs back as prose.
+- Return valid JSON only. No preamble. No markdown.`;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -99,8 +236,8 @@ Return JSON: { "title": "${pieceItem}", "body": "[one paragraph, max 60 words, a
       try {
         const client = new Anthropic();
         const anthropicStream = client.messages.stream({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 160,
+          model: "claude-sonnet-4-6",
+          max_tokens: 400,
           temperature: 0.4,
           system: systemPrompt,
           messages: [{ role: "user", content: userMessage }],
@@ -119,10 +256,15 @@ Return JSON: { "title": "${pieceItem}", "body": "[one paragraph, max 60 words, a
         }
 
         try {
-          const parsed = parseJSONResponse<{ title: string; body: string }>(accumulated);
+          const parsed = parseJSONResponse<PieceReadResponse>(accumulated);
           controller.enqueue(encoder.encode(sse('complete', {
-            title: typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : pieceItem,
-            body: typeof parsed.body === "string" && parsed.body.trim() ? parsed.body.trim() : fallback.body,
+            headline: typeof parsed.headline === "string" && parsed.headline.trim() ? parsed.headline.trim() : fallback.headline,
+            core_read: typeof parsed.core_read === "string" && parsed.core_read.trim() ? parsed.core_read.trim() : fallback.core_read,
+            move_that_matters:
+              typeof parsed.move_that_matters === "string" && parsed.move_that_matters.trim()
+                ? parsed.move_that_matters.trim()
+                : fallback.move_that_matters,
+            start_here: typeof parsed.start_here === "string" && parsed.start_here.trim() ? parsed.start_here.trim() : fallback.start_here,
           })));
         } catch {
           controller.enqueue(encoder.encode(sse('complete', fallback)));

@@ -2,27 +2,31 @@
 // Streams the spec insight as SSE.
 // Events emitted:
 //   chunk    — { text: string } raw LLM text delta
-//   complete — SynthesizerResult (full parsed InsightData)
-//   fallback — SynthesizerResult (template fallback on parse failure)
+//   complete — SynthesizerResult (rail contract + mapped InsightData)
+//   fallback — SynthesizerResult (deterministic fallback on parse failure)
 
 import { NextRequest } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import type { SpecBlackboard } from '@/lib/synthesizer/specInsight';
 import {
   buildSpecPrompt,
-  SPEC_STUDIO_PROMPT_V6_2,
+  buildSpecSystemPrompt,
   determineSpecMode,
-  buildSpecFallbackInput,
-  parseSpecV5Output,
+  buildSpecFallbackRail,
+  parseSpecRailOutput,
 } from '@/lib/synthesizer/specInsight';
-import { generateTemplateNarrative } from '@/lib/agents/synthesizer';
-import type { InsightData, InsightMode } from '@/lib/types/insight';
+import { mapSpecRailToInsightData } from '@/lib/synthesizer/specDecision';
 
-function makeFallback(bb: SpecBlackboard, editLabel: string, mode: InsightMode) {
-  const fallbackInput = buildSpecFallbackInput(bb, mode);
-  const data = generateTemplateNarrative(fallbackInput);
-  data.editLabel = editLabel;
-  return { data, meta: { method: 'template' as const, latency_ms: 0 } };
+function makeFallback(bb: SpecBlackboard) {
+  const { mode } = determineSpecMode(
+    bb.margin_pass,
+    bb.execution_score,
+    bb.identity_score,
+    bb.resonance_score,
+  );
+  const rail = buildSpecFallbackRail(bb);
+  const data = mapSpecRailToInsightData(rail, mode);
+  return { rail, data, meta: { method: 'template' as const, latency_ms: 0 } };
 }
 
 export async function POST(req: NextRequest) {
@@ -44,11 +48,14 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { mode, editLabel } = determineSpecMode(
+  const { mode } = determineSpecMode(
     blackboard.margin_pass,
-    blackboard.execution_score
+    blackboard.execution_score,
+    blackboard.identity_score,
+    blackboard.resonance_score,
   );
   const userPrompt = buildSpecPrompt(blackboard);
+  const systemPrompt = buildSpecSystemPrompt(blackboard);
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -65,7 +72,7 @@ export async function POST(req: NextRequest) {
           model: 'claude-sonnet-4-6',
           max_tokens: 650,
           temperature: 0.35,
-          system: SPEC_STUDIO_PROMPT_V6_2,
+          system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }],
         });
 
@@ -80,37 +87,23 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Parse v5.0 JSON output and emit complete event
+        // Parse v7.0 JSON output and emit complete event
         try {
-          const parsed = parseSpecV5Output(accumulated);
+          const parsed = parseSpecRailOutput(accumulated);
           if (!parsed) {
             console.warn('[SpecRoute] Invalid JSON in response, emitting fallback');
-            emit('fallback', JSON.stringify(makeFallback(blackboard, editLabel, mode)));
+            emit('fallback', JSON.stringify(makeFallback(blackboard)));
             return;
           }
 
-          // Replace "YOUR brand" placeholder with the actual brand/collection name
-          const brandName = blackboard.brand_name;
-          if (brandName) {
-            const r = (s: string) => s.replace(/YOUR brand/g, brandName);
-            parsed.insight_title = r(parsed.insight_title);
-            parsed.insight_description = r(parsed.insight_description);
-            parsed.build_reality = parsed.build_reality.map(r);
-          }
-
-          const data: InsightData = {
-            statements: [parsed.insight_title, parsed.insight_description],
-            edit: parsed.build_reality.slice(0, 3),
-            editLabel: 'BUILD REALITY',
-            mode,
-          };
-          emit('complete', JSON.stringify({ data, meta: { method: 'llm', latency_ms: 0 } }));
+          const data = mapSpecRailToInsightData(parsed, mode);
+          emit('complete', JSON.stringify({ rail: parsed, data, meta: { method: 'llm', latency_ms: 0 } }));
         } catch {
-          emit('fallback', JSON.stringify(makeFallback(blackboard, editLabel, mode)));
+          emit('fallback', JSON.stringify(makeFallback(blackboard)));
         }
       } catch {
         try {
-          emit('fallback', JSON.stringify(makeFallback(blackboard, editLabel, mode)));
+          emit('fallback', JSON.stringify(makeFallback(blackboard)));
         } catch { /* silent */ }
       } finally {
         controller.close();

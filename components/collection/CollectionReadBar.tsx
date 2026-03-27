@@ -139,7 +139,7 @@ export function CollectionReadBar({
                 transition={{ duration: 0.2, ease: "easeInOut" }}
                 style={{
                   overflow: "hidden",
-                  maxWidth: 920,
+                  width: "100%",
                 }}
               >
                 <AnimatePresence mode="wait" initial={false}>
@@ -155,7 +155,7 @@ export function CollectionReadBar({
                       fontSize: isExpanded ? 18 : 15,
                       fontWeight: summaryWeight,
                       letterSpacing: "0.06em",
-                      textTransform: "uppercase",
+                      textTransform: "lowercase",
                       lineHeight: 1.3,
                       color: stage === 0 ? "rgba(67,67,43,0.48)" : "rgba(67,67,43,0.74)",
                       display: "-webkit-box",

@@ -26,6 +26,25 @@ export interface CollectionDistributionItem {
   percentage: number;
 }
 
+export interface AssortmentIntelligence {
+  collection_state: string;
+  collection_read: string;
+  supporting_line: string;
+  muko_insight: string;
+  collection_insight: string;
+  breakdown: string[];
+  recommended_actions: string[];
+  watchlist: string[];
+  diagnostics?: {
+    collectionStage: 'early' | 'developing' | 'built';
+    roleBalanceStatus: 'missing_core' | 'missing_hero' | 'missing_support' | 'balanced';
+    complexityRisk: 'front_loaded_high' | 'balanced' | 'too_safe';
+    coverage: 'narrow' | 'moderate' | 'broad';
+    viabilitySignal: 'fragile' | 'building' | 'stable';
+    complexitySummary: string;
+  };
+}
+
 export interface CollectionReportPieceSummaryItem {
   id: string;
   piece_name: string;
@@ -67,6 +86,7 @@ export interface CollectionReportPayload {
     watch: string[];
     recommendations: string[];
   };
+  assortment_intelligence: AssortmentIntelligence;
   collection_health: {
     role_balance: CollectionHealthDetail;
     complexity_load: CollectionHealthDetail;

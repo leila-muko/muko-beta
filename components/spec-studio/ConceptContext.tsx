@@ -29,7 +29,7 @@ export default function ConceptContext({ concept }: ConceptContextProps) {
             ✓ Identity {concept.identityScore}
           </span>
           <span className="text-[11px] text-[#A8B475] font-medium">
-            ✓ Resonance {concept.resonanceScore}
+            ✓ Commercial Potential {concept.resonanceScore}
           </span>
         </div>
         <span

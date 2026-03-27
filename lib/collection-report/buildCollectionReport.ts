@@ -1,17 +1,17 @@
 import type {
+  AssortmentIntelligence,
   CollectionComplexity,
   CollectionDistributionItem,
   CollectionHealthDetail,
   CollectionPieceRole,
   CollectionPieceStatus,
-  CollectionReportBrandInput,
   CollectionReportInput,
   CollectionReportInputPiece,
   CollectionReportIntentInput,
   CollectionReportPayload,
   CollectionReportResponse,
-  CollectionRisk,
 } from '@/lib/collection-report/types';
+import { buildAssortmentIntelligence } from '@/lib/collection-report/buildAssortmentIntelligence';
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, Math.round(value)));
@@ -176,33 +176,6 @@ function summarizeIntent(intent?: CollectionReportIntentInput | null) {
   return `Measured against ${parts.join(' / ')}.`;
 }
 
-function buildGapRecommendation(args: {
-  dominantCategory?: string;
-  topMaterial?: string;
-  foundationShare: number;
-  heroShare: number;
-  silhouetteDiversity: CollectionHealthDetail;
-  complexityLoad: CollectionHealthDetail;
-}) {
-  if (args.foundationShare < 45) {
-    return `Add a clearer core or volume-driving ${args.dominantCategory ? args.dominantCategory.toLowerCase().replace(/s$/, '') : 'piece'} in ${args.topMaterial?.toLowerCase() ?? 'a simpler material'} to make the headline ideas easier to merchandise.`;
-  }
-
-  if (args.silhouetteDiversity.label === 'Low') {
-    return `Introduce one sharper silhouette shift outside ${args.dominantCategory?.toLowerCase() ?? 'the current category center'} so the line stops repeating the same outline.`;
-  }
-
-  if (args.complexityLoad.score <= 48) {
-    return `Hold one hero in ${args.topMaterial?.toLowerCase() ?? 'the lead fabrication'} and strip complexity out of the next supporting style before development load compounds.`;
-  }
-
-  if (args.heroShare < 18) {
-    return `Add one clearer hero ${args.dominantCategory ? args.dominantCategory.toLowerCase().replace(/s$/, '') : 'piece'} to give the assortment a visible lead story.`;
-  }
-
-  return 'Keep new additions disciplined around one clear role gap rather than broadening the range in every direction at once.';
-}
-
 function describeRoleBalance(
   score: number,
   roles: Record<CollectionPieceRole, number>,
@@ -358,26 +331,26 @@ function getScoreExplanation(
 ): string {
   if (label === 'Identity') {
     if (score >= 80) {
-      return `${context.brandName ?? 'The collection'} reads coherently through ${context.dominantCategory ?? 'the key categories'}, with a point of view that stays consistent under the current brief.`;
+      return `${context.brandName ?? 'The collection'} is holding a consistent line across ${context.dominantCategory ?? 'the key categories'}, so the assortment reads as one system instead of isolated pieces.`;
     }
 
     if (score >= 65) {
-      return `The direction is recognizable, though a sharper edit around ${context.dominantCategory ?? 'the lead category'} would make the brand language feel more deliberate for this collection intent.`;
+      return `The assortment has a readable identity, but a sharper structural edit around ${context.dominantCategory ?? 'the lead category'} would make the line feel more disciplined.`;
     }
 
-    return 'The collection direction is still fragmented, and the strongest pieces are not yet pulling the rest of the line into one coherent story.';
+    return 'The collection is still fragmented at the assortment level, and the strongest pieces are not yet pulling the rest of the line into one coherent build.';
   }
 
   if (label === 'Resonance') {
     if (score >= 80) {
-      return `The assortment lands in a commercially relevant space, with enough clarity around ${context.dominantCategory ?? 'the lead categories'} to feel timely without blurring into category sameness.`;
+      return `The assortment has enough structural clarity around ${context.dominantCategory ?? 'the lead categories'} to feel commercially legible without collapsing into sameness.`;
     }
 
     if (score >= 65) {
-      return 'There is market promise here, but the line needs stronger role clarity and differentiation to convert relevance into demand.';
+      return 'The line has commercial potential, but it needs stronger role clarity and category separation to convert interest into a viable buy.';
     }
 
-    return 'The assortment is not yet translating its creative direction into a sharp market proposition, especially where overlap is highest.';
+    return 'The assortment is not yet built clearly enough to support demand, especially where overlap is highest.';
   }
 
   if (score >= 80) {
@@ -392,35 +365,9 @@ function getScoreExplanation(
 }
 
 function buildThesis(input: CollectionReportInput, context: {
-  brand?: CollectionReportBrandInput | null;
-  intent?: CollectionReportIntentInput | null;
-  identity: number;
-  resonance: number;
-  execution: number;
-  dominantCategory?: string;
-  topMaterial?: string;
-  roleBalanceLabel: string;
-  silhouetteLabel: string;
+  assortmentIntelligence: AssortmentIntelligence;
 }) {
-  const brandName = context.brand?.brand_name || input.collection_name;
-  const leadGoal = getPrimaryGoal(context.intent);
-  const customer = context.brand?.customer_profile?.split(/[.!?]/)[0]?.trim();
-  const strongest =
-    context.identity >= context.resonance && context.identity >= context.execution
-      ? 'brand coherence'
-      : context.resonance >= context.execution
-        ? 'market relevance'
-        : 'build viability';
-  const mainTension =
-    context.silhouetteLabel === 'Low'
-      ? 'broader silhouette differentiation'
-      : context.roleBalanceLabel === 'Hero-led'
-        ? 'sharper role balance'
-        : context.execution < 70
-          ? 'a cleaner execution edit'
-          : 'tighter assortment discipline';
-
-  return `${brandName} is building a ${context.dominantCategory ? `${context.dominantCategory.toLowerCase()}-led` : 'focused'} collection that is strongest when it pushes ${strongest}${leadGoal ? ` in service of ${leadGoal.toLowerCase()}` : ''}. ${customer ? `For a customer anchored in ${customer.toLowerCase()},` : 'Right now,'} the line feels most convincing through ${context.topMaterial ? context.topMaterial.toLowerCase() : 'its material language'}, but it still needs ${mainTension} before development decisions lock.`;
+  return context.assortmentIntelligence.collection_insight;
 }
 
 function buildOverviewNote(silhouetteScore: number, dominantSilhouetteShare: number) {
@@ -435,160 +382,17 @@ function buildOverviewNote(silhouetteScore: number, dominantSilhouetteShare: num
   return 'The collection has some silhouette range, though overlap is starting to show in adjacent pieces.';
 }
 
-function buildRisks(args: {
-  roleBalance: CollectionHealthDetail;
-  complexityLoad: CollectionHealthDetail;
-  silhouetteDiversity: CollectionHealthDetail;
-  redundancyRisk: CollectionHealthDetail;
-  dominantCategory?: string;
-  topMaterial?: string;
-  foundationShare: number;
-  heroShare: number;
-}): CollectionRisk[] {
-  const risks: CollectionRisk[] = [];
-
-  if (args.complexityLoad.score <= 48) {
-    risks.push({
-      title: 'Complexity concentration',
-      detail: 'Too much development weight is sitting in a small number of pieces, which raises sampling and execution pressure.',
-    });
-  }
-
-  if (args.silhouetteDiversity.score <= 48) {
-    risks.push({
-      title: 'Silhouette redundancy',
-      detail: 'Several looks are landing in adjacent shapes, reducing the assortment’s sense of range.',
-    });
-  }
-
-  if (args.roleBalance.label === 'Hero-led' || args.foundationShare < 40) {
-    risks.push({
-      title: 'Underbuilt commercial base',
-      detail: 'The collection has direction, but it needs more core and volume-driving pieces to make the lead ideas commercially legible.',
-    });
-  }
-
-  if (args.redundancyRisk.score <= 42 && args.dominantCategory) {
-    risks.push({
-      title: `${args.dominantCategory} dependence`,
-      detail: `The line is leaning heavily on ${args.dominantCategory.toLowerCase()}, so performance risk is concentrated in one area.`,
-    });
-  }
-
-  if (risks.length < 2) {
-    risks.push({
-      title: 'Editing discipline',
-      detail: `The strongest opportunity is to clarify what each piece contributes before the collection expands further around ${args.topMaterial?.toLowerCase() ?? 'the current material direction'}.`,
-    });
-  }
-
-  return risks.slice(0, 4);
-}
-
 function buildOverallRead(args: {
-  brand?: CollectionReportBrandInput | null;
-  intent?: CollectionReportIntentInput | null;
-  identity: number;
-  resonance: number;
-  execution: number;
-  roleBalance: CollectionHealthDetail;
-  silhouetteDiversity: CollectionHealthDetail;
-  riskCount: number;
+  assortmentIntelligence: AssortmentIntelligence;
 }) {
-  if (args.identity >= 80 && args.resonance >= 75 && args.execution >= 72 && args.riskCount <= 2) {
-    return `${args.brand?.brand_name ?? 'This collection'} is ready to move forward with refinement, not rethinking.`;
-  }
-
-  if (args.identity >= 78 && (args.roleBalance.label !== 'Balanced' || args.silhouetteDiversity.label === 'Low')) {
-    return 'The direction is convincing, but the assortment needs rebalancing before sampling earns the headline.';
-  }
-
-  if (args.identity >= 75 && args.execution < 70) {
-    return 'Brand clarity is landing; development discipline is the gate to readiness.';
-  }
-
-  return 'The collection is promising, but the line edit is not resolved enough to lock cleanly.';
+  const firstSentence = args.assortmentIntelligence.collection_insight.split('. ')[0]?.trim() || 'The assortment needs a clearer structure.';
+  return `${firstSentence.replace(/\.$/, '')}.`;
 }
 
 function buildOverallReadDetail(args: {
-  dominantCategory?: string;
-  roleBalance: CollectionHealthDetail;
-  complexityLoad: CollectionHealthDetail;
-  silhouetteDiversity: CollectionHealthDetail;
-  recommendation: string;
+  assortmentIntelligence: AssortmentIntelligence;
 }) {
-  return [
-    args.dominantCategory ? `${args.dominantCategory} is still carrying too much of the collection’s outcome.` : null,
-    args.roleBalance.label !== 'Balanced' ? args.roleBalance.interpretation : null,
-    args.complexityLoad.score >= 68 ? args.complexityLoad.interpretation : null,
-    args.silhouetteDiversity.label === 'Low' ? args.silhouetteDiversity.interpretation : null,
-    args.recommendation,
-  ].filter(Boolean)[0] ?? args.recommendation;
-}
-
-function summarizeInsight(args: {
-  brand?: CollectionReportBrandInput | null;
-  intent?: CollectionReportIntentInput | null;
-  roleBalance: CollectionHealthDetail;
-  complexityLoad: CollectionHealthDetail;
-  silhouetteDiversity: CollectionHealthDetail;
-  redundancyRisk: CollectionHealthDetail;
-  dominantCategory?: string;
-  heroShare: number;
-  foundationShare: number;
-  topMaterial?: string;
-}) {
-  const working: string[] = [];
-  const watch: string[] = [];
-  const recommendations: string[] = [];
-
-  if (args.heroShare >= 18) {
-    working.push(`The collection has enough hero energy to anchor the line, so the lead story is legible instead of diffused across too many ideas.`);
-  } else {
-    working.push('Core and volume-driving pieces are carrying the line consistently, which gives the assortment a stable commercial base to build on.');
-  }
-
-  if (args.roleBalance.label === 'Balanced') {
-    working.push('Role distribution is reading with discipline, so the collection feels intentionally built rather than accumulated piece by piece.');
-  }
-
-  if (args.topMaterial) {
-    working.push(`${args.topMaterial} is helping unify the edit without flattening the collection into a single-note material story.`);
-  }
-
-  if (args.silhouetteDiversity.label === 'Low') {
-    watch.push(`Shape repetition is compressing the collection, making adjacent ${args.dominantCategory?.toLowerCase() ?? 'pieces'} feel closer than they should.`);
-  }
-
-  if (args.complexityLoad.score <= 48) {
-    watch.push('Complexity is stacking into too few pieces, which could slow development disproportionate to assortment size.');
-  }
-
-  if (args.foundationShare < 40) {
-    watch.push('The commercial foundation is thin, so lead ideas may arrive without enough surrounding clarity.');
-  }
-
-  if (args.redundancyRisk.score <= 42 && args.dominantCategory) {
-    watch.push(`Too much of the collection outcome depends on ${args.dominantCategory.toLowerCase()}, increasing concentration risk.`);
-  }
-
-  recommendations.push(buildGapRecommendation(args));
-
-  if (args.foundationShare < 45) {
-    recommendations.push(`Add or strengthen core and volume-driving pieces that make the lead concepts easier to merchandise${args.topMaterial ? `, ideally in ${args.topMaterial.toLowerCase()} or an adjacent easier fabric` : ''}.`);
-  }
-
-  if (args.complexityLoad.score <= 48) {
-    recommendations.push('Validate feasibility on the most complex pieces now, then simplify construction or fabrication where the payoff is marginal.');
-  } else {
-    recommendations.push(`Protect the strongest direction by keeping new additions disciplined around role and silhouette${args.intent?.collection_role ? ` for a ${titleCase(args.intent.collection_role).toLowerCase()} brief` : ''}.`);
-  }
-
-  return {
-    working: working.slice(0, 3),
-    watch: watch.slice(0, 3),
-    recommendations: recommendations.slice(0, 3),
-  };
+  return args.assortmentIntelligence.watchlist[0] ?? args.assortmentIntelligence.recommended_actions[0] ?? '';
 }
 
 export function buildCollectionReport(input: CollectionReportInput): CollectionReportResponse {
@@ -709,6 +513,17 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     .filter((item) => normalizeToken(item.label) !== 'unknown')
     .slice(0, 3)
     .map((item) => item.label);
+  const assortmentIntelligence = buildAssortmentIntelligence({
+    totalPieces: pieceCount,
+    heroCount: roles.hero,
+    coreCount: roles['core-evolution'] + roles['volume-driver'],
+    supportCount: roles.directional,
+    lowCount: complexityCounts.low ?? 0,
+    mediumCount: complexityCounts.medium ?? 0,
+    highCount: complexityCounts.high ?? 0,
+    uniqueCategoryCount: Object.keys(categoryCounts).filter((token) => token !== 'unknown').length,
+    executionScore: rawExecution,
+  });
 
   const scoresContext = {
     brandName: input.brand?.brand_name ?? undefined,
@@ -736,71 +551,30 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     },
   };
 
-  const insight = summarizeInsight({
-    brand: input.brand,
-    intent: input.intent,
-    roleBalance,
-    complexityLoad,
-    silhouetteDiversity,
-    redundancyRisk,
-    dominantCategory,
-    heroShare,
-    foundationShare,
-    topMaterial: topMaterialLabel,
-  });
+  const insight = {
+    working: assortmentIntelligence.breakdown,
+    watch: assortmentIntelligence.watchlist,
+    recommendations: assortmentIntelligence.recommended_actions,
+  };
 
-  const keyRisks = buildRisks({
-    roleBalance,
-    complexityLoad,
-    silhouetteDiversity,
-    redundancyRisk,
-    dominantCategory,
-    topMaterial: topMaterialLabel,
-    foundationShare,
-    heroShare,
-  });
+  const keyRisks = assortmentIntelligence.watchlist.map((detail, index) => ({
+    title:
+      index === 0
+        ? 'Role Balance'
+        : index === 1
+          ? 'Complexity Risk'
+          : index === 2
+            ? 'Coverage Risk'
+            : 'Assortment Risk',
+    detail,
+  }));
 
   const overallRead = buildOverallRead({
-    brand: input.brand,
-    intent: input.intent,
-    identity,
-    resonance,
-    execution,
-    roleBalance,
-    silhouetteDiversity,
-    riskCount: keyRisks.length,
+    assortmentIntelligence,
   });
   const overallReadDetail = buildOverallReadDetail({
-    dominantCategory,
-    roleBalance,
-    complexityLoad,
-    silhouetteDiversity,
-    recommendation: insight.recommendations[0] ?? 'Keep editing toward a clearer collection hierarchy.',
+    assortmentIntelligence,
   });
-
-  const immediateActions = [
-    complexityLoad.score <= 48
-      ? 'Validate feasibility, costing, and timeline on the most complex hero pieces before sampling slots tighten.'
-      : 'Confirm the lead hero pieces and keep the rest of the line disciplined around them.',
-    silhouetteDiversity.label === 'Low'
-      ? 'Edit duplicate silhouettes so adjacent pieces are not competing for the same role in the assortment.'
-      : 'Review the line for any pieces whose role or silhouette is still too close to an existing style.',
-    foundationShare < 45
-      ? 'Strengthen the core and volume-driving layer so the collection can sell through more than its headline concepts.'
-      : 'Lock materials and trims on the strongest pieces to protect coherence as development continues.',
-  ].slice(0, 3);
-
-  const decisionPoints = [
-    dominantCategory
-      ? `Decide whether to maintain the current concentration in ${dominantCategory.toLowerCase()} or reallocate into adjacent categories.`
-      : 'Decide whether the current category concentration is intentional or needs rebalancing.',
-    complexityLoad.score <= 48
-      ? 'Choose where elevated complexity is truly worth the investment and where a simpler build would preserve the idea.'
-      : 'Decide how much construction ambition the team wants to hold before costs begin to distort the assortment.',
-    silhouetteDiversity.label === 'Low'
-      ? 'Choose whether overlapping silhouettes should be differentiated further or reduced before the line locks.'
-      : 'Decide whether the current shape range is enough for the market breadth you want the collection to cover.',
-  ].slice(0, 3);
 
   return {
     collection_report: {
@@ -813,15 +587,7 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
         version_label: input.version_label ?? null,
       },
       collection_thesis: buildThesis(input, {
-        brand: input.brand,
-        intent: input.intent,
-        identity,
-        resonance,
-        execution,
-        dominantCategory,
-        topMaterial: topMaterialLabel,
-        roleBalanceLabel: roleBalance.label,
-        silhouetteLabel: silhouetteDiversity.label,
+        assortmentIntelligence,
       }),
       narrative: input.narrative?.trim() || '',
       overview: {
@@ -834,6 +600,7 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
       },
       scores,
       muko_insight: insight,
+      assortment_intelligence: assortmentIntelligence,
       collection_health: {
         role_balance: roleBalance,
         complexity_load: complexityLoad,
@@ -855,8 +622,8 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
         })),
       key_risks: keyRisks,
       next_steps: {
-        immediate_actions: immediateActions,
-        decision_points: decisionPoints,
+        immediate_actions: assortmentIntelligence.recommended_actions.slice(0, 3),
+        decision_points: assortmentIntelligence.watchlist.slice(0, 3),
       },
       overall_read: overallRead,
       overall_read_detail: overallReadDetail,

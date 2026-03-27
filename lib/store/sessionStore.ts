@@ -133,6 +133,7 @@ interface SessionState {
   // Collections hub
   activeCollection: string | null;
   assortmentInsightCache: Record<string, string>;
+  preloadedCriticScores: Record<string, number>;
 
   // Actions
   setSeason: (season: string) => void;
@@ -181,6 +182,7 @@ interface SessionState {
   setSavedAnalysisId: (id: string | null) => void;
   setActiveCollection: (name: string | null) => void;
   setAssortmentInsightCache: (collectionName: string, insight: string) => void;
+  setPreloadedCriticScores: (scores: Record<string, number>) => void;
 
   lockConcept: () => void;
   unlockConcept: () => void;
@@ -246,6 +248,7 @@ export const useSessionStore = create<SessionState>()(
       savedAnalysisId: null,
       activeCollection: null,
       assortmentInsightCache: {},
+      preloadedCriticScores: {},
 
       // Actions
       setSeason: (season) => set({ season }),
@@ -318,12 +321,13 @@ export const useSessionStore = create<SessionState>()(
         set((state) => ({
           assortmentInsightCache: { ...state.assortmentInsightCache, [collectionName]: insight },
         })),
+      setPreloadedCriticScores: (preloadedCriticScores) => set({ preloadedCriticScores }),
 
       lockConcept: () => set({ conceptLocked: true }),
       unlockConcept: () => set({ conceptLocked: false }),
       setCurrentStep: (step) => set({ currentStep: step }),
 
-      resetSession: () => set({
+      resetSession: () => set((state) => ({
         season: '',
         collectionName: '',
         aestheticInput: '',
@@ -362,7 +366,7 @@ export const useSessionStore = create<SessionState>()(
         intentGoals: [],
         intentTradeoff: '',
         successPriorities: [],
-        targetMargin: 50,
+        targetMargin: state.targetMargin > 0 ? state.targetMargin : 50,
         sliderTrend: 50,
         sliderCreative: 50,
         sliderElevated: 50,
@@ -375,11 +379,12 @@ export const useSessionStore = create<SessionState>()(
         pieceRolesById: {},
         pieceBuildContext: null,
         savedAnalysisId: null,
-      }),
+        preloadedCriticScores: {},
+      })),
     }),
     {
       name: 'muko-session',
-      version: 3,
+      version: 4,
       migrate: (persistedState, version) => {
         if (version < 2) {
           return {
@@ -399,11 +404,17 @@ export const useSessionStore = create<SessionState>()(
             strategySummary: null,
           };
         }
+        if (version < 4) {
+          return {
+            ...(persistedState as object),
+            preloadedCriticScores: {},
+          };
+        }
         return persistedState;
       },
       partialize: (state) => {
         // Persist everything except actions
-        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setStrategySummary, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setSuccessPriorities, setTargetMargin, setSliderTrend, setSliderCreative, setSliderElevated, setSliderNovelty, setCollectionRole, setSelectedKeyPiece, setSelectedPieceImage, setDecisionGuidanceState, setActiveProductPieceId, setPieceRolesById, setPieceBuildContext, setSavedAnalysisId, setActiveCollection, setAssortmentInsightCache, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
+        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setStrategySummary, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setSuccessPriorities, setTargetMargin, setSliderTrend, setSliderCreative, setSliderElevated, setSliderNovelty, setCollectionRole, setSelectedKeyPiece, setSelectedPieceImage, setDecisionGuidanceState, setActiveProductPieceId, setPieceRolesById, setPieceBuildContext, setSavedAnalysisId, setActiveCollection, setAssortmentInsightCache, setPreloadedCriticScores, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
         return rest;
       },
     }

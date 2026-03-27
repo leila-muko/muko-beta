@@ -12,7 +12,7 @@ describe("buildPulseMicroInsight", () => {
     });
 
     expect(pulseMicroInsightToText(insight)).toBe(
-      "Market appetite is strong, but the product expression isn't fully anchored in your brand yet."
+      "The direction has momentum, but the brand coherence still needs tightening."
     );
     expect(insight.cues).toEqual([
       expect.objectContaining({ key: "identity", value: "mixed", tone: "warning" }),
@@ -45,7 +45,7 @@ describe("buildPulseMicroInsight", () => {
     });
 
     expect(pulseMicroInsightToText(insight)).toBe(
-      "The direction has signal, but the product expression still needs to be locked."
+      "The direction has signal, but it still needs a cleaner edit."
     );
   });
 

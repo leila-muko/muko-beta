@@ -72,27 +72,13 @@ function decodePartialJsonString(value: string) {
   }
 }
 
-function extractPartialJsonArray(raw: string, key: string): string[] {
-  const match = raw.match(new RegExp(`"${key}"\\s*:\\s*\\[([\\s\\S]*?)`));
-  if (!match) return [];
-
-  const items: string[] = [];
-  const itemPattern = /"((?:\\.|[^"\\])*)"/g;
-  let itemMatch: RegExpExecArray | null;
-
-  while ((itemMatch = itemPattern.exec(match[1])) !== null) {
-    items.push(decodePartialJsonString(itemMatch[1]).trim());
+function extractPartialCollectionInsight(raw: string) {
+  const stringMatch = raw.match(/"collection_insight"\s*:\s*"((?:\\.|[^"\\])*)"/);
+  if (stringMatch) {
+    return decodePartialJsonString(stringMatch[1]).trim();
   }
 
-  return items.filter(Boolean);
-}
-
-function extractPartialCollectionInsight(raw: string) {
-  return [
-    ...extractPartialJsonArray(raw, 'whats_working'),
-    ...extractPartialJsonArray(raw, 'what_to_watch'),
-    ...extractPartialJsonArray(raw, 'recommendations'),
-  ].join(' ');
+  return '';
 }
 
 function inferRole(value: string | null | undefined): CollectionPieceRole | null {

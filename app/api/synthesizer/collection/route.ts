@@ -35,35 +35,33 @@ function buildAssortmentInsight(collectionName: string, directionCounts: Record<
 
 const COLLECTION_SYSTEM_PROMPT = `You are Muko's collection strategist. You write the intelligence layer of a collection report that will be read in a creative review — by a design director, a merchandising lead, or both together on a shared screen.
 
-This is not a summary of what the scores say. The scores are already on screen. Your job is to say what the scores mean for this specific brand, this specific season, and these specific choices — and what the design director should do before the line locks.
+This is not a summary of what the scores say. The scores are already on screen. Your job is to say what the scores mean for the collection as a system — what is structurally working, what is missing at assortment level, and what should happen next before the line locks.
 
 Your reader is a senior creative professional. They have seen hundreds of brand decks and trend reports. They will dismiss anything that sounds like generated text. Write as a strategist who has studied this brand for years and is giving their honest read in a pre-season review.
 
 Rules you must follow:
 - Never mention scores, numbers, or percentages in your narrative output — those are already rendered by the UI
 - Never use the words: "analysis", "data", "metric", "algorithm", "assessment", "leverage", "utilize", "optimize", "holistic", "robust"
-- The overall read must be one sentence. It is the most important sentence in the report. It must contain a tension — what is working against what needs to change. Do not resolve the tension in this sentence.
-- "What's working" items: state facts about the collection as they are, not as they could be. Present tense. Specific.
-- "What to watch" items: name the structural problem, not the symptom. E.g. not "complexity is high" but "development weight is sitting in too few pieces, which narrows the window for revision without cascading delays"
-- Recommendations must be actionable in the next two weeks. Nothing strategic, nothing long-term. Specific enough that the design director could hand it to a product developer today.
+- Focus only on role distribution, structure, balance, completeness, coverage, complexity distribution, and collection-level viability
+- Do not recap the concept, trend lane, market timing, or aesthetic thesis
+- Do not reference specific piece names, garment names, materials, silhouettes, or product details
+- Do not use "start here", "build this", "lean in", or any named product recommendation language
+- Collection state and supporting line must be concise, editorial, and decisive
+- Recommendations must be structural only, actionable in the next two weeks, and phrased without exact product suggestions
 - Tone: the tone of a trusted advisor in the room, not a consultant report. Sentences can be short. Directness is respect.
-- Do not reference specific piece names, garment names, or individual product details. Write only about the collection direction, aesthetic world, and creative intent.
+- Do not reference "the data" or explain methodology.
 
 Output valid JSON only. No preamble, no explanation, no markdown fences.`;
 
 interface SynthesizerNarrativeOutput {
-  overall_read: string;
-  overall_read_sub: string;
-  collection_thesis: string;
-  identity_narrative: string;
-  resonance_narrative: string;
-  execution_narrative: string;
-  whats_working: string[];
-  what_to_watch: string[];
-  recommendations: string[];
-  key_risks: Array<{ title: string; description: string }>;
-  immediate_actions: string[];
-  decision_points: string[];
+  collection_state: string;
+  collection_read: string;
+  muko_insight: string;
+  secondary_metrics?: {
+    identity?: number;
+    resonance?: number;
+    execution?: number;
+  };
 }
 
 function buildSynthesizerUserMessage(
@@ -157,24 +155,21 @@ Silhouette distribution: ${silDist}
 
 Return only valid JSON matching this schema exactly:
 {
-  "overall_read": "one sentence containing a tension. Max 22 words.",
-  "overall_read_sub": "one sentence naming what needs to change and when. Max 16 words.",
-  "collection_thesis": "2–3 sentences. What this collection is trying to do, who it is for, where it is strongest right now. Present tense. Specific to this brand.",
-  "identity_narrative": "1–2 sentences interpreting the identity score in plain language. No numbers.",
-  "resonance_narrative": "1–2 sentences interpreting the resonance score. Name the market condition driving it.",
-  "execution_narrative": "1–2 sentences interpreting the execution score. Name the structural cause, not just the outcome.",
-  "whats_working": ["specific observation, present tense, max 20 words", "..."],
-  "what_to_watch": ["structural problem not symptom, max 22 words", "..."],
-  "recommendations": ["actionable in 2 weeks, specific, max 22 words", "...", "..."],
-  "key_risks": [{ "title": "2–4 words", "description": "1 sentence on consequence if unresolved. Max 18 words." }],
-  "immediate_actions": ["specific, doable today or this week, max 20 words", "...", "..."],
-  "decision_points": ["choice to make before line locks, framed as real decision, max 22 words", "...", "..."]
+  "collection_state": "Developing Direction",
+  "collection_read": "Direction is strong, but the collection is not yet structurally built.",
+  "muko_insight": "This collection is currently concept-led rather than assortment-led. The direction is clear, but the build is still too narrow to support it commercially.",
+  "secondary_metrics": {
+    "identity": ${report.scores.identity.score},
+    "resonance": ${report.scores.resonance.score},
+    "execution": ${report.scores.execution.score}
+  }
 }
 
 Rules:
-- "whats_working" and "what_to_watch": 2–3 items each.
-- "recommendations", "immediate_actions", "decision_points": exactly 3 items each.
-- "key_risks": 2–3 items.
+- Preserve the secondary_metrics values exactly as provided.
+- No concept justification, no trend validation, no market positioning.
+- Speak in roles, structure, balance, coverage, completeness, and viability.
+- The response must not overlap with a piece recommendation surface.
 - No markdown. No prose outside the JSON.`;
 }
 
@@ -203,34 +198,16 @@ function mergeSynthesizerResult(
   return {
     collection_report: {
       ...fallback.collection_report,
-      overall_read: parsed.overall_read ?? fallback.collection_report.overall_read,
-      overall_read_detail: parsed.overall_read_sub ?? fallback.collection_report.overall_read_detail,
-      collection_thesis: parsed.collection_thesis ?? fallback.collection_report.collection_thesis,
-      scores: {
-        identity: {
-          ...fallback.collection_report.scores.identity,
-          explanation: parsed.identity_narrative ?? fallback.collection_report.scores.identity.explanation,
-        },
-        resonance: {
-          ...fallback.collection_report.scores.resonance,
-          explanation: parsed.resonance_narrative ?? fallback.collection_report.scores.resonance.explanation,
-        },
-        execution: {
-          ...fallback.collection_report.scores.execution,
-          explanation: parsed.execution_narrative ?? fallback.collection_report.scores.execution.explanation,
-        },
-      },
-      muko_insight: {
-        working: parsed.whats_working?.length ? parsed.whats_working : fallback.collection_report.muko_insight.working,
-        watch: parsed.what_to_watch?.length ? parsed.what_to_watch : fallback.collection_report.muko_insight.watch,
-        recommendations: parsed.recommendations?.length ? parsed.recommendations : fallback.collection_report.muko_insight.recommendations,
-      },
-      key_risks: parsed.key_risks?.length
-        ? parsed.key_risks.map((r) => ({ title: r.title, detail: r.description }))
-        : fallback.collection_report.key_risks,
-      next_steps: {
-        immediate_actions: parsed.immediate_actions?.length ? parsed.immediate_actions : fallback.collection_report.next_steps.immediate_actions,
-        decision_points: parsed.decision_points?.length ? parsed.decision_points : fallback.collection_report.next_steps.decision_points,
+      overall_read: parsed.collection_state ?? fallback.collection_report.overall_read,
+      overall_read_detail: parsed.collection_read ?? fallback.collection_report.overall_read_detail,
+      collection_thesis: parsed.muko_insight ?? fallback.collection_report.collection_thesis,
+      assortment_intelligence: {
+        ...fallback.collection_report.assortment_intelligence,
+        collection_state: parsed.collection_state ?? fallback.collection_report.assortment_intelligence.collection_state,
+        collection_read: parsed.collection_read ?? fallback.collection_report.assortment_intelligence.collection_read,
+        supporting_line: parsed.collection_read ?? fallback.collection_report.assortment_intelligence.supporting_line,
+        muko_insight: parsed.muko_insight ?? fallback.collection_report.assortment_intelligence.muko_insight,
+        collection_insight: parsed.muko_insight ?? fallback.collection_report.assortment_intelligence.collection_insight,
       },
       meta: {
         ...fallback.collection_report.meta,

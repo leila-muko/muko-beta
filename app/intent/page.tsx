@@ -101,10 +101,14 @@ function positionLabel(v: number, labels: [string, string, string]): string {
 }
 
 function deliveryWeeks(season: string): number | null {
-  const m = season.match(/^(SS|FW)(\d{2})$/i);
+  const normalized = season.trim().toUpperCase();
+  const m =
+    normalized.match(/^(SS|FW)\s*(\d{2})$/i) ??
+    normalized.match(/^(SS|FW)\s*(\d{4})$/i);
   if (!m) return null;
   const type = m[1].toUpperCase();
-  const year = 2000 + parseInt(m[2], 10);
+  const rawYear = parseInt(m[2], 10);
+  const year = m[2].length === 2 ? 2000 + rawYear : rawYear;
   const delivery = type === "FW" ? new Date(year, 7, 1) : new Date(year, 1, 1);
   const now = new Date();
   const weeks = Math.round((delivery.getTime() - now.getTime()) / (7 * 24 * 3600 * 1000));
@@ -140,6 +144,7 @@ function BeatHeader({
             fontSize: 13,
             color: MUTED,
             fontStyle: "italic",
+            textTransform: "lowercase",
             lineHeight: 1.6,
             marginBottom: 30,
             maxWidth: 600,
@@ -152,20 +157,88 @@ function BeatHeader({
   );
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
+function FrameValueField({
+  label,
+  prefix,
+  suffix,
+  value,
+  placeholder,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  prefix?: string;
+  suffix?: string;
+  value: number;
+  placeholder: string;
+  min?: number;
+  max?: number;
+  onChange: (next: number) => void;
+}) {
   return (
-    <div
-      style={{
-        fontFamily: inter,
-        fontSize: 9,
-        fontWeight: 600,
-        letterSpacing: "0.16em",
-        textTransform: "uppercase",
-        color: MUTED,
-        marginBottom: 5,
-      }}
-    >
-      {children}
+    <div style={{ minWidth: 220, flex: "0 1 320px" }}>
+      <div
+        style={{
+          fontFamily: inter,
+          fontSize: 9,
+          fontWeight: 500,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "rgba(67,67,43,0.56)",
+          marginBottom: 8,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 3,
+          borderBottom: "1px solid rgba(67, 67, 43, 0.08)",
+          paddingBottom: 8,
+        }}
+      >
+        {prefix ? (
+          <span
+            style={{
+              fontFamily: sohne,
+              fontSize: 20,
+              fontWeight: 500,
+              letterSpacing: "-0.02em",
+              lineHeight: 1.1,
+              color: "rgba(25,25,25,0.9)",
+            }}
+          >
+            {prefix}
+          </span>
+        ) : null}
+        <input
+          className="intent-card-field"
+          type="number"
+          placeholder={placeholder}
+          value={value || ""}
+          min={min}
+          max={max}
+          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : 0)}
+          style={{ borderBottom: "none", padding: 0 }}
+        />
+        {suffix ? (
+          <span
+            style={{
+              fontFamily: sohne,
+              fontSize: 20,
+              fontWeight: 500,
+              letterSpacing: "-0.02em",
+              lineHeight: 1.1,
+              color: "rgba(25,25,25,0.9)",
+            }}
+          >
+            {suffix}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -316,19 +389,38 @@ export default function IntentCalibrationPage() {
   const season = useSessionStore((s) => s.season);
   const collectionName = useSessionStore((s) => s.collectionName);
 
-  const init = useSessionStore.getState();
-  const [targetMsrp, setTargetMsrp] = useState<number>(init.targetMsrp ?? 0);
-  const [targetMargin, setTargetMargin] = useState<number>(init.targetMargin > 0 ? init.targetMargin : 0);
-  const [successPriorities, setSuccessPriorities] = useState<SuccessId[]>((init.successPriorities as SuccessId[]) || []);
-  const [sliderTrend, setSliderTrend] = useState(init.sliderTrend ?? 50);
-  const [sliderCreative, setSliderCreative] = useState(init.sliderCreative ?? 50);
-  const [sliderElevated, setSliderElevated] = useState(init.sliderElevated ?? 50);
-  const [sliderNovelty, setSliderNovelty] = useState(init.sliderNovelty ?? 50);
+  const [hasMounted, setHasMounted] = useState(false);
+  const [targetMsrp, setTargetMsrp] = useState<number>(0);
+  const [targetMargin, setTargetMargin] = useState<number>(50);
+  const [successPriorities, setSuccessPriorities] = useState<SuccessId[]>([]);
+  const [sliderTrend, setSliderTrend] = useState(50);
+  const [sliderCreative, setSliderCreative] = useState(50);
+  const [sliderElevated, setSliderElevated] = useState(50);
+  const [sliderNovelty, setSliderNovelty] = useState(50);
   const [brandDnaChips, setBrandDnaChips] = useState<string[]>([]);
+
+  const resolvedSeason = hasMounted ? season : "";
+  const resolvedCollectionName = hasMounted ? collectionName : "";
 
   useEffect(() => {
     setCurrentStep?.(1);
   }, [setCurrentStep]);
+
+  useEffect(() => {
+    const persistedState = useSessionStore.getState();
+    const timeoutId = window.setTimeout(() => {
+      setTargetMsrp(persistedState.targetMsrp ?? 0);
+      setTargetMargin(persistedState.targetMargin > 0 ? persistedState.targetMargin : 50);
+      setSuccessPriorities((persistedState.successPriorities as SuccessId[]) || []);
+      setSliderTrend(persistedState.sliderTrend ?? 50);
+      setSliderCreative(persistedState.sliderCreative ?? 50);
+      setSliderElevated(persistedState.sliderElevated ?? 50);
+      setSliderNovelty(persistedState.sliderNovelty ?? 50);
+      setHasMounted(true);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -360,7 +452,7 @@ export default function IntentCalibrationPage() {
 
   const cogsCeiling =
     targetMsrp > 0 && targetMargin > 0 ? Math.round(targetMsrp * (1 - targetMargin / 100)) : null;
-  const weeksOut = deliveryWeeks(season);
+  const weeksOut = deliveryWeeks(resolvedSeason);
 
   const sliderLabels = {
     trend: positionLabel(sliderTrend, SLIDERS[0].labels),
@@ -400,7 +492,8 @@ export default function IntentCalibrationPage() {
     sliderNoveltyValue: sliderNovelty,
   });
 
-  const canContinue = collectionName.trim().length > 0 && season.length > 0 && successPriorities.length > 0;
+  const canContinue =
+    resolvedCollectionName.trim().length > 0 && resolvedSeason.length > 0 && successPriorities.length > 0;
 
   const handleTargetMsrp = (v: number) => {
     setTargetMsrp(v);
@@ -466,12 +559,13 @@ export default function IntentCalibrationPage() {
       directionInterpretationChips: [],
       isProxyMatch: false,
     });
-    router.push("/concept");
+    router.push("/concept-prep");
   };
 
   useEffect(() => {
+    if (!hasMounted) return;
     setStrategySummary(strategySummary);
-  }, [setStrategySummary, strategySummary]);
+  }, [hasMounted, setStrategySummary, strategySummary]);
 
   const sliderValues = {
     trend: sliderTrend,
@@ -538,21 +632,36 @@ export default function IntentCalibrationPage() {
         }
         .intent-card-field {
           width: 100%;
-          padding: 10px 0 12px;
+          padding: 4px 0 8px;
           border: none;
-          border-bottom: 1px solid rgba(67, 67, 43, 0.12);
+          border-bottom: 1px solid rgba(67, 67, 43, 0.08);
           border-radius: 0;
-          font-family: ${inter};
-          font-size: 15px;
+          font-family: ${sohne};
+          font-size: 20px;
           font-weight: 500;
           color: ${TEXT};
           background: transparent;
           outline: none;
           box-sizing: border-box;
-          transition: border-bottom-color 0.15s;
+          letter-spacing: -0.02em;
+          line-height: 1.1;
+          transition: border-bottom-color 0.15s, color 0.15s;
         }
-        .intent-card-field::placeholder { color: ${BORDER}; font-weight: 400; font-size: 14px; }
-        .intent-card-field:focus { border-bottom: 1.5px solid ${CHARTREUSE}; }
+        .intent-card-field::placeholder {
+          color: rgba(136, 128, 120, 0.55);
+          font-weight: 400;
+          font-size: 18px;
+        }
+        .intent-card-field:focus { border-bottom: 1px solid ${CHARTREUSE}; }
+        .intent-card-field::-webkit-outer-spin-button,
+        .intent-card-field::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .intent-card-field[type='number'] {
+          -moz-appearance: textfield;
+          appearance: textfield;
+        }
         .priority-row {
           width: 100%;
           background: transparent;
@@ -602,14 +711,14 @@ export default function IntentCalibrationPage() {
         activeTab="setup"
         setupComplete={false}
         piecesComplete={false}
-        collectionName={collectionName || undefined}
-        seasonLabel={season || undefined}
+        collectionName={resolvedCollectionName || undefined}
+        seasonLabel={resolvedSeason || undefined}
         onSaveClose={() => {}}
       />
 
       <CollectionReadBar
-        collectionName={collectionName}
-        season={season}
+        collectionName={resolvedCollectionName}
+        season={resolvedSeason}
         summary={collectionRead.text}
         stage={collectionRead.stage}
         stickyTop={72}
@@ -676,11 +785,11 @@ export default function IntentCalibrationPage() {
                   fontFamily: sohne,
                   fontSize: 22,
                   fontWeight: 700,
-                  color: collectionName ? TEXT : MUTED,
+                  color: resolvedCollectionName ? TEXT : MUTED,
                   letterSpacing: "-0.02em",
                 }}
               >
-                {collectionName || "Untitled Collection"}
+                {resolvedCollectionName || "Untitled Collection"}
               </div>
               <div
                 style={{
@@ -689,115 +798,143 @@ export default function IntentCalibrationPage() {
                   fontWeight: 600,
                   letterSpacing: "0.14em",
                   textTransform: "uppercase",
-                  color: season ? MUTED : "rgba(136, 128, 120, 0.6)",
+                  color: resolvedSeason ? MUTED : "rgba(136, 128, 120, 0.6)",
                 }}
               >
-                {season || "Season not set"}
+                {resolvedSeason || "Season not set"}
               </div>
             </div>
 
             <div
               style={{
-                background: "white",
-                borderRadius: 14,
-                padding: "22px 24px 18px",
-                marginBottom: brandDnaChips.length > 0 ? 18 : 0,
-                boxShadow: "0 8px 24px rgba(67, 67, 43, 0.05)",
+                background: "rgba(255, 255, 255, 0.56)",
+                border: "1px solid rgba(67, 67, 43, 0.08)",
+                borderRadius: 18,
+                boxShadow: "0 10px 28px rgba(67, 67, 43, 0.04), inset 0 1px 0 rgba(255,255,255,0.45)",
+                backdropFilter: "blur(8px) saturate(115%)",
+                WebkitBackdropFilter: "blur(8px) saturate(115%)",
+                padding: "26px 28px 22px",
+                marginBottom: brandDnaChips.length > 0 ? 28 : 0,
               }}
             >
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 28 }}>
                 <div
                   style={{
                     fontFamily: inter,
                     fontSize: 9,
-                    fontWeight: 600,
-                    letterSpacing: "0.16em",
+                    fontWeight: 500,
+                    letterSpacing: "0.14em",
                     textTransform: "uppercase",
-                    color: MUTED,
+                    color: "rgba(67,67,43,0.56)",
                     marginBottom: 5,
                   }}
                 >
                   Commercial Frame
                 </div>
-                <div style={{ fontFamily: inter, fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 11,
+                    color: "rgba(67,67,43,0.5)",
+                    lineHeight: 1.5,
+                    maxWidth: 520,
+                  }}
+                >
                   Set the price architecture that defines how far the collection can stretch.
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-                <div>
-                  <FieldLabel>Target MSRP ($)</FieldLabel>
-                  <input
-                    className="intent-card-field"
-                    type="number"
-                    placeholder="e.g. 450"
-                    value={targetMsrp || ""}
-                    min={0}
-                    onChange={(e) => handleTargetMsrp(e.target.value ? Number(e.target.value) : 0)}
-                  />
-                </div>
-
-                <div style={{ borderLeft: "1px solid rgba(67, 67, 43, 0.08)", paddingLeft: 18 }}>
-                  <FieldLabel>Target Margin (%)</FieldLabel>
-                  <input
-                    className="intent-card-field"
-                    type="number"
-                    placeholder="e.g. 60"
-                    value={targetMargin || ""}
-                    min={0}
-                    max={100}
-                    onChange={(e) => handleTargetMargin(e.target.value ? Number(e.target.value) : 0)}
-                  />
                 </div>
               </div>
 
               <div
                 style={{
-                  marginTop: 18,
-                  paddingTop: 14,
-                  borderTop: "1px solid rgba(67, 67, 43, 0.08)",
                   display: "flex",
                   flexWrap: "wrap",
-                  gap: "12px 28px",
+                  alignItems: "flex-end",
+                  gap: "28px 88px",
                 }}
               >
-                <div>
+                <FrameValueField
+                  label="Target MSRP"
+                  prefix="$"
+                  value={targetMsrp ?? 0}
+                  placeholder="415"
+                  min={0}
+                  onChange={handleTargetMsrp}
+                />
+
+                <FrameValueField
+                  label="Target Margin"
+                  suffix="%"
+                  value={targetMargin ?? 0}
+                  placeholder="50"
+                  min={0}
+                  max={100}
+                  onChange={handleTargetMargin}
+                />
+              </div>
+
+              <div
+                style={{
+                  marginTop: 30,
+                  borderTop: "1px solid rgba(67, 67, 43, 0.08)",
+                  paddingTop: 22,
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "18px 40px",
+                }}
+              >
+                <div style={{ minWidth: 240 }}>
                   <div
                     style={{
                       fontFamily: inter,
                       fontSize: 9,
-                      fontWeight: 600,
-                      letterSpacing: "0.14em",
+                      fontWeight: 500,
+                      letterSpacing: "0.12em",
                       textTransform: "uppercase",
-                      color: MUTED,
-                      marginBottom: 4,
+                      color: "rgba(67,67,43,0.56)",
+                      marginBottom: 7,
                     }}
                   >
                     Cost ceiling
                   </div>
-                  <div style={{ fontFamily: inter, fontSize: 12, color: cogsCeiling !== null ? TEXT : MUTED }}>
+                  <div
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 13,
+                      fontWeight: 450,
+                      color: "rgba(25,25,25,0.88)",
+                      lineHeight: 1.45,
+                    }}
+                  >
                     {cogsCeiling !== null
-                      ? `${Math.round(targetMargin)}% margin keeps COGS near $${cogsCeiling}`
+                      ? `Maintains a ~$${cogsCeiling} cost ceiling`
                       : "Add price and margin to set the ceiling."}
                   </div>
                 </div>
-                <div>
+                <div style={{ minWidth: 220 }}>
                   <div
                     style={{
                       fontFamily: inter,
                       fontSize: 9,
-                      fontWeight: 600,
-                      letterSpacing: "0.14em",
+                      fontWeight: 500,
+                      letterSpacing: "0.12em",
                       textTransform: "uppercase",
-                      color: MUTED,
-                      marginBottom: 4,
+                      color: "rgba(67,67,43,0.56)",
+                      marginBottom: 7,
                     }}
                   >
                     Delivery window
                   </div>
-                  <div style={{ fontFamily: inter, fontSize: 12, color: weeksOut !== null ? TEXT : MUTED }}>
+                  <div
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 13,
+                      fontWeight: 450,
+                      color: "rgba(25,25,25,0.88)",
+                      lineHeight: 1.45,
+                    }}
+                  >
                     {weeksOut !== null
-                      ? `${weeksOut} weeks to ${season} delivery`
+                      ? `${weeksOut} weeks to ${resolvedSeason} delivery`
                       : "Select a season to understand the delivery window."}
                   </div>
                 </div>

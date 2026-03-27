@@ -19,6 +19,8 @@ import {
   CONSTRUCTION_INFO,
   getOverrideWarning,
   getSmartDefault,
+  getSmartDefaultForSubcategory,
+  normalizeSpecSubcategoryId,
 } from "@/lib/spec-studio/smart-defaults";
 import type { SubcategoryEntry } from "@/lib/spec-studio/smart-defaults";
 
@@ -36,6 +38,12 @@ import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
 import type { PulseChipProps } from "@/components/ui/PulseChip";
 import type { InsightData, SpecInsightMode } from "@/lib/types/insight";
 import { buildReportBlackboard, buildSpecBlackboard } from "@/lib/synthesizer/assemble";
+import {
+  buildFallbackSpecRail,
+  deriveSpecDiagnostics,
+  shouldShowBetterPath,
+  type SpecRailInsight,
+} from "@/lib/synthesizer/specDecision";
 import { buildAnalysisRow, AGENT_VERSIONS } from "@/lib/agents/orchestrator-shared";
 import type { PipelineBlackboard, AnalysisResult as AnalysisResultOrch } from "@/lib/agents/orchestrator-shared";
 import { createClient } from "@/lib/supabase/client";
@@ -46,8 +54,9 @@ import { MukoNav } from "@/components/MukoNav";
 import { CollectionContextBar, COLLECTION_CONTEXT_BAR_OFFSET } from "@/components/collection/CollectionContextBar";
 import { getFlatForPiece } from "@/components/flats";
 import type { SelectedPieceImage } from "@/lib/piece-image";
+import { buildSelectedPieceImage } from "@/lib/piece-image";
 import { getCollectionLanguageLabels, getExpressionSignalLabels } from "@/lib/collection-signals";
-import { buildPulseMicroInsight } from "@/lib/pulse/microInsight";
+import { buildSpecPulseInsight, buildSpecPulseTelemetry, getSpecMarketSaturationSignal } from "@/lib/pulse/specPulseInsight";
 
 /* ─── Icons: matched to Concept Studio (star, users, cog) ─── */
 function IconIdentity({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
@@ -119,19 +128,8 @@ const OLIVE = "#43432B";
 const PULSE_GREEN = "#4D7A56";
 const PULSE_RED = "#8A3A3A";
 const PULSE_YELLOW = "#B8876B";
-const SPEC_CONTEXT_BAR_OFFSET = 96;
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
-
-function extractPartialJsonString(raw: string, key: string): string {
-  const match = raw.match(new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)`));
-  if (!match) return "";
-
-  return match[1]
-    .replace(/\\"/g, '"')
-    .replace(/\\n/g, " ")
-    .trim();
-}
 
 /* ─── Icons ─── */
 function IconExecution({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
@@ -171,6 +169,102 @@ const microLabel: React.CSSProperties = {
   color: "rgba(67, 67, 43, 0.42)",
   fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
 };
+
+function serializePersistError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const serializedRecord = (() => {
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return undefined;
+      }
+    })();
+
+    return {
+      name: typeof record.name === "string" ? record.name : undefined,
+      code: typeof record.code === "string" ? record.code : undefined,
+      message: typeof record.message === "string" ? record.message : undefined,
+      details: typeof record.details === "string" ? record.details : undefined,
+      hint: typeof record.hint === "string" ? record.hint : undefined,
+      status: typeof record.status === "number" ? record.status : undefined,
+      raw: serializedRecord && serializedRecord !== "{}" ? serializedRecord : undefined,
+    };
+  }
+
+  return { message: String(error) };
+}
+
+function isMissingPieceNameColumnError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const record = error as Record<string, unknown>;
+  return (
+    record.code === "PGRST204" &&
+    typeof record.message === "string" &&
+    record.message.includes("'piece_name' column")
+  );
+}
+
+function getMissingSchemaColumn(error: unknown) {
+  if (!error || typeof error !== "object") return null;
+  const record = error as Record<string, unknown>;
+  if (record.code !== "PGRST204" || typeof record.message !== "string") return null;
+  const match = record.message.match(/'([^']+)' column/);
+  return match?.[1] ?? null;
+}
+
+async function runAnalysisMutationWithSchemaFallback(
+  payload: Record<string, unknown>,
+  execute: (nextPayload: Record<string, unknown>) => Promise<{ data: { id?: string } | null; error: unknown }>
+) {
+  let nextPayload = { ...payload };
+
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const result = await execute(nextPayload);
+    const missingColumn = getMissingSchemaColumn(result.error);
+    if (!missingColumn) {
+      return { result, payload: nextPayload };
+    }
+
+    if (!(missingColumn in nextPayload)) {
+      return { result, payload: nextPayload };
+    }
+
+    const { [missingColumn]: _removed, ...rest } = nextPayload;
+    nextPayload = rest;
+  }
+
+  return {
+    result: {
+      data: null,
+      error: new Error("Exceeded schema fallback attempts while saving analysis."),
+    },
+    payload: nextPayload,
+  };
+}
+
+function readCollectionContextFromBrowser() {
+  if (typeof window === "undefined") {
+    return { collectionName: "", season: "" };
+  }
+
+  try {
+    return {
+      collectionName: window.localStorage.getItem("muko_collectionName")?.trim() ?? "",
+      season: window.localStorage.getItem("muko_seasonLabel")?.trim() ?? "",
+    };
+  } catch {
+    return { collectionName: "", season: "" };
+  }
+}
 
 /* ─── Aesthetic palettes (3 options per aesthetic) ─── */
 /* ─── Aesthetic keywords for matching ─── */
@@ -359,6 +453,121 @@ function toSlug(name: string): string {
   return name.toLowerCase().replace(/\s+/g, "-");
 }
 
+function normalizeMaterialText(value: string | null | undefined): string {
+  return (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function buildMaterialAliases(material: Material): string[] {
+  const aliases = new Set<string>();
+  const add = (value: string | null | undefined) => {
+    const normalized = normalizeMaterialText(value);
+    if (normalized) aliases.add(normalized);
+  };
+
+  add(material.id);
+  add(material.name);
+
+  if (material.id === "vegan-leather") {
+    ["vegan leather", "pu leather", "faux leather", "pleather", "polyurethane leather"].forEach(add);
+  } else if (material.id === "leather") {
+    ["leather", "genuine leather", "real leather"].forEach(add);
+  } else if (material.id === "denim-conventional") {
+    ["denim", "jean", "jeans", "blue jean", "conventional denim"].forEach(add);
+  } else if (material.id === "denim-raw-selvedge") {
+    ["raw denim", "selvedge", "selvedge denim", "raw selvedge denim", "rigid denim"].forEach(add);
+  } else if (material.id === "organic-cotton") {
+    ["organic cotton", "cotton"].forEach(add);
+  } else if (material.id === "conventional-cotton") {
+    ["conventional cotton", "cotton poplin", "cotton woven"].forEach(add);
+  } else if (material.id === "rayon-viscose") {
+    ["rayon", "viscose"].forEach(add);
+  } else if (material.id === "wool-merino") {
+    ["wool", "merino", "merino wool"].forEach(add);
+  } else if (material.id === "cashmere-blend") {
+    ["cashmere", "cashmere blend"].forEach(add);
+  } else if (material.id === "deadstock-fabric") {
+    ["deadstock", "deadstock fabric", "deadstock material"].forEach(add);
+  }
+
+  return Array.from(aliases);
+}
+
+function findMaterialMention(
+  source: string,
+  materials: Material[],
+): Material | null {
+  const normalized = normalizeMaterialText(source);
+  if (!normalized) return null;
+
+  let bestMatch: { material: Material; score: number } | null = null;
+
+  for (const material of materials) {
+    for (const alias of buildMaterialAliases(material)) {
+      if (!alias) continue;
+      let score = 0;
+
+      if (normalized === alias) {
+        score = 100;
+      } else if (normalized.includes(alias)) {
+        score = alias.split(" ").length * 10 + alias.length;
+      } else {
+        continue;
+      }
+
+      if (!bestMatch || score > bestMatch.score) {
+        bestMatch = { material, score };
+      }
+    }
+  }
+
+  return bestMatch?.material ?? null;
+}
+
+function scoreMaterialForPiece(options: {
+  material: Material;
+  categoryId: string | null | undefined;
+  typeId: string | null | undefined;
+  pieceText: string;
+  chipMaterialId: string | null;
+  aestheticKeywords: string[];
+}): number {
+  const { material, categoryId, typeId, pieceText, chipMaterialId, aestheticKeywords } = options;
+  const normalizedText = normalizeMaterialText(pieceText);
+  let score = 20 - material.cost_per_yard * 0.15 - material.lead_time_weeks * 0.9;
+
+  if (chipMaterialId === material.id) score += 18;
+
+  const explicitMention = findMaterialMention(pieceText, [material]);
+  if (explicitMention?.id === material.id) score += 100;
+
+  const isBottom = categoryId === "bottoms";
+  const isJean =
+    /\bjean|jeans|denim|cigarette\b/.test(normalizedText) ||
+    typeId === "straight-pant";
+
+  if (isJean) {
+    if (material.id === "denim-raw-selvedge") score += 65;
+    if (material.id === "denim-conventional") score += 55;
+    if (material.id === "organic-cotton") score += 10;
+    if (material.id === "conventional-cotton") score += 6;
+    if (material.id === "vegan-leather") score -= 45;
+    if (material.id === "leather") score -= 25;
+  } else if (isBottom) {
+    if (["denim-raw-selvedge", "denim-conventional", "linen", "hemp", "wool-merino", "organic-cotton"].includes(material.id)) score += 12;
+    if (material.id === "vegan-leather" && !/\bskirt|mini skirt|trouser coated|coated\b/.test(normalizedText)) score -= 18;
+  }
+
+  if (aestheticKeywords.includes("clean") || aestheticKeywords.includes("tailored") || aestheticKeywords.includes("structural")) {
+    if (["linen", "tencel", "wool-merino", "organic-cotton", "denim-raw-selvedge", "denim-conventional"].includes(material.id)) score += 6;
+  }
+
+  if (aestheticKeywords.includes("soft") || aestheticKeywords.includes("fluid")) {
+    if (["tencel", "rayon-viscose", "silk"].includes(material.id)) score += 5;
+  }
+
+  return score;
+}
+
 /* ─── Fallback concept data ─── */
 const FALLBACK_CONCEPT: ConceptContextType = {
   aestheticName: "Quiet Structure",
@@ -372,7 +581,7 @@ const FALLBACK_CONCEPT: ConceptContextType = {
 /* ─────────────────────────────────────────────────────────────── */
 /* Helpers: recommended + deltas + compact score clusters           */
 /* ─────────────────────────────────────────────────────────────── */
-type Deltas = { identity: number; resonance: number; execution: number };
+type Deltas = { identity: number; commercialPotential: number; execution: number };
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -395,13 +604,13 @@ function deltaColor({
 }
 
 function getAggregateDeltaStatus(deltas: Deltas): "good" | "bad" {
-  const total = deltas.identity + deltas.resonance + deltas.execution;
+  const total = deltas.identity + deltas.commercialPotential + deltas.execution;
   return total > 0 ? "good" : "bad";
 }
 
 function aggregateDeltaDot({ deltas }: { deltas: Deltas }) {
   const total =
-    deltas.identity + deltas.resonance + deltas.execution;
+    deltas.identity + deltas.commercialPotential + deltas.execution;
 
   // ✨ No signal = no dot
   if (total === 0) return null;
@@ -434,7 +643,7 @@ function compactDeltaCluster({
 
   const deltaItems = [
     { icon: (c: string) => <IconIdentity size={10} color={c} />, value: deltas.identity, key: "identity" },
-    { icon: (c: string) => <IconResonance size={10} color={c} />, value: deltas.resonance, key: "resonance" },
+    { icon: (c: string) => <IconResonance size={10} color={c} />, value: deltas.commercialPotential, key: "commercial-potential" },
     { icon: (c: string) => <IconExecution size={10} color={c} />, value: deltas.execution, key: "execution" },
   ].filter((item) => item.value !== 0);
 
@@ -773,10 +982,12 @@ function getRoleLabel(role: CollectionRoleId | null | undefined) {
 }
 
 export default function SpecStudioPage() {
+  const contextBarRef = useRef<HTMLDivElement | null>(null);
+  const [contextBarHeight, setContextBarHeight] = useState(COLLECTION_CONTEXT_BAR_OFFSET);
   const router = useRouter();
   const previousMaterialIdRef = useRef<string | null>(null);
   const materialDeltaTimeoutRef = useRef<number | null>(null);
-  const { setCategory, setSubcategory: setStoreSubcategory, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setSelectedKeyPiece, setActiveProductPieceId, setPieceBuildContext } = useSessionStore();
+  const { setCategory, setSubcategory: setStoreSubcategory, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setSelectedKeyPiece, setActiveProductPieceId, setPieceBuildContext, setCollectionName, setSeason, setActiveCollection } = useSessionStore();
   // parent_analysis_id — deferred to Phase 2
   const categories: Category[] = categoriesData.categories as unknown as Category[];
   const materials: Material[] = materialsData as unknown as Material[];
@@ -794,6 +1005,7 @@ export default function SpecStudioPage() {
   const [subcategoryId, setSubcategoryId] = useState(() => {
     return useSessionStore.getState().subcategory || "";
   });
+  const constructionTierOverride = useSessionStore((s) => s.constructionTierOverride);
   // targetMSRP is now set in the Intent step — read-only here
   const targetMSRP = useSessionStore((s) => s.targetMsrp) ?? 0;
   const [materialId, setMaterialId] = useState(() => {
@@ -811,12 +1023,6 @@ export default function SpecStudioPage() {
     const isFW = season && (season.toLowerCase().includes('fw') || season.toLowerCase().includes('fall'));
     return isFW ? 24 : 20;
   });
-  const [timelineWeeksInput, setTimelineWeeksInput] = useState(() => {
-    const season = useSessionStore.getState().season;
-    const isFW = season && (season.toLowerCase().includes('fw') || season.toLowerCase().includes('fall'));
-    return String(isFW ? 24 : 20);
-  });
-  const [constraintPromptVisible, setConstraintPromptVisible] = useState(false);
 
   // Scorecard modal state
   const [showScorecardModal, setShowScorecardModal] = useState(false);
@@ -952,7 +1158,10 @@ export default function SpecStudioPage() {
     [categoryId, allSubcategories]
   );
   const selectedSubcategory = useMemo(
-    () => categorySubcategories.find((s) => s.id === subcategoryId) || null,
+    () => {
+      const normalizedSubcategoryId = normalizeSpecSubcategoryId(subcategoryId);
+      return categorySubcategories.find((s) => s.id === normalizedSubcategoryId) || null;
+    },
     [subcategoryId, categorySubcategories]
   );
   const pieceAnchorName = useMemo(() => {
@@ -994,17 +1203,21 @@ export default function SpecStudioPage() {
     () => pieceBuildContext?.originalLabel ?? selectedKeyPiece?.item ?? selectedSubcategory?.name ?? selectedCategory.name,
     [pieceBuildContext?.originalLabel, selectedKeyPiece?.item, selectedSubcategory?.name, selectedCategory.name]
   );
-  const translationIntent = useMemo(
-    () => pieceBuildContext?.translation ?? directionInterpretationText ?? pieceSubtitle ?? null,
-    [pieceBuildContext?.translation, directionInterpretationText, pieceSubtitle]
+  const pieceTitleBarName = useMemo(
+    () => selectedKeyPiece?.item ?? selectedSubcategory?.name ?? selectedCategory.name,
+    [selectedKeyPiece?.item, selectedSubcategory?.name, selectedCategory.name]
   );
   const pieceContextTitle = useMemo(
     () => pieceBuildContext?.adaptedTitle ?? pieceAnchorName,
     [pieceBuildContext?.adaptedTitle, pieceAnchorName]
   );
-  const specHeaderTitle = useMemo(
+  const contextBarTitle = useMemo(
     () => `${headerCollectionName} · ${pieceContextTitle}`.toLowerCase(),
     [headerCollectionName, pieceContextTitle]
+  );
+  const specHeaderTitle = useMemo(
+    () => `${headerCollectionName} · ${pieceTitleBarName}`.toLowerCase(),
+    [headerCollectionName, pieceTitleBarName]
   );
   const collectionLanguageContext = useMemo(() => {
     if (pieceBuildContext?.collectionLanguage?.length) return pieceBuildContext.collectionLanguage;
@@ -1020,67 +1233,67 @@ export default function SpecStudioPage() {
       state: "emerging" as const,
     }));
   }, [chipSelection, pieceBuildContext?.expressionSignals]);
-  const strongLanguageLabels = useMemo(
-    () => collectionLanguageContext.filter((chip) => chip.state === "strong").map((chip) => chip.label),
-    [collectionLanguageContext]
-  );
-  const emergingLanguageLabels = useMemo(
-    () => collectionLanguageContext.filter((chip) => chip.state === "emerging").map((chip) => chip.label),
-    [collectionLanguageContext]
-  );
-  const missingLanguageLabels = useMemo(
-    () => collectionLanguageContext.filter((chip) => chip.state === "missing").map((chip) => chip.label),
-    [collectionLanguageContext]
-  );
   const strongExpressionLabels = useMemo(
     () => expressionSignalContext.filter((chip) => chip.state === "strong").map((chip) => chip.label),
-    [expressionSignalContext]
-  );
-  const emergingExpressionLabels = useMemo(
-    () => expressionSignalContext.filter((chip) => chip.state === "emerging").map((chip) => chip.label),
     [expressionSignalContext]
   );
   const missingExpressionLabels = useMemo(
     () => expressionSignalContext.filter((chip) => chip.state === "missing").map((chip) => chip.label),
     [expressionSignalContext]
   );
-  const collectionLanguageSentence = useMemo(() => {
-    if (strongLanguageLabels.length > 0) return `${strongLanguageLabels[0]} should stay the lead language in the collection.`;
-    if (emergingLanguageLabels.length > 0) return `${emergingLanguageLabels[0]} is starting to register and should remain legible here.`;
-    if (missingLanguageLabels.length > 0) return `This piece can introduce ${missingLanguageLabels[0]} without pulling the line off tone.`;
-    return "Keep the execution aligned with the collection language already taking shape.";
-  }, [strongLanguageLabels, emergingLanguageLabels, missingLanguageLabels]);
-  const expressionSignalSentence = useMemo(() => {
-    if (strongExpressionLabels.length > 0) return `${strongExpressionLabels[0]} is already carrying through the line and should stay explicit in the execution.`;
-    if (emergingExpressionLabels.length > 0) return `${emergingExpressionLabels[0]} is beginning to register and should become intentional rather than incidental here.`;
-    if (missingExpressionLabels.length > 0) return `Use this piece to introduce ${missingExpressionLabels[0]} as an execution cue rather than leaving it in setup only.`;
-    return "Let the build show how the collection is supposed to come alive, not just what it is.";
-  }, [emergingExpressionLabels, missingExpressionLabels, strongExpressionLabels]);
-  const roleConstructionSentence = useMemo(() => {
-    const activeRole = pieceBuildContext?.role ?? storeCollectionRole;
-    if (activeRole === "volume-driver") return "Keep construction simple enough to repeat cleanly across production.";
-    if (activeRole === "hero") return "Allow more construction depth, but make sure every detail earns its place.";
-    if (activeRole === "core-evolution") return "Prioritize familiarity and brand alignment over novelty in the build.";
-    if (activeRole === "directional") return "Push one idea forward, but keep the experimentation controlled.";
-    return "Let construction support the concept without overworking the piece.";
-  }, [pieceBuildContext?.role, storeCollectionRole]);
-
-
-  const hasUserSelection = userManuallySelected && (materialId !== "" || constructionTier !== null);
-
   const aestheticKws =
     AESTHETIC_KEYWORDS[conceptContext.aestheticMatchedId] ||
     AESTHETIC_KEYWORDS.default;
+  const customPieceMaterialSource = useMemo(
+    () => [
+      selectedKeyPiece?.item,
+      pieceBuildContext?.originalLabel,
+      pieceBuildContext?.translation,
+      pieceBuildContext?.adaptedTitle,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    [
+      pieceBuildContext?.adaptedTitle,
+      pieceBuildContext?.originalLabel,
+      pieceBuildContext?.translation,
+      selectedKeyPiece?.item,
+    ]
+  );
+  const chipMaterialId = chipSelection?.activatedChips.find((c) => c.material != null)?.material ?? null;
 
   const recommendedMaterialId = useMemo(() => {
     // If a key piece specifies a recommended material, prefer it
     if (selectedKeyPiece?.recommended_material_id && materials.find((m) => m.id === selectedKeyPiece.recommended_material_id)) {
       return selectedKeyPiece.recommended_material_id;
     }
+
+    if (selectedKeyPiece?.custom) {
+      const explicitMaterial = findMaterialMention(customPieceMaterialSource, materials);
+      if (explicitMaterial) {
+        return explicitMaterial.id;
+      }
+
+      const scored = materials
+        .map((material) => ({
+          id: material.id,
+          score: scoreMaterialForPiece({
+            material,
+            categoryId: selectedKeyPiece.category ?? categoryId,
+            typeId: selectedKeyPiece.type,
+            pieceText: customPieceMaterialSource,
+            chipMaterialId,
+            aestheticKeywords: aestheticKws,
+          }),
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      return scored[0]?.id || "";
+    }
+
     // If a chip specifies a material, prefer it (first chip with a material wins)
-    const chipMaterial = chipSelection?.activatedChips.find((c) => c.material != null)?.material;
-    if (chipMaterial && materials.find((m) => m.id === chipMaterial)) {
-      return chipMaterial;
+    if (chipMaterialId && materials.find((m) => m.id === chipMaterialId)) {
+      return chipMaterialId;
     }
 
     const mats = materials.slice();
@@ -1104,7 +1317,7 @@ export default function SpecStudioPage() {
 
     mats.sort((a, b) => score(b) - score(a));
     return mats[0]?.id || "";
-  }, [materials, aestheticKws, chipSelection]);
+  }, [materials, selectedKeyPiece, customPieceMaterialSource, categoryId, chipMaterialId, aestheticKws]);
 
   const alternativeMaterial = useMemo(
     () => (selectedMaterial ? findAlternativeMaterial(selectedMaterial, materials, 1, conceptSilhouette || undefined) : null),
@@ -1219,10 +1432,11 @@ export default function SpecStudioPage() {
   };
 
   const handleSubcategoryChange = (newSubId: string) => {
-    setSubcategoryId(newSubId);
-    setStoreSubcategory(newSubId);
+    const normalizedSubId = normalizeSpecSubcategoryId(newSubId) ?? newSubId;
+    setSubcategoryId(normalizedSubId);
+    setStoreSubcategory(normalizedSubId);
     // Update smart complexity based on subcategory affinity
-    const sub = (allSubcategories[categoryId] ?? []).find((s) => s.id === newSubId);
+    const sub = (allSubcategories[categoryId] ?? []).find((s) => s.id === normalizedSubId);
     if (sub) {
       const smartTier = getSmartDefault(categoryId, conceptSilhouette || undefined, sub.complexity_affinity as 'low' | 'moderate' | 'high');
       setConstructionTier(smartTier);
@@ -1332,17 +1546,20 @@ export default function SpecStudioPage() {
   };
 
   const isComplete = materialId && constructionTier;
-  const marginCeiling = Math.round(targetMSRP * (1 - brandTargetMargin));
 
   const baselineComplexity: ConstructionTier = useMemo(() => {
-    const subAffinity = selectedSubcategory?.complexity_affinity as 'low' | 'moderate' | 'high' | undefined;
-    const base: ConstructionTier = getSmartDefault(categoryId, conceptSilhouette || undefined, subAffinity);
+    const base: ConstructionTier = getSmartDefaultForSubcategory(
+      categoryId,
+      conceptSilhouette || undefined,
+      subcategoryId,
+      categorySubcategories,
+    );
     // If any complexity chip is active, recommend High
     if (chipSelection?.activatedChips.some((c) => c.complexity_mod > 0 && !c.isCustom)) {
       return "high";
     }
     return base;
-  }, [categoryId, conceptSilhouette, chipSelection, selectedSubcategory]);
+  }, [categoryId, conceptSilhouette, chipSelection, subcategoryId, categorySubcategories]);
 
   useEffect(() => {
     const previousMaterialId = previousMaterialIdRef.current;
@@ -1395,6 +1612,36 @@ export default function SpecStudioPage() {
     return materials.find((m) => m.id === id) || null;
   }, [materials, recommendedMaterialId, materialId]);
   const selectedMaterialIsRecommended = materialId === recommendedMaterialId;
+  const displayMaterial = selectedMaterial ?? baselineMaterial;
+  const resolvedSelectedPieceImage = useMemo(
+    () =>
+      buildSelectedPieceImage({
+        type: selectedKeyPiece?.type ?? selectedSubcategory?.id ?? null,
+        pieceName:
+          selectedKeyPiece?.item ??
+          pieceBuildContext?.adaptedTitle ??
+          pieceBuildContext?.originalLabel ??
+          selectedSubcategory?.name ??
+          selectedCategory.name,
+        category: selectedKeyPiece?.category ?? categoryId,
+        silhouette: selectedSubcategory?.name ?? conceptSilhouette,
+        signal: selectedKeyPiece?.signal ?? null,
+      }) ?? selectedPieceImage,
+    [
+      categoryId,
+      conceptSilhouette,
+      pieceBuildContext?.adaptedTitle,
+      pieceBuildContext?.originalLabel,
+      selectedCategory.name,
+      selectedKeyPiece?.category,
+      selectedKeyPiece?.item,
+      selectedKeyPiece?.signal,
+      selectedKeyPiece?.type,
+      selectedPieceImage,
+      selectedSubcategory?.id,
+      selectedSubcategory?.name,
+    ]
+  );
 
   // Set step indicator and pre-select Muko's recommended values on first mount
   useEffect(() => { setCurrentStep(3); }, [setCurrentStep]);
@@ -1412,12 +1659,6 @@ export default function SpecStudioPage() {
   }, [categoryId, categories, setCategory]);
 
   useEffect(() => {
-    if (timelineWeeksInput.trim()) {
-      setConstraintPromptVisible(false);
-    }
-  }, [timelineWeeksInput]);
-
-  useEffect(() => {
     if (materialId) setMaterial(materialId);
   }, [materialId, setMaterial]);
 
@@ -1429,6 +1670,33 @@ export default function SpecStudioPage() {
   useEffect(() => {
     setSpecStep("material");
     setSpecStepDirection(1);
+    if (selectedKeyPiece?.custom) {
+      const matchedCat = selectedKeyPiece.category
+        ? categories.find(
+            (c) => c.id === selectedKeyPiece.category ||
+              c.name.toLowerCase() === selectedKeyPiece.category?.toLowerCase()
+          )
+        : null;
+      const resolvedCategoryId = matchedCat?.id ?? categoryId;
+      const resolvedSubcategoryId = normalizeSpecSubcategoryId(selectedKeyPiece.type) ?? selectedKeyPiece.type ?? "";
+      const resolvedSubcategories = allSubcategories[resolvedCategoryId] ?? [];
+      if (matchedCat) setCategoryId(matchedCat.id);
+      setSubcategoryId(resolvedSubcategoryId);
+      setStoreSubcategory(resolvedSubcategoryId);
+      setMaterialId("");
+      setConstructionConfirmed(false);
+      setOverrideWarning(null);
+      setUserManuallySelected(false);
+      setConstructionTier(
+        getSmartDefaultForSubcategory(
+          resolvedCategoryId,
+          conceptSilhouette || undefined,
+          resolvedSubcategoryId,
+          resolvedSubcategories,
+        )
+      );
+      return;
+    }
     if (selectedKeyPiece && !selectedKeyPiece.custom) {
       if (selectedKeyPiece.category) {
         const matchedCat = categories.find(
@@ -1438,8 +1706,9 @@ export default function SpecStudioPage() {
         if (matchedCat) handleCategoryChange(matchedCat.id);
       }
       if (selectedKeyPiece.type) {
-        setSubcategoryId(selectedKeyPiece.type);
-        setStoreSubcategory(selectedKeyPiece.type);
+        const normalizedSubcategoryId = normalizeSpecSubcategoryId(selectedKeyPiece.type) ?? selectedKeyPiece.type;
+        setSubcategoryId(normalizedSubcategoryId);
+        setStoreSubcategory(normalizedSubcategoryId);
       }
       if (selectedKeyPiece.recommended_material_id) {
         setMaterialId(selectedKeyPiece.recommended_material_id);
@@ -1449,6 +1718,11 @@ export default function SpecStudioPage() {
   // Only run when selectedKeyPiece changes (not on every render)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedKeyPiece]);
+
+  useEffect(() => {
+    if (!selectedKeyPiece?.custom || materialId || !recommendedMaterialId) return;
+    setMaterialId(recommendedMaterialId);
+  }, [materialId, recommendedMaterialId, selectedKeyPiece?.custom]);
 
   function getBaselineMaterialCost() {
     if (!baselineMaterial) {
@@ -1484,7 +1758,7 @@ export default function SpecStudioPage() {
 
     return {
       identity: clamp(id, -3, 4),
-      resonance: clamp(res, -3, 4),
+      commercialPotential: clamp(res, -3, 4),
       execution: clamp(exec + ltExec, -6, 6),
     };
   }
@@ -1498,13 +1772,13 @@ export default function SpecStudioPage() {
     const exec = clamp(-d * 2, -4, 4);
     // Each chip with complexity_mod > 0 adds overhead (execution cost)
     const chipComplexityCount = chipSelection?.activatedChips.filter((c) => c.complexity_mod > 0).length ?? 0;
-    return { identity: id, resonance: res, execution: clamp(exec - chipComplexityCount, -6, 4) };
+    return { identity: id, commercialPotential: res, execution: clamp(exec - chipComplexityCount, -6, 4) };
   }
 
   function addDeltas(a: Deltas, b: Deltas): Deltas {
     return {
       identity: a.identity + b.identity,
-      resonance: a.resonance + b.resonance,
+      commercialPotential: a.commercialPotential + b.commercialPotential,
       execution: a.execution + b.execution,
     };
   }
@@ -1538,12 +1812,12 @@ export default function SpecStudioPage() {
     selectedKeyPiece,
   ]);
 
-  const dynamicResonanceScore = useMemo(() => {
+  const commercialPotentialScore = useMemo(() => {
     if (!selectedMaterial) return conceptContext.resonanceScore;
 
     const baseScore = conceptContext.resonanceScore;
-    const materialDelta = selectedMaterial ? scoreMaterialDeltas(selectedMaterial).resonance : 0;
-    const complexityDelta = constructionTier ? scoreComplexityDeltas(constructionTier).resonance : 0;
+    const materialDelta = selectedMaterial ? scoreMaterialDeltas(selectedMaterial).commercialPotential : 0;
+    const complexityDelta = constructionTier ? scoreComplexityDeltas(constructionTier).commercialPotential : 0;
     // Key piece signal reflects market momentum for this piece type
     const keyPieceDelta = selectedKeyPiece && !selectedKeyPiece.custom
       ? selectedKeyPiece.signal === 'ascending' ? 6
@@ -1577,10 +1851,10 @@ export default function SpecStudioPage() {
         ? BRAND.rose
         : BRAND.camel;
 
-  const resonanceColor =
-    dynamicResonanceScore >= 80
+  const commercialPotentialColor =
+    commercialPotentialScore >= 80
       ? CHARTREUSE
-      : dynamicResonanceScore >= 60
+      : commercialPotentialScore >= 60
         ? BRAND.rose
         : BRAND.camel;
 
@@ -1595,17 +1869,17 @@ export default function SpecStudioPage() {
   const aestheticEntry = (aestheticsData as Array<{ id: string; name: string; trend_velocity: string; saturation_score: number }>)
     .find((a) => a.id === conceptContext.aestheticMatchedId || a.name === conceptContext.aestheticName);
 
-  const resonanceChipData: PulseChipProps = aestheticEntry
-    ? aestheticEntry.trend_velocity === "emerging"
-      ? { variant: "green", status: "Ascending", consequence: "Differentiation window open" }
-      : aestheticEntry.trend_velocity === "peak"
-        ? aestheticEntry.saturation_score < 60
-          ? { variant: "amber", status: "Peak saturation", consequence: "Differentiation required" }
-          : { variant: "red", status: "Peak saturation", consequence: "High risk of blending" }
-        : aestheticEntry.trend_velocity === "declining"
-          ? { variant: "red", status: "Declining", consequence: "High risk of feeling dated" }
-          : { variant: "amber", status: "Ascending", consequence: "Differentiation window open" }
-    : { variant: "amber", status: "Ascending", consequence: "Differentiation window open" };
+  const marketSaturationSignal = useMemo(() => getSpecMarketSaturationSignal({
+    trendVelocity: aestheticEntry?.trend_velocity,
+    saturationScore: aestheticEntry?.saturation_score,
+  }), [aestheticEntry?.saturation_score, aestheticEntry?.trend_velocity]);
+
+  const commercialPotentialChipData: PulseChipProps =
+    commercialPotentialScore >= 80
+      ? { variant: "green", status: "High upside", consequence: "Commercially attractive" }
+      : commercialPotentialScore >= 60
+        ? { variant: "amber", status: "Promising", consequence: "Viable with sharper distinction" }
+        : { variant: "red", status: "Limited pull", consequence: "Needs a stronger commercial hook" };
 
   // Blended execution chip: lead with cost if both fail; show timeline message if only timeline fails
   const executionChipData: PulseChipProps | null = (() => {
@@ -1675,14 +1949,14 @@ export default function SpecStudioPage() {
   const reportAbortRef = useRef<AbortController | null>(null);
   const specRawJsonRef = useRef<string>('');
   const [specSynthInsightData, setSpecSynthInsightData] = useState<InsightData | null>(null);
-  const [specInsightLoading, setSpecInsightLoading] = useState(false);
-  const [specStreamingText, setSpecStreamingText] = useState('');
-  const [specStreamingParagraph, setSpecStreamingParagraph] = useState('');
-  const [specIsParagraphStreaming, setSpecIsParagraphStreaming] = useState(false);
+  const [specRailInsight, setSpecRailInsight] = useState<SpecRailInsight | null>(null);
 
 
   useEffect(() => {
-    if (!userManuallySelected || !materialId || !conceptContext.aestheticMatchedId) return;
+    if (!userManuallySelected || !materialId || !conceptContext.aestheticMatchedId || !specFallbackRail) {
+      setSpecRailInsight(null);
+      return;
+    }
 
     const tensionToNum = (v: string) => v === 'left' ? 75 : v === 'right' ? 25 : 50;
     let intentPayload: import('@/lib/synthesizer/blackboard').IntentCalibration | undefined;
@@ -1713,18 +1987,31 @@ export default function SpecStudioPage() {
       expressionSignals: expressionSignalContext.map((chip) => chip.label),
       brandInterpretation: directionInterpretationText || null,
       identity_score: dynamicIdentityScore,
-      resonance_score: dynamicResonanceScore,
+      resonance_score: commercialPotentialScore,
       execution_score: executionScore,
       materialId,
       cogs_usd: insight?.cogs ?? 0,
       target_msrp: targetMSRP,
+      targetMargin: brandTargetMargin,
+      marginBuffer,
       margin_pass: marginGatePassed,
       construction_tier: constructionTier ?? 'moderate',
       timeline_weeks: timelineWeeks,
+      requiredTimelineWeeks: timelineFeasibility?.required_weeks ?? null,
+      timelineGapWeeks: timelineFeasibility?.timeline_gap ?? null,
       season: storeSeason || 'SS27',
       collectionName: brandProfileName || '',
       silhouette: conceptSilhouette || undefined,
       category: categoryId || undefined,
+      currentStep: specStep,
+      constructionOverride: constructionTierOverride || Boolean(overrideWarning),
+      pulse: {
+        identity: specPulseTelemetry.identity.label.replace(/\s+/g, "_"),
+        commercial_potential: specPulseTelemetry.commercial_potential.label.replace(/\s+/g, "_"),
+        execution: specPulseTelemetry.execution.label.replace(/\s+/g, "_"),
+        saturation: specPulseTelemetry.saturation.label.replace(/\s+/g, "_"),
+      },
+      diagnostics: specDiagnostics,
       keyPiece: selectedKeyPiece && !selectedKeyPiece.custom && selectedKeyPiece.type
         ? { item: selectedKeyPiece.item, type: selectedKeyPiece.type, signal: selectedKeyPiece.signal ?? '' }
         : undefined,
@@ -1746,12 +2033,9 @@ export default function SpecStudioPage() {
     specAbortRef.current?.abort();
     const controller = new AbortController();
     specAbortRef.current = controller;
+    setSpecRailInsight(null);
 
     const timer = window.setTimeout(async () => {
-      setSpecInsightLoading(true);
-      setSpecStreamingText('');
-      setSpecStreamingParagraph('');
-      setSpecIsParagraphStreaming(true);
       specRawJsonRef.current = '';
       try {
         const res = await fetch('/api/synthesizer/spec', {
@@ -1774,20 +2058,13 @@ export default function SpecStudioPage() {
               const parsed = JSON.parse(data) as { text: string };
               const chunk = parsed.text ?? '';
               specRawJsonRef.current += chunk;
-              const accumulated = specRawJsonRef.current;
-              // Extract partial insight_title value for display
-              const match = accumulated.match(/"insight_title"\s*:\s*"([^"]*)/);
-              setSpecStreamingText(match ? match[1] : (accumulated.length > 10 ? '...' : ''));
-              setSpecStreamingParagraph(extractPartialJsonString(accumulated, 'insight_description'));
             } catch { /* ignore parse errors on partial chunks */ }
           } else if (event === 'complete' || event === 'fallback') {
             try {
-              const result = JSON.parse(data) as { data: InsightData; meta: { method: string } };
+              const result = JSON.parse(data) as { rail: SpecRailInsight; data: InsightData; meta: { method: string } };
               if (!controller.signal.aborted) {
+                setSpecRailInsight(result.rail);
                 setSpecSynthInsightData(result.data);
-                setSpecStreamingText('');
-                setSpecStreamingParagraph(result.data.statements?.slice(0, 2).join(' ').trim() ?? '');
-                setSpecIsParagraphStreaming(false);
                 // Persist analysis — awaited inside async IIFE so the stream loop is not blocked
                 void (async () => {
                   try {
@@ -1797,7 +2074,7 @@ export default function SpecStudioPage() {
 
                     const session = useSessionStore.getState();
                     const finalScore = Math.round(
-                      (dynamicIdentityScore + dynamicResonanceScore + executionScore) / 3
+                      (dynamicIdentityScore + commercialPotentialScore + executionScore) / 3
                     );
                     let reportNarrative = result.data.statements?.join('\n\n') ?? '';
 
@@ -1805,7 +2082,7 @@ export default function SpecStudioPage() {
                       aestheticSlug: conceptContext.aestheticMatchedId || '',
                       brandKeywords: refinementModifiers,
                       identity_score: dynamicIdentityScore,
-                      resonance_score: dynamicResonanceScore,
+                      resonance_score: commercialPotentialScore,
                       execution_score: executionScore,
                       overall_score: finalScore,
                       materialId: materialId || '',
@@ -1892,6 +2169,9 @@ export default function SpecStudioPage() {
                         aestheticInflection:         session.aestheticInflection,
                         directionInterpretationText: session.directionInterpretationText,
                         intent:                      intentPayload,
+                        selectedKeyPiece:           session.selectedKeyPiece,
+                        pieceBuildContext:          session.pieceBuildContext,
+                        selectedPieceImage:         session.selectedPieceImage,
                       },
                       aesthetic_matched_id:     conceptContext.aestheticMatchedId || null,
                       is_proxy_match:           false,
@@ -1906,7 +2186,7 @@ export default function SpecStudioPage() {
                       critic_conflict_ids:      [],
                       critic_llm_used:          false,
                       critic_reasoning:         '',
-                      resonance_score:          dynamicResonanceScore,
+                      resonance_score:          commercialPotentialScore,
                       execution_score:          executionScore,
                       timeline_buffer:          timelineBuffer,
                       cogs:                     insight?.cogs ?? 0,
@@ -1921,7 +2201,7 @@ export default function SpecStudioPage() {
                       score:      finalScore,
                       dimensions: {
                         identity:  dynamicIdentityScore,
-                        resonance: dynamicResonanceScore,
+                        resonance: commercialPotentialScore,
                         execution: executionScore,
                       },
                       gates_passed: { cost: marginGatePassed, sustainability: null },
@@ -1934,19 +2214,15 @@ export default function SpecStudioPage() {
                     };
 
                     const row = buildAnalysisRow(bb, analysisResult, userId);
-                    const { data: upsertData, error: upsertError } = await supabase
-                      .from('analyses')
-                      .upsert(row, { onConflict: 'id' })
-                      .select('id')
-                      .single();
+                    const { data: upsertData, error: upsertError } = await persistAnalysisRow(supabase, row);
 
                     if (upsertError) {
-                      console.error('[Spec] Analysis persist failed:', upsertError);
+                      console.error('[Spec] Analysis persist failed:', serializePersistError(upsertError));
                     } else if (upsertData?.id) {
                       setSavedAnalysisId(upsertData.id as string);
                     }
                   } catch (err) {
-                    console.error('[Spec] Analysis persist threw:', err);
+                    console.error('[Spec] Analysis persist threw:', serializePersistError(err));
                   }
                 })();
               }
@@ -1975,11 +2251,7 @@ export default function SpecStudioPage() {
       } catch (e) {
         if ((e as Error).name === 'AbortError') return;
       } finally {
-        setSpecIsParagraphStreaming(false);
-        if (!controller.signal.aborted) {
-          setSpecInsightLoading(false);
-          setSpecStreamingText('');
-        }
+        if (controller.signal.aborted) return;
       }
     }, 400);
 
@@ -2009,9 +2281,9 @@ export default function SpecStudioPage() {
   // ──────────────────────────────────────────────────────────────────────────
 
   const selectedImpact: Deltas = useMemo(() => {
-    if (!selectedMaterial) return { identity: 0, resonance: 0, execution: 0 };
+    if (!selectedMaterial) return { identity: 0, commercialPotential: 0, execution: 0 };
     const m = scoreMaterialDeltas(selectedMaterial);
-    const c = constructionTier ? scoreComplexityDeltas(constructionTier) : { identity: 0, resonance: 0, execution: 0 };
+    const c = constructionTier ? scoreComplexityDeltas(constructionTier) : { identity: 0, commercialPotential: 0, execution: 0 };
     return addDeltas(m, c);
   }, [selectedMaterial, constructionTier]);
 
@@ -2054,14 +2326,14 @@ export default function SpecStudioPage() {
             ? "drifting off-brand"
             : "brand-neutral";
 
-    const resLine =
-      selectedImpact.resonance >= 2
-        ? "market-aligned"
-        : selectedImpact.resonance >= 1
-          ? "market-positive"
-          : selectedImpact.resonance <= -1
-            ? "higher risk commercially"
-            : "commercially neutral";
+    const commercialLine =
+      selectedImpact.commercialPotential >= 2
+        ? "commercially attractive"
+        : selectedImpact.commercialPotential >= 1
+          ? "commercially supportive"
+          : selectedImpact.commercialPotential <= -1
+            ? "less persuasive commercially"
+            : "commercially steady";
 
     const execLine =
       overBy > 0
@@ -2070,7 +2342,7 @@ export default function SpecStudioPage() {
           ? "with strong execution headroom"
           : "with manageable execution headroom";
 
-    const overall = `Overall: ${idLine} + ${resLine}, ${execLine}.`;
+    const overall = `Overall: ${idLine} + ${commercialLine}, ${execLine}.`;
 
     const currentCogs = cogs;
     const currentTier = constructionTier!;
@@ -2240,226 +2512,129 @@ export default function SpecStudioPage() {
   ]);
 
 
-  /* ─── Spec insight content ─────────────────────────────────────────────── */
-  const specInsightContent = useMemo(() => {
-    const mat = selectedMaterial ?? baselineMaterial;
-    const dir = conceptContext.aestheticName;
-    const ceiling = marginCeiling;
-
-    if (!mat) {
-      return {
-        headline: `Choose a material to start your ${dir} spec.`,
-        p1: `The rose glow on the material grid marks Muko's recommendation for this direction — the starting point with the best fit across brand alignment, margin, and lead time.`,
-        p2: `Your margin ceiling is $${ceiling} — that's the maximum COGS at your target margin. Material cost × yardage + construction multiplier must stay within this.`,
-        p3: `Select a material and silhouette to see your full execution readout. Identity and Resonance carry forward from Concept Studio — Execution is the score to optimize here.`,
-        opportunity: [] as string[],
-        editItems: [] as string[],
-      };
-    }
-
-    const cost = mat.cost_per_yard || 0;
-    const leadTime = mat.lead_time_weeks || 0;
-    const isOver = insight ? insight.cogs > insight.ceiling : false;
-    const overBy = isOver && insight ? insight.cogs - insight.ceiling : 0;
-
-    const matP1Map: Record<string, string> = {
-      "organic-cotton": `Organic cotton reads cleanly within ${dir}'s visual language — honest material, GOTS-certified, with a provenance story your customer can verify. The fabrication lets the design carry the concept without competing for attention.`,
-      "tencel": `Tencel's fluid drape reads elevated on-body for ${dir} — the Lenzing trademark adds a sustainability credential at a price point that doesn't strain margin. Premium-feeling material that doesn't demand premium cost.`,
-      "linen": `Linen's natural slub texture is one of the most authentic fabrication signals for ${dir} — it improves with wear and reads honest in a way synthetic blends can't replicate. The 13-week lead is your primary planning constraint.`,
-      "silk": `Silk is the highest-identity material signal available for ${dir} — luminous, fluid, and immediately readable as a hero fabrication. Watch the 15-week lead and factor genuine complexity into your production calendar.`,
-      "wool-merino": `Merino wool is itch-free, temperature-regulating, and premium-feeling without announcing itself — for ${dir}, it's the easiest fabrication upgrade with the clearest commercial proposition.`,
-      "cashmere-blend": `Cashmere signals luxury before the garment is worn — for ${dir}, it elevates the entire concept. An 18-week lead and $40/yd cost means this should be a hero SKU, not a basic.`,
-      "recycled-polyester": `Recycled polyester gives ${dir} a credible sustainability angle without premium cost — best positioned in layering or outerwear where surface texture is secondary to function.`,
-      "deadstock-fabric": `Deadstock fits ${dir}'s restraint ethos — the material story becomes part of the design story, and your customer responds to that kind of intentionality. Lot-based availability is the trade-off: size the run carefully.`,
-      "hemp": `Hemp has the highest sustainability score in the lineup for ${dir} — structured drape, improving softness, and a strong provenance story that carries real commercial credibility now.`,
-      "leather": `Leather is a high-identity, long-lead choice for ${dir} — a genuinely premium read that requires the production depth and complexity budget to execute correctly. Half-measures won't register.`,
-      "vegan-leather": `Vegan leather gives ${dir} leather's structure at lower cost with easier compliance — the sustainability score is lower than organic materials, so be transparent rather than leaning on the eco story.`,
-      "rayon-viscose": `Rayon viscose gives ${dir} Tencel's fluid drape at a lower price point — affordable and commercial, though the environmental story is weaker. Best where drape and cost take priority over provenance.`,
-    };
-
-    const p1 = matP1Map[mat.id] ?? `${mat.name} aligns with ${dir}'s fabrication language — the material weight and surface carry the direction's signals clearly without requiring additional explanation.`;
-
-    const p2 = insight
-      ? isOver
-        ? `At $${cost}/yd, your COGS comes in at $${insight.cogs} — $${overBy} over your $${ceiling} ceiling. The fastest recovery is construction tier or silhouette yardage, not a material swap.`
-        : `At $${cost}/yd with a $${ceiling} ceiling, you're at $${insight.cogs} COGS — $${ceiling - insight.cogs} within margin. That's real room to invest in construction quality without pressure.`
-      : `At $${cost}/yd with a $${ceiling} ceiling, select a silhouette to see your full COGS breakdown. Material cost is your biggest lever — the rest is construction and yardage.`;
-
-    const p3 = leadTime <= 4
-      ? `${leadTime}-week lead time is your sharpest production advantage — short enough to course-correct on anything in the spec without calendar risk.`
-      : leadTime <= 8
-        ? `${leadTime}-week lead gives you a workable window — plan sampling now and confirm construction approval early to stay ahead of deadline risk.`
-        : leadTime <= 12
-          ? `${leadTime}-week lead is tight against a typical season calendar. Confirm factory alignment and don't let sampling stretch — any slip compounds quickly.`
-          : `${leadTime}-week lead is your biggest risk flag. Confirm material receipt and factory capacity before committing to the range plan.`;
-
-    const opportunity: string[] = !isOver
-      ? [
-          `${mat.name} is the most legible fabrication signal for this direction — let it carry the concept`,
-          insight && (ceiling - insight.cogs) > 30
-            ? `You have $${ceiling - insight.cogs} in margin headroom — room to invest in finishing detail or construction quality`
-            : `Keep construction at Moderate to preserve margin flexibility`,
-          leadTime <= 6
-            ? `Short lead means fast iteration — confirm silhouette and move`
-            : `Confirm yardage and spec early to protect against lead time risk`,
-        ]
-      : [
-          `Reduce complexity to Moderate — fastest route to recover $${Math.round(overBy * 0.6)} without touching the material`,
-          alternativeMaterial
-            ? `Consider ${alternativeMaterial.name} at $${alternativeMaterial.cost_per_yard}/yd — comparable properties, lower cost`
-            : `Review silhouette yardage — lower volume cut reduces COGS without changing the design language`,
-          `Lock silhouette and confirm lead time before committing to production quantities`,
-        ];
-
-    const editItems: string[] = isOver
-      ? [
-          `A lower-cost fabrication would bring COGS back within your $${ceiling} ceiling`,
-          `Reducing construction complexity is the fastest route to recover margin headroom`,
-        ]
-      : leadTime > 10
-        ? [
-            `Confirm material lead time against your season deadline before locking the spec`,
-            `A shorter-lead alternative would reduce calendar risk without changing the design language`,
-          ]
-        : [];
-
-    return {
-      headline: `${mat.name} is your starting point for ${dir}.`,
-      p1, p2, p3, opportunity, editItems,
-    };
-  }, [selectedMaterial, baselineMaterial, conceptContext.aestheticName, marginCeiling, insight, alternativeMaterial, baselineComplexity]);
-
-  const suggestedQuestions = useMemo(() => {
-    const qs = [
-      "What's the biggest execution risk here?",
-      "Is there a better material for this direction?",
-    ];
-    if (insight && insight.cogs <= insight.ceiling) qs.push("How much complexity can I add before I'm at risk?");
-    else if (insight && insight.cogs > insight.ceiling) qs.push("What's the fastest way to get back within margin?");
-    if (selectedMaterial && (selectedMaterial.lead_time_weeks ?? 0) > 14) qs.push("Is there a material with a shorter lead time?");
-    if (constructionTier === "high") qs.push("Is High complexity worth the margin cost for this direction?");
-    return qs.slice(0, 3);
-  }, [insight, selectedMaterial, constructionTier]);
-
   const displayConstruction = constructionConfirmed && constructionTier
     ? CONSTRUCTION_INFO[constructionTier].label
     : "—";
   const displayLeadTime = selectedMaterial ? `${selectedMaterial.lead_time_weeks} weeks` : "—";
   const displayEstimatedCogs = insight ? `$${insight.cogs}` : "—";
   const marginBuffer = insight ? insight.ceiling - insight.cogs : null;
-  const hasMaterialSelection = Boolean(selectedMaterial);
-  const hasConstructionSelection = Boolean(selectedMaterial && constructionConfirmed && constructionTier);
-  const hasExecutionStage = hasConstructionSelection;
-  const activeSignalLabels = useMemo(
-    () => (chipSelection?.activatedChips ?? []).map((chip) => chip.label),
-    [chipSelection]
+  const activeRole = pieceBuildContext?.role ?? storeCollectionRole;
+  const selectedMaterialProperties = useMemo(
+    () => getMaterialProperties(selectedMaterial),
+    [selectedMaterial]
   );
-  const constructionImplication = useMemo(
-    () =>
-      getConstructionImplicationCopy({
-        tier: constructionConfirmed ? constructionTier : null,
-        material: selectedMaterial,
-        silhouette: formattedSilhouette,
-        timelineStatus,
-        selectedSignals: activeSignalLabels,
-      }),
-    [constructionConfirmed, constructionTier, selectedMaterial, formattedSilhouette, timelineStatus, activeSignalLabels]
-  );
-  const materialDirectionGuidance = useMemo(() => {
-    const translationLine = translationIntent
-      ? `Favor materials that keep ${translationIntent.toLowerCase()} readable.`
-      : "Favor materials that preserve the translated tone rather than the raw market idea.";
-    const finishLine = strongExpressionLabels.some((label) => /fluid|drape/i.test(label)) || missingExpressionLabels.some((label) => /fluid|drape/i.test(label))
-      ? "Preserve the collection's discipline while letting fluidity come through the fabric's movement."
-      : strongExpressionLabels.some((label) => /contrast|lustre|surface|finish/i.test(label)) || missingExpressionLabels.some((label) => /contrast|lustre|surface|finish/i.test(label))
-        ? "Introduce contrast through finish and surface, not embellishment or louder color moves."
-        : selectedKeyPiece?.signal === "high-volume"
-          ? "Keep surface finish disciplined so the piece stays commercially broad."
-          : selectedKeyPiece?.signal === "ascending"
-            ? "Let the handfeel carry the freshness rather than pushing shine or visual effect."
-            : "Use material to clarify the point of view, not to overstate it.";
-    return `${translationLine} ${finishLine}`;
-  }, [missingExpressionLabels, selectedKeyPiece?.signal, strongExpressionLabels, translationIntent]);
-  const constructionDirectionGuidance = useMemo(() => {
-    const opening = roleConstructionSentence;
-    const followUp = strongExpressionLabels.some((label) => /tailor/i.test(label)) || missingExpressionLabels.some((label) => /tailor/i.test(label))
-      ? "Guide seam and shape choices toward restraint so tailoring reads softened rather than rigid."
-      : constructionTier === "high"
-        ? "Make the structure work through one clear move instead of layered detailing."
-        : "Let the fabric behavior do more of the work than added build complexity.";
-    return `${opening} ${followUp}`;
-  }, [constructionTier, missingExpressionLabels, roleConstructionSentence, strongExpressionLabels]);
-  const executionDirectionGuidance = useMemo(() => {
-    const translationLine = translationIntent
-      ? `Translate "${translationIntent}" into clean, deliberate decisions rather than decorative ones.`
-      : "Translate the concept into clean, deliberate decisions rather than decorative ones.";
-    const constructionLine = strongExpressionLabels.some((label) => /contrast|lustre|surface|finish/i.test(label)) || missingExpressionLabels.some((label) => /contrast|lustre|surface|finish/i.test(label))
-      ? "Use finish contrast sparingly so the piece gains dimension without breaking the collection's tonal logic."
-      : selectedMaterial
-        ? `Use ${selectedMaterial.name.toLowerCase()} to keep the silhouette readable with minimal interruption.`
-        : "Use seams, finishing, and proportion to keep the silhouette readable with minimal interruption.";
-    return `${translationLine} ${constructionLine}`;
-  }, [missingExpressionLabels, selectedMaterial, strongExpressionLabels, translationIntent]);
-
-  const executionImplications = useMemo(() => {
-    const items: string[] = [];
-    const selectedMaterialProperties = getMaterialProperties(selectedMaterial);
-
-    if (selectedMaterial) {
-      items.push(selectedMaterialProperties.some((property) => /drape|fluid|soft/i.test(property))
-        ? "Let movement come from the fabric rather than added volume."
-        : "Let the silhouette stay clean so the material carries the read.");
+  const materialBehavior = useMemo(() => {
+    if (!selectedMaterial) return null;
+    if (
+      selectedMaterialProperties.some((property) => /drape|fluid|soft|silky|slinky/i.test(property)) ||
+      /tencel|silk|rayon|viscose/i.test(selectedMaterial.id)
+    ) {
+      return "fluid";
     }
-
-    if (strongExpressionLabels.some((label) => /fluid|drape/i.test(label)) || missingExpressionLabels.some((label) => /fluid|drape/i.test(label))) {
-      items.push("Preserve the collection's column or structural discipline while allowing fluidity to come through the material's behavior.");
-    } else if (strongExpressionLabels.some((label) => /contrast|lustre|surface|finish/i.test(label)) || missingExpressionLabels.some((label) => /contrast|lustre|surface|finish/i.test(label))) {
-      items.push("Use finish contrast sparingly so the piece gains dimension without breaking the collection's muted tonal logic.");
-    } else if (strongExpressionLabels.some((label) => /tailor/i.test(label)) || missingExpressionLabels.some((label) => /tailor/i.test(label))) {
-      items.push("Guide seam and shape decisions toward restraint so the tailoring reads softened instead of rigid.");
+    if (
+      selectedMaterialProperties.some((property) => /structured|crisp|firm|body|hold/i.test(property)) ||
+      /linen|hemp|nylon|leather|vegan-leather/i.test(selectedMaterial.id)
+    ) {
+      return "structured";
     }
-
-    if ((pieceBuildContext?.role ?? storeCollectionRole) === "volume-driver") {
-      items.push("Keep finishing disciplined so the piece remains repeatable at scale.");
-    } else if ((pieceBuildContext?.role ?? storeCollectionRole) === "hero") {
-      items.push("Concentrate detail in one focal area instead of spreading complexity across the whole piece.");
-    } else if ((pieceBuildContext?.role ?? storeCollectionRole) === "core-evolution") {
-      items.push("Stay close to brand-recognizable proportions and avoid novelty for its own sake.");
-    } else if ((pieceBuildContext?.role ?? storeCollectionRole) === "directional") {
-      items.push("Push one directional move forward, but keep the rest of the execution calm.");
+    if (selectedMaterialProperties.some((property) => /texture|slub|grain|tactile|brushed/i.test(property))) {
+      return "textural";
     }
+    return "balanced";
+  }, [selectedMaterial, selectedMaterialProperties]);
+  const specDiagnostics = useMemo(() => {
+    const targetCogs = insight?.ceiling ?? (targetMSRP > 0 ? Math.round(targetMSRP * (1 - brandTargetMargin)) : null);
+    return deriveSpecDiagnostics({
+      pieceRole: activeRole,
+      specStep,
+      silhouette: conceptSilhouette ?? selectedSubcategory?.name ?? selectedCategory.name,
+      constructionTier: constructionTier ?? "moderate",
+      constructionOverride: constructionTierOverride || Boolean(overrideWarning),
+      materialBehavior: materialBehavior ?? "balanced",
+      materialProperties: selectedMaterialProperties,
+      marginBuffer,
+      targetCogs,
+      timelineGapWeeks: timelineFeasibility?.timeline_gap ?? null,
+      requiredTimelineWeeks: timelineFeasibility?.required_weeks ?? null,
+      availableTimelineWeeks: timelineWeeks,
+      identityScore: dynamicIdentityScore,
+      resonanceScore: commercialPotentialScore,
+      executionScore,
+      strongExpressionLabels,
+      missingExpressionLabels,
+      collectionLanguageLabels: collectionLanguageContext.map((chip) => chip.label),
+      expressionSignals: expressionSignalContext.map((chip) => chip.label),
+    });
+  }, [
+    activeRole,
+    brandTargetMargin,
+    collectionLanguageContext,
+    commercialPotentialScore,
+    conceptSilhouette,
+    constructionTier,
+    constructionTierOverride,
+    dynamicIdentityScore,
+    executionScore,
+    expressionSignalContext,
+    insight?.ceiling,
+    marginBuffer,
+    materialBehavior,
+    missingExpressionLabels,
+    overrideWarning,
+    selectedCategory.name,
+    selectedMaterialProperties,
+    selectedSubcategory?.name,
+    specStep,
+    strongExpressionLabels,
+    targetMSRP,
+    timelineFeasibility?.required_weeks,
+    timelineFeasibility?.timeline_gap,
+    timelineWeeks,
+  ]);
+  const specFallbackRail = useMemo(() => {
+    if (!selectedMaterial || !insight) return null;
+    return buildFallbackSpecRail({
+      material_name: selectedMaterial.name,
+      material_id: selectedMaterial.id,
+      category: categoryId || selectedCategory.name,
+      silhouette: conceptSilhouette || selectedSubcategory?.name || selectedCategory.name,
+      construction_tier: constructionTier ?? "moderate",
+      target_msrp: targetMSRP,
+      cogs_usd: insight.cogs,
+      timeline_weeks: timelineWeeks,
+      required_timeline_weeks: timelineFeasibility?.required_weeks ?? undefined,
+      timeline_gap_weeks: timelineFeasibility?.timeline_gap ?? undefined,
+      brand_name: brandProfileName ?? undefined,
+      keyPiece: selectedKeyPiece && !selectedKeyPiece.custom && selectedKeyPiece.type
+        ? { item: selectedKeyPiece.item, type: selectedKeyPiece.type, signal: selectedKeyPiece.signal ?? "" }
+        : undefined,
+      diagnostics: specDiagnostics,
+      resolved_redirects: {
+        cost_reduction: alternativeMaterial
+          ? { material_id: alternativeMaterial.id, reason: "Lower-cost option preserving key behavior." }
+          : null,
+      },
+    });
+  }, [
+    alternativeMaterial,
+    brandProfileName,
+    categoryId,
+    conceptSilhouette,
+    constructionTier,
+    insight,
+    selectedCategory.name,
+    selectedKeyPiece,
+    selectedMaterial,
+    selectedSubcategory?.name,
+    specDiagnostics,
+    timelineFeasibility?.required_weeks,
+    timelineFeasibility?.timeline_gap,
+    timelineWeeks,
+    targetMSRP,
+  ]);
+  const activeSpecRail = specRailInsight ?? specFallbackRail;
+  const showBetterPath = activeSpecRail ? shouldShowBetterPath(activeSpecRail) : false;
 
-    if (constructionTier === "high") {
-      items.push("Avoid secondary detailing that would over-structure the piece.");
-    } else if (translationIntent) {
-      items.push(`Use seams and finishing to reinforce a ${translationIntent.toLowerCase()} read.`);
-    }
-
-    return items.slice(0, 3);
-  }, [constructionTier, missingExpressionLabels, pieceBuildContext?.role, selectedMaterial, storeCollectionRole, strongExpressionLabels, translationIntent]);
-
-  const riskOpportunity = useMemo(() => {
-    const role = pieceBuildContext?.role ?? storeCollectionRole;
-    const risk = marginBuffer != null && marginBuffer < 0
-      ? "Overbuilding this piece will erase its margin room quickly."
-      : timelineStatus === "red"
-        ? "Longer lead choices will compress the delivery window."
-        : role === "volume-driver"
-          ? "Too much detail will narrow its commercial range."
-          : role === "hero"
-            ? "If the execution gets too restrained, the piece can lose its focal-point role."
-            : null;
-    const opportunity = role === "volume-driver"
-      ? "A clean execution can turn this into a repeatable anchor."
-      : role === "hero"
-        ? "One controlled point of emphasis can sharpen the whole collection."
-        : role === "core-evolution"
-          ? "A familiar build can make the collection language feel owned rather than referenced."
-          : "A controlled experiment here can extend the line without destabilizing it.";
-    return { risk, opportunity };
-  }, [pieceBuildContext?.role, storeCollectionRole, marginBuffer, timelineStatus]);
-
-  const displayExecutionStatus = executionChipData?.status ?? "Pending";
   const displayCogs = insight ? `$${insight.cogs}` : "—";
   const executionSubLabel = selectedMaterial
     ? [
@@ -2472,6 +2647,19 @@ export default function SpecStudioPage() {
         `COGS ${displayCogs}`,
       ].join(" · ")
     : "Select a material to activate execution.";
+  const specPulseTelemetry = useMemo(() => buildSpecPulseTelemetry({
+    commercialPotentialScore,
+    marketSaturation: marketSaturationSignal,
+    identityStatus: dynamicIdentityScore >= 80 ? "green" : dynamicIdentityScore >= 60 ? "yellow" : "red",
+    executionStatus: executionChipData?.variant === "green" ? "green" : executionChipData?.variant === "red" ? "red" : executionChipData?.variant === "amber" ? "yellow" : null,
+    executionPending: !selectedMaterial,
+  }), [
+    commercialPotentialScore,
+    dynamicIdentityScore,
+    executionChipData?.variant,
+    marketSaturationSignal,
+    selectedMaterial,
+  ]);
   const pulseRows = [
     {
       key: "identity",
@@ -2481,22 +2669,22 @@ export default function SpecStudioPage() {
       numericPercent: dynamicIdentityScore,
       scoreColor: identityColor,
       pill: { variant: identityChipData.variant, label: identityChipData.status },
-      subLabel: identityChipData.consequence,
-      whatItMeans: "How clearly the piece carries the collection identity.",
-      howCalculated: "Derived from concept alignment, product anchor, and spec continuity.",
+      subLabel: `Signal ${specPulseTelemetry.identity.label}`,
+      whatItMeans: "Identity telemetry tracks how clearly the piece still carries the collection's intended point of view.",
+      howCalculated: "Built from concept alignment, anchor-piece context, and continuity between the selected spec and the locked direction.",
       isPending: false,
     },
     {
-      key: "resonance",
-      label: "Resonance",
-      icon: <IconResonance color={resonanceColor} />,
-      displayScore: String(dynamicResonanceScore),
-      numericPercent: dynamicResonanceScore,
-      scoreColor: resonanceColor,
-      pill: { variant: resonanceChipData.variant, label: resonanceChipData.status },
-      subLabel: resonanceChipData.consequence,
-      whatItMeans: "How commercially alive the concept feels in the market.",
-      howCalculated: "Weighted by signal trajectory, concept framing, and product relevance.",
+      key: "commercial-potential",
+      label: "Commercial Potential",
+      icon: <IconResonance color={commercialPotentialColor} />,
+      displayScore: String(commercialPotentialScore),
+      numericPercent: commercialPotentialScore,
+      scoreColor: commercialPotentialColor,
+      pill: { variant: commercialPotentialChipData.variant, label: commercialPotentialChipData.status },
+      subLabel: `${specPulseTelemetry.commercial_potential.label} · ${specPulseTelemetry.saturation.label}`,
+      whatItMeans: "Commercial telemetry shows likely pull once the concept becomes product, with market saturation held as supporting evidence.",
+      howCalculated: "Built from concept resonance, product relevance, piece signal, and market state telemetry.",
       isPending: false,
     },
     {
@@ -2507,48 +2695,25 @@ export default function SpecStudioPage() {
       numericPercent: executionScore,
       scoreColor: executionColor,
       pill: executionChipData ? { variant: executionChipData.variant, label: executionChipData.status } : null,
-      subLabel: executionSubLabel,
-      whatItMeans: "Whether the concept still holds together under production pressure.",
-      howCalculated: "Based on material, construction, cost, margin pressure, and delivery feasibility.",
+      subLabel: `Signal ${specPulseTelemetry.execution.label} · ${executionSubLabel}`,
+      whatItMeans: "Execution telemetry tracks how much production pressure the current material, construction, cost, and calendar are creating.",
+      howCalculated: "Derived from cost gate status, timeline feasibility, and the selected build path.",
       isPending: !selectedMaterial,
     },
   ];
-  const collapsedPulseInsight = useMemo(() => buildPulseMicroInsight({
-    stage: "spec",
-    identity: {
-      score: dynamicIdentityScore,
-      status: dynamicIdentityScore >= 80 ? "green" : dynamicIdentityScore >= 60 ? "yellow" : "red",
-    },
-    resonance: {
-      score: dynamicResonanceScore,
-      status: resonanceChipData.variant === "green" ? "green" : resonanceChipData.variant === "red" ? "red" : "yellow",
-      label: resonanceChipData.status,
-    },
-    execution: {
-      score: executionScore,
-      status: executionChipData?.variant === "green" ? "green" : executionChipData?.variant === "red" ? "red" : executionChipData?.variant === "amber" ? "yellow" : null,
-      pending: !selectedMaterial,
-      label: executionChipData?.status ?? null,
-    },
-    context: {
-      materialSelected: Boolean(selectedMaterial),
-    },
+  const collapsedPulseInsight = useMemo(() => buildSpecPulseInsight({
+    commercialPotentialScore,
+    marketSaturation: marketSaturationSignal,
+    identityStatus: dynamicIdentityScore >= 80 ? "green" : dynamicIdentityScore >= 60 ? "yellow" : "red",
+    executionStatus: executionChipData?.variant === "green" ? "green" : executionChipData?.variant === "red" ? "red" : executionChipData?.variant === "amber" ? "yellow" : null,
+    executionPending: !selectedMaterial,
   }), [
     dynamicIdentityScore,
-    dynamicResonanceScore,
+    commercialPotentialScore,
     executionChipData,
-    executionScore,
-    resonanceChipData.status,
-    resonanceChipData.variant,
+    marketSaturationSignal,
     selectedMaterial,
   ]);
-
-  const stageSummaries = useMemo(() => ({
-    "material-reality": selectedMaterial?.name ?? "Choose material",
-    "construction-discipline": constructionConfirmed && constructionTier
-      ? CONSTRUCTION_INFO[constructionTier].label
-      : "Choose construction",
-  }), [selectedMaterial, constructionConfirmed, constructionTier]);
 
   const buildOutcomeRows = useMemo(() => [
     { label: "Material", value: selectedMaterial?.name ?? "—" },
@@ -2561,39 +2726,235 @@ export default function SpecStudioPage() {
     },
   ], [selectedMaterial, displayConstruction, displayEstimatedCogs, displayLeadTime, marginBuffer]);
 
-  const mukoRead = useMemo(() => {
-    const roleLead = pieceRoleLabel !== "Piece" ? `This piece is positioned as a ${pieceRoleLabel}` : "This piece";
-    const translationLine = translationIntent
-      ? `the goal is to keep ${translationIntent.toLowerCase()} in the execution.`
-      : "the goal is to keep the translation disciplined in the execution.";
-    const collectionLine = collectionLanguageSentence;
-    const expressionLine = expressionSignalSentence;
-    const constructionLabel = constructionTier ? CONSTRUCTION_INFO[constructionTier].label.toLowerCase() : "selected";
-    const behaviorLine = !selectedMaterial
-      ? "Start with a material that clarifies the tone before adding construction weight."
-      : !constructionConfirmed
-        ? `${selectedMaterial.name} is setting the tone; construction should now decide how restrained or expressive the piece feels.`
-        : `${selectedMaterial.name} and ${constructionLabel} construction keep the behavior ${executionStatus === "red" ? "under pressure" : "controlled"} in the line.`;
-
-    return {
-      headline: `${roleLead}, so ${translationLine}`,
-      body: `${collectionLine} ${expressionLine} ${behaviorLine}`,
-    };
-  }, [
-    pieceRoleLabel,
-    translationIntent,
-    collectionLanguageSentence,
-    expressionSignalSentence,
-    selectedMaterial,
-    constructionConfirmed,
-    constructionTier,
-    executionStatus,
-    pieceBuildContext?.role,
-    storeCollectionRole,
-  ]);
-
   /* ─── RENDER ───────────────────────────────────────────────────────────── */
-  const overallScore = Math.round((dynamicIdentityScore + dynamicResonanceScore + executionScore) / 3);
+  const overallScore = Math.round((dynamicIdentityScore + commercialPotentialScore + executionScore) / 3);
+  const specInsightNarrative = specInsightData.statements.join(" ");
+
+  const persistAnalysisRow = useCallback(async (
+    supabase: ReturnType<typeof createClient>,
+    row: Record<string, unknown>,
+  ) => {
+    const existingId = typeof row.id === "string" && row.id.trim().length > 0 ? row.id : null;
+
+    if (existingId) {
+      const { id: _id, ...updateRow } = row;
+      const { result: updateResult, payload: sanitizedUpdateRow } = await runAnalysisMutationWithSchemaFallback(
+        updateRow,
+        async (nextPayload) => supabase
+          .from("analyses")
+          .update(nextPayload)
+          .eq("id", existingId)
+          .select("id")
+          .maybeSingle()
+      );
+
+      if (updateResult.error) {
+        throw updateResult.error;
+      }
+
+      if (updateResult.data?.id) {
+        return updateResult;
+      }
+
+      const { result: insertResult } = await runAnalysisMutationWithSchemaFallback(
+        sanitizedUpdateRow,
+        async (nextPayload) => supabase
+          .from("analyses")
+          .insert(nextPayload)
+          .select("id")
+          .single()
+      );
+
+      return insertResult;
+    }
+
+    const { result: insertResult } = await runAnalysisMutationWithSchemaFallback(
+      row,
+      async (nextPayload) => supabase
+        .from("analyses")
+        .insert(nextPayload)
+        .select("id")
+        .single()
+    );
+
+    return insertResult;
+  }, []);
+
+  const persistCurrentPiece = useCallback(async () => {
+    const supabase = createClient();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+
+    const userId = authData.user?.id ?? null;
+    if (!userId) {
+      return;
+    }
+
+    const browserCollectionContext = readCollectionContextFromBrowser();
+    const resolvedCollectionName =
+      storeCollectionName.trim()
+      || browserCollectionContext.collectionName
+      || headerCollectionName.trim()
+      || brandProfileName?.trim()
+      || "";
+    const resolvedSeason =
+      storeSeason.trim()
+      || browserCollectionContext.season
+      || headerSeasonLabel.trim()
+      || "";
+
+    if (!resolvedCollectionName) {
+      throw new Error("No collection name available for piece save.");
+    }
+
+    const intentPayload = {
+      primary_goals: intentGoals,
+      tradeoff: intentTradeoff,
+      tension_sliders: {
+        trend_forward: useSessionStore.getState().sliderTrend,
+        creative_expression: useSessionStore.getState().sliderCreative,
+        elevated_design: useSessionStore.getState().sliderElevated,
+        novelty: useSessionStore.getState().sliderNovelty,
+      },
+    };
+
+    const bb: PipelineBlackboard = {
+      input: {
+        aesthetic_input: conceptContext.aestheticName || "",
+        material_id: materialId || "",
+        silhouette: conceptSilhouette || "",
+        construction_tier: constructionTier ?? "moderate",
+        category: categoryId || "",
+        target_msrp: targetMSRP,
+        season: resolvedSeason,
+        collection_name: resolvedCollectionName,
+        timeline_weeks: timelineWeeks,
+      },
+      brand: {
+        id: brandProfileId,
+        brand_name: brandProfileName ?? "",
+        keywords: [],
+        customer_profile: null,
+        price_tier: "Contemporary",
+        target_margin: brandTargetMargin,
+        tension_context: null,
+      },
+      session: {
+        collectionName: resolvedCollectionName,
+        season: resolvedSeason,
+        selectedAesthetic: conceptContext.aestheticMatchedId || null,
+        selectedElements: [],
+        category: categoryId || null,
+        targetMSRP: targetMSRP,
+        materialId: materialId || null,
+        silhouette: conceptSilhouette || null,
+        constructionTier: constructionTier ?? null,
+        timelineWeeks: timelineWeeks,
+        collectionRole: storeCollectionRole ?? null,
+        savedAnalysisId: savedAnalysisId,
+        collectionAesthetic: useSessionStore.getState().collectionAesthetic,
+        aestheticInflection: useSessionStore.getState().aestheticInflection,
+        directionInterpretationText: useSessionStore.getState().directionInterpretationText,
+        intent: intentPayload,
+        selectedKeyPiece,
+        pieceBuildContext,
+        selectedPieceImage,
+      },
+      aesthetic_matched_id: conceptContext.aestheticMatchedId || null,
+      is_proxy_match: false,
+      aesthetic_keywords: [],
+      saturation_score: 50,
+      trend_velocity: "stable",
+      category_saturation: 50,
+      category_velocity: "stable",
+      identity_score: dynamicIdentityScore,
+      tension_flags: [],
+      critic_conflict_detected: false,
+      critic_conflict_ids: [],
+      critic_llm_used: false,
+      critic_reasoning: "",
+      resonance_score: commercialPotentialScore,
+      execution_score: executionScore,
+      timeline_buffer: timelineBuffer,
+      cogs: insight?.cogs ?? 0,
+      gate_passed: marginGatePassed,
+      cogs_delta: 0,
+      final_score: overallScore,
+      redirect: null,
+      narrative: specInsightNarrative,
+    };
+
+    const analysisResult: AnalysisResultOrch = {
+      score: overallScore,
+      dimensions: {
+        identity: dynamicIdentityScore,
+        resonance: commercialPotentialScore,
+        execution: executionScore,
+      },
+      gates_passed: { cost: marginGatePassed, sustainability: null },
+      narrative: bb.narrative,
+      redirect: null,
+      agent_versions: AGENT_VERSIONS,
+      aesthetic_matched_id: bb.aesthetic_matched_id,
+      errors: [],
+      analysis_id: null,
+    };
+
+    const row = buildAnalysisRow(bb, analysisResult, userId);
+    const { data: upsertData, error: upsertError } = await persistAnalysisRow(supabase, row);
+
+    if (upsertError) throw upsertError;
+    setCollectionName(resolvedCollectionName);
+    setActiveCollection(resolvedCollectionName);
+    if (resolvedSeason) {
+      setSeason(resolvedSeason);
+    }
+    try {
+      window.localStorage.setItem("muko_collectionName", resolvedCollectionName);
+      if (resolvedSeason) {
+        window.localStorage.setItem("muko_seasonLabel", resolvedSeason);
+      }
+    } catch {}
+    if (upsertData?.id) {
+      setSavedAnalysisId(upsertData.id as string);
+    }
+  }, [
+    brandProfileId,
+    brandProfileName,
+    brandTargetMargin,
+    categoryId,
+    commercialPotentialScore,
+    conceptContext.aestheticMatchedId,
+    conceptContext.aestheticName,
+    conceptSilhouette,
+    constructionTier,
+    dynamicIdentityScore,
+    executionScore,
+    insight?.cogs,
+    intentGoals,
+    intentTradeoff,
+    headerCollectionName,
+    headerSeasonLabel,
+    marginGatePassed,
+    materialId,
+    overallScore,
+    pieceBuildContext,
+    persistAnalysisRow,
+    savedAnalysisId,
+    selectedKeyPiece,
+    selectedPieceImage,
+    setActiveCollection,
+    setCollectionName,
+    setSavedAnalysisId,
+    setSeason,
+    specInsightNarrative,
+    storeCollectionName,
+    storeCollectionRole,
+    storeSeason,
+    targetMSRP,
+    timelineBuffer,
+    timelineWeeks,
+  ]);
 
   const askMukoContext: AskMukoContext = {
     step: "spec",
@@ -2611,7 +2972,7 @@ export default function SpecStudioPage() {
     },
     scores: {
       identity: dynamicIdentityScore ?? undefined,
-      resonance: dynamicResonanceScore ?? undefined,
+      resonance: commercialPotentialScore ?? undefined,
       execution: executionScore ?? undefined,
       overall: overallScore,
     },
@@ -2634,7 +2995,25 @@ export default function SpecStudioPage() {
     brandInterpretation: directionInterpretationText || undefined,
   };
 
-  const isTimelineEmpty = timelineWeeksInput.trim().length === 0;
+  useEffect(() => {
+    const node = contextBarRef.current;
+    if (!node) return;
+
+    const updateHeight = () => {
+      setContextBarHeight(Math.ceil(node.getBoundingClientRect().height) || COLLECTION_CONTEXT_BAR_OFFSET);
+    };
+
+    updateHeight();
+
+    if (typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      updateHeight();
+    });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#FAF9F6", overflow: "hidden" }}>
@@ -2649,6 +3028,7 @@ export default function SpecStudioPage() {
       />
 
       <div
+        ref={contextBarRef}
         style={{
           position: "fixed",
           top: 72,
@@ -2660,7 +3040,7 @@ export default function SpecStudioPage() {
         <CollectionContextBar
           collectionName={headerCollectionName}
           season={headerSeasonLabel}
-          titleOverride={specHeaderTitle}
+          titleOverride={contextBarTitle || specHeaderTitle}
           direction={conceptContext.aestheticName || undefined}
           pointOfView={directionInterpretationText || undefined}
           collectionLanguage={collectionLanguageContext.map((chip) => chip.label)}
@@ -2672,7 +3052,13 @@ export default function SpecStudioPage() {
         />
       </div>
 
-      <div className="specStudioLayout" style={{ marginTop: 72 + SPEC_CONTEXT_BAR_OFFSET }}>
+      <div
+        className="specStudioLayout"
+        style={{
+          marginTop: 72 + contextBarHeight,
+          height: `calc(100vh - 72px - ${contextBarHeight}px)`,
+        }}
+      >
         <aside className="specStudioColumn specStudioLeft">
           <div className="specStudioSticky" style={{ padding: "36px 24px 44px" }}>
 
@@ -2687,7 +3073,7 @@ export default function SpecStudioPage() {
               }}
             >
               <PieceFlatPreview
-                selectedPieceImage={selectedPieceImage}
+                selectedPieceImage={resolvedSelectedPieceImage}
               />
               <div style={{ marginTop: 14, fontFamily: sohne, fontSize: 22, fontWeight: 500, color: OLIVE, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
                 {pieceAnchorName}
@@ -2730,21 +3116,21 @@ export default function SpecStudioPage() {
             </div>
 
             {/* Divider — only if material selected */}
-            {selectedMaterial && (
+            {displayMaterial && (
               <div style={{ height: 1, background: "rgba(67,67,43,0.08)", margin: "18px 0" }} />
             )}
 
             {/* ── Section C: Material ────────────────────────────────────── */}
-            {selectedMaterial && (
+            {displayMaterial && (
               <div style={{ animation: "fadeIn 220ms ease both" }}>
                 <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.36)", marginBottom: 8 }}>
                   Material
                 </div>
                 <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 500, color: OLIVE }}>
-                  {selectedMaterial.name}
+                  {displayMaterial.name}
                 </div>
                 <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.52)", marginTop: 3 }}>
-                  ${selectedMaterial.cost_per_yard}/yd · {selectedMaterial.lead_time_weeks}wk lead
+                  ${displayMaterial.cost_per_yard}/yd · {displayMaterial.lead_time_weeks}wk lead
                 </div>
               </div>
             )}
@@ -2767,12 +3153,12 @@ export default function SpecStudioPage() {
             )}
 
             {/* Divider — only if both selected */}
-            {selectedMaterial && constructionConfirmed && constructionTier && insight && (
+            {displayMaterial && constructionConfirmed && constructionTier && insight && (
               <div style={{ height: 1, background: "rgba(67,67,43,0.08)", margin: "18px 0" }} />
             )}
 
             {/* ── Section E: Build Numbers ───────────────────────────────── */}
-            {selectedMaterial && constructionConfirmed && constructionTier && insight && (
+            {displayMaterial && constructionConfirmed && constructionTier && insight && (
               <div style={{ animation: "fadeIn 220ms ease both" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                   <div>
@@ -2788,7 +3174,7 @@ export default function SpecStudioPage() {
                       Lead
                     </div>
                     <div style={{ fontFamily: sohne, fontSize: 15, color: OLIVE }}>
-                      {selectedMaterial.lead_time_weeks}wks
+                      {displayMaterial.lead_time_weeks}wks
                     </div>
                   </div>
                   <div>
@@ -2815,84 +3201,49 @@ export default function SpecStudioPage() {
           <div style={{ padding: "36px 32px 56px" }}>
             <div style={{ maxWidth: 920, margin: "0 auto" }}>
               {/* ── Progress stepper ──────────────────────────────────────── */}
-              {(() => {
-                const materialStatus = specStep === "material" ? "active" : (materialId !== "" ? "complete" : "upcoming");
-                const constructionStatus = constructionConfirmed ? (specStep === "execution" ? "complete" : "active") : (specStep === "construction" ? "active" : "upcoming");
-                const executionStatus = specStep === "execution" ? "active" : (hasExecutionStage ? "complete" : "upcoming");
-
-                const dotStyle = (status: "complete" | "active" | "upcoming"): React.CSSProperties => ({
-                  width: 20,
-                  height: 20,
-                  borderRadius: "50%",
-                  border: status === "complete" ? "1.5px solid #A8B475" : status === "active" ? "1.5px solid #191919" : "1.5px solid #E2DDD6",
-                  background: status === "complete" ? "#A8B475" : "#FFFFFF",
+              <div
+                style={{
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  fontSize: 9,
-                  fontWeight: 700,
-                  color: "#FFFFFF",
-                  fontFamily: inter,
-                });
+                  gap: 14,
+                  marginBottom: 38,
+                }}
+              >
+                {[
+                  { id: "material", label: "Material" },
+                  { id: "construction", label: "Construction" },
+                  { id: "execution", label: "Execution" },
+                ].map((step, index) => (
+                  <React.Fragment key={step.id}>
+                    <div
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        letterSpacing: "0.16em",
+                        textTransform: "uppercase",
+                        color: specStep === step.id ? "#191919" : "#888078",
+                      }}
+                    >
+                      {step.label}
+                    </div>
+                    {index < 2 && <div style={{ width: 34, height: 1, background: "#E2DDD6" }} />}
+                  </React.Fragment>
+                ))}
+              </div>
 
-                const labelStyle = (status: "complete" | "active" | "upcoming"): React.CSSProperties => ({
+              <div
+                style={{
                   fontFamily: inter,
                   fontSize: 12,
-                  fontWeight: status === "active" ? 600 : 400,
-                  color: status === "complete" ? "#A8B475" : status === "active" ? "#191919" : "#888078",
-                });
-
-                const stepStyle: React.CSSProperties = {
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 8,
-                };
-
-                const arrowStyle: React.CSSProperties = {
-                  fontFamily: inter,
-                  fontSize: 13,
-                  color: "#E2DDD6",
-                  padding: "0 12px",
-                  flexShrink: 0,
-                };
-
-                return (
-                  <div style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 0,
-                    marginBottom: 20,
-                    paddingBottom: 0,
-                  }}>
-                    {/* Step 1: Material */}
-                    <div style={stepStyle}>
-                      <div style={dotStyle(materialStatus)}>
-                        {materialStatus === "complete" && "✓"}
-                      </div>
-                      <span style={labelStyle(materialStatus)}>Material Direction</span>
-                    </div>
-                    <div style={arrowStyle} aria-hidden>→</div>
-                    {/* Step 2: Construction */}
-                    <div style={stepStyle}>
-                      <div style={dotStyle(constructionStatus)}>
-                        {constructionStatus === "complete" && "✓"}
-                      </div>
-                      <span style={labelStyle(constructionStatus)}>Construction Complexity</span>
-                    </div>
-                    <div style={arrowStyle} aria-hidden>→</div>
-                    {/* Step 3: Execution */}
-                    <div style={stepStyle}>
-                      <div style={dotStyle(executionStatus)}>
-                        {executionStatus === "complete" && "✓"}
-                      </div>
-                      <span style={labelStyle(executionStatus)}>Execution Direction</span>
-                    </div>
-                  </div>
-                );
-              })()}
+                  lineHeight: 1.55,
+                  color: "rgba(67,67,43,0.52)",
+                  marginBottom: 26,
+                  maxWidth: 560,
+                }}
+              >
+                Concept tested the direction. Spec tests how that direction holds once it becomes product.
+              </div>
 
               <div style={{ position: "relative", minHeight: 760 }}>
                 <AnimatePresence mode="wait" custom={specStepDirection}>
@@ -2909,7 +3260,7 @@ export default function SpecStudioPage() {
                       <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
                 <section id="material-section" style={{ animation: "fadeIn 240ms ease-out" }}>
                   <div style={{ marginBottom: 34 }}>
-                    <div style={{ fontFamily: sohne, fontSize: 28, fontWeight: 500, color: OLIVE, letterSpacing: "-0.03em" }}>
+                    <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, color: OLIVE, letterSpacing: "-0.03em" }}>
                       Material direction
                     </div>
                   </div>
@@ -2968,71 +3319,6 @@ export default function SpecStudioPage() {
                       )}
                     </div>
                   )}
-
-                  <div style={{ paddingBottom: 22, marginBottom: 28, borderBottom: "1px solid rgba(67,67,43,0.08)" }}>
-                    <div style={{ ...microLabel, marginBottom: 10, color: "rgba(67,67,43,0.34)" }}>Constraints</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontFamily: inter, fontSize: 15, color: "rgba(67,67,43,0.66)", lineHeight: 1.5 }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 158 }}>
-                        <span>Delivery Window</span>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={timelineWeeksInput}
-                            placeholder="e.g. 10 weeks"
-                            onChange={(e) => {
-                              const next = e.target.value.replace(/[^\d]/g, "");
-                              setTimelineWeeksInput(next);
-                              setTimelineWeeks(Math.max(4, next ? Number(next) : 4));
-                            }}
-                            aria-label="Delivery window in weeks"
-                            className="specConstraintInput"
-                            style={{
-                              width: 46,
-                              border: "none",
-                              background: "transparent",
-                              padding: 0,
-                              fontFamily: sohne,
-                              fontSize: 22,
-                              color: OLIVE,
-                              outline: "none",
-                              textAlign: "right",
-                              letterSpacing: "-0.02em",
-                              lineHeight: 1.1,
-                              appearance: "textfield",
-                              WebkitAppearance: "none",
-                              MozAppearance: "textfield",
-                            }}
-                          />
-                          <span>weeks</span>
-                        </span>
-                        <span style={{ fontSize: 11.5, color: BRAND.camel, fontFamily: inter, lineHeight: 1.45 }}>
-                          Used to assess execution feasibility
-                        </span>
-                        {constraintPromptVisible && isTimelineEmpty && (
-                          <span
-                            style={{
-                              fontSize: 11.5,
-                              color: BRAND.camel,
-                              fontFamily: inter,
-                              lineHeight: 1.45,
-                              padding: "6px 10px",
-                              borderRadius: 999,
-                              background: "rgba(184,135,107,0.10)",
-                              border: "1px solid rgba(184,135,107,0.18)",
-                              width: "fit-content",
-                            }}
-                          >
-                            Add your delivery window for an execution assessment
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 6, fontSize: 11.5, color: "rgba(67,67,43,0.42)", fontFamily: inter, lineHeight: 1.5 }}>
-                      Ceiling ${marginCeiling}{timelineFeasibility ? ` · ${timelineFeasibility.required_weeks} weeks required at current build` : ""}
-                    </div>
-                  </div>
 
                   <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
                     {(["all", "natural", "luxury", "synthetic", "deadstock"] as const).map((cat) => {
@@ -3122,9 +3408,6 @@ export default function SpecStudioPage() {
                     <button
                       onClick={() => {
                         if (!selectedMaterial) return;
-                        if (isTimelineEmpty) {
-                          setConstraintPromptVisible(true);
-                        }
                         advanceToConstruction();
                       }}
                       disabled={!selectedMaterial}
@@ -3151,7 +3434,7 @@ export default function SpecStudioPage() {
                       <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
                       <section id="complexity-section" style={{ }}>
                     <div style={{ marginBottom: 34 }}>
-                    <div style={{ fontFamily: sohne, fontSize: 28, fontWeight: 500, color: OLIVE, letterSpacing: "-0.03em" }}>
+                    <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, color: OLIVE, letterSpacing: "-0.03em" }}>
                         Construction complexity
                       </div>
                     </div>
@@ -3341,7 +3624,7 @@ export default function SpecStudioPage() {
                       <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
                         <section id="execution-section">
                           <div style={{ marginBottom: 28 }}>
-                            <div style={{ fontFamily: sohne, fontSize: 28, fontWeight: 500, color: OLIVE, letterSpacing: "-0.03em" }}>
+                            <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, color: OLIVE, letterSpacing: "-0.03em" }}>
                               Execution direction
                             </div>
                           </div>
@@ -3380,7 +3663,7 @@ export default function SpecStudioPage() {
                             ← Back to Construction
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               const cat = categories.find(c => c.id === categoryId);
                               setCategory(cat?.name ?? categoryId);
                               setMaterial(materialId);
@@ -3394,6 +3677,12 @@ export default function SpecStudioPage() {
                                 if (palOption) {
                                   setColorPalette(palOption.swatches, palOption.name);
                                 }
+                              }
+                              try {
+                                await persistCurrentPiece();
+                              } catch (error) {
+                                console.error("[Spec] Failed to save piece before returning to pieces:", serializePersistError(error));
+                                return;
                               }
                               setSelectedKeyPiece(null);
                               setActiveProductPieceId(null);
@@ -3427,28 +3716,21 @@ export default function SpecStudioPage() {
             </main>
           }
           rightContent={
-            <div style={{ display: "flex", flexDirection: "row", height: "100%", minHeight: 0 }}>
-            <aside className="specStudioColumn specStudioRight" style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "stretch", height: "100%", minHeight: 0, overflow: "hidden" }}>
+            <aside
+              className="specStudioColumn specStudioRight"
+              style={{ flex: 1, minWidth: 0, minHeight: 0, height: "100%", overflowY: "auto", overscrollBehavior: "contain" }}
+            >
           <div className="specStudioSticky" style={{ padding: "36px 28px 44px" }}>
             <section style={{ marginBottom: 30 }}>
               <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 20 }}>Muko&apos;s Read</div>
-              {specInsightLoading && !specSynthInsightData && !specStreamingText ? (
-                <>
-                  {[84, 68, 92].map((width, index) => (
-                    <div key={index} style={{ height: index === 0 ? 18 : 12, borderRadius: 6, background: "rgba(67,67,43,0.07)", marginBottom: index === 0 ? 14 : 8, width: `${width}%`, animation: "pulse 1.4s ease-in-out infinite" }} />
-                  ))}
-                </>
-              ) : (
-                <>
-                  <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em", marginBottom: 10 }}>
-                    {mukoRead.headline}
-                  </div>
-                  <MukoStreamingParagraph
-                    text={mukoRead.body.split(/(?<=[.!?])\s+/).slice(0, 2).join(" ")}
-                    containerStyle={{ marginBottom: 0 }}
-                    paragraphStyle={{ fontFamily: inter, fontSize: 12, color: "#888078", lineHeight: 1.7 }}
-                  />
-                </>
+              <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em" }}>
+                {activeSpecRail?.headline ?? "Select a material and build path to activate the spec read."}
+              </div>
+              {activeSpecRail && (
+                <div style={{ marginTop: 12, fontFamily: inter, fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.66)" }}>
+                  {activeSpecRail.decision.reason}
+                </div>
               )}
             </section>
 
@@ -3502,9 +3784,9 @@ export default function SpecStudioPage() {
 
             <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
             <section style={{ marginBottom: 24 }}>
-              <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>Execution Implications</div>
+              <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>What to get right</div>
               <div style={{ display: "grid", gap: 12 }}>
-                {executionImplications.map((item) => (
+                {(activeSpecRail?.execution_levers ?? []).map((item) => (
                   <div key={item} style={{ display: "grid", gridTemplateColumns: "10px 1fr", gap: 10, alignItems: "start" }}>
                     <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#43432B", marginTop: 6, marginLeft: 2 }} />
                     <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58 }}>
@@ -3515,21 +3797,50 @@ export default function SpecStudioPage() {
               </div>
             </section>
 
-            {(riskOpportunity.risk || riskOpportunity.opportunity) && (
+            <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
+            <section style={{ marginBottom: 24 }}>
+              <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>Feasibility tension</div>
+              <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.62 }}>
+                {activeSpecRail?.core_tension ?? "The rail will sharpen once feasibility numbers and execution context are in place."}
+              </div>
+              {activeSpecRail && (
+                <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {[
+                    `Cost: ${activeSpecRail.feasibility_breakdown.cost.replace(/_/g, " ")}`,
+                    `Timeline: ${activeSpecRail.feasibility_breakdown.timeline.replace(/_/g, " ")}`,
+                    `Complexity: ${activeSpecRail.feasibility_breakdown.complexity}`,
+                  ].map((label) => (
+                    <span
+                      key={label}
+                      style={{
+                        borderRadius: 999,
+                        padding: "5px 9px",
+                        border: "1px solid rgba(67,67,43,0.08)",
+                        background: "rgba(250,249,246,0.88)",
+                        fontFamily: inter,
+                        fontSize: 10,
+                        lineHeight: 1,
+                        color: "rgba(67,67,43,0.62)",
+                      }}
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {showBetterPath && activeSpecRail && (
               <>
                 <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
                 <section style={{ marginBottom: 24 }}>
-                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>Risk + Opportunity</div>
-                  {riskOpportunity.risk && (
-                    <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58, marginBottom: 10 }}>
-                      <span style={{ color: "rgba(67,67,43,0.52)" }}>Risk:</span> {riskOpportunity.risk}
-                    </div>
-                  )}
-                  {riskOpportunity.opportunity && (
-                    <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58 }}>
-                      <span style={{ color: "rgba(67,67,43,0.52)" }}>Opportunity:</span> {riskOpportunity.opportunity}
-                    </div>
-                  )}
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>Better path</div>
+                  <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: "#191919", marginBottom: 8 }}>
+                    {activeSpecRail.alternative_path.title}
+                  </div>
+                  <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58 }}>
+                    {activeSpecRail.alternative_path.description}
+                  </div>
                 </section>
               </>
             )}
@@ -3549,7 +3860,7 @@ export default function SpecStudioPage() {
                 howCalculated: row.howCalculated,
                 isPending: row.isPending,
               }))}
-              helperText={!selectedMaterial ? "Select a material to begin execution analysis." : null}
+              helperText={!selectedMaterial ? "Pulse activates once material and build inputs are in play." : "Telemetry only: Pulse shows the current signal state; Muko’s Read makes the call."}
             />
 
           </div>
@@ -3574,7 +3885,6 @@ export default function SpecStudioPage() {
           display: flex;
           flex: 1;
           min-height: 0;
-          height: calc(100vh - 72px - ${SPEC_CONTEXT_BAR_OFFSET}px);
         }
         .specStudioColumn {
           overflow-y: auto;
@@ -3601,38 +3911,6 @@ export default function SpecStudioPage() {
           column-gap: 10px;
           row-gap: 7px;
         }
-        .specRevealSection {
-          animation: specReveal 260ms ease-out;
-        }
-        .specStagePill {
-          display: inline-flex;
-          align-items: center;
-          padding: 5px 11px;
-          border-radius: 999px;
-          border: 1px solid rgba(67,67,43,0.07);
-          background: rgba(255,255,255,0.56);
-          color: rgba(67,67,43,0.52);
-          font-family: ${inter};
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.02em;
-          animation: specReveal 240ms ease-out;
-        }
-        .specStagePillActive {
-          background: rgba(245,242,235,0.9);
-          color: rgba(67,67,43,0.74);
-        }
-        .specStagePillComplete {
-          color: #6B7A40;
-          border-color: rgba(168,180,117,0.24);
-          background: rgba(255,255,255,0.72);
-        }
-        .specStageArrow {
-          color: rgba(67,67,43,0.28);
-          font-size: 13px;
-          line-height: 1;
-          animation: specReveal 240ms ease-out;
-        }
         .specConstructionGrid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3649,20 +3927,6 @@ export default function SpecStudioPage() {
           border-radius: 999px;
           padding: 3px 7px;
           font-family: ${inter};
-        }
-        .specConstraintInput::placeholder {
-          color: rgba(67,67,43,0.28);
-        }
-        .specRevealPrompt {
-          padding: 14px 16px;
-          border-radius: 16px;
-          background: rgba(255,255,255,0.56);
-          border: 1px solid rgba(67,67,43,0.06);
-          color: rgba(67,67,43,0.54);
-          font-family: ${inter};
-          font-size: 12.2px;
-          line-height: 1.6;
-          animation: specReveal 220ms ease-out;
         }
         .specNextMoveRow:hover {
           background: rgba(255,255,255,0.72);
@@ -3698,7 +3962,7 @@ export default function SpecStudioPage() {
 
       {/* ═══ ANALYSIS LOADING OVERLAY ═══ */}
       {isRunningAnalysis && (() => {
-        const phases = ["Scoring identity…", "Calibrating resonance…", "Analyzing execution…", "Finalizing…"];
+        const phases = ["Scoring identity…", "Calibrating commercial pull…", "Analyzing execution…", "Finalizing…"];
         return (
           <div style={{
             position: "fixed", inset: 0,
@@ -3732,11 +3996,11 @@ export default function SpecStudioPage() {
 
       {/* ═══ SCORECARD MODAL ═══ */}
       {showScorecardModal && (() => {
-        const mukoScore = Math.round((dynamicIdentityScore + dynamicResonanceScore + executionScore) / 3);
+        const mukoScore = Math.round((dynamicIdentityScore + commercialPotentialScore + executionScore) / 3);
         return (
           <ScorecardModal
             identityScore={dynamicIdentityScore}
-            resonanceScore={dynamicResonanceScore}
+            resonanceScore={commercialPotentialScore}
             executionScore={executionScore}
             mukoScore={mukoScore}
             marginGatePassed={marginGatePassed}

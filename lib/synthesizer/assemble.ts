@@ -19,9 +19,10 @@ import aestheticsRaw from '@/data/aesthetics.json';
 import materialsRaw from '@/data/materials.json';
 import redirectsRaw from '@/data/redirects.json';
 import type { ConceptBlackboard } from '@/lib/synthesizer/conceptInsight';
-import type { SpecBlackboard } from '@/lib/synthesizer/specInsight';
+import type { SpecBlackboard, SpecPulseEvidence } from '@/lib/synthesizer/specInsight';
 import type { ReportBlackboard } from '@/lib/synthesizer/reportNarrative';
 import type { AestheticContext, ResolvedRedirects, IntentCalibration } from '@/lib/synthesizer/blackboard';
+import type { SpecDecisionDiagnostics, SpecStepId } from '@/lib/synthesizer/specDecision';
 import type { InsightMode } from '@/lib/types/insight';
 
 // ─── Internal types ────────────────────────────────────────────────────────────
@@ -309,9 +310,16 @@ export interface SpecBlackboardInput {
   materialId: string;
   cogs_usd: number;
   target_msrp: number;
+  targetMargin?: number | null;
+  marginBuffer?: number | null;
   margin_pass: boolean;
   construction_tier: string;
+  /** Available development / delivery window in weeks */
   timeline_weeks: number;
+  /** Estimated required weeks once material lead + complexity are combined */
+  requiredTimelineWeeks?: number | null;
+  /** Positive means buffer remains; negative means the build exceeds the window */
+  timelineGapWeeks?: number | null;
   season: string;
   collectionName: string;
   /** Brand name from brand profile — distinct from collectionName */
@@ -329,6 +337,10 @@ export interface SpecBlackboardInput {
   };
   gapState?: string[];
   tensionState?: string[];
+  pulse?: SpecPulseEvidence;
+  currentStep?: SpecStepId;
+  constructionOverride?: boolean;
+  diagnostics: SpecDecisionDiagnostics;
   /** Optional intent calibration from the Intent page */
   intent?: IntentCalibration;
 }
@@ -365,9 +377,16 @@ export function buildSpecBlackboard(
     material_name: getMaterialName(input.materialId),
     cogs_usd: input.cogs_usd,
     target_msrp: input.target_msrp,
+    target_margin: input.targetMargin ?? undefined,
+    margin_buffer: input.marginBuffer ?? undefined,
     margin_pass: input.margin_pass,
     construction_tier: input.construction_tier,
     timeline_weeks: input.timeline_weeks,
+    required_timeline_weeks: input.requiredTimelineWeeks ?? undefined,
+    timeline_gap_weeks: input.timelineGapWeeks ?? undefined,
+    current_step: input.currentStep,
+    construction_override: input.constructionOverride ?? false,
+    diagnostics: input.diagnostics,
     material_cost_note: getMaterialCostNote(input.materialId),
     category: input.category,
     silhouette: input.silhouette,
@@ -375,6 +394,7 @@ export function buildSpecBlackboard(
     current_piece_set: input.currentPieceSet,
     gap_state: input.gapState ?? [],
     tension_state: input.tensionState ?? [],
+    pulse: input.pulse,
     resolved_redirects: {
       brand_mismatch: resolveBrandMismatch(input.aestheticSlug, input.brandKeywords),
       cost_reduction: resolveCostReduction(input.materialId, input.margin_pass),
