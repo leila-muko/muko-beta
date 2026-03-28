@@ -644,6 +644,12 @@ function ReportPageContent() {
                 const supabase = createClient();
                 const { data: authData } = await supabase.auth.getUser();
                 const userId = authData.user?.id ?? null;
+                if (!userId) {
+                  setSaveStatus('error');
+                  setToastMessage('Sign in to save this analysis');
+                  setTimeout(() => setSaveStatus('idle'), 2000);
+                  return;
+                }
                 const resolvedCollectionName =
                   collectionFromUrl || activeCollection || collectionName || null;
                 const resolvedSeason = seasonFromUrl || season || null;
@@ -653,9 +659,9 @@ function ReportPageContent() {
                     (executionPulse?.score ?? 0)) /
                     3
                 );
-                const { data: upsertData, error: upsertError } = await supabase
+                const { data: insertData, error: insertError } = await supabase
                   .from('analyses')
-                  .upsert({
+                  .insert({
                     user_id:          userId,
                     collection_name:  resolvedCollectionName,
                     season:           resolvedSeason,
@@ -674,18 +680,18 @@ function ReportPageContent() {
                     gates_passed: {
                       cost: (executionPulse?.score ?? 0) >= 65,
                     },
-                  }, { onConflict: 'id' })
+                  })
                   .select('id')
                   .single();
 
-                if (upsertError) {
-                  console.error('[Report] Save to collection failed:', upsertError);
+                if (insertError) {
+                  console.error('[Report] Save to collection failed:', insertError);
                   setSaveStatus('error');
                   setToastMessage('Save failed — please try again');
                   setTimeout(() => setSaveStatus('idle'), 2000);
                   return;
                 }
-                if (upsertData?.id) setSavedAnalysisId(upsertData.id as string);
+                if (insertData?.id) setSavedAnalysisId(insertData.id as string);
                 setSaveStatus('saved');
                 setToastMessage('Analysis saved to your collection');
               } catch (err) {

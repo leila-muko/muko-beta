@@ -32,6 +32,7 @@ export interface AssortmentIntelligence {
   supporting_line: string;
   muko_insight: string;
   collection_insight: string;
+  next_action?: string;
   breakdown: string[];
   recommended_actions: string[];
   watchlist: string[];

@@ -416,9 +416,13 @@ function ConceptDecisionRail({
   const prevIsStreamingRef = useRef(isStreaming);
   const paragraphsRef = useRef(paragraphs);
   const headlineRef = useRef(headline);
+  const shouldPromoteParagraphLeadRef = useRef(pageMode !== "concept");
 
   useEffect(() => { paragraphsRef.current = paragraphs; }, [paragraphs]);
   useEffect(() => { headlineRef.current = headline; }, [headline]);
+  useEffect(() => { shouldPromoteParagraphLeadRef.current = pageMode !== "concept"; }, [pageMode]);
+
+  const shouldPromoteParagraphLead = pageMode !== "concept";
 
   useEffect(() => {
     const wasStreaming = prevIsStreamingRef.current;
@@ -432,7 +436,7 @@ function ConceptDecisionRail({
         setHeadlineFadedOut(false);
       });
       return () => window.cancelAnimationFrame(frameId);
-    } else if (wasStreaming && paragraphsRef.current[0]) {
+    } else if (shouldPromoteParagraphLeadRef.current && wasStreaming && paragraphsRef.current[0]) {
       const match = paragraphsRef.current[0].match(/^[^.!?]*[.!?]/);
       const newText = (match ? match[0] : paragraphsRef.current[0]).trim();
       if (newText !== headlineRef.current) {
@@ -488,9 +492,17 @@ function ConceptDecisionRail({
     background: "rgba(67,67,43,0.08)",
     margin: "40px 0 30px",
   };
-  const leadInsight = !isStreaming && paragraphs[0] ? getFirstSentence(paragraphs[0]).trim() : headline;
-  const leadBody = !isStreaming && paragraphs[0] ? removeFirstSentence(paragraphs[0]) : "";
-  const settledParagraphs = leadBody ? [leadBody, ...paragraphs.slice(1)] : paragraphs.slice(1);
+  const leadInsight =
+    shouldPromoteParagraphLead && !isStreaming && paragraphs[0]
+      ? getFirstSentence(paragraphs[0]).trim()
+      : headline;
+  const leadBody =
+    shouldPromoteParagraphLead && !isStreaming && paragraphs[0]
+      ? removeFirstSentence(paragraphs[0])
+      : "";
+  const settledParagraphs = shouldPromoteParagraphLead
+    ? (leadBody ? [leadBody, ...paragraphs.slice(1)] : paragraphs.slice(1))
+    : paragraphs;
 
   if (conceptStage === "language") {
     const displayHeadline = isLanguageStreaming && languageStreamingText ? languageStreamingText : headline;

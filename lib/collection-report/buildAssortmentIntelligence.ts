@@ -16,6 +16,7 @@ interface AssortmentIntelligenceInput {
   highCount: number;
   uniqueCategoryCount: number;
   executionScore?: number | null;
+  collectionScore?: number | null;
 }
 
 interface AssortmentDiagnostics {
@@ -195,6 +196,30 @@ function buildInsight(input: AssortmentIntelligenceInput, diagnostics: Assortmen
   return `${opening} ${middle} ${closing}`;
 }
 
+function buildNextAction(input: AssortmentIntelligenceInput, diagnostics: AssortmentDiagnostics): string {
+  if (input.totalPieces === 1) {
+    return 'Add more pieces to establish collection shape.';
+  }
+
+  if (diagnostics.roleBalanceStatus === 'missing_hero') {
+    return 'Introduce a stronger anchor role so the assortment reads with clearer hierarchy.';
+  }
+
+  if (diagnostics.complexityRisk === 'front_loaded_high') {
+    return 'Reduce construction complexity on at least one piece to protect the production timeline.';
+  }
+
+  if (
+    (input.collectionScore ?? 0) >= 80 &&
+    diagnostics.roleBalanceStatus === 'balanced' &&
+    diagnostics.complexityRisk === 'balanced'
+  ) {
+    return 'Continue building — the collection direction is strong.';
+  }
+
+  return 'Review role distribution before adding more pieces.';
+}
+
 function buildRecommendedActions(
   input: AssortmentIntelligenceInput,
   diagnostics: AssortmentDiagnostics
@@ -292,6 +317,7 @@ export function buildAssortmentIntelligence(
   const collectionState = getCollectionState(diagnostics);
   const supportingLine = buildSupportingLine(input, diagnostics);
   const collectionInsight = buildInsight(input, diagnostics);
+  const nextAction = buildNextAction(input, diagnostics);
   const breakdown = [
     `Pieces: ${input.totalPieces} (target range 6–10)`,
     `Roles: ${input.heroCount} Hero / ${input.coreCount} Core / ${input.supportCount} Support`,
@@ -305,6 +331,7 @@ export function buildAssortmentIntelligence(
     supporting_line: supportingLine,
     muko_insight: collectionInsight,
     collection_insight: collectionInsight,
+    next_action: nextAction,
     breakdown,
     recommended_actions: buildRecommendedActions(input, diagnostics),
     watchlist: buildWatchlist(input, diagnostics),

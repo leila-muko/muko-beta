@@ -29,7 +29,6 @@ import materialsData from "@/data/materials.json";
 import subcategoriesData from "@/data/subcategories.json";
 import aestheticsData from "@/data/aesthetics.json";
 import designLanguageData from "@/data/design-language.json";
-import materialConstructionImplications from "@/data/material_construction_implications.json";
 import AskMuko from "@/components/AskMuko";
 import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
@@ -158,15 +157,6 @@ const sectionHeading: React.CSSProperties = {
   fontSize: 18,
   fontWeight: 650,
   color: BRAND.oliveInk,
-  fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
-};
-
-const microLabel: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 800,
-  letterSpacing: "0.10em",
-  textTransform: "uppercase" as const,
-  color: "rgba(67, 67, 43, 0.42)",
   fontFamily: "var(--font-sohne-breit), system-ui, sans-serif",
 };
 
@@ -828,86 +818,6 @@ Tone: precise, technical, advisory. The headline should state the key production
 consideration as a fact, not a risk. The body should give specific, actionable
 craft guidance.
 */
-function buildConstructionImplication(options: {
-  materialName: string;
-  constructionTier: "low" | "moderate" | "high";
-  topChips: string[];
-  complexityChipCount: number;
-  leadTimeWeeks: number;
-  deliveryWindowWeeks: number;
-}): string {
-  const { materialName, constructionTier, topChips, complexityChipCount, leadTimeWeeks, deliveryWindowWeeks } = options;
-  const chipText = topChips.length > 0
-    ? `${topChips.slice(0, 2).join(" and ")} stay legible`
-    : "the design language stays legible";
-  const buffer = deliveryWindowWeeks - leadTimeWeeks;
-  const timeNote = buffer >= 4
-    ? `${leadTimeWeeks}-week lead time leaves a ${buffer}-week development buffer.`
-    : buffer >= 0
-    ? `${leadTimeWeeks}-week lead time is workable but leaves no room for sampling revision.`
-    : `${leadTimeWeeks}-week lead time exceeds the ${deliveryWindowWeeks}-week delivery window — this needs immediate action.`;
-  const chipPressure = complexityChipCount >= 3
-    ? ` ${complexityChipCount} active signals are adding construction demand.`
-    : complexityChipCount === 2
-    ? ` 2 active signals are pushing complexity upward.`
-    : complexityChipCount === 1
-    ? ` 1 active signal is adding construction demand.`
-    : "";
-
-  if (constructionTier === "low") {
-    return `Low construction keeps ${materialName} costs and timelines stable.${chipPressure ? ` Note:${chipPressure}` : ""} ${chipText} at this complexity tier without forcing unnecessary production strain. ${timeNote}`;
-  }
-  if (constructionTier === "moderate") {
-    return `Moderate construction introduces structured seam work with ${materialName}.${chipPressure ? `${chipPressure}` : ""} Assembly demand is present but stays within a workable production window — ${chipText} without overcommitting the build. ${timeNote}`;
-  }
-  return `High construction pushes ${materialName} into hero-piece territory.${chipPressure ? `${chipPressure}` : ""} Structured seam work and finishing intensity become part of the build expectation — ${chipText} but production feasibility becomes an active decision. ${timeNote}`;
-}
-
-function getConstructionImplicationCopy(options: {
-  tier: ConstructionTier | null;
-  material: Material | null;
-  silhouette: string | null;
-  timelineStatus: "green" | "yellow" | "red" | null;
-  selectedSignals: string[];
-}) {
-  const { tier, material, silhouette, timelineStatus, selectedSignals } = options;
-  if (!tier) return null;
-
-  const silhouetteText = silhouette ? `${silhouette.toLowerCase()} silhouette` : "piece language";
-  const signalLead = selectedSignals.length > 0
-    ? `${selectedSignals.slice(0, 2).join(" and ")}`
-    : "the concept language";
-
-  if (tier === "low") {
-    return `Low construction keeps seam work disciplined and finishing demand minimal. That protects assembly speed and cost control, but it leaves ${signalLead} carrying most of the definition in the ${silhouetteText}.`;
-  }
-
-  if (tier === "high") {
-    const hardwareLine = material?.id === "leather" || material?.id === "vegan-leather"
-      ? "Hardware and reinforced finishing become part of the build expectation"
-      : "Structured seam work and finishing detail become part of the build expectation";
-    const feasibilityLine = timelineStatus === "red"
-      ? "and the current delivery window is unlikely to absorb that assembly load cleanly."
-      : timelineStatus === "yellow"
-        ? "and the current delivery window leaves limited recovery room if sampling slips."
-        : "while still remaining viable if approvals stay tight.";
-    return `High construction pushes seam complexity and finishing intensity into hero-piece territory. ${hardwareLine}, ${feasibilityLine} This sharpens ${signalLead} but turns production feasibility into an active decision, not a background assumption.`;
-  }
-
-  const materialLine = material?.id === "deadstock-fabric"
-    ? "Deadstock keeps the calendar fast, but it reduces reorder flexibility and raises the importance of early commitment."
-    : material
-      ? `${material.name} can support this level without forcing unnecessary construction inflation.`
-      : "This level keeps the build balanced across craft and feasibility.";
-  const timelineLine = timelineStatus === "red"
-    ? "The current delivery window is under pressure, so moderation is doing real protective work."
-    : timelineStatus === "yellow"
-      ? "Assembly demand stays present, but still within a workable production window."
-      : "Assembly demand stays intentional without pushing the piece beyond the current delivery window.";
-
-  return `Moderate construction introduces structured seam work and light finishing demand. ${materialLine} ${timelineLine} It keeps ${signalLead} legible in the ${silhouetteText} without overcommitting the build.`;
-}
-
 function PieceFlatPreview({
   selectedPieceImage,
 }: {
@@ -961,16 +871,6 @@ function PieceFlatPreview({
       )}
     </div>
   );
-}
-
-function getMaterialConstructionImplication(
-  materialId: string | null | undefined,
-  constructionTier: string | null | undefined
-): string | null {
-  if (!materialId || !constructionTier) return null;
-  const tierKey = constructionTier.toLowerCase() as "low" | "moderate" | "high";
-  const entry = (materialConstructionImplications as Record<string, Record<string, string>>)[materialId];
-  return entry?.[tierKey] ?? null;
 }
 
 function getRoleLabel(role: CollectionRoleId | null | undefined) {
@@ -1040,6 +940,10 @@ export default function SpecStudioPage() {
   const [showAllMaterials, setShowAllMaterials] = useState(false);
   const [specStep, setSpecStep] = useState<"material" | "construction" | "execution">("material");
   const [specStepDirection, setSpecStepDirection] = useState<1 | -1>(1);
+  const [executionNotes, setExecutionNotes] = useState<string[]>([]);
+  const [selectedLevers, setSelectedLevers] = useState<Set<string>>(new Set());
+  const [leverNotesSaved, setLeverNotesSaved] = useState(false);
+  const [showBetterPathConfirm, setShowBetterPathConfirm] = useState(false);
   const [materialSelectionDelta, setMaterialSelectionDelta] = useState<{
     cogs: number;
     leadTime: number;
@@ -1207,10 +1111,13 @@ export default function SpecStudioPage() {
     () => selectedKeyPiece?.item ?? selectedSubcategory?.name ?? selectedCategory.name,
     [selectedKeyPiece?.item, selectedSubcategory?.name, selectedCategory.name]
   );
-  const pieceContextTitle = useMemo(
-    () => pieceBuildContext?.adaptedTitle ?? pieceAnchorName,
-    [pieceBuildContext?.adaptedTitle, pieceAnchorName]
-  );
+  const pieceContextTitle = useMemo(() => {
+    if (selectedKeyPiece?.custom) {
+      return selectedKeyPiece?.item ?? pieceBuildContext?.originalLabel ?? pieceAnchorName;
+    }
+
+    return pieceBuildContext?.adaptedTitle ?? pieceAnchorName;
+  }, [pieceAnchorName, pieceBuildContext?.adaptedTitle, pieceBuildContext?.originalLabel, selectedKeyPiece?.custom, selectedKeyPiece?.item]);
   const contextBarTitle = useMemo(
     () => `${headerCollectionName} · ${pieceContextTitle}`.toLowerCase(),
     [headerCollectionName, pieceContextTitle]
@@ -1429,20 +1336,6 @@ export default function SpecStudioPage() {
     setConstructionConfirmed(false);
     setOverrideWarning(null);
     setUserManuallySelected(false);
-  };
-
-  const handleSubcategoryChange = (newSubId: string) => {
-    const normalizedSubId = normalizeSpecSubcategoryId(newSubId) ?? newSubId;
-    setSubcategoryId(normalizedSubId);
-    setStoreSubcategory(normalizedSubId);
-    // Update smart complexity based on subcategory affinity
-    const sub = (allSubcategories[categoryId] ?? []).find((s) => s.id === normalizedSubId);
-    if (sub) {
-      const smartTier = getSmartDefault(categoryId, conceptSilhouette || undefined, sub.complexity_affinity as 'low' | 'moderate' | 'high');
-      setConstructionTier(smartTier);
-      setConstructionConfirmed(false);
-      setOverrideWarning(null);
-    }
   };
 
   const handleMaterialSelection = (nextMaterialId: string) => {
@@ -1948,6 +1841,7 @@ export default function SpecStudioPage() {
   const specAbortRef = useRef<AbortController | null>(null);
   const reportAbortRef = useRef<AbortController | null>(null);
   const specRawJsonRef = useRef<string>('');
+  const leverNotesSavedTimeoutRef = useRef<number | null>(null);
   const [specSynthInsightData, setSpecSynthInsightData] = useState<InsightData | null>(null);
   const [specRailInsight, setSpecRailInsight] = useState<SpecRailInsight | null>(null);
 
@@ -2635,6 +2529,18 @@ export default function SpecStudioPage() {
   const activeSpecRail = specRailInsight ?? specFallbackRail;
   const showBetterPath = activeSpecRail ? shouldShowBetterPath(activeSpecRail) : false;
 
+  useEffect(() => {
+    const nextLevers = activeSpecRail?.execution_levers ?? [];
+    setSelectedLevers(new Set(nextLevers));
+    setShowBetterPathConfirm(false);
+  }, [activeSpecRail?.execution_levers]);
+
+  useEffect(() => () => {
+    if (leverNotesSavedTimeoutRef.current) {
+      window.clearTimeout(leverNotesSavedTimeoutRef.current);
+    }
+  }, []);
+
   const displayCogs = insight ? `$${insight.cogs}` : "—";
   const executionSubLabel = selectedMaterial
     ? [
@@ -2780,6 +2686,61 @@ export default function SpecStudioPage() {
     return insertResult;
   }, []);
 
+  const persistExecutionNotes = useCallback(async (notes: string[]) => {
+    if (!savedAnalysisId || notes.length === 0) return;
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("analyses")
+      .update({
+        execution_notes: notes.join("\n"),
+      })
+      .eq("id", savedAnalysisId);
+
+    if (error) {
+      console.error("[Spec] Failed to persist execution notes:", serializePersistError(error));
+    }
+  }, [savedAnalysisId]);
+
+  const showLeverNotesSavedConfirmation = useCallback(() => {
+    setLeverNotesSaved(true);
+    if (leverNotesSavedTimeoutRef.current) {
+      window.clearTimeout(leverNotesSavedTimeoutRef.current);
+    }
+    leverNotesSavedTimeoutRef.current = window.setTimeout(() => {
+      setLeverNotesSaved(false);
+      leverNotesSavedTimeoutRef.current = null;
+    }, 2000);
+  }, []);
+
+  const handleApplySelectedLevers = useCallback(async () => {
+    const checkedLevers = (activeSpecRail?.execution_levers ?? []).filter((item) => selectedLevers.has(item));
+    if (checkedLevers.length === 0) return;
+
+    const nextNotes = Array.from(new Set([...executionNotes, ...checkedLevers]));
+    setExecutionNotes(nextNotes);
+    await persistExecutionNotes(nextNotes);
+    showLeverNotesSavedConfirmation();
+  }, [activeSpecRail?.execution_levers, executionNotes, persistExecutionNotes, selectedLevers, showLeverNotesSavedConfirmation]);
+
+  const handleConfirmBetterPath = useCallback(async () => {
+    if (!activeSpecRail) return;
+
+    const nextNote = `${activeSpecRail.alternative_path.title}: ${activeSpecRail.alternative_path.description}`;
+    const nextNotes = Array.from(new Set([...executionNotes, nextNote]));
+    setExecutionNotes(nextNotes);
+    await persistExecutionNotes(nextNotes);
+
+    const description = activeSpecRail.alternative_path.description.toLowerCase();
+    if (description.includes("low-moderate")) {
+      setConstructionTier("low");
+    } else if (description.includes(" moderate") && !description.includes("low-moderate")) {
+      setConstructionTier("moderate");
+    }
+
+    setShowBetterPathConfirm(false);
+  }, [activeSpecRail, executionNotes, persistExecutionNotes, setConstructionTier]);
+
   const persistCurrentPiece = useCallback(async () => {
     const supabase = createClient();
     const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -2901,6 +2862,9 @@ export default function SpecStudioPage() {
     };
 
     const row = buildAnalysisRow(bb, analysisResult, userId);
+    if (executionNotes.length > 0) {
+      row.execution_notes = executionNotes.join("\n");
+    }
     const { data: upsertData, error: upsertError } = await persistAnalysisRow(supabase, row);
 
     if (upsertError) throw upsertError;
@@ -2952,6 +2916,7 @@ export default function SpecStudioPage() {
     storeCollectionRole,
     storeSeason,
     targetMSRP,
+    executionNotes,
     timelineBuffer,
     timelineWeeks,
   ]);
@@ -3016,7 +2981,7 @@ export default function SpecStudioPage() {
   }, []);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#FAF9F6", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#FAF9F6", overflowX: "hidden" }}>
       <MukoNav
         activeTab="pieces"
         setupComplete={true}
@@ -3056,7 +3021,7 @@ export default function SpecStudioPage() {
         className="specStudioLayout"
         style={{
           marginTop: 72 + contextBarHeight,
-          height: `calc(100vh - 72px - ${contextBarHeight}px)`,
+          minHeight: `calc(100vh - 72px - ${contextBarHeight}px)`,
         }}
       >
         <aside className="specStudioColumn specStudioLeft">
@@ -3196,6 +3161,7 @@ export default function SpecStudioPage() {
           defaultLeftPercent={50}
           storageKey="muko_spec_splitPanel"
           topOffset={0}
+          constrainToViewport={false}
           leftContent={
             <main className="specStudioColumn specStudioCenter">
           <div style={{ padding: "36px 32px 56px" }}>
@@ -3264,61 +3230,6 @@ export default function SpecStudioPage() {
                       Material direction
                     </div>
                   </div>
-
-                  {(!selectedKeyPiece || selectedKeyPiece.custom) && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16 }}>
-                      <span style={{ ...microLabel, color: "rgba(67,67,43,0.32)", marginRight: 4 }}>Piece</span>
-                      <select
-                        value={categoryId}
-                        onChange={(e) => handleCategoryChange(e.target.value)}
-                        style={{
-                          minWidth: 140,
-                          padding: "7px 28px 7px 12px",
-                          borderRadius: 999,
-                          border: "1px solid rgba(67,67,43,0.10)",
-                          background: "rgba(255,255,255,0.68)",
-                          fontFamily: inter,
-                          fontSize: 12.5,
-                          fontWeight: 500,
-                          color: OLIVE,
-                          appearance: "none",
-                          backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2343432B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.4'/%3E%3C/svg%3E")`,
-                          backgroundRepeat: "no-repeat",
-                          backgroundPosition: "right 12px center",
-                        }}
-                      >
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                      {categorySubcategories.length > 0 && (
-                        <select
-                          value={subcategoryId}
-                          onChange={(e) => handleSubcategoryChange(e.target.value)}
-                          style={{
-                            minWidth: 160,
-                            padding: "7px 28px 7px 12px",
-                            borderRadius: 999,
-                            border: "1px solid rgba(67,67,43,0.10)",
-                            background: "rgba(255,255,255,0.68)",
-                            fontFamily: inter,
-                            fontSize: 12.5,
-                            fontWeight: 500,
-                            color: subcategoryId ? OLIVE : "rgba(67,67,43,0.40)",
-                            appearance: "none",
-                            backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2343432B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.4'/%3E%3C/svg%3E")`,
-                            backgroundRepeat: "no-repeat",
-                            backgroundPosition: "right 12px center",
-                          }}
-                        >
-                          <option value="" disabled>Select type</option>
-                          {categorySubcategories.map((s) => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  )}
 
                   <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
                     {(["all", "natural", "luxury", "synthetic", "deadstock"] as const).map((cat) => {
@@ -3478,116 +3389,6 @@ export default function SpecStudioPage() {
                       })}
                     </div>
                     {overrideWarning && <div style={{ marginTop: 12, fontSize: 12, color: "rgba(67,67,43,0.56)", fontFamily: inter }}>{overrideWarning}</div>}
-                    {constructionTier && constructionConfirmed && selectedMaterial && (
-                      <div style={{ marginTop: 24 }}>
-                        <div style={{
-                          fontFamily: inter,
-                          fontSize: 9,
-                          fontWeight: 700,
-                          letterSpacing: "0.12em",
-                          textTransform: "uppercase" as const,
-                          color: "rgba(67,67,43,0.36)",
-                          marginBottom: 10,
-                        }}>
-                          Execution brief
-                        </div>
-
-                        {/* LAYER 1: Material × construction tier — deterministic, instant */}
-                        {(() => {
-                          const implication = getMaterialConstructionImplication(
-                            selectedMaterial?.id,
-                            constructionTier
-                          );
-                          return implication ? (
-                            <div style={{
-                              fontFamily: sohne,
-                              fontSize: 15,
-                              fontWeight: 500,
-                              color: OLIVE,
-                              lineHeight: 1.35,
-                              marginBottom: 10,
-                            }}>
-                              {implication}
-                            </div>
-                          ) : null;
-                        })()}
-
-                        {/* LAYER 2: Chip × aesthetic × category guidance from design-language.json */}
-                        {buildInsightContent?.text && (
-                          <div style={{
-                            fontFamily: inter,
-                            fontSize: 13,
-                            color: "rgba(67,67,43,0.62)",
-                            lineHeight: 1.6,
-                            marginBottom: ((buildInsightContent?.tags?.length ?? 0) > 0 || chipsForHighComplexity.length > 0) ? 10 : 0,
-                          }}>
-                            {buildInsightContent?.text}
-                          </div>
-                        )}
-
-                        {constructionTier === "high" && (
-                          <div style={{
-                            fontFamily: inter,
-                            fontSize: 11.4,
-                            color: "rgba(67,67,43,0.48)",
-                            lineHeight: 1.58,
-                            marginBottom: ((buildInsightContent?.tags?.length ?? 0) > 0 || chipsForHighComplexity.length > 0) ? 10 : 0,
-                          }}>
-                            Continuing at High locks this complexity into your spec. Adjust the tier above if you want a different execution path.
-                          </div>
-                        )}
-
-                        {/* LAYER 3: Risk tags + complexity chip count */}
-                        {((buildInsightContent?.tags?.length ?? 0) > 0 || chipsForHighComplexity.length > 0) && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                            {buildInsightContent?.tags?.map((tag: string) => (
-                              <span key={tag} style={{
-                                padding: "3px 9px",
-                                borderRadius: 999,
-                                fontFamily: inter,
-                                fontSize: 10,
-                                fontWeight: 600,
-                                letterSpacing: "0.04em",
-                                background: "rgba(67,67,43,0.06)",
-                                color: "rgba(67,67,43,0.62)",
-                                border: "1px solid rgba(67,67,43,0.12)",
-                              }}>
-                                {tag}
-                              </span>
-                            ))}
-                            {chipsForHighComplexity.length > 0 && (
-                              <span style={{
-                                fontFamily: inter,
-                                fontSize: 11,
-                                color: "rgba(67,67,43,0.42)",
-                              }}>
-                                {chipsForHighComplexity.length} high-complexity signal{chipsForHighComplexity.length > 1 ? "s" : ""} active
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* FALLBACK: if both layers are empty */}
-                        {!getMaterialConstructionImplication(selectedMaterial?.id, constructionTier) &&
-                         !buildInsightContent?.text && (
-                          <div style={{
-                            fontFamily: inter,
-                            fontSize: 13,
-                            color: "rgba(67,67,43,0.62)",
-                            lineHeight: 1.6,
-                          }}>
-                            {buildConstructionImplication({
-                              materialName: selectedMaterial?.name ?? "",
-                              constructionTier: constructionTier ?? "moderate",
-                              topChips: (chipSelection?.activatedChips ?? []).slice(0, 2).map((c) => c.label),
-                              complexityChipCount: chipsForHighComplexity.length,
-                              leadTimeWeeks: selectedMaterial?.lead_time_weeks ?? 12,
-                              deliveryWindowWeeks: timelineWeeks ?? 24,
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </section>
 
                         <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
@@ -3630,16 +3431,6 @@ export default function SpecStudioPage() {
                           </div>
 
                           <div style={{ display: "grid", gap: 18 }}>
-                            <div style={{ paddingBottom: 18, borderBottom: "1px solid rgba(67,67,43,0.08)" }}>
-                              <div style={{ ...microLabel, marginBottom: 8 }}>Execution Summary</div>
-                              <div style={{ fontFamily: sohne, fontSize: 18, color: OLIVE, lineHeight: 1.32, marginBottom: 6 }}>
-                                {pieceContextTitle}
-                              </div>
-                              <div style={{ fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.58)", lineHeight: 1.62 }}>
-                                {selectedMaterial ? `${selectedMaterial.name} · ` : ""}{constructionTier ? `${CONSTRUCTION_INFO[constructionTier].label} construction` : ""}
-                              </div>
-                            </div>
-
                             <div style={{ display: "grid", gap: 10 }}>
                               {buildOutcomeRows.map((row) => (
                                 <div key={row.label} style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 12 }}>
@@ -3652,6 +3443,32 @@ export default function SpecStudioPage() {
                                 </div>
                               ))}
                             </div>
+
+                            {executionNotes.length > 0 ? (
+                              <div style={{ paddingTop: 18, borderTop: "1px solid rgba(67,67,43,0.08)" }}>
+                                <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.34)", marginBottom: 10 }}>
+                                  Execution Notes
+                                </div>
+                                <div style={{ display: "grid", gap: 10 }}>
+                                  {executionNotes.map((note) => (
+                                    <div
+                                      key={note}
+                                      style={{
+                                        padding: "10px 12px",
+                                        borderRadius: 12,
+                                        background: "#F9F7F4",
+                                        fontFamily: inter,
+                                        fontSize: 12.5,
+                                        color: "rgba(67,67,43,0.72)",
+                                        lineHeight: 1.5,
+                                      }}
+                                    >
+                                      {note}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
                         </section>
 
@@ -3716,12 +3533,20 @@ export default function SpecStudioPage() {
             </main>
           }
           rightContent={
-            <div style={{ display: "flex", flexDirection: "row", alignItems: "stretch", height: "100%", minHeight: 0, overflow: "hidden" }}>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "stretch", height: "100%", minHeight: 0 }}>
             <aside
               className="specStudioColumn specStudioRight"
-              style={{ flex: 1, minWidth: 0, minHeight: 0, height: "100%", overflowY: "auto", overscrollBehavior: "contain" }}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                overscrollBehavior: "contain",
+                position: "sticky",
+                top: 0,
+                height: `calc(100vh - ${72 + contextBarHeight}px)`,
+                overflowY: "auto",
+              }}
             >
-          <div className="specStudioSticky" style={{ padding: "36px 28px 44px" }}>
+          <div style={{ padding: "36px 28px 44px" }}>
             <section style={{ marginBottom: 30 }}>
               <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 20 }}>Muko&apos;s Read</div>
               <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em" }}>
@@ -3787,13 +3612,52 @@ export default function SpecStudioPage() {
               <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>What to get right</div>
               <div style={{ display: "grid", gap: 12 }}>
                 {(activeSpecRail?.execution_levers ?? []).map((item) => (
-                  <div key={item} style={{ display: "grid", gridTemplateColumns: "10px 1fr", gap: 10, alignItems: "start" }}>
-                    <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#43432B", marginTop: 6, marginLeft: 2 }} />
-                    <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58 }}>
+                  <div key={item} style={{ display: "flex", gap: 10, alignItems: "start" }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedLevers.has(item)}
+                      onChange={() => {
+                        setSelectedLevers((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(item)) {
+                            next.delete(item);
+                          } else {
+                            next.add(item);
+                          }
+                          return next;
+                        });
+                      }}
+                      style={{ accentColor: "#43432B", width: 13, height: 13, marginTop: 3, cursor: "pointer", flexShrink: 0 }}
+                    />
+                    <label style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58, cursor: "pointer" }}>
                       {item}
-                    </div>
+                    </label>
                   </div>
                 ))}
+              </div>
+              <div style={{ marginTop: 16 }}>
+                <button
+                  onClick={() => { void handleApplySelectedLevers(); }}
+                  disabled={selectedLevers.size === 0}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 999,
+                    border: "none",
+                    background: selectedLevers.size === 0 ? "#E2DDD6" : "#191919",
+                    color: selectedLevers.size === 0 ? "#888078" : "#FFFFFF",
+                    fontFamily: inter,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    cursor: selectedLevers.size === 0 ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Apply Selected
+                </button>
+                {leverNotesSaved ? (
+                  <div style={{ marginTop: 8, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.5)" }}>
+                    Notes saved
+                  </div>
+                ) : null}
               </div>
             </section>
 
@@ -3841,6 +3705,64 @@ export default function SpecStudioPage() {
                   <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58 }}>
                     {activeSpecRail.alternative_path.description}
                   </div>
+                  <button
+                    onClick={() => setShowBetterPathConfirm(true)}
+                    style={{
+                      marginTop: 12,
+                      padding: "7px 14px",
+                      borderRadius: 999,
+                      border: "1px solid rgba(67,67,43,0.25)",
+                      background: "transparent",
+                      color: "#43432B",
+                      fontFamily: inter,
+                      fontSize: 11,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Apply
+                  </button>
+                  {showBetterPathConfirm ? (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.7)", lineHeight: 1.58, marginBottom: 10 }}>
+                        This will update your construction detail. Apply better path?
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <button
+                          onClick={() => { void handleConfirmBetterPath(); }}
+                          style={{
+                            padding: "8px 16px",
+                            borderRadius: 999,
+                            border: "none",
+                            background: "#191919",
+                            color: "#FFFFFF",
+                            fontFamily: inter,
+                            fontSize: 11,
+                            fontWeight: 500,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setShowBetterPathConfirm(false)}
+                          style={{
+                            padding: "7px 14px",
+                            borderRadius: 999,
+                            border: "1px solid rgba(67,67,43,0.25)",
+                            background: "transparent",
+                            color: "#43432B",
+                            fontFamily: inter,
+                            fontSize: 11,
+                            fontWeight: 500,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </section>
               </>
             )}

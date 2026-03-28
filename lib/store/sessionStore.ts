@@ -51,6 +51,7 @@ export interface PieceBuildContext {
   role: CollectionRoleId | null;
   archetype: string | null;
   originalLabel: string | null;
+  expression: string | null;
   translation: string | null;
   collectionLanguage: Array<{
     label: string;

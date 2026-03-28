@@ -33,6 +33,7 @@ interface PieceRefinementRequest {
     direction?: string;
   };
   user_input?: string;
+  current_expression?: string;
   selected_role?: string;
   existing_pieces?: Array<{
     name: string;
@@ -45,6 +46,8 @@ interface PieceRefinementResponse {
   read: string;
   refined_expression: string;
   role: "Hero" | "Volume Driver" | "Core Evolution" | "Directional Signal";
+  category: string;
+  subcategory: string;
 }
 
 interface AestheticEntry {
@@ -117,7 +120,7 @@ function hasOverprecision(value: string) {
   return OVERPRECISION_REGEX.test(value);
 }
 
-function looksCredibleForStage(output: PieceRefinementResponse) {
+function looksCredibleForStage(output: Pick<PieceRefinementResponse, "read" | "refined_expression">) {
   const read = output.read?.trim() ?? "";
   const expression = output.refined_expression?.trim() ?? "";
   const combined = `${read} ${expression}`.toLowerCase();
@@ -156,6 +159,8 @@ function buildFallback(
     saturation: market.saturation,
   });
   const pieceLabel = titleCase(userInput);
+  const mappedCategory = mapArchetypeCategoryToSpecCategory(archetype.category);
+  const mappedSubcategory = mapArchetypeToSpecSubcategory(archetype.category, archetype.archetype);
 
   return {
     read:
@@ -166,7 +171,37 @@ function buildFallback(
         : `${pieceLabel} can still support the collection, but only if it is treated as a secondary piece rather than a lead statement. The risk is letting it blur the collection direction instead of sharpening it.`,
     refined_expression: limitToSentenceCount(refinedExpression),
     role: roleType,
+    category: mappedCategory,
+    subcategory: mappedSubcategory,
   };
+}
+
+function mapArchetypeCategoryToSpecCategory(category: string) {
+  if (category === "jean" || category === "trouser") return "bottoms";
+  if (category === "blazer" || category === "outerwear") return "outerwear";
+  if (category === "dress") return "dresses";
+  if (category === "knit") return "knitwear";
+  return "tops";
+}
+
+function mapArchetypeToSpecSubcategory(category: string, archetype: string) {
+  if (category === "jean") return "trouser";
+  if (category === "trouser") return archetype === "wide" ? "wide_leg" : "trouser";
+  if (category === "blazer") return "blazer";
+  if (category === "dress") {
+    if (archetype === "slip") return "slip_dress";
+    if (archetype === "draped") return "wrap_dress";
+    return "midi_dress";
+  }
+  if (category === "knit") {
+    if (archetype === "fine-gauge") return "sweater";
+    return "pullover";
+  }
+  if (category === "outerwear") {
+    if (archetype === "oversized") return "overcoat";
+    return "trench";
+  }
+  return "shirt";
 }
 
 function parseJsonResponse(raw: string): PieceRefinementResponse {
@@ -303,8 +338,12 @@ Rules:
 - "read" must answer three things at a high level: what role this piece plays in the collection, what makes it work or fail, and what the risk is if it is handled too generically.
 - "read" must sound like a senior merchandiser or design director. It should stay grounded in assortment logic and product positioning, not garment engineering.
 - "refined_expression" is the Suggested Expression field. It must be 1 or 2 sentences max.
-- "refined_expression" must name one primary design lever only, then explain how the piece should behave visually.
+- If current_expression is present in the payload, you are rewriting THAT text, not the original user_input. The current_expression is what the designer has settled on so far — treat it as the thing to transform.
+- If current_expression is absent or empty, use user_input as the starting point.
+- The refined_expression must be a genuine reframe, not a paraphrase. If you could swap the refined_expression with the input and no information would be lost, you have failed. Something must change: the frame, the design lever, the collection positioning, or the role logic.
+- Name one primary design lever only, then explain specifically how the piece should behave visually in this collection.
 - Good levers: proportion, line, volume, dominance, restraint, surface emphasis, control vs softness, statement vs support role, placement in the assortment.
+- The lever you choose must be appropriate to the piece's role. A Hero lever is about distinctiveness and statement. A Volume Driver lever is about repeatability and how it wears across the range. A Core Evolution lever is about what's been updated and why it still belongs. A Directional Signal lever is about what direction it's pointing the collection toward.
 - If the piece is Anchoring, sharpen one dimension that keeps it intentional rather than generic.
 - If the piece is Carrying, keep the differentiation visible through line, proportion, or visual control without changing the garment archetype.
 - If the piece is Diluting but still viable, integrate it through reduced dominance or clearer positioning rather than rejecting it.
@@ -340,7 +379,9 @@ When existing_pieces is present and non-empty:
 
 Return valid JSON only. No markdown. No preamble.`;
 
-  const userMessage = `Refine this custom piece proposal inside the given collection frame:
+  const userMessage = `${body.current_expression?.trim()
+    ? `Current expression (rewrite this, do not paraphrase it): ${body.current_expression.trim()}\n`
+    : ''}Refine this custom piece proposal inside the given collection frame:
 ${JSON.stringify(structuredPayload, null, 2)}`;
 
   try {
@@ -383,6 +424,8 @@ ${JSON.stringify(structuredPayload, null, 2)}`;
       read: safeRead,
       refined_expression: safeExpression,
       role: parsed.role || fallback.role,
+      category: fallback.category,
+      subcategory: fallback.subcategory,
     });
   } catch {
     return Response.json(fallback);

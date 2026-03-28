@@ -1423,12 +1423,14 @@ export default function ConceptStudioPage() {
     const controller = new AbortController();
     conceptAbortRef.current = controller;
 
+    setStep1ReadData(null);
+    setStep1ReadLoading(true);
+    setConceptStreamingText('');
+    setConceptStreamingParagraph('');
+    setConceptIsParagraphStreaming(true);
+
     const timer = window.setTimeout(async () => {
       console.log('[Muko] Synthesizer timer firing');
-      setStep1ReadLoading(true);
-      setConceptStreamingText('');
-      setConceptStreamingParagraph('');
-      setConceptIsParagraphStreaming(true);
       conceptRawJsonRef.current = '';
       try {
         const res = await fetch('/api/synthesizer/concept', {
@@ -1485,14 +1487,6 @@ export default function ConceptStudioPage() {
                   } catch { /* leave confidence null */ }
                   setConceptInsight({ title, description, positioning, confidence });
                 } catch { /* do not block on insight persistence */ }
-                // Fire-and-forget DB log
-                try {
-                  const supabase = createClient();
-                  supabase.from('analyses').insert({
-                    narrative: result.data.statements?.join(' ') ?? '',
-                    agent_versions: { synthesizer: result.meta?.method ?? 'unknown' },
-                  }).then(() => {});
-                } catch { /* fire-and-forget */ }
               }
             } catch { /* ignore */ }
           }

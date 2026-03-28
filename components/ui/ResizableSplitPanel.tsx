@@ -11,6 +11,7 @@ interface ResizableSplitPanelProps {
   rightContent: React.ReactNode;
   topOffset?: number;
   className?: string;
+  constrainToViewport?: boolean;
 }
 
 function getInitialLeftPercent(
@@ -42,6 +43,7 @@ export function ResizableSplitPanel({
   rightContent,
   topOffset = 72,
   className,
+  constrainToViewport = true,
 }: ResizableSplitPanelProps) {
   const [leftPercent, setLeftPercent] = useState(() =>
     getInitialLeftPercent(storageKey, defaultLeftPercent, minLeftPercent, maxLeftPercent)
@@ -132,8 +134,8 @@ export function ResizableSplitPanel({
           flexDirection: "column",
           flex: 1,
           paddingTop: topOffset,
-          overflow: "auto",
-          height: `calc(100vh - ${topOffset}px)`,
+          overflow: constrainToViewport ? "auto" : "visible",
+          minHeight: `calc(100vh - ${topOffset}px)`,
         }}
       >
         <div style={{ minHeight: 0 }}>{leftContent}</div>
@@ -150,8 +152,8 @@ export function ResizableSplitPanel({
         display: "flex",
         flex: 1,
         paddingTop: topOffset,
-        overflow: "hidden",
-        height: `calc(100vh - ${topOffset}px)`,
+        overflow: constrainToViewport ? "hidden" : "visible",
+        minHeight: `calc(100vh - ${topOffset}px)`,
         position: "relative",
       }}
     >
@@ -159,8 +161,8 @@ export function ResizableSplitPanel({
       <div
         style={{
           width: `${leftPercent}%`,
-          height: "100%",
-          overflowY: "auto",
+          height: constrainToViewport ? "100%" : "auto",
+          overflowY: constrainToViewport ? "auto" : "visible",
           overflowX: "hidden",
           minWidth: 0,
         }}
@@ -236,9 +238,9 @@ export function ResizableSplitPanel({
       <div
         style={{
           flex: 1,
-          height: "100%",
+          height: constrainToViewport ? "100%" : "auto",
           minHeight: 0,
-          overflow: "hidden",
+          overflow: constrainToViewport ? "hidden" : "visible",
           minWidth: 0,
           borderLeft: "none",
           background: "rgba(250,249,246,0.60)",

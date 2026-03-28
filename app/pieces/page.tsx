@@ -11,9 +11,11 @@ import { getCollectionLanguageLabels, getExpressionSignalLabels } from "@/lib/co
 import { resolvePieceImageType } from "@/lib/piece-image";
 import aestheticsData from "@/data/aesthetics.json";
 import categoriesData from "@/data/categories.json";
+import subcategoriesData from "@/data/subcategories.json";
 import { CollectionContextBar, COLLECTION_CONTEXT_BAR_OFFSET } from "@/components/collection/CollectionContextBar";
 import { buildPiecesReadFallback } from "@/lib/pieces/buildPiecesReadFallback";
 import { buildPiecesReadInput } from "@/lib/pieces/buildPiecesReadInput";
+import { normalizeSpecSubcategoryId } from "@/lib/spec-studio/smart-defaults";
 import {
   assignStrategicRole,
   buildDeterministicPieceMicrocopy,
@@ -101,6 +103,7 @@ interface CollectionPiece {
   construction_tier: string | null;
   agent_versions?: {
     saved_piece_name?: string | null;
+    saved_piece_expression?: string | null;
   } | null;
 }
 
@@ -117,6 +120,7 @@ interface AestheticDataEntry {
 }
 
 type CategoriesData = { categories: Array<{ id: string; name: string }> };
+type SubcategoryEntry = { id: string; name: string };
 type CollectionLanguageState = "strong" | "emerging" | "missing";
 type SignalExpression = {
   label: string;
@@ -149,6 +153,8 @@ type CustomPieceRefinement = {
   read: string;
   refined_expression: string;
   role: CustomPieceRoleLabel;
+  category: string;
+  subcategory: string;
 };
 
 const PIECE_ROLE_OPTIONS: Array<{
@@ -197,32 +203,20 @@ function toTitleCase(value: string) {
     .join(" ");
 }
 
-function deriveCustomPieceName(value: string) {
-  const normalized = value
-    .replace(/[.;:,]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+function getCategoryLabel(categories: Array<{ id: string; name: string }>, categoryId: string) {
+  return categories.find((entry) => entry.id === categoryId)?.name ?? toTitleCase(categoryId.replace(/[-_]+/g, " "));
+}
 
-  if (!normalized) return "";
-
-  const token = normalized.toLowerCase();
-
-  if (token.includes("cigarette") && (token.includes("jean") || token.includes("denim"))) return "Cigarette Jean";
-  if (token.includes("straight") && token.includes("jean")) return "Straight Jean";
-  if (token.includes("blazer") && token.includes("soft shoulder")) return "Soft Shoulder Blazer";
-  if (token.includes("blazer")) return "Tailored Blazer";
-  if (token.includes("draped") && token.includes("dress")) return "Draped Dress";
-  if (token.includes("slip") && token.includes("dress")) return "Slip Dress";
-  if (token.includes("trouser")) return token.includes("wide") ? "Wide Trouser" : "Straight Trouser";
-  if (token.includes("jean") || token.includes("denim")) return "Jean";
-  if (token.includes("dress")) return "Dress";
-  if (token.includes("coat")) return "Coat";
-  if (token.includes("jacket")) return "Jacket";
-  if (token.includes("skirt")) return "Skirt";
-  if (token.includes("shirt")) return "Shirt";
-  if (token.includes("knit") || token.includes("sweater")) return "Knit";
-
-  return toTitleCase(normalized.split(" ").slice(0, 3).join(" "));
+function getSubcategoryLabel(
+  subcategories: Record<string, SubcategoryEntry[]>,
+  categoryId: string,
+  subcategoryId: string
+) {
+  const normalizedSubcategoryId = normalizeSpecSubcategoryId(subcategoryId) ?? subcategoryId;
+  return (
+    subcategories[categoryId]?.find((entry) => entry.id === normalizedSubcategoryId)?.name ??
+    toTitleCase(subcategoryId.replace(/[-_]+/g, " "))
+  );
 }
 
 function getStrategySliderLabel(value: number, labels: [string, string, string]): string {
@@ -284,6 +278,10 @@ function getDisplayPieceName(piece: Pick<CollectionPiece, "piece_name" | "catego
     || piece.category?.trim()
     || "Untitled Piece"
   );
+}
+
+function getDisplayPieceExpression(piece: Pick<CollectionPiece, "agent_versions">) {
+  return piece.agent_versions?.saved_piece_expression?.trim() || null;
 }
 
 function buildSuggestedPieceCorpus(piece: KeyPiece) {
@@ -847,7 +845,7 @@ function ConfirmedPieceCard({
             ...BODY_SMALL_STYLE,
           }}
         >
-          {[piece.category, piece.silhouette].filter(Boolean).join(" • ") || "In development"}
+          {getDisplayPieceExpression(piece) || [piece.category, piece.silhouette].filter(Boolean).join(" • ") || "In development"}
         </div>
       </div>
     </button>
@@ -1025,7 +1023,9 @@ function ConfirmDrawer({
   piece,
   pieceName,
   category,
+  subcategory,
   categories,
+  allSubcategories,
   selectedRole,
   suggestion,
   customProposal,
@@ -1034,6 +1034,7 @@ function ConfirmDrawer({
   customRefinementState,
   onPieceNameChange,
   onCategoryChange,
+  onSubcategoryChange,
   onRoleSelect,
   onCustomProposalChange,
   onCustomFinalExpressionChange,
@@ -1045,7 +1046,9 @@ function ConfirmDrawer({
   piece: KeyPiece;
   pieceName: string;
   category: string;
+  subcategory: string;
   categories: Array<{ id: string; name: string }>;
+  allSubcategories: Record<string, SubcategoryEntry[]>;
   selectedRole: CollectionRoleId | null;
   suggestion: { role: CollectionRoleId; rationale: string } | null;
   customProposal: string;
@@ -1054,6 +1057,7 @@ function ConfirmDrawer({
   customRefinementState: "idle" | "loading" | "ready";
   onPieceNameChange: (name: string) => void;
   onCategoryChange: (cat: string) => void;
+  onSubcategoryChange: (subcategory: string) => void;
   onRoleSelect: (role: CollectionRoleId) => void;
   onCustomProposalChange: (value: string) => void;
   onCustomFinalExpressionChange: (value: string) => void;
@@ -1073,7 +1077,7 @@ function ConfirmDrawer({
   const metadataTokens = [piece.custom ? "Custom piece" : "Market archetype", fitValue, marketValue].filter(Boolean);
 
   const resolvedType = resolvePieceImageType({
-    type: piece.type,
+    type: subcategory || piece.type,
     pieceName: customProposal.trim() || pieceName.trim() || piece.item,
     category,
   });
@@ -1084,8 +1088,16 @@ function ConfirmDrawer({
       } | null)
     : null;
   const ctaLabel = "Start Building →";
-  const finalName = piece.custom ? customProposal.trim() : pieceName.trim() || piece.item;
+  const finalName = piece.custom ? pieceName.trim() || customProposal.trim() : pieceName.trim() || piece.item;
   const canStart = piece.custom ? Boolean(selectedRole && finalName) : Boolean(selectedRole);
+  const [isPieceTypeEditorOpen, setIsPieceTypeEditorOpen] = useState(false);
+  const availableSubcategories = category ? allSubcategories[category] ?? [] : [];
+  const pieceTypeLabel =
+    category && subcategory
+      ? `${getCategoryLabel(categories, category)} · ${getSubcategoryLabel(allSubcategories, category, subcategory)}`
+      : category
+        ? getCategoryLabel(categories, category)
+        : "Select piece type";
 
   const autoResizeTextarea = (event: React.FormEvent<HTMLTextAreaElement>) => {
     const target = event.currentTarget;
@@ -1305,6 +1317,102 @@ function ConfirmDrawer({
               </div>
 
               {customProposal.trim() ? (
+                customRefinementState === "loading" ? (
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ ...EYEBROW_STYLE, marginBottom: 8 }}>PIECE TYPE</div>
+                    <div
+                      style={{
+                        width: 224,
+                        height: 36,
+                        borderRadius: 999,
+                        background: "linear-gradient(90deg, rgba(226,221,214,0.72) 0%, rgba(242,239,233,0.96) 50%, rgba(226,221,214,0.72) 100%)",
+                        backgroundSize: "200% 100%",
+                        animation: "mukoGlassOrbRotate 1.2s linear infinite",
+                      }}
+                    />
+                  </div>
+                ) : customRefinement ? (
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ ...EYEBROW_STYLE, marginBottom: 8 }}>PIECE TYPE</div>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      <button
+                        type="button"
+                        onClick={() => setIsPieceTypeEditorOpen((value) => !value)}
+                        style={{
+                          width: "fit-content",
+                          border: `1px solid ${BORDER}`,
+                          background: "rgba(255,255,255,0.88)",
+                          color: TEXT,
+                          borderRadius: 999,
+                          padding: "9px 14px",
+                          fontFamily: inter,
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {`${pieceTypeLabel} ▾`}
+                      </button>
+                      {isPieceTypeEditorOpen ? (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                          <select
+                            value={category}
+                            onChange={(e) => {
+                              onCategoryChange(e.target.value);
+                              const nextSubcategories = allSubcategories[e.target.value] ?? [];
+                              if (!nextSubcategories.some((entry) => entry.id === subcategory)) {
+                                onSubcategoryChange(nextSubcategories[0]?.id ?? "");
+                              }
+                            }}
+                            style={{
+                              minWidth: 140,
+                              padding: "8px 28px 8px 12px",
+                              borderRadius: 999,
+                              border: `1px solid ${BORDER}`,
+                              background: "rgba(255,255,255,0.92)",
+                              fontFamily: inter,
+                              fontSize: 12.5,
+                              fontWeight: 500,
+                              color: TEXT,
+                              appearance: "none",
+                            }}
+                          >
+                            {categories.map((entry) => (
+                              <option key={entry.id} value={entry.id}>
+                                {entry.name}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={subcategory}
+                            onChange={(e) => onSubcategoryChange(e.target.value)}
+                            style={{
+                              minWidth: 170,
+                              padding: "8px 28px 8px 12px",
+                              borderRadius: 999,
+                              border: `1px solid ${BORDER}`,
+                              background: "rgba(255,255,255,0.92)",
+                              fontFamily: inter,
+                              fontSize: 12.5,
+                              fontWeight: 500,
+                              color: TEXT,
+                              appearance: "none",
+                            }}
+                          >
+                            {availableSubcategories.map((entry) => (
+                              <option key={entry.id} value={entry.id}>
+                                {entry.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null
+              ) : null}
+
+              {customProposal.trim() ? (
                 <div style={{ marginBottom: 22 }}>
                   {customRefinementState === "loading" ? (
                     <div
@@ -1405,8 +1513,7 @@ function ConfirmDrawer({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 14,
+                gap: 18,
                 marginBottom: 18,
               }}
               className="muko-claim-fields"
@@ -1443,42 +1550,81 @@ function ConfirmDrawer({
               </div>
 
               <div>
-                <div
-                  style={{
-                    ...EYEBROW_STYLE,
-                    marginBottom: 6,
-                  }}
-                >
-                  CATEGORY
+                <div style={{ ...EYEBROW_STYLE, marginBottom: 8 }}>PIECE TYPE</div>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsPieceTypeEditorOpen((value) => !value)}
+                    style={{
+                      width: "fit-content",
+                      border: `1px solid ${BORDER}`,
+                      background: "rgba(255,255,255,0.88)",
+                      color: TEXT,
+                      borderRadius: 999,
+                      padding: "9px 14px",
+                      fontFamily: inter,
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {`${pieceTypeLabel} ▾`}
+                  </button>
+                  {isPieceTypeEditorOpen ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                      <select
+                        value={category}
+                        onChange={(e) => {
+                          onCategoryChange(e.target.value);
+                          const nextSubcategories = allSubcategories[e.target.value] ?? [];
+                          if (!nextSubcategories.some((entry) => entry.id === subcategory)) {
+                            onSubcategoryChange(nextSubcategories[0]?.id ?? "");
+                          }
+                        }}
+                        style={{
+                          minWidth: 140,
+                          padding: "8px 28px 8px 12px",
+                          borderRadius: 999,
+                          border: `1px solid ${BORDER}`,
+                          background: "rgba(255,255,255,0.92)",
+                          fontFamily: inter,
+                          fontSize: 12.5,
+                          fontWeight: 500,
+                          color: TEXT,
+                          appearance: "none",
+                        }}
+                      >
+                        {categories.map((entry) => (
+                          <option key={entry.id} value={entry.id}>
+                            {entry.name}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={subcategory}
+                        onChange={(e) => onSubcategoryChange(e.target.value)}
+                        style={{
+                          minWidth: 170,
+                          padding: "8px 28px 8px 12px",
+                          borderRadius: 999,
+                          border: `1px solid ${BORDER}`,
+                          background: "rgba(255,255,255,0.92)",
+                          fontFamily: inter,
+                          fontSize: 12.5,
+                          fontWeight: 500,
+                          color: TEXT,
+                          appearance: "none",
+                        }}
+                      >
+                        {availableSubcategories.map((entry) => (
+                          <option key={entry.id} value={entry.id}>
+                            {entry.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
                 </div>
-                <select
-                  value={category}
-                  onChange={(e) => onCategoryChange(e.target.value)}
-                  style={{
-                    width: "100%",
-                    background: BG,
-                    border: `1px solid ${BORDER}`,
-                    borderRadius: 8,
-                    padding: "11px 14px",
-                    fontSize: 13.5,
-                    fontWeight: 500,
-                    color: category ? TEXT : MUTED,
-                    fontFamily: inter,
-                    outline: "none",
-                    boxSizing: "border-box",
-                    cursor: "pointer",
-                    appearance: "none",
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = CHARTREUSE)}
-                  onBlur={(e) => (e.target.style.borderColor = BORDER)}
-                >
-                  <option value="">Select category...</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
           )}
@@ -2132,12 +2278,15 @@ export default function PiecesPage() {
   const [drawerSuggestion, setDrawerSuggestion] = useState<StartingPointSuggestion | null>(null);
   const [drawerPieceName, setDrawerPieceName] = useState("");
   const [drawerCategory, setDrawerCategory] = useState("");
+  const [drawerSubcategory, setDrawerSubcategory] = useState("");
   const [drawerRole, setDrawerRole] = useState<CollectionRoleId | null>(null);
   const [customProposal, setCustomProposal] = useState("");
   const [customFinalExpression, setCustomFinalExpression] = useState("");
   const [customRefinement, setCustomRefinement] = useState<CustomPieceRefinement | null>(null);
   const [customRefinementState, setCustomRefinementState] = useState<"idle" | "loading" | "ready">("idle");
   const refinementAbortRef = React.useRef<AbortController | null>(null);
+  const lastInferredDrawerCategoryRef = React.useRef("");
+  const lastInferredDrawerSubcategoryRef = React.useRef("");
   const inferredDrawerSuggestion = useMemo(() => {
     if (!drawerPiece) return null;
     if (drawerPiece.custom) {
@@ -2176,8 +2325,9 @@ export default function PiecesPage() {
   const openDrawer = useCallback((piece: KeyPiece, suggestion: StartingPointSuggestion | null = null) => {
     setDrawerPiece(piece);
     setDrawerSuggestion(suggestion);
-    setDrawerPieceName(piece.custom ? "" : piece.item);
+    setDrawerPieceName(piece.item);
     setDrawerCategory(piece.category ?? "");
+    setDrawerSubcategory(normalizeSpecSubcategoryId(piece.type) ?? piece.type ?? "");
     setDrawerRole(null);
     setCustomProposal(piece.custom ? piece.item : "");
     setCustomFinalExpression(piece.custom ? piece.item : "");
@@ -2192,6 +2342,7 @@ export default function PiecesPage() {
     setDrawerSuggestion(null);
     setDrawerPieceName("");
     setDrawerCategory("");
+    setDrawerSubcategory("");
     setDrawerRole(null);
     setCustomProposal("");
     setCustomFinalExpression("");
@@ -2208,6 +2359,8 @@ export default function PiecesPage() {
       refinementAbortRef.current = null;
       setCustomRefinement(null);
       setCustomRefinementState("idle");
+      lastInferredDrawerCategoryRef.current = "";
+      lastInferredDrawerSubcategoryRef.current = "";
       setDrawerRole(null);
       return;
     }
@@ -2244,6 +2397,7 @@ export default function PiecesPage() {
               direction: collectionAesthetic || directionInterpretationText || "",
             },
             user_input: proposal,
+            current_expression: customFinalExpression.trim() || undefined,
             selected_role: drawerRole ? getPieceRoleLabel(drawerRole) : undefined,
             existing_pieces: confirmedPieces.map((p) => ({
               name: getDisplayPieceName(p),
@@ -2293,19 +2447,37 @@ export default function PiecesPage() {
     sliderTrend,
   ]);
 
+  useEffect(() => {
+    if (!drawerPiece?.custom || !customRefinement) return;
+
+    const nextCategory = customRefinement.category ?? "";
+    const nextSubcategory = normalizeSpecSubcategoryId(customRefinement.subcategory) ?? customRefinement.subcategory ?? "";
+
+    setDrawerCategory((current) => {
+      if (!current || current === lastInferredDrawerCategoryRef.current) return nextCategory;
+      return current;
+    });
+    setDrawerSubcategory((current) => {
+      if (!current || current === lastInferredDrawerSubcategoryRef.current) return nextSubcategory;
+      return current;
+    });
+
+    lastInferredDrawerCategoryRef.current = nextCategory;
+    lastInferredDrawerSubcategoryRef.current = nextSubcategory;
+  }, [customRefinement, drawerPiece?.custom]);
+
   const handleStartBuilding = useCallback(() => {
     if (!drawerPiece || !drawerRole) return;
     const finalPieceName = drawerPiece.custom
-      ? drawerPieceName.trim() || deriveCustomPieceName(customFinalExpression.trim() || customProposal.trim())
+      ? drawerPieceName.trim() || customProposal.trim()
       : drawerPieceName.trim() || drawerPiece.item;
     if (!finalPieceName) return;
-    const inferredType = resolvePieceImageType({
+    const inferredType = drawerSubcategory || customRefinement?.subcategory || resolvePieceImageType({
       type: drawerPiece.type,
       pieceName: finalPieceName,
       category: drawerCategory,
     });
-    const inferredCategory =
-      drawerCategory ||
+    const inferredCategory = customRefinement?.category ||
       (inferredType === "straight-pant" || inferredType === "trouser" || inferredType === "skirt" || inferredType === "mini-skirt"
         ? "bottoms"
         : inferredType?.includes("dress")
@@ -2320,13 +2492,13 @@ export default function PiecesPage() {
     const finalPiece: KeyPiece = {
       ...drawerPiece,
       item: finalPieceName,
-      category: inferredCategory ?? null,
-      type: inferredType,
+      category: (drawerCategory || inferredCategory) ?? null,
+      type: drawerSubcategory || inferredType,
     };
     const pieceBuildContext: PieceBuildContext = {
       adaptedTitle:
         drawerPiece.custom
-          ? customFinalExpression.trim() || finalPieceName
+          ? finalPieceName
           : drawerSuggestion?.adapted_title ?? finalPieceName,
       role: drawerRole,
       archetype:
@@ -2334,6 +2506,10 @@ export default function PiecesPage() {
           ? (customFinalExpression.trim() || finalPieceName).toLowerCase().replace(/\s+/g, "_")
           : drawerSuggestion?.archetype ?? drawerPiece.item.toLowerCase().replace(/\s+/g, "_"),
       originalLabel: drawerPiece.custom ? customProposal.trim() || finalPieceName : drawerSuggestion?.original_label ?? drawerPiece.item,
+      expression:
+        drawerPiece.custom && customFinalExpression.trim() && customFinalExpression.trim() !== finalPieceName
+          ? customFinalExpression.trim()
+          : null,
       translation:
         (drawerPiece.custom
           ? customRefinement?.read || directionInterpretationText
@@ -2359,19 +2535,24 @@ export default function PiecesPage() {
     setActiveProductPieceId(finalPieceName);
     if (drawerPiece.custom) {
       setMaterial("");
-      setSubcategory(inferredType ?? "");
-    } else if (drawerCategory) {
-      setCategory(drawerCategory);
+      setCategory(drawerCategory || inferredCategory || "");
+      setSubcategory(drawerSubcategory || inferredType || "");
+    } else {
+      setCategory(drawerCategory || drawerPiece.category || "");
+      setSubcategory(drawerSubcategory || drawerPiece.type || "");
     }
     router.push("/spec");
   }, [
     drawerPiece,
     drawerPieceName,
     drawerCategory,
+    drawerSubcategory,
     drawerRole,
     customFinalExpression,
     customProposal,
     customRefinement?.read,
+    customRefinement?.category,
+    customRefinement?.subcategory,
     setSelectedKeyPiece,
     setCollectionRole,
     setPieceBuildContext,
@@ -2391,6 +2572,7 @@ export default function PiecesPage() {
   ]);
 
   const categories = (categoriesData as CategoriesData).categories;
+  const allSubcategories = subcategoriesData as Record<string, SubcategoryEntry[]>;
 
   return (
     <div style={{ minHeight: "100vh", background: BG, fontFamily: inter }}>
@@ -2771,7 +2953,9 @@ export default function PiecesPage() {
           piece={drawerPiece}
           pieceName={drawerPieceName}
           category={drawerCategory}
+          subcategory={drawerSubcategory}
           categories={categories}
+          allSubcategories={allSubcategories}
           selectedRole={drawerRole}
           suggestion={
             drawerPiece.custom
@@ -2786,13 +2970,13 @@ export default function PiecesPage() {
           customRefinementState={customRefinementState}
           onPieceNameChange={setDrawerPieceName}
           onCategoryChange={setDrawerCategory}
+          onSubcategoryChange={setDrawerSubcategory}
           onRoleSelect={setDrawerRole}
           onCustomProposalChange={setCustomProposal}
           onCustomFinalExpressionChange={setCustomFinalExpression}
           onAcceptRefinedExpression={() => {
             if (!customRefinement) return;
             setCustomFinalExpression(customRefinement.refined_expression);
-            setDrawerPieceName(deriveCustomPieceName(customRefinement.refined_expression));
             setDrawerRole(mapRoleLabelToId(customRefinement.role));
           }}
           onContinueWithOriginal={() => {

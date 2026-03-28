@@ -125,14 +125,16 @@ export function buildAnalysisRow(
   const pieceBuildContext = bb.session.pieceBuildContext as {
     adaptedTitle?: string | null;
     originalLabel?: string | null;
+    expression?: string | null;
   } | null | undefined;
   const selectedPieceImage = bb.session.selectedPieceImage;
   const savedPieceName =
-    pieceBuildContext?.adaptedTitle?.trim()
-    || selectedKeyPiece?.item?.trim()
+    selectedKeyPiece?.item?.trim()
+    || pieceBuildContext?.adaptedTitle?.trim()
     || pieceBuildContext?.originalLabel?.trim()
     || bb.input.category?.trim()
     || null;
+  const savedPieceExpression = pieceBuildContext?.expression?.trim() || null;
 
   const row: Record<string, unknown> = {
     user_id:          userId,
@@ -170,6 +172,7 @@ export function buildAnalysisRow(
       ...result.agent_versions,
       collection_role: bb.session.collectionRole ?? null,
       saved_piece_name: savedPieceName,
+      saved_piece_expression: savedPieceExpression,
       selected_piece_image: selectedPieceImage ? JSON.stringify(selectedPieceImage) : null,
     },
     intent_success_goals:    intent?.primary_goals ?? [],

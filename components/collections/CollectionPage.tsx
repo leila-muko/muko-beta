@@ -29,6 +29,7 @@ interface AnalysisRow {
   agent_versions?: Record<string, string | null> | null;
   dimensions?: { identity?: number | null; resonance?: number | null; execution?: number | null } | null;
   narrative?: string | null;
+  execution_notes?: string | null;
 }
 
 interface CollectionPageProps {
@@ -91,6 +92,12 @@ function getRoleBadgeStyles(role: PieceRole): React.CSSProperties {
   return { background: '#f0eeee', color: '#5a4a4a' };
 }
 
+function getMetricScoreColor(score: number) {
+  if (score >= 80) return '#A8B475';
+  if (score >= 60) return '#B8876B';
+  return '#C47B6B';
+}
+
 function PlaceholderFlat() {
   return (
     <div
@@ -151,7 +158,17 @@ function Toast({ message }: { message: string }) {
   );
 }
 
-function PieceCard({ analysis, onClick, onDelete }: { analysis: AnalysisRow; onClick: () => void; onDelete: () => void }) {
+function PieceCard({
+  analysis,
+  execution_notes,
+  onClick,
+  onDelete,
+}: {
+  analysis: AnalysisRow;
+  execution_notes?: string | null;
+  onClick: () => void;
+  onDelete: () => void;
+}) {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -170,6 +187,10 @@ function PieceCard({ analysis, onClick, onDelete }: { analysis: AnalysisRow; onC
   const role = getPieceRole(analysis);
   const roleLabel = getRoleLabel(role);
   const scoreColor = score >= 80 ? '#A8B475' : '#B8876B';
+  const executionNoteCount = execution_notes
+    ?.split('\n')
+    .map((note) => note.trim())
+    .filter(Boolean).length ?? 0;
 
   return (
     <div
@@ -303,6 +324,29 @@ function PieceCard({ analysis, onClick, onDelete }: { analysis: AnalysisRow; onC
               </span>
             ))}
           </div>
+
+          {executionNoteCount > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 7 }}>
+              <span
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: '50%',
+                  background: '#A8B475',
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 10,
+                  color: 'rgba(67,67,43,0.36)',
+                  fontFamily: inter,
+                }}
+              >
+                {executionNoteCount} execution notes
+              </span>
+            </div>
+          ) : null}
         </div>
       </button>
 
@@ -495,8 +539,9 @@ export default function CollectionPage({
       highCount: complexityCounts.high,
       uniqueCategoryCount: categories.size,
       executionScore: avgExecution,
+      collectionScore,
     });
-  }, [avgExecution, scoredAnalyses]);
+  }, [avgExecution, collectionScore, scoredAnalyses]);
 
   const editorialDirection = useMemo(() => {
     const preferred = [
@@ -689,46 +734,150 @@ export default function CollectionPage({
                   maxWidth: 620,
                 }}
               >
-                <div style={{ fontFamily: inter, fontSize: 12, fontWeight: 600, lineHeight: 1.4, color: 'rgba(67,67,43,0.72)' }}>
-                  {collectionScore} — {assortmentIntelligence.collection_state}
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 9,
+                    fontWeight: 600,
+                    letterSpacing: '0.16em',
+                    textTransform: 'uppercase',
+                    color: '#888078',
+                    marginBottom: 6,
+                  }}
+                >
+                  Collection Read
                 </div>
 
-                <p
+                <div style={{ display: 'flex', alignItems: 'flex-end', marginBottom: 14 }}>
+                  <div
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 32,
+                      fontWeight: 500,
+                      color: '#191919',
+                      letterSpacing: '-0.04em',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {collectionScore}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.12em',
+                      textTransform: 'uppercase',
+                      color: 'rgba(67,67,43,0.38)',
+                      marginLeft: 12,
+                      alignSelf: 'flex-end',
+                      background: 'rgba(67,67,43,0.04)',
+                      border: '1px solid rgba(67,67,43,0.08)',
+                      borderRadius: 999,
+                      padding: '6px 10px',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {assortmentIntelligence.collection_state}
+                  </div>
+                </div>
+
+                <div
                   style={{
-                    margin: 0,
-                    fontFamily: inter,
-                    fontSize: 11.5,
-                    lineHeight: 1.48,
-                    color: 'rgba(67,67,43,0.62)',
+                    fontFamily: sohne,
+                    fontSize: 17,
+                    fontWeight: 500,
+                    color: '#191919',
+                    lineHeight: 1.38,
+                    letterSpacing: '-0.025em',
+                    marginBottom: 14,
                     maxWidth: 580,
                   }}
                 >
                   {assortmentIntelligence.supporting_line}
-                </p>
-
-                <p
-                  style={{
-                    margin: 0,
-                    fontFamily: inter,
-                    fontSize: 11,
-                    lineHeight: 1.48,
-                    color: 'rgba(67,67,43,0.52)',
-                    maxWidth: 580,
-                  }}
-                >
-                  {assortmentIntelligence.muko_insight}
-                </p>
+                </div>
 
                 <div
                   style={{
                     fontFamily: inter,
-                    fontSize: 9.5,
-                    lineHeight: 1.4,
-                    color: 'rgba(67,67,43,0.36)',
-                    letterSpacing: '0.03em',
+                    fontSize: 12.5,
+                    color: 'rgba(67,67,43,0.6)',
+                    lineHeight: 1.65,
+                    marginBottom: assortmentIntelligence.next_action ? 18 : 16,
+                    maxWidth: 580,
                   }}
                 >
-                  Identity {avgIdentity || '—'} · Resonance {avgResonance || '—'} · Execution {avgExecution || '—'}
+                  {assortmentIntelligence.muko_insight}
+                </div>
+
+                {assortmentIntelligence.next_action ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 14,
+                      alignItems: 'flex-start',
+                      padding: '11px 14px',
+                      background: 'rgba(67,67,43,0.04)',
+                      borderRadius: 6,
+                      marginBottom: 18,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: '0.13em',
+                        textTransform: 'uppercase',
+                        color: 'rgba(67,67,43,0.32)',
+                        paddingTop: 2,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Next
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 12,
+                        color: 'rgba(67,67,43,0.72)',
+                        lineHeight: 1.58,
+                      }}
+                    >
+                      {assortmentIntelligence.next_action}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 11,
+                    lineHeight: 1.4,
+                    color: 'rgba(67,67,43,0.38)',
+                    display: 'flex',
+                    gap: 20,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div>
+                    Identity
+                    <span style={{ fontWeight: 700, color: getMetricScoreColor(avgIdentity), marginLeft: 4 }}>
+                      {avgIdentity || '—'}
+                    </span>
+                  </div>
+                  <div>
+                    Resonance
+                    <span style={{ fontWeight: 700, color: getMetricScoreColor(avgResonance), marginLeft: 4 }}>
+                      {avgResonance || '—'}
+                    </span>
+                  </div>
+                  <div>
+                    Execution
+                    <span style={{ fontWeight: 700, color: getMetricScoreColor(avgExecution), marginLeft: 4 }}>
+                      {avgExecution || '—'}
+                    </span>
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -737,6 +886,15 @@ export default function CollectionPage({
 
         {/* ── Pieces section ─────────────────────────────────────────────── */}
         <div style={{ flex: 1, overflowY: 'auto', padding: reportExists ? '2px 32px 24px' : '20px 32px 24px' }}>
+          {reportExists ? (
+            <div
+              style={{
+                borderTop: '1px solid rgba(67,67,43,0.08)',
+                margin: '24px 0',
+              }}
+            />
+          ) : null}
+
           {/* Section label */}
           <div
             style={{
@@ -791,6 +949,7 @@ export default function CollectionPage({
                 <PieceCard
                   key={analysis.id}
                   analysis={analysis}
+                  execution_notes={analysis.execution_notes ?? null}
                   onClick={() => router.push('/spec')}
                   onDelete={() => handleDeletePiece(analysis.id)}
                 />
