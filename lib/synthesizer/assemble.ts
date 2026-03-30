@@ -374,6 +374,9 @@ export function buildSpecBlackboard(
     brand_name: (input.brandName && input.brandName.trim()) ? input.brandName : (input.collectionName || undefined),
     aesthetic_context: aestheticContext,
     material_id: input.materialId,
+    available_materials: materials
+      .filter((material): material is MaterialEntry & { name: string } => Boolean(material.id && material.name))
+      .map((material) => ({ id: material.id, name: material.name })),
     material_name: getMaterialName(input.materialId),
     cogs_usd: input.cogs_usd,
     target_msrp: input.target_msrp,

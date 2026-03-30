@@ -114,6 +114,10 @@ export function buildAnalysisRow(
   result: AnalysisResult,
   userId: string | null,
 ): Record<string, unknown> {
+  if (!userId) {
+    throw new Error('Cannot build analysis row without a user_id.');
+  }
+
   const intent        = bb.session.intent as IntentCalibration | undefined;
   const existingId    = (bb.session.savedAnalysisId as string | null | undefined) ?? null;
   // parent_analysis_id removed — branching deferred to Phase 2
@@ -128,6 +132,9 @@ export function buildAnalysisRow(
     expression?: string | null;
   } | null | undefined;
   const selectedPieceImage = bb.session.selectedPieceImage;
+  const directionInterpretationChips =
+    ((bb.session.directionInterpretationChips as string[] | null | undefined) ?? []).filter(Boolean);
+  const chipSelection = (bb.session.chipSelection as { directionId?: string; activatedChips?: unknown[] } | null | undefined) ?? null;
   const savedPieceName =
     selectedKeyPiece?.item?.trim()
     || pieceBuildContext?.adaptedTitle?.trim()
@@ -174,6 +181,8 @@ export function buildAnalysisRow(
       saved_piece_name: savedPieceName,
       saved_piece_expression: savedPieceExpression,
       selected_piece_image: selectedPieceImage ? JSON.stringify(selectedPieceImage) : null,
+      direction_interpretation_chips: JSON.stringify(directionInterpretationChips),
+      chip_selection: chipSelection ? JSON.stringify(chipSelection) : null,
     },
     intent_success_goals:    intent?.primary_goals ?? [],
     intent_tradeoff:         intent?.tradeoff ?? null,

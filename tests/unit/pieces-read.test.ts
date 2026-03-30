@@ -23,7 +23,72 @@ const baseInput: PiecesReadInput = {
   currentCollectionState: {
     confirmedPieceCount: 1,
     confirmedCategories: ["outerwear"],
+    categoryDistribution: {
+      outerwear: 1,
+      tops: 0,
+      bottoms: 0,
+      dresses: 0,
+      knitwear: 0,
+    },
+    silhouetteDistribution: {
+      column: 1,
+      cocoon: 0,
+      belted: 0,
+      straight: 0,
+      cropped: 0,
+      relaxed: 0,
+      fitted: 0,
+      oversized: 0,
+      boxy: 0,
+      "wide-leg": 0,
+      "straight-leg": 0,
+      slim: 0,
+      flare: 0,
+      "a-line": 0,
+      wrap: 0,
+      shift: 0,
+    },
     coverageGaps: ["needs_visible_surface_expression", "needs_anchor_piece"],
+    coverageGapLabels: ["the surface signal is still too weak", "a clear anchor piece is missing"],
+    collectionPhase: "opening",
+    dominantSilhouette: "column",
+    materialSignals: ["Merino Wool"],
+    roleBalance: {
+      hero: 0,
+      directional: 1,
+      coreEvolution: 0,
+      volumeDriver: 0,
+    },
+    roleTargets: {
+      hero: 1,
+      directional: 0,
+      coreEvolution: 0,
+      volumeDriver: 0,
+    },
+    scoreSignals: {
+      averageScore: 64,
+      strongestPiece: "Sharp Utility Coat",
+      weakestPiece: "Sharp Utility Coat",
+    },
+    dimensionDragSummary: {
+      dominantDrag: "execution",
+      affectedPieceCount: 1,
+      affectedPieces: ["Sharp Utility Coat"],
+    },
+    confirmedPieces: [
+      {
+        name: "Sharp Utility Coat",
+        category: "outerwear",
+        silhouette: "column",
+        material: "Merino Wool",
+        role: "Directional Signal",
+        score: 64,
+        identityScore: 71,
+        resonanceScore: 62,
+        executionScore: 59,
+        expression: "Controlled structure with visible seam tension.",
+      },
+    ],
   },
   suggestedPieces: [
     {
@@ -91,6 +156,19 @@ describe("pieces read helpers", () => {
           microcopy: "Does not exist.",
         },
       ],
+    });
+
+    expect(result.valid).toBe(false);
+  });
+
+  it("rejects generic output that ignores the supplied collection state", () => {
+    const result = validatePiecesReadOutput(baseInput, {
+      read_headline: "Lead with the clearest piece.",
+      read_body: "Build this starting point so the collection feels more cohesive and easier to understand.",
+      how_to_lean_in: "Use the first piece to sharpen the message.",
+      start_here_title: "Begin here",
+      start_here_body: "Open-knit Crochet Midi is the right first move because it makes the collection direction legible early.",
+      piece_microcopy: [],
     });
 
     expect(result.valid).toBe(false);

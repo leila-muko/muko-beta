@@ -112,7 +112,14 @@ export function parseJSONResponse<T>(raw: string): T {
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/\u2014/g, '-')
-    .replace(/\u2026/g, '...');
+    .replace(/\u2026/g, '...')
+    .replace(/[\u0000-\u001F]+/g, ' ');
+
+  const jsonStart = cleaned.indexOf("{");
+  const jsonEnd = cleaned.lastIndexOf("}");
+  if (jsonStart >= 0 && jsonEnd > jsonStart) {
+    cleaned = cleaned.slice(jsonStart, jsonEnd + 1);
+  }
 
   try {
     return JSON.parse(cleaned) as T;

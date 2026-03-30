@@ -120,7 +120,7 @@ export default function OnboardingWizard() {
     try {
       const { data, error } = await supabase
         .from('brand_profiles')
-        .insert({
+        .upsert({
           user_id: userId,
           brand_name: formData.brandName,
           price_tier: formData.priceTier,
@@ -133,7 +133,7 @@ export default function OnboardingWizard() {
           target_margin: formData.targetMargin / 100,
           tension_context: formData.tensionContext,
           accepts_conflicts: formData.acceptsConflicts,
-        })
+        }, { onConflict: 'user_id' })
         .select()
         .single();
 

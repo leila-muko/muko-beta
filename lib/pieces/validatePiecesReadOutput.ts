@@ -26,8 +26,27 @@ export function validatePiecesReadOutput(
   validateString(candidate.start_here_title, "start_here_title", LIMITS.start_here_title, errors);
   validateString(candidate.start_here_body, "start_here_body", LIMITS.start_here_body, errors);
 
+  if (typeof candidate.read_body === "string") {
+    const specificityChecks = buildSpecificityChecks(input);
+    const hits = specificityChecks.filter((value) => containsToken(candidate.read_body ?? "", value));
+    if (hits.length < 2) {
+      errors.push("read_body is too generic for the supplied collection state");
+    }
+
+    if (!containsToken(candidate.read_headline ?? "", input.movement.name) && !containsToken(candidate.read_body, input.movement.name)) {
+      errors.push("read must reference the actual direction name");
+    }
+
+    if (isGenericCopy(candidate.read_headline ?? "") || isGenericCopy(candidate.read_body)) {
+      errors.push("read output contains generic copy");
+    }
+  }
+
   const suggestedNames = new Set(input.suggestedPieces.map((piece) => piece.name));
   const recommendedName = input.recommendedStartPiece?.name ?? null;
+  const isNextMovePhase =
+    input.currentCollectionState.collectionPhase === "forming" ||
+    input.currentCollectionState.collectionPhase === "complete";
 
   if (candidate.piece_microcopy != null) {
     if (!Array.isArray(candidate.piece_microcopy)) {
@@ -42,14 +61,14 @@ export function validatePiecesReadOutput(
         const microcopy = "microcopy" in entry ? entry.microcopy : undefined;
         validateString(pieceName, `piece_microcopy[${index}].piece_name`, undefined, errors);
         validateString(microcopy, `piece_microcopy[${index}].microcopy`, LIMITS.piece_microcopy, errors);
-        if (typeof pieceName === "string" && !suggestedNames.has(pieceName)) {
+        if (suggestedNames.size > 0 && typeof pieceName === "string" && !suggestedNames.has(pieceName)) {
           errors.push(`piece_microcopy[${index}] references unknown piece`);
         }
       });
     }
   }
 
-  if (typeof candidate.start_here_body === "string" && recommendedName) {
+  if (typeof candidate.start_here_body === "string" && recommendedName && !isNextMovePhase) {
     input.suggestedPieces
       .map((piece) => piece.name)
       .filter((name) => name !== recommendedName)
@@ -80,4 +99,59 @@ function validateString(value: unknown, field: string, maxWords: number | undefi
 
 function wordCount(value: string) {
   return value.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function containsToken(body: string, token: string | null | undefined) {
+  if (!token) return false;
+  const haystack = normalize(body);
+  const needle = normalize(token);
+  return needle.length > 0 && haystack.includes(needle);
+}
+
+function buildSpecificityChecks(input: PiecesReadInput) {
+  const checks = new Set<string>();
+  checks.add(input.movement.name);
+  checks.add(input.currentCollectionState.collectionPhase);
+  if (input.currentCollectionState.dimensionDragSummary.dominantDrag) {
+    checks.add(input.currentCollectionState.dimensionDragSummary.dominantDrag);
+  }
+  input.currentCollectionState.coverageGapLabels.forEach((gap) => checks.add(gap));
+  input.currentCollectionState.confirmedCategories.forEach((category) => checks.add(category));
+  Object.entries(input.currentCollectionState.categoryDistribution).forEach(([category, count]) => {
+    checks.add(`${category} ${count}`);
+  });
+  Object.entries(input.currentCollectionState.silhouetteDistribution).forEach(([silhouette, count]) => {
+    checks.add(`${silhouette} ${count}`);
+  });
+  Object.entries(input.currentCollectionState.roleBalance).forEach(([role, count]) => {
+    checks.add(`${role} ${count}`);
+  });
+  Object.entries(input.currentCollectionState.roleTargets).forEach(([role, count]) => {
+    checks.add(`${role} ${count}`);
+  });
+  input.currentCollectionState.dimensionDragSummary.affectedPieces.forEach((piece) => checks.add(piece));
+  input.currentCollectionState.materialSignals.forEach((material) => checks.add(material));
+  if (input.currentCollectionState.dominantSilhouette) checks.add(input.currentCollectionState.dominantSilhouette);
+  input.currentCollectionState.confirmedPieces.forEach((piece) => {
+    checks.add(piece.name);
+    if (piece.category) checks.add(piece.category);
+    if (piece.material) checks.add(piece.material);
+    if (piece.silhouette) checks.add(piece.silhouette);
+  });
+
+  return Array.from(checks).filter((value) => normalize(value).length >= 4);
+}
+
+function isGenericCopy(value: string) {
+  const normalized = normalize(value);
+  return [
+    "lead with the clearest piece",
+    "build this starting point",
+    "start with the clearest piece",
+    "build the starting point",
+  ].some((phrase) => normalized.includes(phrase));
 }

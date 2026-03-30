@@ -523,6 +523,25 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     highCount: complexityCounts.high ?? 0,
     uniqueCategoryCount: Object.keys(categoryCounts).filter((token) => token !== 'unknown').length,
     executionScore: rawExecution,
+    categoryLeaders: overviewCategoryDistribution.slice(0, 3).map((item) => ({
+      label: item.label,
+      count: item.count,
+    })),
+    materialLeaders: toDistribution(materialCounts, total)
+      .filter((item) => normalizeToken(item.label) !== 'unknown')
+      .slice(0, 3)
+      .map((item) => ({
+        label: item.label,
+        count: item.count,
+      })),
+    silhouetteLeaders: toDistribution(silhouetteCounts, total)
+      .filter((item) => normalizeToken(item.label) !== 'unknown')
+      .slice(0, 3)
+      .map((item) => ({
+        label: item.label,
+        count: item.count,
+      })),
+    uniqueSilhouetteCount: uniqueSilhouettes,
   });
 
   const scoresContext = {

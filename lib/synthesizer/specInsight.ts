@@ -11,6 +11,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { InsightData, InsightMode } from '@/lib/types/insight';
 import type { AestheticContext, ResolvedRedirects, IntentCalibration } from '@/lib/synthesizer/blackboard';
 import {
+  findMaterialMention,
+  materialIdsToDisplayList,
+} from '@/lib/spec-studio/material-resolver';
+import {
   buildFallbackSpecRail,
   mapSpecRailToInsightData,
   type SpecDecisionDiagnostics,
@@ -62,6 +66,8 @@ export interface SpecBlackboard {
   aesthetic_context: AestheticContext;
   /** Selected material ID */
   material_id: string;
+  /** Allowed material options from the library */
+  available_materials: Array<{ id: string; name: string }>;
   /** Human-readable material name */
   material_name?: string;
   /** Calculated cost of goods sold in USD */
@@ -231,6 +237,7 @@ WRITING RULES
 - Do not give trend copy, poetic copy, or motivational copy.
 - Preserve the same idea when proposing an alternative path. Do not switch aesthetics.
 - If the spec is strained, the alternative path must be concrete enough that a design and production team could act on it.
+- Never mention internal field names such as next_best_move or best_next_move.
 
 STEP-SPECIFIC FOCUS (NON-NEGOTIABLE)
 current_step tells you what decision the designer is actively making.
@@ -242,6 +249,7 @@ Focus question: does this material carry the concept, and what does it cost?
 - core_tension must name the specific material behavior tension: drape vs structure, cost vs surface quality, lead time vs availability. Name the material by name.
 - execution_levers must be actionable at the material selection stage: what to look for in this material, what to avoid, what the surface story should do.
 - alternative_path must name a specific different material (not a category) and state exactly what it preserves and what it costs.
+- Any material named in alternative_path must come from the allowed materials list provided in the user message.
 
 When current_step is "construction":
 Focus question: does the build complexity match what the concept needs to read correctly, and can it land on time?
@@ -315,6 +323,7 @@ FIELD RULES
   specific detail?", rewrite it until they would not.
   Do not restate the problem. Do not use: "consider", "you might",
   "it may be worth", "think about". State the path directly.
+  If decision.direction is "swap_material", name one exact allowed material.
 
 VALIDATION
 - Use only the enum values provided.
@@ -346,6 +355,7 @@ export function buildSpecSystemPrompt(bb: SpecBlackboard): string {
 }
 
 export function buildSpecPrompt(bb: SpecBlackboard): string {
+  const availableMaterials = Array.isArray(bb.available_materials) ? bb.available_materials : [];
   const targetMargin = bb.target_margin ?? 0.60;
   const cogsTarget = bb.target_msrp > 0 ? bb.target_msrp * (1 - targetMargin) : 0;
   const marginGap = bb.cogs_usd - cogsTarget;
@@ -385,6 +395,8 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
     spec: {
       material_id: bb.material_id,
       material_name: bb.material_name ?? bb.material_id,
+      allowed_materials: availableMaterials,
+      allowed_materials_display: materialIdsToDisplayList(availableMaterials),
       material_cost_per_yard: bb.material_cost_per_yard ?? null,
       available_timeline_weeks: bb.timeline_weeks,
       required_timeline_weeks: bb.required_timeline_weeks ?? null,
@@ -415,6 +427,33 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
     intent: bb.intent ?? undefined,
   };
   return JSON.stringify(sanitizePayload(raw as Record<string, unknown>));
+}
+
+function railLeaksInternalFieldNames(rail: SpecRailInsight): boolean {
+  const content = [
+    rail.headline,
+    rail.core_tension,
+    rail.decision.reason,
+    rail.alternative_path.title,
+    rail.alternative_path.description,
+    ...rail.execution_levers,
+  ].join(' ').toLowerCase();
+
+  return content.includes('next_best_move') || content.includes('best_next_move');
+}
+
+function railHasValidMaterialSwap(rail: SpecRailInsight, bb: SpecBlackboard): boolean {
+  if (rail.decision.direction !== 'swap_material') return true;
+  if (!Array.isArray(bb.available_materials) || bb.available_materials.length === 0) return false;
+  const source = `${rail.alternative_path.title} ${rail.alternative_path.description}`;
+  const material = findMaterialMention(source, bb.available_materials);
+  return Boolean(material && material.id !== bb.material_id);
+}
+
+export function validateSpecRailOutput(rail: SpecRailInsight, bb: SpecBlackboard): boolean {
+  if (railLeaksInternalFieldNames(rail)) return false;
+  if (!railHasValidMaterialSwap(rail, bb)) return false;
+  return true;
 }
 
 // ─────────────────────────────────────────────
@@ -570,6 +609,10 @@ export async function generateSpecInsight(
     }
 
     const data: InsightData = mapSpecRailToInsightData(parsed, mode);
+
+    if (!validateSpecRailOutput(parsed, blackboard)) {
+      throw new Error('Spec rail validation failed');
+    }
 
     return { rail: parsed, data, meta: { method: 'llm', latency_ms: Date.now() - start } };
   } catch (err) {

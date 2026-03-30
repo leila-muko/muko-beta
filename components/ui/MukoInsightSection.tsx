@@ -626,8 +626,8 @@ function ConceptDecisionRail({
             isStreaming={isParagraphStreaming}
             paragraphStyle={{
               fontFamily: inter,
-              fontSize: 12.5,
-              lineHeight: 1.8,
+              fontSize: 13.5,
+              lineHeight: 1.72,
               color: "rgba(67,67,43,0.65)",
             }}
             paragraphSpacing={12}

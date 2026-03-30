@@ -2,6 +2,11 @@ import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 
+type AskMukoHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 function buildSystemPrompt(context: AskMukoContext): string {
   const lines: string[] = [
     "You are Muko, a fashion decision intelligence assistant embedded inside a design tool. You help designers understand their analysis and make better decisions. You have access to the session context below — scores, brand data, material specs, aesthetic match — and that is the boundary of what you know. You do not have access to external trend data, supplier databases, or real-time market information beyond what is in the context.",
@@ -92,6 +97,53 @@ function buildSystemPrompt(context: AskMukoContext): string {
     lines.push(`- Expression signals: ${context.expressionSignals.join(", ")}`);
   }
 
+  if (context.pieces) {
+    const {
+      confirmedPieceCount,
+      suggestedPieceCount,
+      confirmedPieceNames,
+      confirmedCategories,
+      coverageGaps,
+      recommendedStartPiece,
+      averageScore,
+      strongestPiece,
+      weakestPiece,
+      dominantSilhouette,
+      materialSignals,
+      suggestedStartingPoints,
+    } = context.pieces;
+
+    const assortmentParts: string[] = [];
+    if (confirmedPieceCount != null) assortmentParts.push(`confirmed pieces: ${confirmedPieceCount}`);
+    if (suggestedPieceCount != null) assortmentParts.push(`suggested starting points: ${suggestedPieceCount}`);
+    if (recommendedStartPiece) assortmentParts.push(`recommended start: ${recommendedStartPiece}`);
+    if (averageScore != null) assortmentParts.push(`average piece score: ${Math.round(averageScore)}`);
+    if (strongestPiece) assortmentParts.push(`strongest piece: ${strongestPiece}`);
+    if (weakestPiece) assortmentParts.push(`weakest piece: ${weakestPiece}`);
+    if (dominantSilhouette) assortmentParts.push(`dominant silhouette: ${dominantSilhouette}`);
+    if (assortmentParts.length) lines.push(`- Assortment: ${assortmentParts.join(", ")}`);
+
+    if (confirmedPieceNames?.length) {
+      lines.push(`- Confirmed piece names: ${confirmedPieceNames.join(", ")}`);
+    }
+
+    if (confirmedCategories?.length) {
+      lines.push(`- Confirmed categories: ${confirmedCategories.join(", ")}`);
+    }
+
+    if (coverageGaps?.length) {
+      lines.push(`- Coverage gaps: ${coverageGaps.join(", ")}`);
+    }
+
+    if (materialSignals?.length) {
+      lines.push(`- Material signals: ${materialSignals.join(", ")}`);
+    }
+
+    if (suggestedStartingPoints?.length) {
+      lines.push(`- Suggested starting points: ${suggestedStartingPoints.join(", ")}`);
+    }
+  }
+
 
   return lines.join("\n");
 }
@@ -106,7 +158,15 @@ export async function POST(req: NextRequest) {
   if (!body) {
     return Response.json({ message: 'Request body is required' }, { status: 400 });
   }
-  const { question, context }: { question: string; context: AskMukoContext } = body;
+  const {
+    question,
+    context,
+    history,
+  }: {
+    question: string;
+    context: AskMukoContext;
+    history?: AskMukoHistoryMessage[];
+  } = body;
 
   if (!question || !context) {
     return new Response(JSON.stringify({ error: "Missing question or context" }), {
@@ -118,12 +178,20 @@ export async function POST(req: NextRequest) {
   try {
     const client = new Anthropic();
     const systemPrompt = buildSystemPrompt(context);
+    const messages = [
+      ...((Array.isArray(history) ? history : []).filter(
+        (message): message is AskMukoHistoryMessage =>
+          (message.role === "user" || message.role === "assistant") &&
+          typeof message.content === "string"
+      )),
+      { role: "user" as const, content: question },
+    ];
 
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 400,
       system: systemPrompt,
-      messages: [{ role: "user", content: question }],
+      messages,
     });
 
     const answer = (response.content[0] as { type: string; text: string }).text;

@@ -29,7 +29,9 @@ export function SignInForm() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push('/dashboard')
+      const next = new URLSearchParams(window.location.search).get('next')
+      const destination = next && next.startsWith('/') ? next : '/dashboard'
+      router.push(destination)
       router.refresh()
     }
   }

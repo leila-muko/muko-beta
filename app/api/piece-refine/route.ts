@@ -61,9 +61,11 @@ interface AestheticEntry {
 
 const aesthetics = aestheticsData as AestheticEntry[];
 const MAX_SENTENCES = 2;
+const MAX_READ_SENTENCES = 3;
 const SENTENCE_SPLIT_REGEX = /(?<=[.!?])\s+/;
 const OVERPRECISION_REGEX =
   /\b(\d+(?:\.\d+)?\s?(?:cm|mm|inches|inch|in|oz|gsm|%))\b|\b(\$\d+|\d+\s?(?:usd|eur))\b|\b(msrp|margin|markup|price point|cost ceiling|opening|inseam|outseam|rise|waistband|fly|yoke|dart|topstitch|top-stitch|seam allowance|placket|zipper|zip fly|button fly|pocket bag|belt loop|hem width|ankle opening|sweep)\b/i;
+const MATERIAL_REGEX = /\b(cotton|wool|silk|denim|leather|linen|viscose|tencel|cashmere|nylon|polyester|satin)\b/i;
 const ROLE_SCOPE_TERMS = [
   "anchor",
   "anchoring",
@@ -120,6 +122,23 @@ function hasOverprecision(value: string) {
   return OVERPRECISION_REGEX.test(value);
 }
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stripExistingPieceNames(
+  output: Pick<PieceRefinementResponse, "read" | "refined_expression">,
+  existingPieces: PieceRefinementRequest["existing_pieces"]
+) {
+  const combined = `${output.read ?? ""} ${output.refined_expression ?? ""}`;
+  const names = (existingPieces ?? [])
+    .map((piece) => piece.name?.trim())
+    .filter((name): name is string => Boolean(name))
+    .sort((a, b) => b.length - a.length);
+
+  return names.reduce((value, name) => value.replace(new RegExp(escapeRegex(name), "gi"), " "), combined);
+}
+
 function looksCredibleForStage(output: Pick<PieceRefinementResponse, "read" | "refined_expression">) {
   const read = output.read?.trim() ?? "";
   const expression = output.refined_expression?.trim() ?? "";
@@ -127,7 +146,7 @@ function looksCredibleForStage(output: Pick<PieceRefinementResponse, "read" | "r
 
   if (!read || !expression) return false;
   if (hasOverprecision(read) || hasOverprecision(expression)) return false;
-  if (read.split(SENTENCE_SPLIT_REGEX).filter(Boolean).length > MAX_SENTENCES) return false;
+  if (read.split(SENTENCE_SPLIT_REGEX).filter(Boolean).length > MAX_READ_SENTENCES) return false;
   if (expression.split(SENTENCE_SPLIT_REGEX).filter(Boolean).length > MAX_SENTENCES) return false;
 
   const hasRoleLanguage = ROLE_SCOPE_TERMS.some((term) => combined.includes(term));
@@ -178,6 +197,7 @@ function buildFallback(
 
 function mapArchetypeCategoryToSpecCategory(category: string) {
   if (category === "jean" || category === "trouser") return "bottoms";
+  if (category === "skirt") return "bottoms";
   if (category === "blazer" || category === "outerwear") return "outerwear";
   if (category === "dress") return "dresses";
   if (category === "knit") return "knitwear";
@@ -187,6 +207,7 @@ function mapArchetypeCategoryToSpecCategory(category: string) {
 function mapArchetypeToSpecSubcategory(category: string, archetype: string) {
   if (category === "jean") return "trouser";
   if (category === "trouser") return archetype === "wide" ? "wide_leg" : "trouser";
+  if (category === "skirt") return "skirt";
   if (category === "blazer") return "blazer";
   if (category === "dress") {
     if (archetype === "slip") return "slip_dress";
@@ -201,7 +222,33 @@ function mapArchetypeToSpecSubcategory(category: string, archetype: string) {
     if (archetype === "oversized") return "overcoat";
     return "trench";
   }
+  if (category === "shirt") {
+    if (archetype === "polo") return "knit_polo";
+    if (archetype === "tee") return "tshirt";
+    if (archetype === "blouse") return "blouse";
+    if (archetype === "vest") return "vest";
+    return "shirt";
+  }
   return "shirt";
+}
+
+const SILHOUETTE_SIGNAL_SYNONYMS: Record<string, string[]> = {
+  relaxed: ["relaxed", "ease", "eased", "loose", "drape", "draped", "fluid"],
+  structured: ["structured", "tailored", "sharp", "precise", "controlled"],
+  fitted: ["fitted", "close", "slim", "body-skimming"],
+};
+
+function getSignalTokens(signal: string, type: "direction" | "palette" | "silhouette") {
+  const normalized = signal.toLowerCase().trim();
+  if (!normalized) return [];
+
+  if (type === "silhouette") {
+    const baseTokens = normalized.split(/\s+/).filter((word) => word.length > 0);
+    const synonymTokens = baseTokens.flatMap((word) => SILHOUETTE_SIGNAL_SYNONYMS[word] ?? []);
+    return Array.from(new Set([...baseTokens, ...synonymTokens]));
+  }
+
+  return normalized.split(/\s+/).filter((word) => word.length > 4);
 }
 
 function parseJsonResponse(raw: string): PieceRefinementResponse {
@@ -217,22 +264,19 @@ function isCollectionSpecific(
     .join(' ')
     .toLowerCase();
 
-  const direction = (collection.direction ?? '').toLowerCase();
-  const silhouette = (collection.silhouette ?? '').toLowerCase();
-  const palette = (collection.palette ?? '').toLowerCase();
+  const signals = [
+    { value: collection.direction ?? "", type: "direction" as const },
+    { value: collection.silhouette ?? "", type: "silhouette" as const },
+    { value: collection.palette ?? "", type: "palette" as const },
+  ].filter(({ value }) => value.trim().length > 0);
+  if (signals.length === 0) return true;
 
-  // Require at least 2 of 3 collection signals present, not just 1
-  const signals = [direction, silhouette, palette].filter(s => s.length > 3);
-  if (signals.length === 0) return true; // no collection context to check
-
-  const matchCount = signals.filter(signal => {
-    // Check for the signal itself or meaningful substrings (>4 chars)
-    const words = signal.split(/\s+/).filter(w => w.length > 4);
-    return words.some(word => combined.includes(word));
+  const matchCount = signals.filter(({ value, type }) => {
+    const tokens = getSignalTokens(value, type);
+    return tokens.some((token) => combined.includes(token));
   }).length;
 
-  // Must match at least 2 signals, or all available if fewer than 2
-  const required = Math.min(2, signals.length);
+  const required = 1;
   return matchCount >= required;
 }
 
@@ -400,25 +444,25 @@ ${JSON.stringify(structuredPayload, null, 2)}`;
     }
 
     const parsed = parseJsonResponse(content.text);
-    const validation = validateArchetypeOutput(parsed, archetype);
-    const specificToCollection = isCollectionSpecific(parsed, {
-      direction: structuredPayload.collection.direction,
-      silhouette: structuredPayload.collection.silhouette,
-      palette: structuredPayload.collection.palette,
-    });
+    const baseValidation = validateArchetypeOutput(parsed, archetype);
+    const strippedOutput = stripExistingPieceNames(parsed, body.existing_pieces);
+    const validation = {
+      ...baseValidation,
+      mentionsMaterial: MATERIAL_REGEX.test(strippedOutput.toLowerCase()),
+    };
+    validation.valid = !validation.hasDisallowed && !validation.mentionsMaterial && !validation.violatesCategory;
     const scopedOutput = {
       read: limitToSentenceCount(parsed.read?.trim() || ""),
       refined_expression: limitToSentenceCount(parsed.refined_expression?.trim() || ""),
       role: parsed.role,
     };
-    const safeExpression =
-      validation.valid && specificToCollection && looksCredibleForStage(scopedOutput)
-        ? scopedOutput.refined_expression || fallback.refined_expression
-        : fallback.refined_expression;
-    const safeRead =
-      validation.valid && specificToCollection && looksCredibleForStage(scopedOutput)
-        ? scopedOutput.read || fallback.read
-        : fallback.read;
+    const canUseModelOutput = validation.valid && looksCredibleForStage(scopedOutput);
+    const safeExpression = canUseModelOutput
+      ? scopedOutput.refined_expression || fallback.refined_expression
+      : fallback.refined_expression;
+    const safeRead = canUseModelOutput
+      ? scopedOutput.read || fallback.read
+      : fallback.read;
 
     return Response.json({
       read: safeRead,

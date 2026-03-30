@@ -1,4 +1,6 @@
 export type PieceStrategicRole = "stabilize_core" | "express_signal" | "extend_direction";
+export type PieceDimension = "identity" | "resonance" | "execution";
+export type CollectionPhase = "opening" | "building" | "forming" | "complete";
 
 export type PiecesReadInput = {
   season: string;
@@ -19,7 +21,47 @@ export type PiecesReadInput = {
   currentCollectionState: {
     confirmedPieceCount: number;
     confirmedCategories: string[];
+    categoryDistribution: Record<string, number>;
+    silhouetteDistribution: Record<string, number>;
     coverageGaps: string[];
+    coverageGapLabels: string[];
+    collectionPhase: CollectionPhase;
+    dominantSilhouette?: string | null;
+    materialSignals: string[];
+    roleBalance: {
+      hero: number;
+      directional: number;
+      coreEvolution: number;
+      volumeDriver: number;
+    };
+    roleTargets: {
+      hero: number;
+      directional: number;
+      coreEvolution: number;
+      volumeDriver: number;
+    };
+    scoreSignals: {
+      averageScore?: number | null;
+      strongestPiece?: string | null;
+      weakestPiece?: string | null;
+    };
+    dimensionDragSummary: {
+      dominantDrag: PieceDimension | null;
+      affectedPieceCount: number;
+      affectedPieces: string[];
+    };
+    confirmedPieces: Array<{
+      name: string;
+      category?: string;
+      silhouette?: string;
+      material?: string;
+      role?: string;
+      score?: number | null;
+      identityScore?: number | null;
+      resonanceScore?: number | null;
+      executionScore?: number | null;
+      expression?: string;
+    }>;
   };
   suggestedPieces: Array<{
     name: string;

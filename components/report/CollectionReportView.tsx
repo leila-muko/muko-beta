@@ -5,7 +5,6 @@ import { CollectionReportHeader } from '@/components/report/CollectionReportHead
 import { CollectionScoreCard } from '@/components/report/CollectionScoreCard';
 import { CollectionThesis } from '@/components/report/CollectionThesis';
 import { KeyRisksSection } from '@/components/report/KeyRisksSection';
-import { MukoInsightSection } from '@/components/report/MukoInsightSection';
 import { NextStepsSection } from '@/components/report/NextStepsSection';
 import { OverallReadCallout } from '@/components/report/OverallReadCallout';
 import { PieceSummaryTable } from '@/components/report/PieceSummaryTable';
@@ -14,12 +13,8 @@ import { reportPalette, sectionCard, sectionEyebrow, fonts } from '@/components/
 
 export function CollectionReportView({
   report,
-  reportInsightStreaming,
-  reportIsParagraphStreaming = false,
 }: {
   report: CollectionReportPayload;
-  reportInsightStreaming?: string;
-  reportIsParagraphStreaming?: boolean;
 }) {
   return (
     <div
@@ -53,12 +48,6 @@ export function CollectionReportView({
           <CollectionScoreCard label="Execution" detail={report.scores.execution} />
         </div>
       </section>
-
-      <MukoInsightSection
-        intelligence={report.assortment_intelligence}
-        streamingParagraph={reportInsightStreaming}
-        isParagraphStreaming={reportIsParagraphStreaming}
-      />
       <CollectionHealthSection health={report.collection_health} />
       <PieceSummaryTable pieces={report.piece_summary} />
       <KeyRisksSection risks={report.key_risks} />

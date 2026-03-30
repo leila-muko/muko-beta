@@ -111,9 +111,9 @@ export function resolvePieceImageType(input: PieceImageResolverInput | null): st
 
   return (
     resolveTypeFromText(rawType) ??
-    resolveTypeFromText(pieceName) ??
     resolveTypeFromCategory(category) ??
     resolveTypeFromSilhouette(silhouette, category) ??
+    resolveTypeFromText(pieceName) ??
     resolveTypeFromSilhouette(silhouette, pieceName) ??
     null
   );

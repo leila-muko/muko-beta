@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  const next = searchParams.get('next')
 
   if (code) {
     const supabase = await createClient()
@@ -14,6 +15,10 @@ export async function GET(request: Request) {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user) {
+        if (next && next.startsWith('/')) {
+          return NextResponse.redirect(`${origin}${next}`)
+        }
+
         const { data: brandProfile } = await supabase
           .from('brand_profiles')
           .select('id')

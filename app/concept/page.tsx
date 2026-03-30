@@ -683,6 +683,17 @@ function getStrategySliderLabel(value: number, labels: [string, string, string])
   return labels[2];
 }
 
+function getPieceReadBucket(
+  role: CollectionRoleId | null | undefined,
+  fallbackBucket?: string | null
+): string {
+  if (role === "hero") return "anchor";
+  if (role === "volume-driver") return "commercial_base";
+  if (role === "core-evolution") return "core";
+  if (role === "directional") return "signal";
+  return fallbackBucket?.trim() || "unknown";
+}
+
 function getStageIndex(stage: ConceptStageId): number {
   if (stage === "direction") return 0;
   if (stage === "language") return 1;
@@ -929,6 +940,7 @@ export default function ConceptStudioPage() {
     collectionName: storeCollectionName,
     refinementModifiers,
     aestheticInput,
+    chipSelection: storeChipSelection,
     setAestheticInput,
     identityPulse,
     resonancePulse,
@@ -963,6 +975,7 @@ export default function ConceptStudioPage() {
     setActiveProductPieceId,
     pieceRolesById,
     setPieceRolesById,
+    pieceBuildContext,
     setSelectedPieceImage,
     setConceptInsight,
     clearConceptInsight,
@@ -977,6 +990,7 @@ export default function ConceptStudioPage() {
       collectionName: state.collectionName,
       refinementModifiers: state.refinementModifiers,
       aestheticInput: state.aestheticInput,
+      chipSelection: state.chipSelection,
       setAestheticInput: state.setAestheticInput,
       identityPulse: state.identityPulse,
       resonancePulse: state.resonancePulse,
@@ -1011,6 +1025,7 @@ export default function ConceptStudioPage() {
       setActiveProductPieceId: state.setActiveProductPieceId,
       pieceRolesById: state.pieceRolesById,
       setPieceRolesById: state.setPieceRolesById,
+      pieceBuildContext: state.pieceBuildContext,
       setSelectedPieceImage: state.setSelectedPieceImage,
       setConceptInsight: state.setConceptInsight,
       clearConceptInsight: state.clearConceptInsight,
@@ -1129,7 +1144,27 @@ export default function ConceptStudioPage() {
     return useSessionStore.getState().customChips ?? {};
   });
   const toggleElement = (key: string) => {
-    setSelectedElements((prev) => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
+    let didToggle = false;
+    setSelectedElements((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+        didToggle = true;
+        return next;
+      }
+
+      const directionPrefix = `${key.split("::")[0]}::`;
+      let selectedCount = 0;
+      next.forEach((entry) => {
+        if (entry.startsWith(directionPrefix)) selectedCount += 1;
+      });
+      if (selectedCount >= 3) return prev;
+
+      next.add(key);
+      didToggle = true;
+      return next;
+    });
+    if (!didToggle) return;
     // Mark as user-confirmed (once clicked, the user owns it regardless of source)
     setChipMeta((prev) => {
       const next = new Map(prev);
@@ -1290,9 +1325,17 @@ export default function ConceptStudioPage() {
     if (trimmed) return trimmed;
     return collectionPieces.find((piece) => piece.aesthetic_inflection?.trim())?.aesthetic_inflection?.trim() ?? null;
   }, [aestheticInflection, collectionPieces]);
-  const conceptReadTriggerPhase = selectedAesthetic
-    ? ((aestheticInflection.trim() || selectedInterpretationChips.length > 0) ? "direction-defined" : "aesthetic-selected")
-    : null;
+  const conceptReadTriggerKey = useMemo(
+    () =>
+      selectedAesthetic
+        ? JSON.stringify({
+            aesthetic: selectedAesthetic,
+            pointOfView: aestheticInflection.trim(),
+            interpretationChips: [...selectedInterpretationChips].sort(),
+          })
+        : null,
+    [aestheticInflection, selectedAesthetic, selectedInterpretationChips]
+  );
   // ─── Synthesizer: reactive MUKO INSIGHT (streaming) ──────────────────────
   const conceptAbortRef = useRef<AbortController | null>(null);
   const conceptLanguageRequestKeyRef = useRef<string | null>(null);
@@ -1529,11 +1572,11 @@ export default function ConceptStudioPage() {
       controller.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAesthetic, conceptReadTriggerPhase]);
+  }, [selectedAesthetic, conceptReadTriggerKey]);
 
   const selectedExpressionSignals = useMemo(
-    () => getExpressionSignalLabels(useSessionStore.getState().chipSelection),
-    [selectedElements, selectedAesthetic]
+    () => getExpressionSignalLabels(storeChipSelection),
+    [storeChipSelection]
   );
   const selectedCollectionLanguage = useMemo(
     () => getCollectionLanguageLabels(selectedInterpretationChips, aestheticInflection),
@@ -1732,7 +1775,7 @@ export default function ConceptStudioPage() {
       Promise.all([brandProfilePromise, collectionPiecesPromise]).then(
         async ([{ data, error }, { data: piecesData, error: piecesError }]) => {
           console.log('[Muko] brand_profiles query result — data:', data, '| error:', error);
-          let normalizedPiecesData: Array<{
+          const normalizedPiecesData: Array<{
             id: string;
             piece_name?: string | null;
             score: number;
@@ -2985,6 +3028,32 @@ export default function ConceptStudioPage() {
 
     void (async () => {
       try {
+        const collectionExpressionSignals = Array.from(selectedElements)
+          .filter((key) => key.startsWith(`${topAesthetic}::`))
+          .map((key) => key.replace(`${topAesthetic}::`, ""))
+          .filter((value) => Boolean(value.trim()));
+        const pieceWithPromptFields = targetEntry.piece as KeyPiece & {
+          material?: string | null;
+          construction?: string | null;
+          construction_tier?: string | null;
+        };
+        const assignedRole = pieceRolesById[targetEntry.piece.item] ?? null;
+        const pieceBuildExpression =
+          pieceBuildContext &&
+          (
+            pieceBuildContext.adaptedTitle === targetEntry.piece.item ||
+            pieceBuildContext.originalLabel === targetEntry.piece.item
+          )
+            ? pieceBuildContext.expression?.trim()
+            : null;
+        const derivedCustomSignal =
+          targetEntry.piece.custom
+            ? [
+                pieceBuildExpression,
+                ...collectionExpressionSignals,
+              ].find((value): value is string => Boolean(value?.trim())) ?? null
+            : null;
+
         const response = await fetch("/api/piece-read", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2993,9 +3062,18 @@ export default function ConceptStudioPage() {
             piece: {
               item: targetEntry.piece.item,
               type: targetEntry.piece.type ?? "",
-              signal: targetEntry.piece.signal ?? "",
+              signal: targetEntry.piece.signal ?? derivedCustomSignal ?? "unknown",
               note: targetEntry.piece.note ?? "",
-              bucket: targetEntry.recommendation?.bucket ?? "",
+              bucket: getPieceReadBucket(
+                assignedRole,
+                targetEntry.recommendation?.bucket ?? null
+              ),
+              category: targetEntry.piece.category ?? undefined,
+              material: pieceWithPromptFields.material?.trim() || undefined,
+              construction:
+                pieceWithPromptFields.construction?.trim() ||
+                pieceWithPromptFields.construction_tier?.trim() ||
+                undefined,
             },
             context: {
               aestheticName: selectedAesthetic ?? combinedDirection?.dnaLines[0] ?? "this direction",
@@ -3006,9 +3084,7 @@ export default function ConceptStudioPage() {
               interpretationSummary: interpretationSummary || null,
               collectionDirection: selectedAesthetic ?? null,
               collectionLanguage: selectedInterpretationChips,
-              expressionSignals: Array.from(selectedElements)
-                .filter((key) => key.startsWith(`${topAesthetic}::`))
-                .map((key) => key.replace(`${topAesthetic}::`, "")),
+              expressionSignals: collectionExpressionSignals,
               priorities: intentGoals,
               tradeoffs: {
                 trend_exposure: getStrategySliderLabel(sliderTrend, ["low", "balanced", "high"]),
@@ -3139,6 +3215,8 @@ export default function ConceptStudioPage() {
     storeTargetMsrp,
     suggestedStartingPieceEntry,
     topAesthetic,
+    pieceBuildContext,
+    pieceRolesById,
   ]);
   const activeStrategicImplication = useMemo(
     () =>

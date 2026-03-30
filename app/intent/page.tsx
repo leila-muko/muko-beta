@@ -435,12 +435,12 @@ export default function IntentCalibrationPage() {
         .eq("user_id", user.id)
         .single();
       if (!data) return;
-      if (targetMargin === 0 && data.target_margin) {
+      if (data.target_margin != null) {
         const pct = Math.round(data.target_margin * 100);
         setTargetMargin(pct);
         storeTargetMargin(pct);
       }
-      if (targetMsrp === 0 && data.target_msrp) {
+      if (data.target_msrp != null) {
         setTargetMsrp(data.target_msrp);
         storeTargetMsrp(data.target_msrp);
       }

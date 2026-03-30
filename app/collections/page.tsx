@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import CollectionPage from '@/components/collections/CollectionPage';
 import { BRAND } from '@/lib/concept-studio/constants';
+import { hydrateCollectionContextFromAnalysis } from '@/lib/collections/hydrateCollectionContext';
 
 const SIDEBAR_WIDTH = 272;
 const OLIVE = BRAND.oliveInk;
@@ -106,22 +107,35 @@ export default function CollectionsHubPage() {
   }, [router]);
 
   const handleNewPiece = useCallback(() => {
-    if (activeCollection) {
-      const activeMeta = collections.find((collection) => collection.name === activeCollection);
+    const run = async () => {
+      if (activeCollection) {
+        const activeMeta = collections.find((collection) => collection.name === activeCollection);
+        const supabase = createClient();
+        const { data } = await supabase
+          .from('analyses')
+          .select('collection_aesthetic, aesthetic_inflection, aesthetic_matched_id, silhouette, season, agent_versions, created_at')
+          .eq('collection_name', activeCollection)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      useSessionStore.getState().setCollectionName(activeCollection);
+        hydrateCollectionContextFromAnalysis(activeCollection, data);
 
-      try {
-        localStorage.setItem('muko_collectionName', activeCollection);
-        if (activeMeta?.season) {
-          localStorage.setItem('muko_seasonLabel', activeMeta.season);
-        }
-      } catch {}
-    }
+        try {
+          localStorage.setItem('muko_collectionName', activeCollection);
+          if (activeMeta?.season ?? data?.season) {
+            localStorage.setItem('muko_seasonLabel', activeMeta?.season ?? data?.season ?? '');
+          }
+        } catch {}
+      }
 
-    setCurrentStep(2);
-    router.push('/pieces');
-  }, [activeCollection, collections, router, setCurrentStep]);
+      setCurrentStep(2);
+      router.push('/pieces');
+    };
+
+    void run();
+  }, [activeCollection, collections, router, setCurrentStep, userId]);
 
   const handleDeleteCollection = useCallback(async (name: string) => {
     if (!userId) return;

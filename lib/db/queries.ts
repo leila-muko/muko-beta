@@ -21,7 +21,7 @@ export async function getBrandProfile(userId: string) {
 export async function createBrandProfile(profile: Omit<BrandProfile, 'id' | 'created_at' | 'updated_at'>) {
   const { data, error } = await supabase
     .from('brand_profiles')
-    .insert(profile)
+    .upsert(profile, { onConflict: 'user_id' })
     .select()
     .single();
   

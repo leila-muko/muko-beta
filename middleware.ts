@@ -34,7 +34,10 @@ export async function middleware(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (isProtectedRoute && !user) {
-      return NextResponse.redirect(new URL('/auth/signin', request.url))
+      const signInUrl = new URL('/auth/signin', request.url)
+      const nextPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
+      signInUrl.searchParams.set('next', nextPath)
+      return NextResponse.redirect(signInUrl)
     }
 
     // Logged-in user hitting auth pages or root — route by brand profile

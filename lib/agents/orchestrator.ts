@@ -144,11 +144,13 @@ async function persistAnalysis(
     const { createClient } = await import('@/lib/supabase/server');
     const supabase = await createClient();
 
-    // Authenticated user — required for RLS; gracefully null if unavailable
+    // Authenticated user is required for owned persistence.
     const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id ?? null;
+    if (!user?.id) {
+      throw new Error('Authenticated user required to persist analysis.');
+    }
 
-    const row = buildAnalysisRow(bb, result, userId);
+    const row = buildAnalysisRow(bb, result, user.id);
 
     const { data, error } = await supabase
       .from('analyses')

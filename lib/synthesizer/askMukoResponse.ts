@@ -1,5 +1,5 @@
 export interface AskMukoContext {
-  step: "concept" | "spec";
+  step: "concept" | "spec" | "pieces";
   brand?: {
     brandName?: string;
     keywords?: string[];
@@ -41,9 +41,23 @@ export interface AskMukoContext {
   collectionLanguage?: string[];
   expressionSignals?: string[];
   brandInterpretation?: string;
+  pieces?: {
+    confirmedPieceCount?: number;
+    suggestedPieceCount?: number;
+    confirmedPieceNames?: string[];
+    confirmedCategories?: string[];
+    coverageGaps?: string[];
+    recommendedStartPiece?: string;
+    averageScore?: number;
+    strongestPiece?: string;
+    weakestPiece?: string;
+    dominantSilhouette?: string;
+    materialSignals?: string[];
+    suggestedStartingPoints?: string[];
+  };
 }
 
-const FALLBACK_SUGGESTIONS: Record<"concept" | "spec", string[]> = {
+const FALLBACK_SUGGESTIONS: Record<AskMukoContext["step"], string[]> = {
   concept: [
     "Why is Identity scored this way?",
     "What brands own this aesthetic?",
@@ -53,6 +67,11 @@ const FALLBACK_SUGGESTIONS: Record<"concept" | "spec", string[]> = {
     "Why did Execution score this?",
     "What happens if I keep this material?",
     "Should I act on the redirect?",
+  ],
+  pieces: [
+    "What piece should I build first?",
+    "Where is the assortment still weak?",
+    "Which role is still missing?",
   ],
 };
 

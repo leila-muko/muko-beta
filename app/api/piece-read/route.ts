@@ -10,6 +10,9 @@ interface PieceReadRequest {
     signal?: string;
     note?: string;
     bucket?: string;
+    category?: string;
+    material?: string;
+    construction?: string;
   };
   context?: {
     aestheticName?: string;
@@ -156,6 +159,7 @@ export async function POST(req: NextRequest) {
     market: {
       momentum,
       saturation,
+      resonance_score: context?.resonanceScore ?? null,
       ownership: aestheticEntry?.seen_in?.slice(0, 5) ?? [],
       whitespace:
         aestheticEntry?.risk_factors?.[0]
@@ -173,6 +177,9 @@ export async function POST(req: NextRequest) {
       signal: piece?.signal?.trim() || "unknown",
       note: piece?.note?.trim() || "none",
       bucket: piece?.bucket?.trim() || "unknown",
+      category: piece?.category?.trim() || undefined,
+      material: piece?.material?.trim() || undefined,
+      construction: piece?.construction?.trim() || undefined,
       stage: context?.isStartingPiece ? "starting piece" : "selected piece",
     },
   };

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { SelectedPieceImage } from '@/lib/piece-image';
+import { createClient } from '@/lib/supabase/client';
 import { getSmartDefault } from '@/lib/spec-studio/smart-defaults';
 
 interface PulseState {
@@ -192,64 +193,69 @@ interface SessionState {
   resetSession: () => void;
 }
 
+function createInitialSessionState(targetMargin = 50) {
+  return {
+    season: '',
+    collectionName: '',
+    aestheticInput: '',
+    aestheticMatchedId: null,
+    refinementModifiers: [],
+    moodboardImages: [],
+    colorPalette: [],
+    colorPaletteName: '',
+    chipSelection: null,
+    customChips: {},
+    conceptSilhouette: '',
+    conceptPalette: null,
+    collectionAesthetic: null,
+    aestheticInflection: null,
+    directionInterpretationText: '',
+    directionInterpretationModifiers: [],
+    directionInterpretationChips: [],
+    conceptInsightTitle: null,
+    conceptInsightDescription: null,
+    conceptInsightPositioning: null,
+    conceptInsightConfidence: null,
+    strategySummary: null,
+    isProxyMatch: false,
+    category: '',
+    subcategory: '',
+    targetMsrp: null,
+    materialId: '',
+    silhouette: '',
+    constructionTier: 'moderate' as const,
+    constructionTierOverride: false,
+    identityPulse: null,
+    resonancePulse: null,
+    executionPulse: null,
+    currentStep: 1 as const,
+    conceptLocked: false,
+    intentGoals: [],
+    intentTradeoff: '',
+    successPriorities: [],
+    targetMargin,
+    sliderTrend: 50,
+    sliderCreative: 50,
+    sliderElevated: 50,
+    sliderNovelty: 50,
+    collectionRole: null,
+    selectedKeyPiece: null,
+    selectedPieceImage: null,
+    decisionGuidanceState: { is_confirmed: false, selected_anchor_piece: null },
+    activeProductPieceId: null,
+    pieceRolesById: {},
+    pieceBuildContext: null,
+    savedAnalysisId: null,
+    activeCollection: null,
+    assortmentInsightCache: {},
+    preloadedCriticScores: {},
+  };
+}
+
 export const useSessionStore = create<SessionState>()(
   persist(
     (set) => ({
-      // Initial state
-      season: '',
-      collectionName: '',
-      aestheticInput: '',
-      aestheticMatchedId: null,
-      refinementModifiers: [],
-      moodboardImages: [],
-      colorPalette: [],
-      colorPaletteName: '',
-      chipSelection: null,
-      customChips: {},
-      conceptSilhouette: '',
-      conceptPalette: null,
-      collectionAesthetic: null,
-      aestheticInflection: null,
-      directionInterpretationText: '',
-      directionInterpretationModifiers: [],
-      directionInterpretationChips: [],
-      conceptInsightTitle: null,
-      conceptInsightDescription: null,
-      conceptInsightPositioning: null,
-      conceptInsightConfidence: null,
-      strategySummary: null,
-      isProxyMatch: false,
-      category: '',
-      subcategory: '',
-      targetMsrp: null,
-      materialId: '',
-      silhouette: '',
-      constructionTier: 'moderate',
-      constructionTierOverride: false,
-      identityPulse: null,
-      resonancePulse: null,
-      executionPulse: null,
-      currentStep: 1,
-      conceptLocked: false,
-      intentGoals: [],
-      intentTradeoff: '',
-      successPriorities: [],
-      targetMargin: 50,
-      sliderTrend: 50,
-      sliderCreative: 50,
-      sliderElevated: 50,
-      sliderNovelty: 50,
-      collectionRole: null,
-      selectedKeyPiece: null,
-      selectedPieceImage: null,
-      decisionGuidanceState: { is_confirmed: false, selected_anchor_piece: null },
-      activeProductPieceId: null,
-      pieceRolesById: {},
-      pieceBuildContext: null,
-      savedAnalysisId: null,
-      activeCollection: null,
-      assortmentInsightCache: {},
-      preloadedCriticScores: {},
+      ...createInitialSessionState(),
 
       // Actions
       setSeason: (season) => set({ season }),
@@ -329,58 +335,9 @@ export const useSessionStore = create<SessionState>()(
       setCurrentStep: (step) => set({ currentStep: step }),
 
       resetSession: () => set((state) => ({
-        season: '',
-        collectionName: '',
-        aestheticInput: '',
-        aestheticMatchedId: null,
-        refinementModifiers: [],
-        moodboardImages: [],
-        colorPalette: [],
-        colorPaletteName: '',
-        chipSelection: null,
-        customChips: {},
-        conceptSilhouette: '',
-        conceptPalette: null,
-        collectionAesthetic: null,
-        aestheticInflection: null,
-        directionInterpretationText: '',
-        directionInterpretationModifiers: [],
-        directionInterpretationChips: [],
-        conceptInsightTitle: null,
-        conceptInsightDescription: null,
-        conceptInsightPositioning: null,
-        conceptInsightConfidence: null,
-        strategySummary: null,
-        isProxyMatch: false,
-        category: '',
-        subcategory: '',
-        targetMsrp: null,
-        materialId: '',
-        silhouette: '',
-        constructionTier: 'moderate',
-        constructionTierOverride: false,
-        identityPulse: null,
-        resonancePulse: null,
-        executionPulse: null,
-        currentStep: 1,
-        conceptLocked: false,
-        intentGoals: [],
-        intentTradeoff: '',
-        successPriorities: [],
-        targetMargin: state.targetMargin > 0 ? state.targetMargin : 50,
-        sliderTrend: 50,
-        sliderCreative: 50,
-        sliderElevated: 50,
-        sliderNovelty: 50,
-        collectionRole: null,
-        selectedKeyPiece: null,
-        selectedPieceImage: null,
-        decisionGuidanceState: { is_confirmed: false, selected_anchor_piece: null },
-        activeProductPieceId: null,
-        pieceRolesById: {},
-        pieceBuildContext: null,
-        savedAnalysisId: null,
-        preloadedCriticScores: {},
+        ...createInitialSessionState(state.targetMargin > 0 ? state.targetMargin : 50),
+        activeCollection: state.activeCollection,
+        assortmentInsightCache: state.assortmentInsightCache,
       })),
     }),
     {
@@ -421,3 +378,52 @@ export const useSessionStore = create<SessionState>()(
     }
   )
 );
+
+let authListenerInitialized = false;
+let lastSignedInUserId: string | null = null;
+const SESSION_OWNER_STORAGE_KEY = 'muko-session-owner';
+
+function clearSessionStoreForSignedInUser() {
+  useSessionStore.persist.clearStorage();
+  useSessionStore.setState(createInitialSessionState());
+}
+
+function getStoredSessionOwnerId() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem(SESSION_OWNER_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setStoredSessionOwnerId(userId: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(SESSION_OWNER_STORAGE_KEY, userId);
+  } catch {}
+}
+
+function initializeSessionStoreAuthListener() {
+  if (authListenerInitialized || typeof window === 'undefined') return;
+
+  authListenerInitialized = true;
+
+  const supabase = createClient();
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event !== 'SIGNED_IN') return;
+
+    const userId = session?.user?.id ?? null;
+    if (!userId || userId === lastSignedInUserId) return;
+
+    const storedOwnerId = getStoredSessionOwnerId();
+    if (storedOwnerId && storedOwnerId !== userId) {
+      clearSessionStoreForSignedInUser();
+    }
+
+    lastSignedInUserId = userId;
+    setStoredSessionOwnerId(userId);
+  });
+}
+
+initializeSessionStoreAuthListener();

@@ -64,23 +64,6 @@ function normalizeToken(value: string | null | undefined) {
     .replace(/^-+|-+$/g, '');
 }
 
-function decodePartialJsonString(value: string) {
-  try {
-    return JSON.parse(`"${value}"`) as string;
-  } catch {
-    return value.replace(/\\"/g, '"').replace(/\\n/g, ' ');
-  }
-}
-
-function extractPartialCollectionInsight(raw: string) {
-  const stringMatch = raw.match(/"collection_insight"\s*:\s*"((?:\\.|[^"\\])*)"/);
-  if (stringMatch) {
-    return decodePartialJsonString(stringMatch[1]).trim();
-  }
-
-  return '';
-}
-
 function inferRole(value: string | null | undefined): CollectionPieceRole | null {
   const token = normalizeToken(value);
   if (token === 'hero' || token === 'volume-driver' || token === 'core-evolution' || token === 'directional') {
@@ -339,8 +322,6 @@ function ReportPageContent() {
   const [report, setReport] = useState<CollectionReportPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reportInsightStreaming, setReportInsightStreaming] = useState('');
-  const [reportIsParagraphStreaming, setReportIsParagraphStreaming] = useState(false);
   const collectionAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -350,8 +331,6 @@ function ReportPageContent() {
       collectionAbortRef.current = controller;
       setLoading(true);
       setError(null);
-      setReportInsightStreaming('');
-      setReportIsParagraphStreaming(false);
       const supabase = createClient();
       const activeCollectionName = collectionFromUrl || activeCollection || collectionName;
       const activeSeason = seasonFromUrl || season;
@@ -464,7 +443,6 @@ function ReportPageContent() {
             const decoder = new TextDecoder();
             let buffer = '';
             let sseReport: CollectionReportPayload | undefined;
-            let reportRawStream = '';
 
             while (true) {
               const { done, value } = await reader.read();
@@ -492,25 +470,17 @@ function ReportPageContent() {
                   }
 
                   if (event.type === 'delta' && event.payload && !controller.signal.aborted) {
-                    const payload = event.payload as { text?: string };
-                    reportRawStream += payload.text ?? '';
-                    setReportInsightStreaming(extractPartialCollectionInsight(reportRawStream));
-                    setReportIsParagraphStreaming(true);
+                    continue;
                   }
 
                   if (event.type === 'done' && event.payload && !controller.signal.aborted) {
                     // Fully merged result — swap in final narrative
                     sseReport = event.payload;
-                    setReportInsightStreaming('');
-                    setReportIsParagraphStreaming(false);
                   }
                 } catch {
                   // Malformed event line — skip
                 }
               }
-            }
-            if (!controller.signal.aborted) {
-              setReportIsParagraphStreaming(false);
             }
             // Always assign nextReport — if cancelled before done, the !cancelled guard
             // at line 474 prevents setReport from being called with this value.
@@ -519,14 +489,10 @@ function ReportPageContent() {
             // Non-streaming fallback (handles local dev or if endpoint reverts)
             const json = (await response.json()) as { collection_report: CollectionReportPayload };
             nextReport = json.collection_report;
-            setReportInsightStreaming('');
-            setReportIsParagraphStreaming(false);
           }
         } catch (err) {
           if ((err as Error)?.name === 'AbortError') return;
           nextReport = buildCollectionReport(input).collection_report;
-          setReportInsightStreaming('');
-          setReportIsParagraphStreaming(false);
         }
 
         if (!controller.signal.aborted) {
@@ -539,8 +505,6 @@ function ReportPageContent() {
         const intent = typeof window !== 'undefined' ? readIntentFromStorage() : null;
 
         if (!controller.signal.aborted && activeCollectionName) {
-          setReportInsightStreaming('');
-          setReportIsParagraphStreaming(false);
           setReport(
             buildCollectionReport({
               collection_name: activeCollectionName,
@@ -554,13 +518,10 @@ function ReportPageContent() {
           );
           setError(null);
         } else if (!controller.signal.aborted) {
-          setReportInsightStreaming('');
-          setReportIsParagraphStreaming(false);
           setError('Unable to build the collection report right now.');
         }
       } finally {
         if (!controller.signal.aborted) {
-          setReportIsParagraphStreaming(false);
           setLoading(false);
         }
       }
@@ -763,11 +724,7 @@ function ReportPageContent() {
 
       {loading ? <LoadingState /> : null}
       {!loading && report ? (
-        <CollectionReportView
-          report={report}
-          reportInsightStreaming={reportInsightStreaming}
-          reportIsParagraphStreaming={reportIsParagraphStreaming && !!reportInsightStreaming}
-        />
+        <CollectionReportView report={report} />
       ) : null}
       {!loading && !report && error ? <ErrorState message={error} /> : null}
       {!loading && !report && !error ? <EmptyState /> : null}

@@ -186,6 +186,132 @@ const ARCHETYPES: GarmentArchetype[] = [
     disallowed_behaviors: ["clingy shaping", "ankle taper", "ornamental surface"],
   },
   {
+    category: "skirt",
+    archetype: "a-line",
+    silhouette_rules: [
+      "clean set through waist and hip",
+      "controlled sweep through hem",
+      "long uninterrupted line",
+    ],
+    construction_rules: [
+      "structured waistband",
+      "clean closure",
+      "clean side seam line",
+    ],
+    behavior_rules: [
+      "falls in a controlled column",
+      "should not taper sharply",
+      "keeps volume without collapse",
+    ],
+    allowed_finishes: ["pressed", "tonal", "matte"],
+    disallowed_behaviors: ["clingy shaping", "ankle taper", "ornamental surface"],
+  },
+  {
+    category: "shirt",
+    archetype: "classic",
+    silhouette_rules: [
+      "clean body line",
+      "controlled fit through shoulder and torso",
+      "resolved hem and cuff",
+    ],
+    construction_rules: [
+      "clean neckline",
+      "clean shoulder transition",
+      "resolved rib or edge finish",
+    ],
+    behavior_rules: [
+      "follows the body without collapse",
+      "should not read bulky unless stated",
+      "keeps a clean surface",
+    ],
+    allowed_finishes: ["tonal", "clean face", "matte"],
+    disallowed_behaviors: ["hard tailored frame", "ornamental clutter", "overworked texture"],
+  },
+  {
+    category: "shirt",
+    archetype: "blouse",
+    silhouette_rules: [
+      "clean body line",
+      "controlled fit through shoulder and torso",
+      "resolved hem and cuff",
+    ],
+    construction_rules: [
+      "clean neckline",
+      "clean shoulder transition",
+      "resolved rib or edge finish",
+    ],
+    behavior_rules: [
+      "follows the body without collapse",
+      "should not read bulky unless stated",
+      "keeps a clean surface",
+    ],
+    allowed_finishes: ["tonal", "clean face", "matte"],
+    disallowed_behaviors: ["hard tailored frame", "ornamental clutter", "overworked texture"],
+  },
+  {
+    category: "shirt",
+    archetype: "tee",
+    silhouette_rules: [
+      "clean body line",
+      "controlled fit through shoulder and torso",
+      "resolved hem and cuff",
+    ],
+    construction_rules: [
+      "clean neckline",
+      "clean shoulder transition",
+      "resolved rib or edge finish",
+    ],
+    behavior_rules: [
+      "follows the body without collapse",
+      "should not read bulky unless stated",
+      "keeps a clean surface",
+    ],
+    allowed_finishes: ["tonal", "clean face", "matte"],
+    disallowed_behaviors: ["hard tailored frame", "ornamental clutter", "overworked texture"],
+  },
+  {
+    category: "shirt",
+    archetype: "polo",
+    silhouette_rules: [
+      "clean body line",
+      "controlled fit through shoulder and torso",
+      "resolved hem and cuff",
+    ],
+    construction_rules: [
+      "clean neckline",
+      "clean shoulder transition",
+      "resolved rib or edge finish",
+    ],
+    behavior_rules: [
+      "follows the body without collapse",
+      "should not read bulky unless stated",
+      "keeps a clean surface",
+    ],
+    allowed_finishes: ["tonal", "clean face", "matte"],
+    disallowed_behaviors: ["hard tailored frame", "ornamental clutter", "overworked texture"],
+  },
+  {
+    category: "shirt",
+    archetype: "vest",
+    silhouette_rules: [
+      "clean body line",
+      "controlled fit through shoulder and torso",
+      "resolved hem and cuff",
+    ],
+    construction_rules: [
+      "clean neckline",
+      "clean shoulder transition",
+      "resolved rib or edge finish",
+    ],
+    behavior_rules: [
+      "follows the body without collapse",
+      "should not read bulky unless stated",
+      "keeps a clean surface",
+    ],
+    allowed_finishes: ["tonal", "clean face", "matte"],
+    disallowed_behaviors: ["hard tailored frame", "ornamental clutter", "overworked texture"],
+  },
+  {
     category: "knit",
     archetype: "fine-gauge",
     silhouette_rules: [
@@ -233,7 +359,9 @@ const CATEGORY_KEYWORDS: Array<{ category: string; terms: string[] }> = [
   { category: "jean", terms: ["jean", "denim"] },
   { category: "blazer", terms: ["blazer"] },
   { category: "dress", terms: ["dress", "gown", "slip"] },
+  { category: "skirt", terms: ["skirt", "mini skirt", "mini-skirt", "maxi skirt", "maxi-skirt"] },
   { category: "trouser", terms: ["trouser", "pant", "pants"] },
+  { category: "shirt", terms: ["shirt", "button-down", "button down", "blouse", "tee", "t-shirt", "t shirt", "polo", "vest", "waistcoat"] },
   { category: "knit", terms: ["knit", "sweater", "cardigan"] },
   { category: "outerwear", terms: ["coat", "jacket", "trench", "parka", "outerwear"] },
 ];
@@ -247,6 +375,12 @@ const ARCHETYPE_KEYWORDS: Array<{ archetype: string; terms: string[] }> = [
   { archetype: "slip", terms: ["slip"] },
   { archetype: "draped", terms: ["draped", "drape", "wrap"] },
   { archetype: "wide", terms: ["wide", "wide leg", "wide-leg"] },
+  { archetype: "a-line", terms: ["a-line", "aline", "skirt"] },
+  { archetype: "classic", terms: ["shirt", "button-down", "button down"] },
+  { archetype: "blouse", terms: ["blouse"] },
+  { archetype: "tee", terms: ["tee", "t-shirt", "t shirt"] },
+  { archetype: "polo", terms: ["polo"] },
+  { archetype: "vest", terms: ["vest", "waistcoat"] },
   { archetype: "fine-gauge", terms: ["fine gauge", "fine-gauge", "fine knit"] },
 ];
 
@@ -330,7 +464,7 @@ export function buildArchetypeFallbackExpression(
     return `${pieceName} should stabilize the assortment through surface restraint and a clear silhouette. Let it anchor the ${context.palette.toLowerCase()} palette without flattening the direction.`;
   }
 
-  return `${pieceName} should stay recognizable through ${primaryLine} and ${secondaryLine}. Control the proportion so it sits in the assortment with clarity and supports the ${context.direction.toLowerCase()} direction without over-explaining itself.`;
+  return `${pieceName} should ${primaryLine} and ${secondaryLine}. Control the proportion so it sits in the assortment with clarity and supports the ${context.direction.toLowerCase()} direction without over-explaining itself.`;
 }
 
 export function validateArchetypeOutput(

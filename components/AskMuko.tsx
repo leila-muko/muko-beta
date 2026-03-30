@@ -1,9 +1,10 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
 import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 
 /* ─── Types ─── */
-export type AskMukoStep = "concept" | "spec" | "report";
+export type AskMukoStep = "concept" | "spec" | "pieces" | "report";
 
 export interface AskMukoMessage {
   role: "user" | "muko";
@@ -14,6 +15,10 @@ export interface AskMukoProps {
   step: AskMukoStep;
   suggestedQuestions?: string[];
   context?: AskMukoContext;
+  isOpen?: boolean;
+  onOpenChange?: (isOpen: boolean) => void;
+  openingMessage?: string | null;
+  openingMessageVersion?: number;
   brand?: {
     oliveInk?: string;
     chartreuse?: string;
@@ -35,15 +40,36 @@ export default function AskMuko(props: AskMukoProps) {
   return <AskMukoInner key={props.step} {...props} />;
 }
 
-function AskMukoInner({ step, suggestedQuestions = [], context, brand: brandOverride }: AskMukoProps) {
+function AskMukoInner({
+  suggestedQuestions = [],
+  context,
+  isOpen,
+  onOpenChange,
+  openingMessage,
+  openingMessageVersion,
+  brand: brandOverride,
+}: AskMukoProps) {
   const BRAND = { ...DEFAULT_BRAND, ...brandOverride };
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(false);
   const [messages, setMessages] = useState<AskMukoMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [dynamicSuggestions, setDynamicSuggestions] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastSuggestionContextRef = useRef<string | null>(null);
+  const lastOpeningMessageVersionRef = useRef<number | null>(null);
+  const isExpanded = typeof isOpen === "boolean" ? isOpen : internalExpanded;
+
+  const setExpanded = useCallback(
+    (next: boolean) => {
+      if (typeof isOpen !== "boolean") {
+        setInternalExpanded(next);
+      }
+      onOpenChange?.(next);
+    },
+    [isOpen, onOpenChange]
+  );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -58,26 +84,66 @@ function AskMukoInner({ step, suggestedQuestions = [], context, brand: brandOver
   // Load dynamic suggested questions on mount / context change
   useEffect(() => {
     if (!context) return;
+    const contextSignature = JSON.stringify(context);
+    if (lastSuggestionContextRef.current === contextSignature) return;
+    lastSuggestionContextRef.current = contextSignature;
+
+    let isActive = true;
     import("@/lib/synthesizer/askMukoResponse").then(({ generateSuggestedQuestions }) => {
-      generateSuggestedQuestions(context).then(setDynamicSuggestions).catch(() => {});
+      generateSuggestedQuestions(context)
+        .then((questions) => {
+          if (isActive) setDynamicSuggestions(questions);
+        })
+        .catch(() => {});
     });
+    return () => {
+      isActive = false;
+    };
   }, [context]);
 
-  const handleSend = async (text: string) => {
+  const handleSend = useCallback(async (text: string) => {
     if (!text.trim()) return;
+    const history = messages.slice(-20).map((message) => ({
+      role: message.role === "muko" ? "assistant" : "user",
+      content: message.content,
+    }));
     setMessages(prev => [...prev, { role: "user", content: text.trim() }]);
     setInputValue("");
     setIsTyping(true);
     try {
-      const { generateAskMukoResponse } = await import("@/lib/synthesizer/askMukoResponse");
-      const answer = await generateAskMukoResponse(text.trim(), context as AskMukoContext);
+      const response = await fetch("/api/ask-muko", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: text.trim(),
+          context,
+          history,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Ask Muko request failed");
+      }
+
+      const data = await response.json();
+      const answer = data.answer ?? "Muko couldn't process that right now. Try rephrasing or ask something else.";
       setMessages(prev => [...prev, { role: "muko", content: answer }]);
     } catch {
       setMessages(prev => [...prev, { role: "muko", content: "Muko couldn't process that right now. Try rephrasing or ask something else." }]);
     } finally {
       setIsTyping(false);
     }
-  };
+  }, [context, messages]);
+
+  useEffect(() => {
+    if (!isExpanded || isTyping) return;
+    if (!openingMessage?.trim()) return;
+    if (typeof openingMessageVersion !== "number") return;
+    if (lastOpeningMessageVersionRef.current === openingMessageVersion) return;
+
+    lastOpeningMessageVersionRef.current = openingMessageVersion;
+    void handleSend(openingMessage);
+  }, [handleSend, isExpanded, isTyping, openingMessage, openingMessageVersion]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(inputValue); }
@@ -104,7 +170,7 @@ function AskMukoInner({ step, suggestedQuestions = [], context, brand: brandOver
     return (
       <>
         <div
-          onClick={() => setIsExpanded(true)}
+          onClick={() => setExpanded(true)}
           role="button"
           aria-label="Open Muko"
           style={{
@@ -189,7 +255,7 @@ function AskMukoInner({ step, suggestedQuestions = [], context, brand: brandOver
             }}>AI</span>
           </div>
           <button
-            onClick={() => setIsExpanded(false)}
+            onClick={() => setExpanded(false)}
             aria-label="Collapse"
             style={{ width: 24, height: 24, borderRadius: 999, border: "1px solid rgba(67,67,43,0.10)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(67,67,43,0.35)", fontSize: 14, transition: "all 150ms ease" }}
             onMouseEnter={e => { e.currentTarget.style.background = "rgba(67,67,43,0.04)"; e.currentTarget.style.color = "rgba(67,67,43,0.55)"; }}
@@ -242,7 +308,25 @@ function AskMukoInner({ step, suggestedQuestions = [], context, brand: brandOver
                 ) : (
                   <div>
                     <div style={{ fontFamily: sohne, fontSize: 9, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: BRAND.rose, marginBottom: 5 }}>Muko</div>
-                    <div style={{ fontSize: 12.5, lineHeight: 1.7, color: "rgba(67,67,43,0.72)", fontFamily: inter }}>{msg.content}</div>
+                    <div style={{ fontSize: 12.5, lineHeight: 1.7, color: "rgba(67,67,43,0.72)", fontFamily: inter }}>
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => <p style={{ margin: 0 }}>{children}</p>,
+                          strong: ({ children }) => <strong style={{ fontWeight: 700, color: "rgba(67,67,43,0.82)" }}>{children}</strong>,
+                          em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
+                          ul: ({ children }) => <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>{children}</ul>,
+                          ol: ({ children }) => <ol style={{ margin: "8px 0 0", paddingLeft: 18 }}>{children}</ol>,
+                          li: ({ children }) => <li style={{ marginTop: 4 }}>{children}</li>,
+                          a: ({ href, children }) => (
+                            <a href={href} style={{ color: BRAND.rose, textDecoration: "underline" }}>
+                              {children}
+                            </a>
+                          ),
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 )}
               </div>

@@ -17,6 +17,10 @@ interface AssortmentIntelligenceInput {
   uniqueCategoryCount: number;
   executionScore?: number | null;
   collectionScore?: number | null;
+  categoryLeaders?: Array<{ label: string; count: number }>;
+  materialLeaders?: Array<{ label: string; count: number }>;
+  silhouetteLeaders?: Array<{ label: string; count: number }>;
+  uniqueSilhouetteCount?: number;
 }
 
 interface AssortmentDiagnostics {
@@ -29,9 +33,88 @@ interface AssortmentDiagnostics {
 }
 
 function getCollectionStage(totalPieces: number): CollectionStage {
-  if (totalPieces <= 3) return 'early';
+  if (totalPieces <= 2) return 'early';
   if (totalPieces <= 7) return 'developing';
   return 'built';
+}
+
+function formatList(items: string[]) {
+  if (items.length === 0) return '';
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
+function getCoveragePhrase(input: AssortmentIntelligenceInput) {
+  const leaders = (input.categoryLeaders ?? []).filter((item) => item.label && item.count > 0);
+
+  if (leaders.length === 0) {
+    return 'coverage is still too thin to judge at category level';
+  }
+
+  if (leaders.length === 1) {
+    return `${leaders[0].label} is carrying the line almost alone`;
+  }
+
+  if (leaders[0].count === leaders[1].count) {
+    return `${leaders[0].label} and ${leaders[1].label} are sharing the load`;
+  }
+
+  return `${leaders[0].label} is leading, with ${leaders[1].label} as the secondary lane`;
+}
+
+function getSilhouettePhrase(input: AssortmentIntelligenceInput) {
+  const totalPieces = Math.max(input.totalPieces, 1);
+  const leaders = (input.silhouetteLeaders ?? []).filter((item) => item.label && item.count > 0);
+  const uniqueSilhouettes = input.uniqueSilhouetteCount ?? 0;
+  const dominantSilhouette = leaders[0];
+
+  if (!dominantSilhouette) {
+    return 'the silhouette pattern is still unresolved';
+  }
+
+  if (dominantSilhouette.count / totalPieces >= 0.5) {
+    return `${dominantSilhouette.label} is repeating enough to set the shape language`;
+  }
+
+  if (uniqueSilhouettes >= Math.min(totalPieces, 4)) {
+    return `the silhouette spread is opening up across ${uniqueSilhouettes} shapes`;
+  }
+
+  return `${dominantSilhouette.label} is the lead shape, but there is some range around it`;
+}
+
+function getMaterialPhrase(input: AssortmentIntelligenceInput) {
+  const leaders = (input.materialLeaders ?? [])
+    .filter((item) => item.label && item.label !== 'Unknown' && item.count > 0)
+    .slice(0, 2)
+    .map((item) => item.label);
+
+  if (leaders.length === 0) {
+    return 'material language is not yet strong enough to influence the read';
+  }
+
+  if (leaders.length === 1) {
+    return `${leaders[0]} is doing most of the material signaling`;
+  }
+
+  return `${formatList(leaders)} are setting the material signal`;
+}
+
+function getRolePhrase(input: AssortmentIntelligenceInput, diagnostics: AssortmentDiagnostics) {
+  if (diagnostics.roleBalanceStatus === 'missing_core') {
+    return `the line has ${input.heroCount} hero and ${input.supportCount} support roles, but no true core layer yet`;
+  }
+
+  if (diagnostics.roleBalanceStatus === 'missing_hero') {
+    return `the line has a base of ${input.coreCount} core and ${input.supportCount} support roles, but no clear hero`;
+  }
+
+  if (diagnostics.roleBalanceStatus === 'missing_support') {
+    return `the lead idea is there with ${input.heroCount} hero and ${input.coreCount} core roles, but support is still missing`;
+  }
+
+  return `${input.heroCount} hero, ${input.coreCount} core, and ${input.supportCount} support roles are giving the line readable structure`;
 }
 
 function getRoleBalanceStatus(
@@ -83,7 +166,7 @@ function getViabilitySignal(input: AssortmentIntelligenceInput, diagnostics: Ass
   const executionScore = input.executionScore ?? 0;
 
   if (
-    input.totalPieces <= 3 ||
+    input.totalPieces <= 2 ||
     diagnostics.roleBalanceStatus !== 'balanced' ||
     diagnostics.coverage === 'narrow' ||
     executionScore < 55
@@ -118,95 +201,98 @@ function buildSupportingLine(input: AssortmentIntelligenceInput, diagnostics: As
     return 'The direction is not yet built into enough pieces to read as a collection.';
   }
 
-  if (diagnostics.roleBalanceStatus === 'missing_core') {
-    return 'Direction is strong, but the collection is not yet structurally built.';
+  if (input.totalPieces <= 2) {
+    return 'The collection is still building; there are not yet enough pieces to read the full assortment logic.';
   }
 
-  if (diagnostics.roleBalanceStatus === 'missing_hero') {
-    return 'The base is forming, but the assortment still needs a clearer anchor.';
-  }
-
-  if (diagnostics.roleBalanceStatus === 'missing_support') {
-    return 'The lead idea is visible, but the surrounding assortment is still too thin.';
-  }
+  const caveat = input.totalPieces < 8 ? `Based on ${input.totalPieces} pieces so far, ` : '';
+  const rolePhrase = getRolePhrase(input, diagnostics);
+  const coveragePhrase = getCoveragePhrase(input);
 
   if (diagnostics.complexityRisk === 'front_loaded_high') {
-    return 'The collection has shape, but too much weight is sitting in the most demanding pieces.';
+    return `${caveat}${rolePhrase}, but too much of the collection weight is sitting in the highest-complexity pieces while ${coveragePhrase}.`;
   }
 
   if (diagnostics.complexityRisk === 'too_safe') {
-    return 'The collection is organized, but the role mix is still too even to create hierarchy.';
-  }
-
-  if (diagnostics.coverage === 'narrow') {
-    return 'The direction is coherent, but the assortment still needs broader coverage to hold.';
+    return `${caveat}${rolePhrase}, but the assortment is still landing in one safe commercial band even though ${coveragePhrase}.`;
   }
 
   if (diagnostics.viabilitySignal === 'stable') {
-    return 'The collection is reading as a system, with enough balance to support the point of view.';
+    return `${caveat}${rolePhrase}, and ${coveragePhrase}, so the collection is starting to hold as a system.`;
   }
 
-  return 'The collection is moving in the right direction, but the role structure still needs tightening.';
+  return `${caveat}${rolePhrase}, with ${coveragePhrase}, so the collection is readable even if it is not fully built yet.`;
 }
 
 function buildInsight(input: AssortmentIntelligenceInput, diagnostics: AssortmentDiagnostics) {
+  if (input.totalPieces <= 2) {
+    return 'This collection is still direction-led rather than assortment-led. A few more pieces are needed before role distribution, category coverage, and shape language can be judged with confidence.';
+  }
+
+  const caveat = input.totalPieces < 8 ? `Based on ${input.totalPieces} pieces so far, ` : '';
+  const coveragePhrase = getCoveragePhrase(input);
+  const silhouettePhrase = getSilhouettePhrase(input);
+  const materialPhrase = getMaterialPhrase(input);
   const opening =
-    diagnostics.collectionStage === 'early'
-      ? 'This collection is still direction-led rather than assortment-led.'
-      : diagnostics.collectionStage === 'developing'
-        ? 'This collection is beginning to read as a line, but the structure is not holding yet.'
-        : 'This collection has enough pieces to read as a system.';
+    diagnostics.collectionStage === 'developing'
+      ? `${caveat}the collection is starting to read as a line rather than a loose group of pieces.`
+      : 'This collection has enough pieces to read as a system.';
 
-  let middle = 'Role distribution, coverage, and complexity are currently working together without a major structural gap.';
+  let middle = `${getRolePhrase(input, diagnostics)}, ${coveragePhrase}, ${silhouettePhrase}, and ${materialPhrase}.`;
 
   if (diagnostics.roleBalanceStatus === 'missing_core') {
-    middle = 'It is missing a core volume layer, so the point of view does not yet have enough commercial foundation.';
+    middle = `${middle} The missing core layer is what keeps the idea from settling into a real assortment read.`;
   } else if (diagnostics.roleBalanceStatus === 'missing_hero') {
-    middle = 'The role mix is too flat, so no single piece is giving the assortment a clear lead position.';
+    middle = `${middle} The role mix is still too flat, so no single lane is asserting itself as the lead.`;
   } else if (diagnostics.roleBalanceStatus === 'missing_support') {
-    middle = 'The hero and core signals are present, but the collection does not yet have enough support around them.';
+    middle = `${middle} The hero-and-core read is visible, but it still lacks the surrounding context that makes the line feel complete.`;
   } else if (diagnostics.complexityRisk === 'front_loaded_high') {
-    middle = 'Complexity is front-loaded, which puts too much of the collection burden into a narrow set of pieces.';
+    middle = `${middle} Complexity is front-loaded, so too much of the collection burden is sitting in a narrow set of demanding pieces.`;
   } else if (diagnostics.complexityRisk === 'too_safe') {
-    middle = 'The complexity spread is too cautious, so the collection risks flattening into one commercial tier.';
-  } else if (diagnostics.coverage === 'narrow') {
-    middle = 'Coverage is still too limited to validate the direction at the assortment level.';
+    middle = `${middle} The build is too cautious overall, which flattens the line into one commercial tier.`;
   } else if (diagnostics.coverage === 'broad') {
-    middle = 'Coverage is broad enough to support a line, but only if the role separation stays clear.';
+    middle = `${middle} Coverage is broad enough to support a line, as long as the current role separation stays clear.`;
   }
 
-  let closing = 'Next, tighten the role structure before widening the line.';
-
-  if (diagnostics.roleBalanceStatus === 'missing_core') {
-    closing = 'Next, build a stronger core base so the direction can hold at collection scale.';
-  } else if (diagnostics.roleBalanceStatus === 'missing_hero') {
-    closing = 'Next, introduce a stronger anchor role so the assortment reads with clearer hierarchy.';
-  } else if (diagnostics.roleBalanceStatus === 'missing_support') {
-    closing = 'Next, build supporting context around the lead pieces so the assortment feels complete.';
-  } else if (diagnostics.complexityRisk === 'front_loaded_high') {
-    closing = 'Next, reduce front-loaded complexity so the collection is easier to carry forward.';
-  } else if (diagnostics.complexityRisk === 'too_safe') {
-    closing = 'Next, add a stronger point of separation without losing the base layer.';
-  } else if (diagnostics.coverage === 'narrow') {
-    closing = 'Next, broaden assortment coverage before treating the collection as commercially viable.';
-  } else if (diagnostics.viabilitySignal === 'stable') {
-    closing = 'Next, keep additions disciplined so breadth does not weaken the current balance.';
-  }
-
-  return `${opening} ${middle} ${closing}`;
+  return `${opening} ${middle}`;
 }
 
 function buildNextAction(input: AssortmentIntelligenceInput, diagnostics: AssortmentDiagnostics): string {
   if (input.totalPieces === 1) {
-    return 'Add more pieces to establish collection shape.';
+    return 'Add a second piece to start testing whether the direction can extend beyond one look.';
+  }
+
+  if (input.totalPieces === 2) {
+    return 'Add a third piece that tests the same idea in a second role or category so the collection can start to read structurally.';
+  }
+
+  const topCategory = input.categoryLeaders?.[0]?.label ?? 'the lead category';
+  const secondCategory = input.categoryLeaders?.[1]?.label;
+  const topMaterial = input.materialLeaders?.find((item) => item.label !== 'Unknown')?.label;
+  const leadSilhouette = input.silhouetteLeaders?.[0]?.label;
+
+  if (diagnostics.roleBalanceStatus === 'missing_core') {
+    return `Add a core piece around ${topCategory}${topMaterial ? ` using the ${topMaterial.toLowerCase()} signal already present` : ''} so the collection stops depending on statement roles alone.`;
   }
 
   if (diagnostics.roleBalanceStatus === 'missing_hero') {
-    return 'Introduce a stronger anchor role so the assortment reads with clearer hierarchy.';
+    return `Create one clearer hero in ${topCategory}${leadSilhouette ? ` around the ${leadSilhouette.toLowerCase()} shape language` : ''} so the assortment has an obvious lead position.`;
+  }
+
+  if (diagnostics.roleBalanceStatus === 'missing_support') {
+    return `Add a support piece${secondCategory ? ` in ${secondCategory}` : ''} that extends the ${topCategory.toLowerCase()} idea and gives the lead pieces more context around them.`;
   }
 
   if (diagnostics.complexityRisk === 'front_loaded_high') {
-    return 'Reduce construction complexity on at least one piece to protect the production timeline.';
+    return `Offset the high-complexity weight with a simpler core piece${secondCategory ? ` in ${secondCategory}` : ''} so the line is not carried by its hardest builds alone.`;
+  }
+
+  if (diagnostics.coverage === 'narrow') {
+    return `Translate the current ${topCategory.toLowerCase()} language into ${secondCategory ? secondCategory : 'one adjacent category'} before adding more of the same category.`;
+  }
+
+  if (diagnostics.complexityRisk === 'too_safe') {
+    return `Add one sharper directional piece${leadSilhouette ? ` that pushes beyond the current ${leadSilhouette.toLowerCase()} repeat` : ''} so the line stops reading as one safe commercial band.`;
   }
 
   if (
@@ -214,10 +300,10 @@ function buildNextAction(input: AssortmentIntelligenceInput, diagnostics: Assort
     diagnostics.roleBalanceStatus === 'balanced' &&
     diagnostics.complexityRisk === 'balanced'
   ) {
-    return 'Continue building — the collection direction is strong.';
+    return `Expand through ${secondCategory ?? topCategory} while keeping the current role split and material language intact.`;
   }
 
-  return 'Review role distribution before adding more pieces.';
+  return `Add the next piece where the collection is thinnest${secondCategory ? `, especially outside ${topCategory}` : ''}, so the current shape and material story can prove it has range.`;
 }
 
 function buildRecommendedActions(

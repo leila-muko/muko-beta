@@ -7,26 +7,34 @@ import { getFlatForPiece } from '@/components/flats';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { parseSelectedPieceImage, resolvePieceImageType } from '@/lib/piece-image';
 import { buildAssortmentIntelligence } from '@/lib/collection-report/buildAssortmentIntelligence';
+import { hydrateSpecSessionFromAnalysis, type PersistedSpecAnalysisRow } from '@/lib/collections/hydrateSpecSessionFromAnalysis';
 
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
 
 type PieceRole = 'hero' | 'core' | 'support';
+type AssignedRole = 'hero' | 'volume-driver' | 'core-evolution' | 'directional' | 'core' | 'support';
 type ComplexityLevel = 'high' | 'medium' | 'low';
 
 interface AnalysisRow {
   id: string;
   piece_name?: string | null;
   category: string | null;
+  collection_role?: string | null;
   aesthetic_input: string | null;
+  aesthetic_matched_id?: string | null;
   season: string | null;
   material_id: string | null;
   silhouette: string | null;
   construction_tier: 'low' | 'moderate' | 'high' | null;
+  construction_tier_override?: boolean | null;
+  target_msrp?: number | null;
+  collection_aesthetic?: string | null;
+  aesthetic_inflection?: string | null;
   created_at: string;
   score?: number | null;
   gates_passed?: { cost?: boolean | null } | null;
-  agent_versions?: Record<string, string | null> | null;
+  agent_versions?: Record<string, unknown> | null;
   dimensions?: { identity?: number | null; resonance?: number | null; execution?: number | null } | null;
   narrative?: string | null;
   execution_notes?: string | null;
@@ -49,6 +57,14 @@ function normalizeToken(value: string | null | undefined) {
     .replace(/^-+|-+$/g, '');
 }
 
+function getAgentString(
+  agentVersions: Record<string, unknown> | null | undefined,
+  key: string
+) {
+  const value = agentVersions?.[key];
+  return typeof value === 'string' ? value : null;
+}
+
 function getScore(row: AnalysisRow) {
   return row.score ?? 0;
 }
@@ -58,9 +74,32 @@ function titleCase(value: string | null | undefined) {
   return value.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function getPieceRole(analysis: AnalysisRow): PieceRole {
-  const storedRole = normalizeToken(analysis.agent_versions?.collection_role);
+function getAssignedRole(analysis: AnalysisRow): AssignedRole | null {
+  const storedRole = normalizeToken(
+    analysis.collection_role ?? getAgentString(analysis.agent_versions, 'collection_role')
+  );
 
+  if (
+    storedRole === 'hero' ||
+    storedRole === 'volume-driver' ||
+    storedRole === 'core-evolution' ||
+    storedRole === 'directional' ||
+    storedRole === 'core' ||
+    storedRole === 'support'
+  ) {
+    return storedRole;
+  }
+
+  return null;
+}
+
+function getPieceRole(analysis: AnalysisRow): PieceRole {
+  const assignedRole = getAssignedRole(analysis);
+  if (assignedRole === 'hero') return 'hero';
+  if (assignedRole === 'volume-driver' || assignedRole === 'core-evolution' || assignedRole === 'core') return 'core';
+  if (assignedRole === 'directional' || assignedRole === 'support') return 'support';
+
+  const storedRole = normalizeToken(getAgentString(analysis.agent_versions, 'collection_role'));
   if (storedRole === 'hero' || storedRole === 'core' || storedRole === 'support') {
     return storedRole;
   }
@@ -71,8 +110,12 @@ function getPieceRole(analysis: AnalysisRow): PieceRole {
   return 'support';
 }
 
-function getRoleLabel(role: PieceRole) {
-  return role === 'hero' ? 'Hero' : role === 'core' ? 'Core' : 'Support';
+function getRoleLabel(role: AssignedRole) {
+  if (role === 'hero') return 'Hero';
+  if (role === 'volume-driver') return 'Volume Driver';
+  if (role === 'core-evolution') return 'Core Evolution';
+  if (role === 'directional') return 'Directional Signal';
+  return role === 'core' ? 'Core' : 'Support';
 }
 
 function getComplexityLevel(analysis: AnalysisRow): ComplexityLevel {
@@ -83,11 +126,19 @@ function getComplexityLevel(analysis: AnalysisRow): ComplexityLevel {
 }
 
 function getPieceName(analysis: AnalysisRow) {
-  return analysis.piece_name?.trim() || analysis.agent_versions?.saved_piece_name?.trim() || analysis.category?.trim() || 'Untitled Piece';
+  return (
+    analysis.piece_name?.trim() ||
+    getAgentString(analysis.agent_versions, 'saved_piece_name')?.trim() ||
+    analysis.category?.trim() ||
+    'Untitled Piece'
+  );
 }
 
-function getRoleBadgeStyles(role: PieceRole): React.CSSProperties {
+function getRoleBadgeStyles(role: AssignedRole): React.CSSProperties {
   if (role === 'hero') return { background: '#eef2e6', color: '#5a6e2a' };
+  if (role === 'volume-driver') return { background: '#e8eef2', color: '#2e4a5a' };
+  if (role === 'core-evolution') return { background: '#f4ecdf', color: '#7a5d2a' };
+  if (role === 'directional') return { background: '#f2e9ee', color: '#7a4a5d' };
   if (role === 'core') return { background: '#e8eef2', color: '#2e4a5a' };
   return { background: '#f0eeee', color: '#5a4a4a' };
 }
@@ -174,17 +225,25 @@ function PieceCard({
 
   const pieceName = getPieceName(analysis);
   const score = getScore(analysis);
-  const storedPieceImage = parseSelectedPieceImage(analysis.agent_versions?.selected_piece_image);
-  const resolvedPieceType = resolvePieceImageType({
-    type: storedPieceImage?.pieceType,
-    pieceName,
-    category: analysis.category,
-    silhouette: analysis.silhouette,
-  });
+  const storedPieceImage = parseSelectedPieceImage(
+    getAgentString(analysis.agent_versions, 'selected_piece_image')
+  );
+  const resolvedPieceType =
+    resolvePieceImageType({
+      pieceName,
+      category: analysis.category,
+      silhouette: analysis.silhouette,
+    }) ??
+    resolvePieceImageType({
+      type: storedPieceImage?.pieceType,
+      pieceName,
+      category: analysis.category,
+      silhouette: analysis.silhouette,
+    });
   const flat = resolvedPieceType ? getFlatForPiece(resolvedPieceType, storedPieceImage?.signal ?? null) : null;
   const materialLabel = titleCase(analysis.material_id) || 'Unknown material';
   const complexityLabel = titleCase(analysis.construction_tier) || 'Unknown';
-  const role = getPieceRole(analysis);
+  const role = getAssignedRole(analysis) ?? getPieceRole(analysis);
   const roleLabel = getRoleLabel(role);
   const scoreColor = score >= 80 ? '#A8B475' : '#B8876B';
   const executionNoteCount = execution_notes
@@ -442,6 +501,9 @@ export default function CollectionPage({
   const [analyses, setAnalyses] = useState<AnalysisRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isReadHovering, setIsReadHovering] = useState(false);
+  const [isReadPinnedOpen, setIsReadPinnedOpen] = useState(false);
+  const [isReadPinnedClosed, setIsReadPinnedClosed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -468,7 +530,7 @@ export default function CollectionPage({
       setAnalyses(
         ((primary.data as AnalysisRow[] | null) ?? []).map((row) => ({
           ...row,
-          piece_name: row.piece_name ?? row.agent_versions?.saved_piece_name ?? null,
+          piece_name: row.piece_name ?? getAgentString(row.agent_versions, 'saved_piece_name') ?? null,
         }))
       );
       setLoading(false);
@@ -542,6 +604,21 @@ export default function CollectionPage({
       collectionScore,
     });
   }, [avgExecution, collectionScore, scoredAnalyses]);
+  const isReadExpanded = reportExists
+    ? isReadPinnedOpen || (isReadHovering && !isReadPinnedClosed)
+    : true;
+
+  function handleReadToggle() {
+    if (!reportExists) return;
+    if (isReadPinnedOpen) {
+      setIsReadPinnedOpen(false);
+      setIsReadPinnedClosed(true);
+      return;
+    }
+
+    setIsReadPinnedOpen(true);
+    setIsReadPinnedClosed(false);
+  }
 
   const editorialDirection = useMemo(() => {
     const preferred = [
@@ -584,6 +661,11 @@ export default function CollectionPage({
     }
 
     router.push(`/report?${params.toString()}`);
+  };
+
+  const handleOpenExistingPiece = (analysis: AnalysisRow) => {
+    hydrateSpecSessionFromAnalysis(collectionName, analysis as PersistedSpecAnalysisRow);
+    router.push(`/spec?analysis=${encodeURIComponent(analysis.id)}`);
   };
 
   return (
@@ -731,8 +813,11 @@ export default function CollectionPage({
                   display: 'grid',
                   gridTemplateColumns: 'minmax(0, 1fr)',
                   gap: 4,
-                  maxWidth: 620,
+                  cursor: 'pointer',
                 }}
+                onMouseEnter={() => setIsReadHovering(true)}
+                onMouseLeave={() => setIsReadHovering(false)}
+                onClick={handleReadToggle}
               >
                 <div
                   style={{
@@ -752,7 +837,7 @@ export default function CollectionPage({
                   <div
                     style={{
                       fontFamily: inter,
-                      fontSize: 32,
+                      fontSize: isReadExpanded ? 32 : 38,
                       fontWeight: 500,
                       color: '#191919',
                       letterSpacing: '-0.04em',
@@ -782,103 +867,106 @@ export default function CollectionPage({
                   </div>
                 </div>
 
-                <div
-                  style={{
-                    fontFamily: sohne,
-                    fontSize: 17,
-                    fontWeight: 500,
-                    color: '#191919',
-                    lineHeight: 1.38,
-                    letterSpacing: '-0.025em',
-                    marginBottom: 14,
-                    maxWidth: 580,
-                  }}
-                >
-                  {assortmentIntelligence.supporting_line}
-                </div>
+                {isReadExpanded ? (
+                  <>
+                    <div
+                      style={{
+                        fontFamily: sohne,
+                        fontSize: 17,
+                        fontWeight: 500,
+                        color: '#191919',
+                        lineHeight: 1.38,
+                        letterSpacing: '-0.025em',
+                        marginBottom: 14,
+                      }}
+                    >
+                      {assortmentIntelligence.supporting_line}
+                    </div>
 
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 12.5,
-                    color: 'rgba(67,67,43,0.6)',
-                    lineHeight: 1.65,
-                    marginBottom: assortmentIntelligence.next_action ? 18 : 16,
-                    maxWidth: 580,
-                  }}
-                >
-                  {assortmentIntelligence.muko_insight}
-                </div>
-
-                {assortmentIntelligence.next_action ? (
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: 14,
-                      alignItems: 'flex-start',
-                      padding: '11px 14px',
-                      background: 'rgba(67,67,43,0.04)',
-                      borderRadius: 6,
-                      marginBottom: 18,
-                    }}
-                  >
                     <div
                       style={{
                         fontFamily: inter,
-                        fontSize: 9,
-                        fontWeight: 700,
-                        letterSpacing: '0.13em',
-                        textTransform: 'uppercase',
-                        color: 'rgba(67,67,43,0.32)',
-                        paddingTop: 2,
-                        whiteSpace: 'nowrap',
+                        fontSize: 12.5,
+                        color: 'rgba(67,67,43,0.6)',
+                        lineHeight: 1.65,
+                        marginBottom: assortmentIntelligence.next_action ? 18 : 16,
                       }}
                     >
-                      Next
+                      {assortmentIntelligence.muko_insight}
                     </div>
+
+                    {assortmentIntelligence.next_action ? (
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          gap: 14,
+                          alignItems: 'flex-start',
+                          padding: '11px 14px',
+                          background: 'rgba(67,67,43,0.04)',
+                          borderRadius: 6,
+                          marginBottom: 18,
+                          maxWidth: 'min(100%, 820px)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontFamily: inter,
+                            fontSize: 9,
+                            fontWeight: 700,
+                            letterSpacing: '0.13em',
+                            textTransform: 'uppercase',
+                            color: 'rgba(67,67,43,0.32)',
+                            paddingTop: 2,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Next
+                        </div>
+                        <div
+                          style={{
+                            fontFamily: inter,
+                            fontSize: 12,
+                            color: 'rgba(67,67,43,0.72)',
+                            lineHeight: 1.58,
+                          }}
+                        >
+                          {assortmentIntelligence.next_action}
+                        </div>
+                      </div>
+                    ) : null}
+
                     <div
                       style={{
                         fontFamily: inter,
-                        fontSize: 12,
-                        color: 'rgba(67,67,43,0.72)',
-                        lineHeight: 1.58,
+                        fontSize: 11,
+                        lineHeight: 1.4,
+                        color: 'rgba(67,67,43,0.38)',
+                        display: 'flex',
+                        gap: 20,
+                        flexWrap: 'wrap',
                       }}
                     >
-                      {assortmentIntelligence.next_action}
+                      <div>
+                        Identity
+                        <span style={{ fontWeight: 700, color: getMetricScoreColor(avgIdentity), marginLeft: 4 }}>
+                          {avgIdentity || '—'}
+                        </span>
+                      </div>
+                      <div>
+                        Resonance
+                        <span style={{ fontWeight: 700, color: getMetricScoreColor(avgResonance), marginLeft: 4 }}>
+                          {avgResonance || '—'}
+                        </span>
+                      </div>
+                      <div>
+                        Execution
+                        <span style={{ fontWeight: 700, color: getMetricScoreColor(avgExecution), marginLeft: 4 }}>
+                          {avgExecution || '—'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  </>
                 ) : null}
-
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 11,
-                    lineHeight: 1.4,
-                    color: 'rgba(67,67,43,0.38)',
-                    display: 'flex',
-                    gap: 20,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <div>
-                    Identity
-                    <span style={{ fontWeight: 700, color: getMetricScoreColor(avgIdentity), marginLeft: 4 }}>
-                      {avgIdentity || '—'}
-                    </span>
-                  </div>
-                  <div>
-                    Resonance
-                    <span style={{ fontWeight: 700, color: getMetricScoreColor(avgResonance), marginLeft: 4 }}>
-                      {avgResonance || '—'}
-                    </span>
-                  </div>
-                  <div>
-                    Execution
-                    <span style={{ fontWeight: 700, color: getMetricScoreColor(avgExecution), marginLeft: 4 }}>
-                      {avgExecution || '—'}
-                    </span>
-                  </div>
-                </div>
               </div>
             ) : null}
           </div>
@@ -950,7 +1038,7 @@ export default function CollectionPage({
                   key={analysis.id}
                   analysis={analysis}
                   execution_notes={analysis.execution_notes ?? null}
-                  onClick={() => router.push('/spec')}
+                  onClick={() => handleOpenExistingPiece(analysis)}
                   onDelete={() => handleDeletePiece(analysis.id)}
                 />
               ))

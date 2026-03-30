@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import type { CollectionRoleId } from "@/lib/store/sessionStore";
@@ -15,6 +15,10 @@ import type {
 import { calculateCOGS, generateInsight, checkExecutionFeasibility, applyRoleModifiers } from "@/lib/spec-studio/calculator";
 import { findAlternativeMaterial, findUpgradeMaterial, checkSelectedMaterialConflict } from "@/lib/spec-studio/material-matcher";
 import { getMaterialProperties } from "@/lib/spec-studio/material-properties";
+import {
+  findMaterialMention as resolveMaterialMention,
+  findClosestMaterialMatch,
+} from "@/lib/spec-studio/material-resolver";
 import {
   CONSTRUCTION_INFO,
   getOverrideWarning,
@@ -46,6 +50,7 @@ import {
 import { buildAnalysisRow, AGENT_VERSIONS } from "@/lib/agents/orchestrator-shared";
 import type { PipelineBlackboard, AnalysisResult as AnalysisResultOrch } from "@/lib/agents/orchestrator-shared";
 import { createClient } from "@/lib/supabase/client";
+import { hydrateSpecSessionFromAnalysis, type PersistedSpecAnalysisRow } from "@/lib/collections/hydrateSpecSessionFromAnalysis";
 import type { SpecSuggestion } from "@/lib/types/next-move";
 import { ScorecardModal } from "@/components/spec-studio/ScorecardModal";
 import { ResizableSplitPanel } from "@/components/ui/ResizableSplitPanel";
@@ -209,6 +214,33 @@ function getMissingSchemaColumn(error: unknown) {
   if (record.code !== "PGRST204" || typeof record.message !== "string") return null;
   const match = record.message.match(/'([^']+)' column/);
   return match?.[1] ?? null;
+}
+
+function resolveBetterPathConstructionTier(
+  title: string | null | undefined,
+  description: string | null | undefined,
+  currentTier: ConstructionTier | null,
+): ConstructionTier | null {
+  const normalized = `${title ?? ""} ${description ?? ""}`.toLowerCase();
+
+  if (normalized.includes("low tier") || normalized.includes("tier low")) {
+    return "low";
+  }
+
+  if (normalized.includes("moderate tier") || normalized.includes("tier moderate")) {
+    return "moderate";
+  }
+
+  if (normalized.includes("high tier") || normalized.includes("tier high")) {
+    return "high";
+  }
+
+  if (normalized.includes("down one tier")) {
+    if (currentTier === "high") return "moderate";
+    if (currentTier === "moderate") return "low";
+  }
+
+  return null;
 }
 
 async function runAnalysisMutationWithSchemaFallback(
@@ -881,10 +913,11 @@ function getRoleLabel(role: CollectionRoleId | null | undefined) {
   return "Piece";
 }
 
-export default function SpecStudioPage() {
+function SpecStudioPageContent() {
   const contextBarRef = useRef<HTMLDivElement | null>(null);
   const [contextBarHeight, setContextBarHeight] = useState(COLLECTION_CONTEXT_BAR_OFFSET);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const previousMaterialIdRef = useRef<string | null>(null);
   const materialDeltaTimeoutRef = useRef<number | null>(null);
   const { setCategory, setSubcategory: setStoreSubcategory, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setSelectedKeyPiece, setActiveProductPieceId, setPieceBuildContext, setCollectionName, setSeason, setActiveCollection } = useSessionStore();
@@ -944,6 +977,7 @@ export default function SpecStudioPage() {
   const [selectedLevers, setSelectedLevers] = useState<Set<string>>(new Set());
   const [leverNotesSaved, setLeverNotesSaved] = useState(false);
   const [showBetterPathConfirm, setShowBetterPathConfirm] = useState(false);
+  const [betterPathApplyMessage, setBetterPathApplyMessage] = useState<string | null>(null);
   const [materialSelectionDelta, setMaterialSelectionDelta] = useState<{
     cogs: number;
     leadTime: number;
@@ -1026,6 +1060,66 @@ export default function SpecStudioPage() {
         });
     });
   }, []);
+
+  useEffect(() => {
+    const analysisId = searchParams.get("analysis")?.trim();
+    if (!analysisId) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+
+      const { data, error } = await supabase
+        .from("analyses")
+        .select("*")
+        .eq("id", analysisId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (cancelled || error || !data) return;
+
+      const row = data as PersistedSpecAnalysisRow;
+      const resolvedCollectionName =
+        row.collection_name?.trim() ||
+        useSessionStore.getState().collectionName ||
+        "";
+      if (!resolvedCollectionName) return;
+
+      const snapshot = hydrateSpecSessionFromAnalysis(resolvedCollectionName, row);
+      const restoredCategoryId =
+        categories.find(
+          (category) =>
+            category.id === snapshot.categoryId ||
+            category.name.toLowerCase() === snapshot.categoryName.toLowerCase()
+        )?.id ?? categories[0].id;
+
+      setCategoryId(restoredCategoryId);
+      setSubcategoryId(snapshot.subcategoryId);
+      setMaterialId(snapshot.materialId);
+      setConstructionTier(snapshot.constructionTier);
+      setConstructionConfirmed(Boolean(snapshot.constructionTier));
+      setOverrideWarning(null);
+      setUserManuallySelected(Boolean(snapshot.materialId));
+      setSpecStep("material");
+      setSpecStepDirection(1);
+      if (snapshot.season) {
+        const isFW =
+          snapshot.season.toLowerCase().includes("fw") || snapshot.season.toLowerCase().includes("fall");
+        setTimelineWeeks(isFW ? 24 : 20);
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [categories, searchParams]);
 
   const [headerCollectionName, setHeaderCollectionName] = useState("Desert Mirage");
   const [headerSeasonLabel, setHeaderSeasonLabel] = useState("SS26");
@@ -2528,12 +2622,22 @@ export default function SpecStudioPage() {
   ]);
   const activeSpecRail = specRailInsight ?? specFallbackRail;
   const showBetterPath = activeSpecRail ? shouldShowBetterPath(activeSpecRail) : false;
+  const betterPathMaterial = useMemo(() => {
+    if (!activeSpecRail || activeSpecRail.decision.direction !== "swap_material") return null;
+    const source = `${activeSpecRail.alternative_path.title} ${activeSpecRail.alternative_path.description}`;
+    return resolveMaterialMention(source, materials);
+  }, [activeSpecRail, materials]);
+  const displayRecommendedMaterialId =
+    betterPathMaterial && recommendedMaterialId === materialId
+      ? betterPathMaterial.id
+      : recommendedMaterialId;
 
   useEffect(() => {
     const nextLevers = activeSpecRail?.execution_levers ?? [];
     setSelectedLevers(new Set(nextLevers));
     setShowBetterPathConfirm(false);
-  }, [activeSpecRail?.execution_levers]);
+    setBetterPathApplyMessage(null);
+  }, [activeSpecRail]);
 
   useEffect(() => () => {
     if (leverNotesSavedTimeoutRef.current) {
@@ -2725,21 +2829,55 @@ export default function SpecStudioPage() {
 
   const handleConfirmBetterPath = useCallback(async () => {
     if (!activeSpecRail) return;
+    setBetterPathApplyMessage(null);
 
     const nextNote = `${activeSpecRail.alternative_path.title}: ${activeSpecRail.alternative_path.description}`;
     const nextNotes = Array.from(new Set([...executionNotes, nextNote]));
     setExecutionNotes(nextNotes);
     await persistExecutionNotes(nextNotes);
 
-    const description = activeSpecRail.alternative_path.description.toLowerCase();
-    if (description.includes("low-moderate")) {
-      setConstructionTier("low");
-    } else if (description.includes(" moderate") && !description.includes("low-moderate")) {
-      setConstructionTier("moderate");
+    const nextTier = resolveBetterPathConstructionTier(
+      activeSpecRail.alternative_path.title,
+      activeSpecRail.alternative_path.description,
+      constructionTier,
+    );
+    let appliedMaterialId: string | null = null;
+    if (activeSpecRail.decision.direction === "swap_material") {
+      const source = `${activeSpecRail.alternative_path.title} ${activeSpecRail.alternative_path.description}`;
+      const exactMaterial = resolveMaterialMention(source, materials);
+      const closestMaterial = exactMaterial ?? findClosestMaterialMatch(source, materials);
+
+      if (closestMaterial && closestMaterial.id !== materialId) {
+        handleMaterialSelection(closestMaterial.id);
+        appliedMaterialId = closestMaterial.id;
+        if (!exactMaterial) {
+          setBetterPathApplyMessage(`Applied closest library match: ${closestMaterial.name}.`);
+        }
+      } else if (closestMaterial && closestMaterial.id === materialId) {
+        setBetterPathApplyMessage("Better Path resolved to the material already selected, so nothing changed.");
+      } else if (!closestMaterial) {
+        setBetterPathApplyMessage("Better Path could not be mapped to a library material, so nothing changed.");
+      }
+    }
+
+    if (nextTier) {
+      handleComplexityChange(nextTier);
+    }
+    if (!appliedMaterialId && !nextTier && activeSpecRail.decision.direction !== "swap_material") {
+      setBetterPathApplyMessage("Better Path did not include an actionable material or construction change.");
     }
 
     setShowBetterPathConfirm(false);
-  }, [activeSpecRail, executionNotes, persistExecutionNotes, setConstructionTier]);
+  }, [
+    activeSpecRail,
+    constructionTier,
+    executionNotes,
+    handleComplexityChange,
+    handleMaterialSelection,
+    materialId,
+    materials,
+    persistExecutionNotes,
+  ]);
 
   const persistCurrentPiece = useCallback(async () => {
     const supabase = createClient();
@@ -3253,7 +3391,7 @@ export default function SpecStudioPage() {
                       .slice(0, showAllMaterials ? undefined : 6)
                       .map((mat) => {
                         const isSel = materialId === mat.id;
-                        const isRecommended = mat.id === recommendedMaterialId;
+                        const isRecommended = mat.id === displayRecommendedMaterialId;
                         return (
                           <button
                             key={mat.id}
@@ -3725,7 +3863,11 @@ export default function SpecStudioPage() {
                   {showBetterPathConfirm ? (
                     <div style={{ marginTop: 12 }}>
                       <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.7)", lineHeight: 1.58, marginBottom: 10 }}>
-                        This will update your construction detail. Apply better path?
+                        {activeSpecRail.decision.direction === "swap_material"
+                          ? betterPathMaterial
+                            ? `This will switch the material to ${betterPathMaterial.name}. Apply better path?`
+                            : "This will try to switch to the recommended library material. Apply better path?"
+                          : "This will update your construction detail. Apply better path?"}
                       </div>
                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                         <button
@@ -3761,6 +3903,11 @@ export default function SpecStudioPage() {
                           Cancel
                         </button>
                       </div>
+                    </div>
+                  ) : null}
+                  {betterPathApplyMessage ? (
+                    <div style={{ marginTop: 10, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.56)", lineHeight: 1.5 }}>
+                      {betterPathApplyMessage}
                     </div>
                   ) : null}
                 </section>
@@ -3818,9 +3965,7 @@ export default function SpecStudioPage() {
           border-right: 1px solid rgba(67,67,43,0.07);
         }
         .specStudioRight {
-          background:
-            radial-gradient(circle at top left, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0) 34%),
-            linear-gradient(180deg, rgba(250,249,246,0.9) 0%, rgba(245,242,235,0.96) 100%);
+          background: #F5F2EB;
           position: relative;
         }
         .specStudioSticky {
@@ -3936,5 +4081,13 @@ export default function SpecStudioPage() {
         );
       })()}
     </div>
+  );
+}
+
+export default function SpecStudioPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <SpecStudioPageContent />
+    </React.Suspense>
   );
 }

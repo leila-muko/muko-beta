@@ -14,6 +14,7 @@ import {
   determineSpecMode,
   buildSpecFallbackRail,
   parseSpecRailOutput,
+  validateSpecRailOutput,
 } from '@/lib/synthesizer/specInsight';
 import { mapSpecRailToInsightData } from '@/lib/synthesizer/specDecision';
 
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
         // Parse v7.0 JSON output and emit complete event
         try {
           const parsed = parseSpecRailOutput(accumulated);
-          if (!parsed) {
+          if (!parsed || !validateSpecRailOutput(parsed, blackboard)) {
             console.warn('[SpecRoute] Invalid JSON in response, emitting fallback');
             emit('fallback', JSON.stringify(makeFallback(blackboard)));
             return;
