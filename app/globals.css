@@ -148,6 +148,15 @@
   }
 }
 
+@keyframes mukoSpinnerRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Pulse container glow animation (if not already present) */
 @keyframes pulse-container-glow {
   0%, 100% {

@@ -332,12 +332,13 @@ export async function runAnalysis(
     } else {
       const categoryForCOGS = CATEGORIES_MAP[input.category] as { yards_required?: number } | undefined;
       const yardage = categoryForCOGS?.yards_required ?? 2.0;
+      const cogsTargetMsrp = input.target_msrp != null && input.target_msrp > 0 ? input.target_msrp : 0;
       const cogsBreakdown = calculateCOGS(
         resolvedMaterial as unknown as Parameters<typeof calculateCOGS>[0],
         yardage,
         input.construction_tier,
         input.lined ?? false,
-        input.target_msrp,
+        cogsTargetMsrp,
         brandProfile.target_margin,
       );
       bb.cogs = cogsBreakdown.totalCOGS;
@@ -349,13 +350,20 @@ export async function runAnalysis(
 
   // ── Step 7: Margin gate ──────────────────────────────────────────────────────
   try {
-    const gate = calculator.checkMarginGate(
-      bb.cogs,
-      input.target_msrp,
-      brandProfile.target_margin
-    );
-    bb.gate_passed = gate.gate_passed;
-    bb.cogs_delta  = gate.cogs_delta;
+    const effectiveMSRP = (input.target_msrp && input.target_msrp > 0) ? input.target_msrp : null;
+
+    let costGateResult: boolean | null;
+    if (effectiveMSRP === null) {
+      costGateResult = null;
+      bb.cogs_delta = 0;
+    } else {
+      const ceiling = effectiveMSRP * (1 - brandProfile.target_margin);
+      const delta = bb.cogs - ceiling;
+      costGateResult = delta <= 0;
+      bb.cogs_delta = Math.round(delta);
+    }
+
+    bb.gate_passed = costGateResult;
   } catch (err) {
     errors.push({ agent: 'calculator.checkMarginGate', message: String(err) });
     console.error('[Orchestrator] calculator.checkMarginGate failed:', err);
@@ -378,7 +386,7 @@ export async function runAnalysis(
       ? applyRoleModifiers(
           blended,
           session.collectionRole,
-          { cost: bb.gate_passed },
+          { cost: bb.gate_passed === true },
           input.construction_tier
         )
       : blended;
@@ -389,13 +397,13 @@ export async function runAnalysis(
 
   // ── Step 9: Redirect selection ───────────────────────────────────────────────
   try {
-    bb.redirect = redirects.selectRedirect(
-      input.material_id,
-      bb.aesthetic_matched_id,
-      bb.gate_passed,
-      bb.identity_score,
-      bb.execution_score,
-      brandProfile
+      bb.redirect = redirects.selectRedirect(
+        input.material_id,
+        bb.aesthetic_matched_id,
+        bb.gate_passed === true,
+        bb.identity_score,
+        bb.execution_score,
+        brandProfile
     );
   } catch (err) {
     errors.push({ agent: 'redirects.selectRedirect', message: String(err) });

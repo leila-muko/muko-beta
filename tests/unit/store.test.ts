@@ -35,7 +35,7 @@ vi.hoisted(() => {
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import type { KeyPiece, CollectionRoleId } from '@/lib/store/sessionStore';
 import { getSmartDefault, SMART_DEFAULTS } from '@/lib/spec-studio/smart-defaults';

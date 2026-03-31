@@ -110,12 +110,12 @@ export function checkExecutionFeasibility({
 export function applyRoleModifiers(
   baseScore: number,
   role: string,
-  gatesPassed: { cost: boolean },
+  gatesPassed: { cost: boolean | null },
   constructionTier: string
 ): number {
   let score = baseScore;
-  if (role === 'volume-driver' && !gatesPassed.cost) score *= 0.65;
-  if (role === 'hero' && !gatesPassed.cost) score *= 0.92;
+  if (role === 'volume-driver' && gatesPassed.cost === false) score *= 0.65;
+  if (role === 'hero' && gatesPassed.cost === false) score *= 0.92;
   if (role === 'volume-driver' && constructionTier === 'high') score *= 0.88;
   return Math.round(score);
 }

@@ -12,29 +12,31 @@ const LIMITS = {
 export function validatePiecesReadOutput(
   input: PiecesReadInput,
   output: unknown
-): { valid: true; data: PiecesReadOutput } | { valid: false; errors: string[] } {
+): { valid: true; data: PiecesReadOutput; warnings: string[] } | { valid: false; errors: string[] } {
   const errors: string[] = [];
+  const warnings: string[] = [];
   const candidate = output as Partial<PiecesReadOutput> | null;
+  const sanitizedPieceMicrocopy: NonNullable<PiecesReadOutput["piece_microcopy"]> = [];
 
   if (!candidate || typeof candidate !== "object") {
     return { valid: false, errors: ["Output is not an object"] };
   }
 
-  validateString(candidate.read_headline, "read_headline", LIMITS.read_headline, errors);
-  validateString(candidate.read_body, "read_body", LIMITS.read_body, errors);
-  validateString(candidate.how_to_lean_in, "how_to_lean_in", LIMITS.how_to_lean_in, errors);
-  validateString(candidate.start_here_title, "start_here_title", LIMITS.start_here_title, errors);
-  validateString(candidate.start_here_body, "start_here_body", LIMITS.start_here_body, errors);
+  validateString(candidate.read_headline, "read_headline", LIMITS.read_headline, errors, warnings, "warn");
+  validateString(candidate.read_body, "read_body", LIMITS.read_body, errors, warnings, "warn");
+  validateString(candidate.how_to_lean_in, "how_to_lean_in", LIMITS.how_to_lean_in, errors, warnings, "warn");
+  validateString(candidate.start_here_title, "start_here_title", LIMITS.start_here_title, errors, warnings, "warn");
+  validateString(candidate.start_here_body, "start_here_body", LIMITS.start_here_body, errors, warnings, "warn");
 
   if (typeof candidate.read_body === "string") {
     const specificityChecks = buildSpecificityChecks(input);
     const hits = specificityChecks.filter((value) => containsToken(candidate.read_body ?? "", value));
     if (hits.length < 2) {
-      errors.push("read_body is too generic for the supplied collection state");
+      warnings.push("read_body is too generic for the supplied collection state");
     }
 
     if (!containsToken(candidate.read_headline ?? "", input.movement.name) && !containsToken(candidate.read_body, input.movement.name)) {
-      errors.push("read must reference the actual direction name");
+      warnings.push("read should reference the actual direction name");
     }
 
     if (isGenericCopy(candidate.read_headline ?? "") || isGenericCopy(candidate.read_body)) {
@@ -59,10 +61,19 @@ export function validatePiecesReadOutput(
         }
         const pieceName = "piece_name" in entry ? entry.piece_name : undefined;
         const microcopy = "microcopy" in entry ? entry.microcopy : undefined;
-        validateString(pieceName, `piece_microcopy[${index}].piece_name`, undefined, errors);
-        validateString(microcopy, `piece_microcopy[${index}].microcopy`, LIMITS.piece_microcopy, errors);
-        if (suggestedNames.size > 0 && typeof pieceName === "string" && !suggestedNames.has(pieceName)) {
-          errors.push(`piece_microcopy[${index}] references unknown piece`);
+        validateString(pieceName, `piece_microcopy[${index}].piece_name`, undefined, errors, warnings, "hard");
+        validateString(microcopy, `piece_microcopy[${index}].microcopy`, LIMITS.piece_microcopy, errors, warnings, "warn");
+        if (
+          typeof pieceName === "string" &&
+          typeof microcopy === "string" &&
+          suggestedNames.has(pieceName)
+        ) {
+          sanitizedPieceMicrocopy.push({
+            piece_name: pieceName,
+            microcopy,
+          });
+        } else if (typeof pieceName === "string" && !suggestedNames.has(pieceName)) {
+          errors.push(`piece_microcopy[${index}].piece_name must match a suggested piece`);
         }
       });
     }
@@ -83,17 +94,36 @@ export function validatePiecesReadOutput(
     return { valid: false, errors };
   }
 
-  return { valid: true, data: candidate as PiecesReadOutput };
+  return {
+    valid: true,
+    data: {
+      ...candidate,
+      ...(candidate.piece_microcopy != null ? { piece_microcopy: sanitizedPieceMicrocopy } : {}),
+    } as PiecesReadOutput,
+    warnings,
+  };
 }
 
-function validateString(value: unknown, field: string, maxWords: number | undefined, errors: string[]) {
+function validateString(
+  value: unknown,
+  field: string,
+  maxWords: number | undefined,
+  errors: string[],
+  warnings: string[],
+  wordLimitMode: "hard" | "warn"
+) {
   if (typeof value !== "string" || value.trim().length === 0) {
     errors.push(`${field} must be a non-empty string`);
     return;
   }
 
   if (maxWords != null && wordCount(value) > maxWords) {
-    errors.push(`${field} exceeds ${maxWords} words`);
+    const issue = `${field} exceeds ${maxWords} words`;
+    if (wordLimitMode === "hard") {
+      errors.push(issue);
+    } else {
+      warnings.push(issue);
+    }
   }
 }
 

@@ -83,14 +83,14 @@ describe('ANALYSIS RECORD WRITES', () => {
     const { data, error } = await supabase
       .from('analyses')
       .select('piece_name, collection_role, collection_aesthetic, aesthetic_inflection')
-      .eq('id', inserted.id)
+      .eq('id', inserted!.id)
       .single();
 
     expect(error).toBeNull();
-    expect(data.piece_name).toBe('Test Cape');
-    expect(data.collection_role).toBe('hero');
-    expect(data.collection_aesthetic).toBe('Dark Romanticism');
-    expect(data.aesthetic_inflection).toBe('with structural precision');
+    expect(data!.piece_name).toBe('Test Cape');
+    expect(data!.collection_role).toBe('hero');
+    expect(data!.collection_aesthetic).toBe('Dark Romanticism');
+    expect(data!.aesthetic_inflection).toBe('with structural precision');
   });
 
   it('dimensions JSONB has keys: identity, resonance, execution — all integers 0–100', async () => {
@@ -101,11 +101,11 @@ describe('ANALYSIS RECORD WRITES', () => {
       .single();
 
     expect(error).toBeNull();
-    expect(data.dimensions).toHaveProperty('identity');
-    expect(data.dimensions).toHaveProperty('resonance');
-    expect(data.dimensions).toHaveProperty('execution');
+    expect(data!.dimensions).toHaveProperty('identity');
+    expect(data!.dimensions).toHaveProperty('resonance');
+    expect(data!.dimensions).toHaveProperty('execution');
 
-    const dims = data.dimensions as Record<string, number>;
+    const dims = data!.dimensions as Record<string, number>;
     for (const key of ['identity', 'resonance', 'execution']) {
       const val = dims[key];
       expect(typeof val, `dimensions.${key} should be a number`).toBe('number');
@@ -123,7 +123,7 @@ describe('ANALYSIS RECORD WRITES', () => {
       .single();
 
     expect(error).toBeNull();
-    const gates = data.gates_passed as { cost: boolean; sustainability: boolean | null };
+    const gates = data!.gates_passed as { cost: boolean; sustainability: boolean | null };
     expect(typeof gates.cost).toBe('boolean');
     expect('sustainability' in gates).toBe(true);
     expect(gates.sustainability).toBeNull();
@@ -137,7 +137,7 @@ describe('ANALYSIS RECORD WRITES', () => {
       .single();
 
     expect(error).toBeNull();
-    const versions = data.agent_versions as Record<string, string>;
+    const versions = data!.agent_versions as Record<string, string>;
     for (const key of ['orchestrator', 'calculator', 'researcher', 'critic', 'synthesizer']) {
       expect(versions, `agent_versions should have key: ${key}`).toHaveProperty(key);
       expect(typeof versions[key]).toBe('string');
@@ -152,7 +152,7 @@ describe('ANALYSIS RECORD WRITES', () => {
       .single();
 
     expect(error).toBeNull();
-    expect(typeof data.data_version).toBe('string');
+    expect(typeof data!.data_version).toBe('string');
   });
 
   it('score is an integer, not a float', async () => {
@@ -163,8 +163,8 @@ describe('ANALYSIS RECORD WRITES', () => {
       .single();
 
     expect(error).toBeNull();
-    expect(typeof data.score).toBe('number');
-    expect(Number.isInteger(data.score)).toBe(true);
+    expect(typeof data!.score).toBe('number');
+    expect(Number.isInteger(data!.score)).toBe(true);
   });
 });
 
@@ -197,9 +197,9 @@ describe('COLLECTION-FIRST MODEL', () => {
       .single();
 
     expect(collErr).toBeNull();
-    expect(collection.analysis_ids).toHaveLength(3);
+    expect(collection!.analysis_ids).toHaveLength(3);
     for (const id of analysisIds) {
-      expect(collection.analysis_ids).toContain(id);
+      expect(collection!.analysis_ids).toContain(id);
     }
   });
 
@@ -232,12 +232,12 @@ describe('COLLECTION-FIRST MODEL', () => {
     const { data, error } = await supabase
       .from('analyses')
       .select('piece_name, collection_role')
-      .eq('id', inserted.id)
+      .eq('id', inserted!.id)
       .single();
 
     expect(error).toBeNull();
-    expect(data.piece_name).toBe('Test Cape');
-    expect(data.collection_role).toBe('hero');
+    expect(data!.piece_name).toBe('Test Cape');
+    expect(data!.collection_role).toBe('hero');
   });
 
   it('aesthetic_inflection can differ per piece (it is piece-level, not collection-level)', async () => {
@@ -367,10 +367,10 @@ describe('MARGIN GATE DATA INTEGRITY', () => {
       .single();
 
     expect(error).toBeNull();
-    const gates = data.gates_passed as { cost: boolean; sustainability: boolean | null };
+    const gates = data!.gates_passed as { cost: boolean; sustainability: boolean | null };
     expect(gates.cost).toBe(false);
-    expect(data.score).toBe(penalizedScore);
-    expect(data.score).toBeLessThan(baseScore);
+    expect(data!.score).toBe(penalizedScore);
+    expect(data!.score).toBeLessThan(baseScore);
   });
 
   it('analysis with gate pass: gates_passed.cost = true AND score is base score (no penalty)', async () => {
@@ -381,9 +381,9 @@ describe('MARGIN GATE DATA INTEGRITY', () => {
       .single();
 
     expect(error).toBeNull();
-    const gates = data.gates_passed as { cost: boolean };
+    const gates = data!.gates_passed as { cost: boolean };
     expect(gates.cost).toBe(true);
-    expect(data.score).toBe(72);
+    expect(data!.score).toBe(72);
   });
 
   it('score is never stored as a float (must be integer)', async () => {

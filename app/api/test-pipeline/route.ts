@@ -26,7 +26,7 @@ function computeCOGS(input: AnalysisInput, brand: BrandProfile): number {
       yardage,
       input.construction_tier,
       false,
-      input.target_msrp,
+      input.target_msrp != null && input.target_msrp > 0 ? input.target_msrp : 0,
       brand.target_margin,
     );
     return breakdown.totalCOGS;

@@ -161,6 +161,22 @@ describe("pieces read helpers", () => {
     expect(result.valid).toBe(false);
   });
 
+  it("keeps structurally valid output even when specificity is soft", () => {
+    const result = validatePiecesReadOutput(baseInput, {
+      read_headline: "Refined Utility needs a harder opening claim.",
+      read_body: "The assortment needs a more specific opening move before the range reads clearly in market.",
+      how_to_lean_in: "Add the missing anchor piece before extending the assortment further.",
+      start_here_title: "Start with the Midi",
+      start_here_body: "Start with Open-knit Crochet Midi because it makes the collection direction legible early.",
+      piece_microcopy: [],
+    });
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.warnings.length).toBeGreaterThan(0);
+    }
+  });
+
   it("rejects generic output that ignores the supplied collection state", () => {
     const result = validatePiecesReadOutput(baseInput, {
       read_headline: "Lead with the clearest piece.",

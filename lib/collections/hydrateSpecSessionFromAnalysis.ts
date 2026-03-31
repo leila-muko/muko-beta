@@ -8,6 +8,7 @@ import { hydrateCollectionContextFromAnalysis, type PersistedCollectionContextRo
 
 export interface PersistedSpecAnalysisRow extends PersistedCollectionContextRow {
   id: string;
+  brand_profile_id?: string | null;
   collection_name?: string | null;
   piece_name?: string | null;
   category: string | null;
@@ -124,7 +125,7 @@ export function deriveSpecSessionSnapshot(row: PersistedSpecAnalysisRow) {
     silhouette: row.silhouette?.trim() || "",
     constructionTier: row.construction_tier ?? "moderate",
     constructionTierOverride: Boolean(row.construction_tier_override),
-    targetMsrp: row.target_msrp ?? 0,
+    targetMsrp: row.target_msrp ?? null,
     role,
     selectedPieceImage: storedPieceImage,
     selectedKeyPiece,
@@ -163,6 +164,12 @@ export function hydrateSpecSessionFromAnalysis(collectionName: string, row: Pers
   state.setSelectedPieceImage(snapshot.selectedPieceImage);
   state.setSelectedKeyPiece(snapshot.selectedKeyPiece);
   state.setPieceBuildContext(snapshot.pieceBuildContext);
+
+  // Restore brand_profile_id for returning users whose localStorage was cleared
+  if (row.brand_profile_id && !useSessionStore.getState().brandProfileId) {
+    state.setBrandProfileId(row.brand_profile_id);
+  }
+
   state.setPieceRolesById(
     snapshot.role
       ? {

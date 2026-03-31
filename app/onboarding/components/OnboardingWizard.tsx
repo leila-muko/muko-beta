@@ -39,6 +39,7 @@ export default function OnboardingWizard() {
   const router = useRouter();
   const supabase = createClient();
   const setSessionTargetMargin = useSessionStore((state) => state.setTargetMargin);
+  const setBrandProfileId = useSessionStore((state) => state.setBrandProfileId);
   const [currentStep, setCurrentStep] = useState(1);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -144,6 +145,9 @@ export default function OnboardingWizard() {
 
       console.log('Brand profile created successfully:', data);
       setSessionTargetMargin(formData.targetMargin);
+      if (data?.id) {
+        setBrandProfileId(data.id as string);
+      }
       router.push('/entry');
     } catch (error: unknown) {
       console.error('Full error object:', error);

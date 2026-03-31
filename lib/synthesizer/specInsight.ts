@@ -73,11 +73,11 @@ export interface SpecBlackboard {
   /** Calculated cost of goods sold in USD */
   cogs_usd: number;
   /** Designer's target MSRP in USD */
-  target_msrp: number;
+  target_msrp: number | null;
   /** Margin buffer in USD after COGS ceiling is applied */
   margin_buffer?: number;
   /** True when the margin gate passes */
-  margin_pass: boolean;
+  margin_pass: boolean | null;
   /** Selected construction tier label */
   construction_tier: string;
   /** Execution score 0–100 */
@@ -138,7 +138,7 @@ export interface SynthesizerResult {
 // ─────────────────────────────────────────────
 
 export function determineSpecMode(
-  margin_pass: boolean,
+  margin_pass: boolean | null,
   execution_score: number,
   identity_score?: number | null,
   resonance_score?: number | null,
@@ -149,22 +149,22 @@ export function determineSpecMode(
   }
 
   // amplify: margin_pass AND execution_score >= 85 AND identity_score >= 80
-  if (margin_pass && execution_score >= 85 && identity_score != null && identity_score >= 80) {
+  if (margin_pass === true && execution_score >= 85 && identity_score != null && identity_score >= 80) {
     return { mode: 'amplify', editLabel: 'WHY THIS WORKS NOW' };
   }
 
   // invest: margin_pass AND execution_score >= 70
-  if (margin_pass && execution_score >= 70) {
+  if (margin_pass === true && execution_score >= 70) {
     return { mode: 'invest', editLabel: 'WHY THIS WORKS NOW' };
   }
 
   // differentiate: margin_pass AND 50 <= execution_score < 70
-  if (margin_pass && execution_score >= 50) {
+  if (margin_pass === true && execution_score >= 50) {
     return { mode: 'differentiate', editLabel: 'WHY THIS WORKS NOW' };
   }
 
   // reconsider: NOT margin_pass AND execution_score >= 70
-  if (!margin_pass && execution_score >= 70) {
+  if (margin_pass === false && execution_score >= 70) {
     return { mode: 'reconsider', editLabel: 'WHY THIS WORKS NOW' };
   }
 
@@ -357,9 +357,12 @@ export function buildSpecSystemPrompt(bb: SpecBlackboard): string {
 export function buildSpecPrompt(bb: SpecBlackboard): string {
   const availableMaterials = Array.isArray(bb.available_materials) ? bb.available_materials : [];
   const targetMargin = bb.target_margin ?? 0.60;
-  const cogsTarget = bb.target_msrp > 0 ? bb.target_msrp * (1 - targetMargin) : 0;
-  const marginGap = bb.cogs_usd - cogsTarget;
-  const marginBuffer = bb.margin_buffer ?? Math.round((cogsTarget - bb.cogs_usd) * 100) / 100;
+  const effectiveTargetMsrp = bb.target_msrp != null && bb.target_msrp > 0 ? bb.target_msrp : null;
+  const cogsTarget = effectiveTargetMsrp != null ? effectiveTargetMsrp * (1 - targetMargin) : 0;
+  const marginGap = effectiveTargetMsrp != null ? bb.cogs_usd - cogsTarget : null;
+  const marginBuffer = effectiveTargetMsrp != null
+    ? (bb.margin_buffer ?? Math.round((cogsTarget - bb.cogs_usd) * 100) / 100)
+    : null;
 
   const conceptContext = (bb.aesthetic_name != null || bb.brand_name != null || bb.brand_keywords.length > 0)
     ? {
@@ -411,9 +414,9 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
     },
     financials: {
       cogs_actual: bb.cogs_usd,
-      cogs_target: Math.round(cogsTarget * 100) / 100,
+      cogs_target: effectiveTargetMsrp != null ? Math.round(cogsTarget * 100) / 100 : null,
       margin_buffer: marginBuffer,
-      margin_gap: Math.round(marginGap * 100) / 100,
+      margin_gap: marginGap != null ? Math.round(marginGap * 100) / 100 : null,
       cost_passed: bb.margin_pass,
     },
     feasibility: {
@@ -548,7 +551,7 @@ export function buildSpecFallbackRail(bb: SpecBlackboard): SpecRailInsight {
     category: bb.category,
     silhouette: bb.silhouette,
     construction_tier: bb.construction_tier,
-    target_msrp: bb.target_msrp,
+    target_msrp: bb.target_msrp != null && bb.target_msrp > 0 ? bb.target_msrp : 0,
     cogs_usd: bb.cogs_usd,
     timeline_weeks: bb.timeline_weeks,
     required_timeline_weeks: bb.required_timeline_weeks,

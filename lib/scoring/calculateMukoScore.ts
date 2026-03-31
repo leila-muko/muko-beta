@@ -16,7 +16,7 @@ export function calculateMukoScore(
     dimensions.resonance_score * WEIGHTS.resonance +
     dimensions.execution_score * WEIGHTS.execution;
 
-  if (!gates.margin_gate_passed) {
+  if (gates.margin_gate_passed === false) {
     base_score *= 0.7; // 30% penalty for margin failure
   }
 

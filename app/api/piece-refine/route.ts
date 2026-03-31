@@ -34,7 +34,11 @@ interface PieceRefinementRequest {
   };
   user_input?: string;
   current_expression?: string;
+  ask_muko_context?: string;
+  selected_category?: string;
+  selected_subcategory?: string;
   selected_role?: string;
+  source_rationale?: string;
   existing_pieces?: Array<{
     name: string;
     role: string;
@@ -105,6 +109,18 @@ function titleCase(value: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function normalizeRoleLabel(
+  value?: string | null
+): PieceRefinementResponse["role"] | null {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "hero") return "Hero";
+  if (normalized === "volume-driver" || normalized === "volume driver") return "Volume Driver";
+  if (normalized === "core-evolution" || normalized === "core evolution") return "Core Evolution";
+  if (normalized === "directional" || normalized === "directional signal") return "Directional Signal";
+  return null;
 }
 
 function limitToSentenceCount(value: string, maxSentences = MAX_SENTENCES) {
@@ -192,6 +208,28 @@ function buildFallback(
     role: roleType,
     category: mappedCategory,
     subcategory: mappedSubcategory,
+  };
+}
+
+function buildLockedRoleFallback(
+  fallback: PieceRefinementResponse,
+  selectedRole: PieceRefinementResponse["role"],
+  userInput: string,
+  silhouette: string
+): PieceRefinementResponse {
+  const pieceLabel = titleCase(userInput || "piece");
+
+  const readByRole: Record<PieceRefinementResponse["role"], string> = {
+    Hero: `${pieceLabel} should operate as the collection's statement piece. The value comes from giving it enough visual authority to define the line without letting it drift into novelty.`,
+    "Volume Driver": `${pieceLabel} should work as a repeatable volume driver in the assortment. The risk is letting it slip into a generic version of the category instead of keeping the line deliberate inside the ${silhouette.toLowerCase()} silhouette language.`,
+    "Core Evolution": `${pieceLabel} should read as a core evolution for the collection. The value comes from updating what the brand already owns without losing the control that makes it feel familiar.`,
+    "Directional Signal": `${pieceLabel} should work as a directional signal in the collection. The value comes from pointing the line forward through clearer visual control rather than pushing it into novelty.`,
+  };
+
+  return {
+    ...fallback,
+    role: selectedRole,
+    read: readByRole[selectedRole],
   };
 }
 
@@ -324,10 +362,26 @@ export async function POST(req: NextRequest) {
     season: body.market?.season?.trim() || "current season",
   };
   const fallback = buildFallback(body, { saturation: market.saturation });
+  const askMukoContext = body.ask_muko_context?.trim();
+  const selectedRole = normalizeRoleLabel(body.selected_role);
+  const sourceRationale = body.source_rationale?.trim() || null;
+  const lockedFallback = selectedRole
+    ? buildLockedRoleFallback(
+        fallback,
+        selectedRole,
+        userInput,
+        body.collection?.silhouette?.trim() || "controlled proportion"
+      )
+    : fallback;
 
   const structuredPayload = {
     garment_archetype: archetype,
-    selected_role: body.selected_role?.trim() || null,
+    confirmed_piece_type: {
+      category: body.selected_category?.trim() || null,
+      subcategory: body.selected_subcategory?.trim() || null,
+    },
+    selected_role: selectedRole,
+    source_rationale: sourceRationale,
     existing_pieces: body.existing_pieces ?? [],
     piece_count: body.existing_pieces?.length ?? 0,
     collection: {
@@ -353,8 +407,12 @@ export async function POST(req: NextRequest) {
   };
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    return Response.json(fallback);
+    return Response.json(lockedFallback);
   }
+
+  const lockedRoleInstruction = selectedRole
+    ? `The piece role has already been determined by a prior Muko recommendation: ${selectedRole}. Do not reassign or suggest a different role. Your task is to refine the piece expression and construction language to serve that role well within the collection context. The rationale for this role was: ${sourceRationale ?? "No rationale was provided."}`
+    : "";
 
   const systemPrompt = `You are Muko, a fashion design partner inside a collection-building workflow.
 
@@ -376,7 +434,8 @@ Rules:
 - Produce exactly one refined expression.
 - The output must feel specific to this collection. If it could apply to another collection, it is wrong.
 - The garment_archetype object is non-negotiable. Treat it as structural law.
-- Determine the natural role before evaluating the piece. Do not force foundational pieces into statement roles.
+- If confirmed_piece_type is present, treat that category/subcategory as the designer's confirmed piece type when writing the read and refined_expression. Do not ignore it or drift into a different garment family.
+- ${selectedRole ? "Treat selected_role as locked before evaluating the piece. Do not re-determine the role." : "Determine the natural role before evaluating the piece. Do not force foundational pieces into statement roles."}
 - Before writing, force a position for the piece: Anchoring, Carrying, or Diluting. You must choose one internally, but do not label the response with that word unless it reads naturally.
 - "read" is the Muko's Take field. It must be 1 or 2 sentences max.
 - "read" must answer three things at a high level: what role this piece plays in the collection, what makes it work or fail, and what the risk is if it is handled too generically.
@@ -401,6 +460,7 @@ Rules:
 - Follow every silhouette_rules, construction_rules, and behavior_rules item.
 - Avoid every disallowed_behaviors item.
 - Respect category logic. If the result would not still be recognized as the original garment, it is invalid.
+- When confirmed_piece_type is present, make the read and refined_expression consistent with that confirmed piece type rather than re-inferring a different one from ambiguous wording alone.
 - Use line, proportion, surface, structure, control, volume, restraint. Do not drift into poetic or abstract phrasing.
 - Keep foundational pieces simple when that is the right job. Do not over-critique or over-design them.
 - Make the wording specific to THIS silhouette, THIS direction, and THIS palette. If it could apply to any jacket, any skirt, or any collection, rewrite it.
@@ -415,16 +475,18 @@ Rules:
 ROLE AND ASSORTMENT RULES
 When selected_role is present:
 - The read must reflect the specific job this role performs in the collection. A Hero read is different from a Volume Driver read — Hero copy should address statement and distinctiveness, Volume Driver copy should address repeatability and commercial breadth.
-- Do not recommend a role different from selected_role unless the piece genuinely cannot perform that role, and explain specifically why.
+- selected_role is locked. Do not reassign it, hedge it, or suggest a different role.
 
 When existing_pieces is present and non-empty:
 - The read must reference the collection context directly. If there are already two heroes, flag the tension. If this is the only bottom, name that it is anchoring the category.
 - refined_expression must account for how this piece sits relative to the pieces already in the collection — not just how it reads in isolation.
 
-Return valid JSON only. No markdown. No preamble.`;
+${lockedRoleInstruction ? `${lockedRoleInstruction}\n\n` : ""}Return valid JSON only. No markdown. No preamble.`;
 
   const userMessage = `${body.current_expression?.trim()
     ? `Current expression (rewrite this, do not paraphrase it): ${body.current_expression.trim()}\n`
+    : ''}${askMukoContext
+    ? `Strategic context from prior session: ${askMukoContext}. Use this as directional framing when assigning role and writing Muko's Take. If this context recommends a directional piece and the garment archetype supports it, weight toward Directional Signal or Volume Driver rather than Core Evolution.\n`
     : ''}Refine this custom piece proposal inside the given collection frame:
 ${JSON.stringify(structuredPayload, null, 2)}`;
 
@@ -440,7 +502,7 @@ ${JSON.stringify(structuredPayload, null, 2)}`;
 
     const content = response.content[0];
     if (content.type !== "text") {
-      return Response.json(fallback);
+      return Response.json(lockedFallback);
     }
 
     const parsed = parseJsonResponse(content.text);
@@ -458,20 +520,20 @@ ${JSON.stringify(structuredPayload, null, 2)}`;
     };
     const canUseModelOutput = validation.valid && looksCredibleForStage(scopedOutput);
     const safeExpression = canUseModelOutput
-      ? scopedOutput.refined_expression || fallback.refined_expression
-      : fallback.refined_expression;
+      ? scopedOutput.refined_expression || lockedFallback.refined_expression
+      : lockedFallback.refined_expression;
     const safeRead = canUseModelOutput
-      ? scopedOutput.read || fallback.read
-      : fallback.read;
+      ? scopedOutput.read || lockedFallback.read
+      : lockedFallback.read;
 
     return Response.json({
       read: safeRead,
       refined_expression: safeExpression,
-      role: parsed.role || fallback.role,
-      category: fallback.category,
-      subcategory: fallback.subcategory,
+      role: selectedRole ?? parsed.role ?? fallback.role,
+      category: lockedFallback.category,
+      subcategory: lockedFallback.subcategory,
     });
   } catch {
-    return Response.json(fallback);
+    return Response.json(lockedFallback);
   }
 }

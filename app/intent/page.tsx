@@ -373,7 +373,6 @@ export default function IntentCalibrationPage() {
   const router = useRouter();
 
   const {
-    setTargetMsrp: storeTargetMsrp,
     setTargetMargin: storeTargetMargin,
     setSuccessPriorities: storeSuccessPriorities,
     setSliderTrend: storeSliderTrend,
@@ -390,7 +389,6 @@ export default function IntentCalibrationPage() {
   const collectionName = useSessionStore((s) => s.collectionName);
 
   const [hasMounted, setHasMounted] = useState(false);
-  const [targetMsrp, setTargetMsrp] = useState<number>(0);
   const [targetMargin, setTargetMargin] = useState<number>(50);
   const [successPriorities, setSuccessPriorities] = useState<SuccessId[]>([]);
   const [sliderTrend, setSliderTrend] = useState(50);
@@ -409,7 +407,6 @@ export default function IntentCalibrationPage() {
   useEffect(() => {
     const persistedState = useSessionStore.getState();
     const timeoutId = window.setTimeout(() => {
-      setTargetMsrp(persistedState.targetMsrp ?? 0);
       setTargetMargin(persistedState.targetMargin > 0 ? persistedState.targetMargin : 50);
       setSuccessPriorities((persistedState.successPriorities as SuccessId[]) || []);
       setSliderTrend(persistedState.sliderTrend ?? 50);
@@ -431,7 +428,7 @@ export default function IntentCalibrationPage() {
       if (!user) return;
       const { data } = await supabase
         .from("brand_profiles")
-        .select("target_margin, target_msrp, keywords")
+        .select("target_margin, keywords")
         .eq("user_id", user.id)
         .single();
       if (!data) return;
@@ -440,18 +437,11 @@ export default function IntentCalibrationPage() {
         setTargetMargin(pct);
         storeTargetMargin(pct);
       }
-      if (data.target_msrp != null) {
-        setTargetMsrp(data.target_msrp);
-        storeTargetMsrp(data.target_msrp);
-      }
       if (data.keywords && Array.isArray(data.keywords)) {
         setBrandDnaChips(data.keywords as string[]);
       }
     })();
-  }, [storeTargetMargin, storeTargetMsrp, targetMargin, targetMsrp]);
-
-  const cogsCeiling =
-    targetMsrp > 0 && targetMargin > 0 ? Math.round(targetMsrp * (1 - targetMargin / 100)) : null;
+  }, [storeTargetMargin, targetMargin]);
   const weeksOut = deliveryWeeks(resolvedSeason);
 
   const sliderLabels = {
@@ -470,7 +460,6 @@ export default function IntentCalibrationPage() {
     elevatedLabel: sliderLabels.elevated,
     noveltyLabel: sliderLabels.novelty,
     targetMargin,
-    targetMsrp,
     sliderTrendValue: sliderTrend,
     sliderCreativeValue: sliderCreative,
     sliderElevatedValue: sliderElevated,
@@ -485,7 +474,6 @@ export default function IntentCalibrationPage() {
     elevatedLabel: sliderLabels.elevated,
     noveltyLabel: sliderLabels.novelty,
     targetMargin,
-    targetMsrp,
     sliderTrendValue: sliderTrend,
     sliderCreativeValue: sliderCreative,
     sliderElevatedValue: sliderElevated,
@@ -494,11 +482,6 @@ export default function IntentCalibrationPage() {
 
   const canContinue =
     resolvedCollectionName.trim().length > 0 && resolvedSeason.length > 0 && successPriorities.length > 0;
-
-  const handleTargetMsrp = (v: number) => {
-    setTargetMsrp(v);
-    storeTargetMsrp(v);
-  };
 
   const handleTargetMargin = (v: number) => {
     setTargetMargin(v);
@@ -853,15 +836,6 @@ export default function IntentCalibrationPage() {
                 }}
               >
                 <FrameValueField
-                  label="Target MSRP"
-                  prefix="$"
-                  value={targetMsrp ?? 0}
-                  placeholder="415"
-                  min={0}
-                  onChange={handleTargetMsrp}
-                />
-
-                <FrameValueField
                   label="Target Margin"
                   suffix="%"
                   value={targetMargin ?? 0}
@@ -905,9 +879,9 @@ export default function IntentCalibrationPage() {
                       lineHeight: 1.45,
                     }}
                   >
-                    {cogsCeiling !== null
-                      ? `Maintains a ~$${cogsCeiling} cost ceiling`
-                      : "Add price and margin to set the ceiling."}
+                    {targetMargin > 0
+                      ? `Holds to a ${Math.round(targetMargin)}% margin target`
+                      : "Set your margin target to frame viability."}
                   </div>
                 </div>
                 <div style={{ minWidth: 220 }}>

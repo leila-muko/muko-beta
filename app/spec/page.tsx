@@ -688,14 +688,14 @@ function compactDeltaCluster({
 // ─── Spec insight mode helper — Synthesizer replaces in Week 5 ───────────────
 function getSpecInsightData(
   executionScore: number,
-  marginGatePassed: boolean,
+  marginGatePassed: boolean | null,
   timelineBuffer: number
 ): InsightData {
   let mode: SpecInsightMode;
 
-  if (executionScore < 60 || !marginGatePassed || timelineBuffer < 2) {
+  if (executionScore < 60 || marginGatePassed === false || timelineBuffer < 2) {
     mode = 'constrain';
-  } else if (executionScore >= 70 && marginGatePassed && timelineBuffer >= 4) {
+  } else if (executionScore >= 70 && marginGatePassed === true && timelineBuffer >= 4) {
     mode = 'invest';
   } else {
     mode = 'constrain';
@@ -939,8 +939,11 @@ function SpecStudioPageContent() {
     return useSessionStore.getState().subcategory || "";
   });
   const constructionTierOverride = useSessionStore((s) => s.constructionTierOverride);
-  // targetMSRP is now set in the Intent step — read-only here
-  const targetMSRP = useSessionStore((s) => s.targetMsrp) ?? 0;
+  // targetMSRP is captured per piece and read-only here
+  const targetMSRP = useSessionStore((s) => s.targetMsrp) ?? null;
+  const askMukoTargetMSRP = useSessionStore((s) => s.targetMsrp);
+  const hasValidTargetMSRP = targetMSRP != null && targetMSRP > 0;
+  const resolvedTargetMsrp = hasValidTargetMSRP ? targetMSRP : 0;
   const [materialId, setMaterialId] = useState(() => {
     return useSessionStore.getState().materialId || "";
   });
@@ -1044,19 +1047,20 @@ function SpecStudioPageContent() {
   const refinementModifiers = useSessionStore((s) => s.refinementModifiers);
 
   const [brandProfileName, setBrandProfileName] = useState<string | null>(null);
-  const [brandProfileId, setBrandProfileId] = useState<string | null>(null);
+  const [brandProfileTargetMargin, setBrandProfileTargetMargin] = useState<number | null>(null);
+  const brandProfileId = useSessionStore((s) => s.brandProfileId);
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
       supabase
         .from('brand_profiles')
-        .select('brand_name, id')
+        .select('brand_name, target_margin')
         .eq('user_id', user.id)
         .single()
         .then(({ data }) => {
           if (data?.brand_name) setBrandProfileName(data.brand_name);
-          if (data?.id) setBrandProfileId(data.id as string);
+          if (typeof data?.target_margin === "number") setBrandProfileTargetMargin(data.target_margin);
         });
     });
   }, []);
@@ -1351,7 +1355,7 @@ function SpecStudioPageContent() {
       yardage,
       constructionTier,
       false,
-      targetMSRP,
+      resolvedTargetMsrp,
       brandTargetMargin
     );
     return generateInsight(
@@ -1567,7 +1571,7 @@ function SpecStudioPageContent() {
       conceptYardage,
       comparisonTier,
       false,
-      targetMSRP,
+      resolvedTargetMsrp,
       brandTargetMargin
     );
     const nextBreakdown = calculateCOGS(
@@ -1575,7 +1579,7 @@ function SpecStudioPageContent() {
       conceptYardage,
       comparisonTier,
       false,
-      targetMSRP,
+      resolvedTargetMsrp,
       brandTargetMargin
     );
 
@@ -1914,7 +1918,7 @@ function SpecStudioPageContent() {
     return 0;
   })();
 
-  const marginGatePassed = !insight || insight.type !== "warning";
+  const marginGatePassed = hasValidTargetMSRP ? (!insight || insight.type !== "warning") : null;
 
   const executionScore = applyRoleModifiers(
     baseExecutionScore,
@@ -1938,10 +1942,12 @@ function SpecStudioPageContent() {
   const leverNotesSavedTimeoutRef = useRef<number | null>(null);
   const [specSynthInsightData, setSpecSynthInsightData] = useState<InsightData | null>(null);
   const [specRailInsight, setSpecRailInsight] = useState<SpecRailInsight | null>(null);
+  const [specRailLoading, setSpecRailLoading] = useState(false);
 
 
   useEffect(() => {
     if (!userManuallySelected || !materialId || !conceptContext.aestheticMatchedId || !specFallbackRail) {
+      setSpecRailLoading(false);
       setSpecRailInsight(null);
       return;
     }
@@ -1979,7 +1985,7 @@ function SpecStudioPageContent() {
       execution_score: executionScore,
       materialId,
       cogs_usd: insight?.cogs ?? 0,
-      target_msrp: targetMSRP,
+      target_msrp: resolvedTargetMsrp,
       targetMargin: brandTargetMargin,
       marginBuffer,
       margin_pass: marginGatePassed,
@@ -2021,7 +2027,27 @@ function SpecStudioPageContent() {
     specAbortRef.current?.abort();
     const controller = new AbortController();
     specAbortRef.current = controller;
+    const loadStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const minLoadingMs = 900;
+    let settled = false;
+    setSpecRailLoading(true);
     setSpecRailInsight(null);
+
+    const finishSpecRail = (nextRail: SpecRailInsight | null, nextData?: InsightData | null) => {
+      if (settled || controller.signal.aborted) return;
+      settled = true;
+      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const remaining = Math.max(0, minLoadingMs - (now - loadStartedAt));
+
+      window.setTimeout(() => {
+        if (controller.signal.aborted) return;
+        setSpecRailInsight(nextRail);
+        if (nextData !== undefined) {
+          setSpecSynthInsightData(nextData);
+        }
+        setSpecRailLoading(false);
+      }, remaining);
+    };
 
     const timer = window.setTimeout(async () => {
       specRawJsonRef.current = '';
@@ -2032,7 +2058,10 @@ function SpecStudioPageContent() {
           body: JSON.stringify(blackboard),
           signal: controller.signal,
         });
-        if (!res.ok || !res.body || controller.signal.aborted) return;
+        if (!res.ok || !res.body || controller.signal.aborted) {
+          finishSpecRail(specFallbackRail);
+          return;
+        }
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -2051,8 +2080,7 @@ function SpecStudioPageContent() {
             try {
               const result = JSON.parse(data) as { rail: SpecRailInsight; data: InsightData; meta: { method: string } };
               if (!controller.signal.aborted) {
-                setSpecRailInsight(result.rail);
-                setSpecSynthInsightData(result.data);
+                finishSpecRail(result.rail, result.data);
                 // Persist analysis — awaited inside async IIFE so the stream loop is not blocked
                 void (async () => {
                   try {
@@ -2075,7 +2103,7 @@ function SpecStudioPageContent() {
                       overall_score: finalScore,
                       materialId: materialId || '',
                       cogs_usd: insight?.cogs ?? 0,
-                      target_msrp: targetMSRP,
+                      target_msrp: resolvedTargetMsrp,
                       margin_pass: marginGatePassed,
                       construction_tier: constructionTier ?? 'moderate',
                       timeline_weeks: timelineWeeks,
@@ -2238,8 +2266,10 @@ function SpecStudioPageContent() {
         }
       } catch (e) {
         if ((e as Error).name === 'AbortError') return;
+        finishSpecRail(specFallbackRail);
       } finally {
         if (controller.signal.aborted) return;
+        if (!settled) finishSpecRail(specFallbackRail);
       }
     }, 400);
 
@@ -2337,7 +2367,7 @@ function SpecStudioPageContent() {
     const currentMatId = materialId;
 
     const projCOGS = (mat: Material, yardage: number, tier: ConstructionTier) =>
-      calculateCOGS(mat, yardage, tier, false, targetMSRP, brandTargetMargin).totalCOGS;
+      calculateCOGS(mat, yardage, tier, false, resolvedTargetMsrp, brandTargetMargin).totalCOGS;
 
     const suggestions: SpecSuggestion[] = [];
 
@@ -2531,7 +2561,7 @@ function SpecStudioPageContent() {
     return "balanced";
   }, [selectedMaterial, selectedMaterialProperties]);
   const specDiagnostics = useMemo(() => {
-    const targetCogs = insight?.ceiling ?? (targetMSRP > 0 ? Math.round(targetMSRP * (1 - brandTargetMargin)) : null);
+    const targetCogs = insight?.ceiling ?? (hasValidTargetMSRP ? Math.round(targetMSRP * (1 - brandTargetMargin)) : null);
     return deriveSpecDiagnostics({
       pieceRole: activeRole,
       specStep,
@@ -2587,7 +2617,7 @@ function SpecStudioPageContent() {
       category: categoryId || selectedCategory.name,
       silhouette: conceptSilhouette || selectedSubcategory?.name || selectedCategory.name,
       construction_tier: constructionTier ?? "moderate",
-      target_msrp: targetMSRP,
+      target_msrp: hasValidTargetMSRP ? targetMSRP : 0,
       cogs_usd: insight.cogs,
       timeline_weeks: timelineWeeks,
       required_timeline_weeks: timelineFeasibility?.required_weeks ?? undefined,
@@ -2620,7 +2650,7 @@ function SpecStudioPageContent() {
     timelineWeeks,
     targetMSRP,
   ]);
-  const activeSpecRail = specRailInsight ?? specFallbackRail;
+  const activeSpecRail = specRailLoading ? null : (specRailInsight ?? specFallbackRail);
   const showBetterPath = activeSpecRail ? shouldShowBetterPath(activeSpecRail) : false;
   const betterPathMaterial = useMemo(() => {
     if (!activeSpecRail || activeSpecRail.decision.direction !== "swap_material") return null;
@@ -3063,6 +3093,7 @@ function SpecStudioPageContent() {
     step: "spec",
     brand: {
       brandName: brandProfileName ?? undefined,
+      targetMargin: brandProfileTargetMargin ?? undefined,
     },
     intent: {
       season: storeSeason,
@@ -3088,7 +3119,7 @@ function SpecStudioPageContent() {
     gates: {
       costPassed: marginGatePassed ?? undefined,
       cogs: insight?.cogs ?? undefined,
-      msrp: targetMSRP ?? undefined,
+      msrp: typeof askMukoTargetMSRP === "number" && askMukoTargetMSRP > 0 ? askMukoTargetMSRP : undefined,
     },
     pieceRole: storeCollectionRole ?? undefined,
     silhouette: conceptSilhouette ?? undefined,
@@ -3687,13 +3718,22 @@ function SpecStudioPageContent() {
           <div style={{ padding: "36px 28px 44px" }}>
             <section style={{ marginBottom: 30 }}>
               <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 20 }}>Muko&apos;s Read</div>
-              <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em" }}>
-                {activeSpecRail?.headline ?? "Select a material and build path to activate the spec read."}
-              </div>
-              {activeSpecRail && (
-                <div style={{ marginTop: 12, fontFamily: inter, fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.66)" }}>
-                  {activeSpecRail.decision.reason}
+              {specRailLoading ? (
+                <div style={{ display: "grid", gap: 12 }}>
+                  <div style={{ height: 54, borderRadius: 18, background: "linear-gradient(90deg, rgba(226,221,214,0.56) 0%, rgba(250,249,246,0.95) 50%, rgba(226,221,214,0.56) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
+                  <div style={{ height: 34, width: "88%", borderRadius: 14, background: "linear-gradient(90deg, rgba(226,221,214,0.48) 0%, rgba(250,249,246,0.92) 50%, rgba(226,221,214,0.48) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
                 </div>
+              ) : (
+                <>
+                  <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em" }}>
+                    {activeSpecRail?.headline ?? "Select a material and build path to activate the spec read."}
+                  </div>
+                  {activeSpecRail && (
+                    <div style={{ marginTop: 12, fontFamily: inter, fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.66)" }}>
+                      {activeSpecRail.decision.reason}
+                    </div>
+                  )}
+                </>
               )}
             </section>
 
@@ -3748,87 +3788,114 @@ function SpecStudioPageContent() {
             <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
             <section style={{ marginBottom: 24 }}>
               <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>What to get right</div>
-              <div style={{ display: "grid", gap: 12 }}>
-                {(activeSpecRail?.execution_levers ?? []).map((item) => (
-                  <div key={item} style={{ display: "flex", gap: 10, alignItems: "start" }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedLevers.has(item)}
-                      onChange={() => {
-                        setSelectedLevers((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(item)) {
-                            next.delete(item);
-                          } else {
-                            next.add(item);
-                          }
-                          return next;
-                        });
+              {specRailLoading ? (
+                <div style={{ display: "grid", gap: 12 }}>
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <div style={{ width: 13, height: 13, borderRadius: 4, background: "rgba(226,221,214,0.9)" }} />
+                      <div style={{ height: 18, flex: index === 2 ? "0 1 72%" : "0 1 84%", borderRadius: 999, background: "linear-gradient(90deg, rgba(226,221,214,0.5) 0%, rgba(250,249,246,0.94) 50%, rgba(226,221,214,0.5) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
+                    </div>
+                  ))}
+                  <div style={{ marginTop: 4, width: 124, height: 36, borderRadius: 999, background: "rgba(226,221,214,0.85)" }} />
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {(activeSpecRail?.execution_levers ?? []).map((item) => (
+                      <div key={item} style={{ display: "flex", gap: 10, alignItems: "start" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedLevers.has(item)}
+                          onChange={() => {
+                            setSelectedLevers((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(item)) {
+                                next.delete(item);
+                              } else {
+                                next.add(item);
+                              }
+                              return next;
+                            });
+                          }}
+                          style={{ accentColor: "#43432B", width: 13, height: 13, marginTop: 3, cursor: "pointer", flexShrink: 0 }}
+                        />
+                        <label style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58, cursor: "pointer" }}>
+                          {item}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 16 }}>
+                    <button
+                      onClick={() => { void handleApplySelectedLevers(); }}
+                      disabled={selectedLevers.size === 0}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: 999,
+                        border: "none",
+                        background: selectedLevers.size === 0 ? "#E2DDD6" : "#191919",
+                        color: selectedLevers.size === 0 ? "#888078" : "#FFFFFF",
+                        fontFamily: inter,
+                        fontSize: 11,
+                        fontWeight: 500,
+                        cursor: selectedLevers.size === 0 ? "not-allowed" : "pointer",
                       }}
-                      style={{ accentColor: "#43432B", width: 13, height: 13, marginTop: 3, cursor: "pointer", flexShrink: 0 }}
-                    />
-                    <label style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58, cursor: "pointer" }}>
-                      {item}
-                    </label>
+                    >
+                      Apply Selected
+                    </button>
+                    {leverNotesSaved ? (
+                      <div style={{ marginTop: 8, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.5)" }}>
+                        Notes saved
+                      </div>
+                    ) : null}
                   </div>
-                ))}
-              </div>
-              <div style={{ marginTop: 16 }}>
-                <button
-                  onClick={() => { void handleApplySelectedLevers(); }}
-                  disabled={selectedLevers.size === 0}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: 999,
-                    border: "none",
-                    background: selectedLevers.size === 0 ? "#E2DDD6" : "#191919",
-                    color: selectedLevers.size === 0 ? "#888078" : "#FFFFFF",
-                    fontFamily: inter,
-                    fontSize: 11,
-                    fontWeight: 500,
-                    cursor: selectedLevers.size === 0 ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Apply Selected
-                </button>
-                {leverNotesSaved ? (
-                  <div style={{ marginTop: 8, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.5)" }}>
-                    Notes saved
-                  </div>
-                ) : null}
-              </div>
+                </>
+              )}
             </section>
 
             <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
             <section style={{ marginBottom: 24 }}>
               <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>Feasibility tension</div>
-              <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.62 }}>
-                {activeSpecRail?.core_tension ?? "The rail will sharpen once feasibility numbers and execution context are in place."}
-              </div>
-              {activeSpecRail && (
-                <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {[
-                    `Cost: ${activeSpecRail.feasibility_breakdown.cost.replace(/_/g, " ")}`,
-                    `Timeline: ${activeSpecRail.feasibility_breakdown.timeline.replace(/_/g, " ")}`,
-                    `Complexity: ${activeSpecRail.feasibility_breakdown.complexity}`,
-                  ].map((label) => (
-                    <span
-                      key={label}
-                      style={{
-                        borderRadius: 999,
-                        padding: "5px 9px",
-                        border: "1px solid rgba(67,67,43,0.08)",
-                        background: "rgba(250,249,246,0.88)",
-                        fontFamily: inter,
-                        fontSize: 10,
-                        lineHeight: 1,
-                        color: "rgba(67,67,43,0.62)",
-                      }}
-                    >
-                      {label}
-                    </span>
-                  ))}
+              {specRailLoading ? (
+                <div style={{ display: "grid", gap: 12 }}>
+                  <div style={{ height: 48, borderRadius: 16, background: "linear-gradient(90deg, rgba(226,221,214,0.5) 0%, rgba(250,249,246,0.94) 50%, rgba(226,221,214,0.5) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} style={{ width: index === 1 ? 92 : 106, height: 26, borderRadius: 999, background: "rgba(226,221,214,0.8)" }} />
+                    ))}
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.62 }}>
+                    {activeSpecRail?.core_tension ?? "The rail will sharpen once feasibility numbers and execution context are in place."}
+                  </div>
+                  {activeSpecRail && (
+                    <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {[
+                        `Cost: ${activeSpecRail.feasibility_breakdown.cost.replace(/_/g, " ")}`,
+                        `Timeline: ${activeSpecRail.feasibility_breakdown.timeline.replace(/_/g, " ")}`,
+                        `Complexity: ${activeSpecRail.feasibility_breakdown.complexity}`,
+                      ].map((label) => (
+                        <span
+                          key={label}
+                          style={{
+                            borderRadius: 999,
+                            padding: "5px 9px",
+                            border: "1px solid rgba(67,67,43,0.08)",
+                            background: "rgba(250,249,246,0.88)",
+                            fontFamily: inter,
+                            fontSize: 10,
+                            lineHeight: 1,
+                            color: "rgba(67,67,43,0.62)",
+                          }}
+                        >
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </section>
 
@@ -3949,6 +4016,7 @@ function SpecStudioPageContent() {
         @keyframes continueReady { 0% { transform: translateY(4px); opacity: 0.6; } 100% { transform: translateY(0); opacity: 1; } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
         @keyframes railShift { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
         .specStudioLayout {
           display: flex;
@@ -4072,7 +4140,7 @@ function SpecStudioPageContent() {
             mukoScore={mukoScore}
             marginGatePassed={marginGatePassed}
             insight={insight ? { cogs: insight.cogs, ceiling: insight.ceiling } : null}
-            targetMsrp={targetMSRP}
+            targetMsrp={resolvedTargetMsrp}
             mukoInsight={specSynthInsightData?.statements?.[0] ?? null}
             suggestions={mukoSynthesis?.suggestions ?? []}
             onRevise={() => setShowScorecardModal(false)}

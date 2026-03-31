@@ -24,6 +24,9 @@ interface AnalysisRow {
   category: string | null;
   collection_role?: string | null;
   aesthetic_input: string | null;
+  collection_aesthetic?: string | null;
+  aesthetic_inflection?: string | null;
+  collection_silhouette?: string | null;
   material_id: string | null;
   silhouette: string | null;
   construction_tier: 'low' | 'moderate' | 'high' | null;
@@ -111,6 +114,9 @@ function toCollectionInput({
     version_label: versionLabel ?? null,
     snapshot_id: snapshotId ?? null,
     narrative: pieces[0]?.narrative ?? null,
+    collection_aesthetic: pieces[0]?.collection_aesthetic ?? null,
+    aesthetic_inflection: pieces[0]?.aesthetic_inflection ?? null,
+    collection_silhouette: pieces[0]?.silhouette ?? null,
     generated_at: new Date().toISOString(),
     brand: brand ?? null,
     intent: intent ?? null,
@@ -171,9 +177,9 @@ async function fetchCollectionAnalyses(
 ): Promise<AnalysisRow[]> {
   const supabase = createClient();
   const primarySelect =
-    'id, collection_name, season, category, collection_role, aesthetic_input, material_id, silhouette, construction_tier, score, dimensions, gates_passed, piece_name, narrative, created_at, agent_versions';
+    'id, collection_name, season, category, collection_role, aesthetic_input, collection_aesthetic, aesthetic_inflection, material_id, silhouette, construction_tier, score, dimensions, gates_passed, piece_name, narrative, created_at, agent_versions';
   const fallbackSelect =
-    'id, collection_name, season, category, collection_role, aesthetic_input, material_id, silhouette, construction_tier, score, dimensions, gates_passed, narrative, created_at, agent_versions';
+    'id, collection_name, season, category, collection_role, aesthetic_input, collection_aesthetic, aesthetic_inflection, material_id, silhouette, construction_tier, score, dimensions, gates_passed, narrative, created_at, agent_versions';
 
   const primary = await supabase
     .from('analyses')

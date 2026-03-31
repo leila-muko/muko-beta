@@ -5,7 +5,7 @@ export interface ScoreDimensions {
 }
 
 export interface ScoreGates {
-  margin_gate_passed: boolean;
+  margin_gate_passed: boolean | null;
   sustainability?: null; // deferred to Phase 2
 }
 

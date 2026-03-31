@@ -68,12 +68,12 @@ const COMPLEXITY_WEEKS: Record<string, number> = { low: 6, moderate: 10, high: 1
 function deriveConflictType(
   identityScore: number,
   executionScore: number,
-  marginGatePassed: boolean,
+  marginGatePassed: boolean | null,
   material: MaterialEntry | undefined,
   constructionTier: string,
   season: string
 ): ConflictType {
-  if (!marginGatePassed) return "cost_gate";
+  if (marginGatePassed === false) return "cost_gate";
   if (executionScore < 70) {
     if (material) {
       const isFW = /fw|fall|autumn/i.test(season);
@@ -241,9 +241,9 @@ export interface ScorecardModalProps {
   resonanceScore: number;
   executionScore: number;
   mukoScore: number;
-  marginGatePassed: boolean;
+  marginGatePassed: boolean | null;
   insight: { cogs: number; ceiling: number } | null;
-  targetMsrp: number;
+  targetMsrp: number | null;
   mukoInsight: string | null;
   suggestions: SpecSuggestion[];
   onRevise: () => void;
@@ -384,10 +384,10 @@ export function ScorecardModal({
         identity_score: identityScore,
         resonance_score: resonanceScore,
         execution_score: executionScore,
-        cost_gate_passed: marginGatePassed,
+        cost_gate_passed: marginGatePassed === true,
         cogs: insight?.cogs ?? 0,
         margin_buffer: marginBuffer,
-        msrp: targetMsrp,
+        msrp: targetMsrp != null && targetMsrp > 0 ? targetMsrp : 0,
         material_name: material?.name ?? materialId ?? "Unknown",
         material_cost_per_yard: material?.cost_per_yard ?? 0,
         material_lead_time_weeks: material?.lead_time_weeks ?? 0,
@@ -440,7 +440,7 @@ export function ScorecardModal({
         collection_name: effectiveCollection,
         season: season || "SS27",
         category: category?.toLowerCase()?.trim() || null,
-        target_msrp: storeTargetMsrp ?? null,
+        target_msrp: storeTargetMsrp != null && storeTargetMsrp > 0 ? storeTargetMsrp : null,
         aesthetic_input: aestheticInput || null,
         aesthetic_matched_id: aestheticMatchedId ?? aestheticInput?.toLowerCase()?.replace(/\s+/g, '-') ?? null,
         material_id: materialId || null,

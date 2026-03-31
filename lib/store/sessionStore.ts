@@ -131,11 +131,17 @@ interface SessionState {
   pieceBuildContext: PieceBuildContext | null;
 
   savedAnalysisId: string | null;
+  brandProfileId: string | null;
 
   // Collections hub
   activeCollection: string | null;
   assortmentInsightCache: Record<string, string>;
   preloadedCriticScores: Record<string, number>;
+  askMukoLastResponse: string | null;
+  lastSuggestedRole: string | null;
+  lastSuggestedRoleIsLocked: boolean;
+  lastSuggestionRationale: string | null;
+  lastAskMukoResponseTimestamp: number | null;
 
   // Actions
   setSeason: (season: string) => void;
@@ -153,7 +159,7 @@ interface SessionState {
   setDirectionInterpretationChips: (chips: string[]) => void;
   setCategory: (category: string) => void;
   setSubcategory: (subcategory: string) => void;
-  setTargetMsrp: (msrp: number) => void;
+  setTargetMsrp: (msrp: number | null) => void;
   setMaterial: (id: string) => void;
   setSilhouette: (silhouette: string) => void;
   setConstructionTier: (tier: 'low' | 'moderate' | 'high', override?: boolean) => void;
@@ -182,9 +188,14 @@ interface SessionState {
   setStrategySummary: (summary: string | null) => void;
   setIsProxyMatch: (value: boolean) => void;
   setSavedAnalysisId: (id: string | null) => void;
+  setBrandProfileId: (id: string | null) => void;
   setActiveCollection: (name: string | null) => void;
   setAssortmentInsightCache: (collectionName: string, insight: string) => void;
   setPreloadedCriticScores: (scores: Record<string, number>) => void;
+  setAskMukoLastResponse: (response: string | null) => void;
+  setLastSuggestedRole: (role: string | null) => void;
+  setLastSuggestedRoleIsLocked: (isLocked: boolean) => void;
+  setLastSuggestionRationale: (rationale: string | null) => void;
 
   lockConcept: () => void;
   unlockConcept: () => void;
@@ -246,9 +257,15 @@ function createInitialSessionState(targetMargin = 50) {
     pieceRolesById: {},
     pieceBuildContext: null,
     savedAnalysisId: null,
+    brandProfileId: null,
     activeCollection: null,
     assortmentInsightCache: {},
     preloadedCriticScores: {},
+    askMukoLastResponse: null,
+    lastSuggestedRole: null,
+    lastSuggestedRoleIsLocked: false,
+    lastSuggestionRationale: null,
+    lastAskMukoResponseTimestamp: null,
   };
 }
 
@@ -323,12 +340,21 @@ export const useSessionStore = create<SessionState>()(
       setStrategySummary: (strategySummary) => set({ strategySummary }),
       setIsProxyMatch: (isProxyMatch) => set({ isProxyMatch }),
       setSavedAnalysisId: (savedAnalysisId) => set({ savedAnalysisId }),
+      setBrandProfileId: (brandProfileId) => set({ brandProfileId }),
       setActiveCollection: (activeCollection) => set({ activeCollection }),
       setAssortmentInsightCache: (collectionName, insight) =>
         set((state) => ({
           assortmentInsightCache: { ...state.assortmentInsightCache, [collectionName]: insight },
         })),
       setPreloadedCriticScores: (preloadedCriticScores) => set({ preloadedCriticScores }),
+      setAskMukoLastResponse: (askMukoLastResponse) =>
+        set({
+          askMukoLastResponse,
+          lastAskMukoResponseTimestamp: askMukoLastResponse ? Date.now() : null,
+        }),
+      setLastSuggestedRole: (lastSuggestedRole) => set({ lastSuggestedRole }),
+      setLastSuggestedRoleIsLocked: (lastSuggestedRoleIsLocked) => set({ lastSuggestedRoleIsLocked }),
+      setLastSuggestionRationale: (lastSuggestionRationale) => set({ lastSuggestionRationale }),
 
       lockConcept: () => set({ conceptLocked: true }),
       unlockConcept: () => set({ conceptLocked: false }),
@@ -342,7 +368,7 @@ export const useSessionStore = create<SessionState>()(
     }),
     {
       name: 'muko-session',
-      version: 4,
+      version: 8,
       migrate: (persistedState, version) => {
         if (version < 2) {
           return {
@@ -368,11 +394,36 @@ export const useSessionStore = create<SessionState>()(
             preloadedCriticScores: {},
           };
         }
+        if (version < 5) {
+          return {
+            ...(persistedState as object),
+            askMukoLastResponse: null,
+          };
+        }
+        if (version < 6) {
+          return {
+            ...(persistedState as object),
+            lastSuggestedRole: null,
+            lastSuggestionRationale: null,
+          };
+        }
+        if (version < 7) {
+          return {
+            ...(persistedState as object),
+            lastSuggestedRoleIsLocked: false,
+          };
+        }
+        if (version < 8) {
+          return {
+            ...(persistedState as object),
+            brandProfileId: null,
+          };
+        }
         return persistedState;
       },
       partialize: (state) => {
         // Persist everything except actions
-        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setStrategySummary, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setSuccessPriorities, setTargetMargin, setSliderTrend, setSliderCreative, setSliderElevated, setSliderNovelty, setCollectionRole, setSelectedKeyPiece, setSelectedPieceImage, setDecisionGuidanceState, setActiveProductPieceId, setPieceRolesById, setPieceBuildContext, setSavedAnalysisId, setActiveCollection, setAssortmentInsightCache, setPreloadedCriticScores, lockConcept, unlockConcept, setCurrentStep, resetSession, ...rest } = state;
+        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setStrategySummary, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setSuccessPriorities, setTargetMargin, setSliderTrend, setSliderCreative, setSliderElevated, setSliderNovelty, setCollectionRole, setSelectedKeyPiece, setSelectedPieceImage, setDecisionGuidanceState, setActiveProductPieceId, setPieceRolesById, setPieceBuildContext, setSavedAnalysisId, setBrandProfileId, setActiveCollection, setAssortmentInsightCache, setPreloadedCriticScores, setAskMukoLastResponse, setLastSuggestedRole, setLastSuggestedRoleIsLocked, setLastSuggestionRationale, lockConcept, unlockConcept, setCurrentStep, resetSession, lastAskMukoResponseTimestamp, ...rest } = state;
         return rest;
       },
     }

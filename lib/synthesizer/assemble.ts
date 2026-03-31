@@ -116,9 +116,9 @@ export function resolveAestheticContext(
  */
 function resolveCostReduction(
   materialId: string,
-  marginGatePassed: boolean
+  marginGatePassed: boolean | null
 ): ResolvedRedirects['cost_reduction'] {
-  if (marginGatePassed) return null;
+  if (marginGatePassed !== false) return null;
   const alternatives = redirectsData.material_alternatives?.[materialId];
   if (!alternatives || alternatives.length === 0) return null;
 
@@ -309,10 +309,10 @@ export interface SpecBlackboardInput {
   execution_score: number;
   materialId: string;
   cogs_usd: number;
-  target_msrp: number;
+  target_msrp: number | null;
   targetMargin?: number | null;
   marginBuffer?: number | null;
-  margin_pass: boolean;
+  margin_pass: boolean | null;
   construction_tier: string;
   /** Available development / delivery window in weeks */
   timeline_weeks: number;
@@ -417,8 +417,8 @@ export interface ReportBlackboardInput {
   overall_score: number;
   materialId: string;
   cogs_usd: number;
-  target_msrp: number;
-  margin_pass: boolean;
+  target_msrp: number | null;
+  margin_pass: boolean | null;
   construction_tier: string;
   timeline_weeks: number;
   season: string;

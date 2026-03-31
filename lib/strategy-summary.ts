@@ -120,8 +120,9 @@ export function buildProgressiveStrategySummary(input: StrategySummaryInput): Pr
     };
   }
 
-  const cogsCeiling = Math.round((input.targetMsrp ?? 0) * (1 - (input.targetMargin ?? 0) / 100));
-  const frameClause = `A ${formatCurrency(input.targetMsrp ?? 0)} collection anchored to a ${Math.round(
+  const effectiveTargetMsrp = input.targetMsrp != null && input.targetMsrp > 0 ? input.targetMsrp : 0;
+  const cogsCeiling = Math.round(effectiveTargetMsrp * (1 - (input.targetMargin ?? 0) / 100));
+  const frameClause = `A ${formatCurrency(effectiveTargetMsrp)} collection anchored to a ${Math.round(
     input.targetMargin ?? 0
   )}% margin with a ${formatCurrency(cogsCeiling)} cost ceiling`;
 

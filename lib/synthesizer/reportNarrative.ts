@@ -46,9 +46,9 @@ export interface ReportBlackboard {
   /** Calculated COGS in USD */
   cogs_usd: number;
   /** Designer's target MSRP in USD */
-  target_msrp: number;
+  target_msrp: number | null;
   /** True when margin gate passes */
-  margin_pass: boolean;
+  margin_pass: boolean | null;
   /** Selected construction tier label */
   construction_tier: string;
   /** Predicted production timeline in weeks */
@@ -115,7 +115,7 @@ export interface ReportComputedData {
   projectedMargin: number;
   /** Target margin decimal (default 0.60) */
   targetMargin: number;
-  costGatePassed: boolean;
+  costGatePassed: boolean | null;
   considerations: Array<{ title: string; detail: string; dimension: 'identity' | 'resonance' | 'execution' }>;
   actions: Array<{ title: string; detail: string; tags: string[] }>;
   redirect: { label: string; savings?: string; detail: string; redirectMaterialId?: string } | null;
@@ -133,7 +133,8 @@ function titleCase(slug: string): string {
 
 function computeReportData(bb: ReportBlackboard): ReportComputedData {
   const TARGET_MARGIN = bb.target_margin ?? 0.60;
-  const ceiling = bb.target_msrp > 0 ? Math.round(bb.target_msrp * (1 - TARGET_MARGIN)) : 0;
+  const effectiveTargetMsrp = bb.target_msrp != null && bb.target_msrp > 0 ? bb.target_msrp : null;
+  const ceiling = effectiveTargetMsrp != null ? Math.round(effectiveTargetMsrp * (1 - TARGET_MARGIN)) : 0;
   const headroom = ceiling - bb.cogs_usd;
 
   // Radar sub-scores
@@ -143,30 +144,36 @@ function computeReportData(bb: ReportBlackboard): ReportComputedData {
     Math.round((1 - ((bb.aesthetic_context.saturation_score ?? 50) / 100)) * 100)
   ));
   const marginScore = ceiling > 0
-    ? Math.min(95, Math.max(20, Math.round(bb.margin_pass
+    ? Math.min(95, Math.max(20, Math.round(bb.margin_pass === true
         ? 72 + (headroom / ceiling) * 30
         : 55 - ((bb.cogs_usd - ceiling) / ceiling) * 40)))
     : 70;
   const costScore = ceiling > 0
-    ? Math.min(95, Math.max(20, Math.round(bb.margin_pass
+    ? Math.min(95, Math.max(20, Math.round(bb.margin_pass === true
         ? 75 + (headroom / ceiling) * 25
         : 55 - ((bb.cogs_usd - ceiling) / ceiling) * 40)))
     : 70;
   const timelineScore = Math.min(95, Math.max(30,
     Math.round(100 - (bb.timeline_weeks - 8) * 3)
   ));
-  const projectedMargin = bb.target_msrp > 0
-    ? Math.round(((bb.target_msrp - bb.cogs_usd) / bb.target_msrp) * 1000) / 10
+  const projectedMargin = effectiveTargetMsrp != null
+    ? Math.round(((effectiveTargetMsrp - bb.cogs_usd) / effectiveTargetMsrp) * 1000) / 10
     : 0;
 
   // Considerations — derived from real signals
   const considerations: ReportComputedData['considerations'] = [];
 
-  if (!bb.margin_pass && bb.target_msrp > 0) {
+  if (bb.margin_pass === false && bb.target_msrp != null && bb.target_msrp > 0) {
     const gap = Math.abs(Math.round(bb.cogs_usd - ceiling));
     considerations.push({
       title: 'Cost ceiling exceeded',
       detail: `COGS of $${bb.cogs_usd.toFixed(0)} exceeds the $${ceiling} ceiling for your $${bb.target_msrp} MSRP at ${Math.round(TARGET_MARGIN * 100)}% margin. A $${gap}/unit reduction is needed.`,
+      dimension: 'execution',
+    });
+  } else if (bb.margin_pass === null) {
+    considerations.push({
+      title: 'Cost viability not assessed',
+      detail: 'Set a target retail price for this piece to unlock cost viability analysis.',
       dimension: 'execution',
     });
   }
@@ -258,7 +265,7 @@ function computeReportData(bb: ReportBlackboard): ReportComputedData {
 
   // Key redirect card
   let redirect: ReportComputedData['redirect'] = null;
-  if (bb.resolved_redirects.cost_reduction) {
+  if (bb.margin_pass === false && bb.resolved_redirects.cost_reduction) {
     const altName = titleCase(bb.resolved_redirects.cost_reduction.material_id);
     redirect = {
       label: `Switch material to ${altName}`,
@@ -319,7 +326,7 @@ function determineReportMode(bb: ReportBlackboard): { mode: InsightMode; editLab
   if (bb.identity_score >= 75 && bb.resonance_score >= 75) {
     return { mode: 'amplify', editLabel: 'THE OPPORTUNITY' };
   }
-  if (bb.identity_score < 60 || bb.resonance_score < 60 || !bb.margin_pass) {
+  if (bb.identity_score < 60 || bb.resonance_score < 60 || bb.margin_pass === false) {
     return { mode: 'differentiate', editLabel: 'THE EDIT' };
   }
   return { mode: 'reconsider', editLabel: 'THE EDIT' };
@@ -558,8 +565,9 @@ function buildReportPrompt(bb: ReportBlackboard): string {
     .join(' ');
 
   const TARGET_MARGIN = bb.target_margin ?? 0.60;
-  const cogsTarget = bb.target_msrp > 0 ? bb.target_msrp * (1 - TARGET_MARGIN) : 0;
-  const marginGap = bb.target_msrp > 0
+  const effectiveTargetMsrp = bb.target_msrp != null && bb.target_msrp > 0 ? bb.target_msrp : null;
+  const cogsTarget = effectiveTargetMsrp != null ? effectiveTargetMsrp * (1 - TARGET_MARGIN) : 0;
+  const marginGap = effectiveTargetMsrp != null
     ? Math.round((bb.cogs_usd - cogsTarget) * 100) / 100
     : null;
 
@@ -578,7 +586,7 @@ function buildReportPrompt(bb: ReportBlackboard): string {
       reason: bb.resolved_redirects.brand_mismatch.reason,
     });
   }
-  if (bb.resolved_redirects.cost_reduction) {
+  if (bb.margin_pass === false && bb.resolved_redirects.cost_reduction) {
     redirects.push({
       type: 'material',
       suggestion: bb.resolved_redirects.cost_reduction.material_id,
@@ -623,13 +631,22 @@ function buildReportPrompt(bb: ReportBlackboard): string {
       execution: bb.execution_score,
       final: bb.overall_score,
     },
-    gates: {
-      cost_passed: bb.margin_pass,
-      cogs_actual: bb.cogs_usd,
-      cogs_target: Math.round(cogsTarget * 100) / 100,
-      margin_gap: marginGap,
-      target_margin: bb.target_margin != null ? `${Math.round(bb.target_margin * 100)}%` : null,
-    },
+    gates: effectiveTargetMsrp == null
+      ? {
+          cost_passed: null,
+          cogs_actual: bb.cogs_usd,
+          cogs_target: null,
+          margin_gap: null,
+          target_margin: bb.target_margin != null ? `${Math.round(bb.target_margin * 100)}%` : null,
+          cost_viability: 'not assessed — no target retail price set for this piece.',
+        }
+      : {
+          cost_passed: bb.margin_pass,
+          cogs_actual: bb.cogs_usd,
+          cogs_target: Math.round(cogsTarget * 100) / 100,
+          margin_gap: marginGap,
+          target_margin: bb.target_margin != null ? `${Math.round(bb.target_margin * 100)}%` : null,
+        },
     market_data: {
       saturation_score: bb.aesthetic_context.saturation_score ?? null,
       saturation_basis: bb.aesthetic_context.saturation_basis ?? undefined,
@@ -745,7 +762,7 @@ function parseMetadataOutput(raw: string): MetadataOutput | null {
 // ─────────────────────────────────────────────
 
 function resolved_redirects_to_guardrail(bb: ReportBlackboard): string {
-  if (bb.resolved_redirects.cost_reduction) {
+  if (bb.margin_pass === false && bb.resolved_redirects.cost_reduction) {
     return `Switch material to "${bb.resolved_redirects.cost_reduction.material_id}" — ${bb.resolved_redirects.cost_reduction.reason}`;
   }
   if (bb.resolved_redirects.brand_mismatch) {

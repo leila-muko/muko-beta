@@ -171,5 +171,6 @@ export interface CollectionReportInput {
   // Extended fields for synthesizer prompt
   collection_aesthetic?: string | null;
   aesthetic_inflection?: string | null;
+  collection_silhouette?: string | null;
   collection_brief?: string | null;
 }

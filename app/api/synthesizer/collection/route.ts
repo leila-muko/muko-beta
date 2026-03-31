@@ -43,16 +43,27 @@ Rules you must follow:
 - Never mention scores, numbers, or percentages in your narrative output — those are already rendered by the UI
 - Never use the words: "analysis", "data", "metric", "algorithm", "assessment", "leverage", "utilize", "optimize", "holistic", "robust"
 - Focus on role distribution, structure, balance, completeness, coverage, complexity distribution, category mix, silhouette pattern, material signal, and collection-level viability
+- If collection_silhouette is provided, treat silhouette as a locked collection-level design decision, not an emergent pattern. Do not flag silhouette uniformity as a structural weakness. Instead, evaluate whether the pieces are executing that silhouette language with enough range and specificity to feel intentional rather than monotonous — and say so only if they are not.
 - Do not recap the concept, trend lane, market timing, or aesthetic thesis
 - Do not reference specific piece names, but you may reference categories, material families, and silhouette patterns when they are necessary to explain the collection read
 - Do not use "start here", "build this", "lean in", or any named product recommendation language
-- Collection state and supporting line must be concise, editorial, and decisive
+- Each field must be able to stand alone as a true statement. If you could swap collection_read and muko_insight and lose nothing, you have failed.
 - Recommendations must be structural only, actionable in the next two weeks, and phrased without exact product suggestions
 - If there are 1-2 pieces, light scaffolding language is appropriate.
 - If there are 3 or more pieces, give a real collection read based on what is present; do not default to "too thin" or similar holding-pattern language.
 - If there are fewer than 8 pieces, it is acceptable to use a caveat like "based on the pieces so far."
-- Tone: the tone of a trusted advisor in the room, not a consultant report. Sentences can be short. Directness is respect.
+- Tone: the tone of a trusted advisor in the room, not a consultant report. Sentences can be short. Directness is respect. The whole read — all three fields combined — should take under 20 seconds to read aloud.
+- collection_read must be 2-3 sentences maximum. No more.
+- muko_insight must be 1-2 sentences maximum. It is the sharpest thing in the room — one observation, one implication. Not a paragraph.
+- collection_state, collection_read, and muko_insight are one continuous story, not three versions of the same observation. collection_state names what is structurally true. collection_read says what that means for the collection as a system. muko_insight names the specific tension or unlock that would change the read. Each must add something the others don't.
 - Do not reference "the data" or explain methodology.
+
+SILHOUETTE RULE: Never critique silhouette consistency across pieces as a weakness.
+Silhouette is a collection-level creative lock — uniformity is intentional. If
+silhouette range is narrow, you may note it only as a category distribution or
+commercial risk (e.g., "limited layering anchors" or "thin structural range") but
+never as aesthetic sameness or register repetition. The phrase "same silhouette
+register" and any equivalent framing are banned.
 
 Output valid JSON only. No preamble, no explanation, no markdown fences.`;
 
@@ -132,6 +143,7 @@ Season: ${payload.season}
 Collection name: ${payload.collection_name}
 Collection aesthetic: ${payload.collection_aesthetic ?? 'Not specified'}
 Aesthetic inflection: ${payload.aesthetic_inflection ?? 'Not specified'}
+Collection silhouette: ${payload.collection_silhouette ?? 'Not specified'}
 Collection brief / intent: ${payload.collection_brief ?? payload.intent?.primary_goals?.join(', ') ?? 'Not specified'}
 
 Pieces in collection (${payload.pieces.length} total):
@@ -158,13 +170,13 @@ Silhouette distribution: ${silDist}
 
 Return only valid JSON matching this schema exactly:
 {
-  "collection_state": "Developing Direction",
-  "collection_read": "Direction is strong, but the collection is not yet structurally built.",
-  "muko_insight": "This collection is currently concept-led rather than assortment-led. The direction is clear, but the build is still too narrow to support it commercially.",
+  "collection_state": "Emerging Direction",
+  "collection_read": "The structural logic is beginning to hold, but the material language isn't doing enough work yet to make the silhouette pattern legible at category level.",
+  "muko_insight": "The bottoms category is carrying the build right now. Until outerwear or a layering piece lands, the collection reads more like a strong starting point than a coherent line.",
   "secondary_metrics": {
-    "identity": ${report.scores.identity.score},
-    "resonance": ${report.scores.resonance.score},
-    "execution": ${report.scores.execution.score}
+    "identity": 91,
+    "resonance": 95,
+    "execution": 52
   }
 }
 
@@ -262,7 +274,35 @@ async function streamCollectionReport(payload: CollectionReportInput): Promise<R
         } catch {
           controller.enqueue(sseEvent('done', fallback.collection_report));
         }
-      } catch {
+      } catch (error) {
+        const isOverloaded = String(error).includes('overloaded_error');
+        if (isOverloaded) {
+          try {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const { streamClaude } = await import('@/lib/claude/client');
+            let fullText = '';
+            for await (const chunk of streamClaude(userMessage, {
+              model: 'claude-sonnet-4-20250514',
+              maxTokens: 1200,
+              systemPrompt: COLLECTION_SYSTEM_PROMPT,
+              temperature: 0.35,
+            })) {
+              fullText += chunk;
+              controller.enqueue(sseEvent('delta', { text: chunk }));
+            }
+            try {
+              const parsed = parseSynthesizerJSON(fullText);
+              controller.enqueue(sseEvent('done', mergeSynthesizerResult(fallback, parsed).collection_report));
+            } catch {
+              controller.enqueue(sseEvent('done', fallback.collection_report));
+            }
+            return;
+          } catch (retryError) {
+            console.error('[collection-read] Retry also failed:', retryError);
+          }
+        } else {
+          console.error('[collection-read] Claude call failed:', error);
+        }
         controller.enqueue(sseEvent('error', { error: 'Synthesis failed' }));
         controller.enqueue(sseEvent('done', fallback.collection_report));
       }

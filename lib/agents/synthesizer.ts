@@ -164,7 +164,7 @@ export function generateTemplateNarrative(input: NarrativeInput): InsightData {
     brand: brandName ?? 'the brand',
     sLabel,
     timing: toTimingPhrase(sRelevance, sLabel),
-    risk: toRiskFactor(aesthetic.risk_factors, !gates.margin_gate_passed),
+    risk: toRiskFactor(aesthetic.risk_factors, gates.margin_gate_passed === false),
     market: toPairLabel(aesthetic.seen_in),
     ranked,
     strongest: ranked[0],
@@ -173,7 +173,7 @@ export function generateTemplateNarrative(input: NarrativeInput): InsightData {
       aesthetic.adjacent_directions.length > 0
         ? toAdjacentLabel(aesthetic.adjacent_directions[0])
         : null,
-    costFailed: !gates.margin_gate_passed,
+    costFailed: gates.margin_gate_passed === false,
     materialCostNote,
   };
 

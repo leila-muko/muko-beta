@@ -29,6 +29,13 @@ import {
 import { selectRecommendedStartPiece } from "@/lib/pieces/selectRecommendedStartPiece";
 import type { DeterministicSuggestedPiece, PiecesReadOutput, PieceStrategicRole } from "@/lib/pieces/types";
 
+type PiecesReadResponseMeta = {
+  source?: "synthesized" | "fallback";
+  reason?: string | null;
+  detail?: string[];
+  latency_ms?: number;
+};
+
 // ── Design tokens ──────────────────────────────────────────────
 const BG = "#FAF9F6";
 const BG2 = "#F2EFE9";
@@ -160,6 +167,8 @@ type StartingPointSuggestion = {
   sourcePiece: KeyPiece;
 };
 
+type SuggestedPiece = StartingPointSuggestion;
+
 type CustomPieceRoleLabel = "Hero" | "Volume Driver" | "Core Evolution" | "Directional Signal";
 
 type CustomPieceRefinement = {
@@ -206,6 +215,46 @@ function mapRoleLabelToId(role: CustomPieceRoleLabel): CollectionRoleId {
   if (role === "Volume Driver") return "volume-driver";
   if (role === "Directional Signal") return "directional";
   return "core-evolution";
+}
+
+function extractRoleSentence(value: string, keyword: string) {
+  const sentences = value
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+  return sentences.find((sentence) => sentence.toLowerCase().includes(keyword)) ?? value.trim();
+}
+
+function inferRoleFromAskMukoResponse(value: string | null): { role: CollectionRoleId; rationale: string } | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+
+  const normalized = trimmed.toLowerCase();
+  if (normalized.includes("volume driver")) {
+    return { role: "volume-driver", rationale: extractRoleSentence(trimmed, "volume driver") };
+  }
+  if (normalized.includes("core evolution")) {
+    return { role: "core-evolution", rationale: extractRoleSentence(trimmed, "core evolution") };
+  }
+  if (normalized.includes("directional signal")) {
+    return { role: "directional", rationale: extractRoleSentence(trimmed, "directional signal") };
+  }
+  if (normalized.includes("directional")) {
+    return { role: "directional", rationale: extractRoleSentence(trimmed, "directional") };
+  }
+  if (normalized.includes("hero")) {
+    return { role: "hero", rationale: extractRoleSentence(trimmed, "hero") };
+  }
+
+  return null;
+}
+
+function buildSuggestedRoleRationale(suggestion: StartingPointSuggestion) {
+  return (
+    suggestion.description?.trim() ||
+    suggestion.shortRationale?.trim() ||
+    `Recommended by Muko to fill a ${getPieceRoleLabel(suggestion.role)} gap in the collection assortment.`
+  );
 }
 
 function toTitleCase(value: string) {
@@ -1089,56 +1138,38 @@ function SuggestedPieceCard({
   );
 }
 
-function GlassLoadOrb() {
+function InlineLoadingState({ label }: { label: string }) {
   return (
-    <>
-      <style>{`
-        @keyframes mukoGlassOrbRotate {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        @keyframes mukoGlassOrbPulse {
-          0%, 100% { transform: scale(1); opacity: 0.7; }
-          50% { transform: scale(1.06); opacity: 1; }
-        }
-      `}</style>
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 0",
+      }}
+    >
       <div
         style={{
-          width: 56,
-          height: 56,
-          position: "relative",
+          width: 16,
+          height: 16,
+          flexShrink: 0,
           borderRadius: "50%",
-          background: "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0.42) 26%, rgba(232,227,214,0.3) 58%, rgba(232,227,214,0.16) 100%)",
-          border: "1px solid rgba(67,67,43,0.08)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.82), 0 10px 22px rgba(67,67,43,0.08)",
-          backdropFilter: "blur(14px) saturate(120%)",
-          WebkitBackdropFilter: "blur(14px) saturate(120%)",
-          animation: "mukoGlassOrbPulse 1.8s ease-in-out infinite",
+          border: "2px solid rgba(67,67,43,0.14)",
+          borderTopColor: "rgba(67,67,43,0.58)",
+          animation: "mukoSpinnerRotate 0.8s linear infinite",
+        }}
+      />
+      <div
+        style={{
+          fontFamily: inter,
+          fontSize: 13,
+          fontWeight: 500,
+          color: "rgba(67,67,43,0.62)",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            inset: 4,
-            borderRadius: "50%",
-            borderTop: "1.5px solid rgba(67,67,43,0.35)",
-            borderRight: "1.5px solid rgba(67,67,43,0.08)",
-            borderBottom: "1.5px solid rgba(67,67,43,0.08)",
-            borderLeft: "1.5px solid rgba(67,67,43,0.14)",
-            animation: "mukoGlassOrbRotate 1s linear infinite",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: 14,
-            borderRadius: "50%",
-            background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.24) 55%, rgba(255,255,255,0) 100%)",
-          }}
-        />
+        {label}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -1166,6 +1197,11 @@ function ConfirmDrawer({
   onContinueWithOriginal,
   onStartBuilding,
   onCancel,
+  pieceTargetMsrp,
+  onPieceTargetMsrpChange,
+  showPieceTargetMsrpError,
+  roleLocked,
+  roleSoftSuggested,
 }: {
   piece: KeyPiece;
   pieceName: string;
@@ -1189,6 +1225,11 @@ function ConfirmDrawer({
   onContinueWithOriginal: () => void;
   onStartBuilding: () => void;
   onCancel: () => void;
+  pieceTargetMsrp: number | null;
+  onPieceTargetMsrpChange: (value: number | null) => void;
+  showPieceTargetMsrpError: boolean;
+  roleLocked: boolean;
+  roleSoftSuggested: boolean;
 }) {
   const isMarketSignal = piece.signal === "ascending" || piece.signal === "high-volume";
   const fitValue = piece.custom ? "From your direction" : "Translated for your collection";
@@ -1214,6 +1255,8 @@ function ConfirmDrawer({
   const ctaLabel = "Start Building →";
   const finalName = piece.custom ? pieceName.trim() || customProposal.trim() : pieceName.trim() || piece.item;
   const canStart = piece.custom ? Boolean(selectedRole && finalName) : Boolean(selectedRole);
+  const hasValidPieceTargetMsrp = pieceTargetMsrp != null && pieceTargetMsrp > 0;
+  const canPressStart = piece.custom ? canStart && hasValidPieceTargetMsrp : canStart;
   const [isPieceTypeEditorOpen, setIsPieceTypeEditorOpen] = useState(false);
   const availableSubcategories = category ? allSubcategories[category] ?? [] : [];
   const pieceTypeLabel =
@@ -1441,19 +1484,10 @@ function ConfirmDrawer({
               </div>
 
               {customProposal.trim() ? (
-                customRefinementState === "loading" ? (
+                customRefinementState === "loading" && !customRefinement ? (
                   <div style={{ marginBottom: 20 }}>
                     <div style={{ ...EYEBROW_STYLE, marginBottom: 8 }}>PIECE TYPE</div>
-                    <div
-                      style={{
-                        width: 224,
-                        height: 36,
-                        borderRadius: 999,
-                        background: "linear-gradient(90deg, rgba(226,221,214,0.72) 0%, rgba(242,239,233,0.96) 50%, rgba(226,221,214,0.72) 100%)",
-                        backgroundSize: "200% 100%",
-                        animation: "mukoGlassOrbRotate 1.2s linear infinite",
-                      }}
-                    />
+                    <InlineLoadingState label="Detecting piece type..." />
                   </div>
                 ) : customRefinement ? (
                   <div style={{ marginBottom: 20 }}>
@@ -1538,16 +1572,9 @@ function ConfirmDrawer({
 
               {customProposal.trim() ? (
                 <div style={{ marginBottom: 22 }}>
-                  {customRefinementState === "loading" ? (
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "flex-start",
-                        padding: "8px 0 12px",
-                        marginBottom: 14,
-                      }}
-                    >
-                      <GlassLoadOrb />
+                  {customRefinementState === "loading" && !customRefinement ? (
+                    <div style={{ marginBottom: 14 }}>
+                      <InlineLoadingState label="Refining your custom piece..." />
                     </div>
                   ) : null}
 
@@ -1614,19 +1641,6 @@ function ConfirmDrawer({
                         >
                           Continue with original input
                         </button>
-                      </div>
-                      <div>
-                        <div style={{ ...EYEBROW_STYLE, marginBottom: 6 }}>Recommended role</div>
-                        <div
-                          style={{
-                            ...BODY_COPY_STYLE,
-                            color: TEXT,
-                            lineHeight: 1.35,
-                            marginBottom: 4,
-                          }}
-                        >
-                          {customRefinement.role}
-                        </div>
                       </div>
                     </div>
                   ) : null}
@@ -1762,7 +1776,7 @@ function ConfirmDrawer({
           >
             Piece role
           </div>
-          {suggestion && !piece.custom && (
+          {suggestion && (
             <div style={{ marginBottom: 16, padding: "0 2px" }}>
               <div
                 style={{
@@ -1794,6 +1808,27 @@ function ConfirmDrawer({
               >
                 {`— ${suggestion.rationale}`}
               </div>
+              {roleLocked ? (
+                <div
+                  style={{
+                    ...BODY_SMALL_STYLE,
+                    marginTop: 8,
+                    color: "#6F6A63",
+                  }}
+                >
+                  Role locked from the prior Muko recommendation.
+                </div>
+              ) : roleSoftSuggested ? (
+                <div
+                  style={{
+                    ...BODY_SMALL_STYLE,
+                    marginTop: 8,
+                    color: "#6F6A63",
+                  }}
+                >
+                  Suggested by Muko · Change if needed
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -1811,7 +1846,11 @@ function ConfirmDrawer({
                   type="button"
                   role="radio"
                   aria-checked={isSelected}
-                  onClick={() => onRoleSelect(option.id)}
+                  aria-disabled={roleLocked}
+                  onClick={() => {
+                    if (roleLocked) return;
+                    onRoleSelect(option.id);
+                  }}
                   style={{
                     width: "100%",
                     textAlign: "left",
@@ -1820,7 +1859,8 @@ function ConfirmDrawer({
                     border: isSelected ? "1px solid rgba(168,180,117,0.52)" : `1px solid ${BORDER}`,
                     background: isSelected ? "rgba(168,180,117,0.11)" : "rgba(250,249,246,0.92)",
                     boxShadow: isSelected ? "0 0 0 1px rgba(168,180,117,0.08), 0 8px 20px rgba(67,67,43,0.05)" : "none",
-                    cursor: "pointer",
+                    cursor: roleLocked ? "not-allowed" : "pointer",
+                    opacity: roleLocked && !isSelected ? 0.72 : 1,
                     transition: "background 160ms ease, border-color 160ms ease, box-shadow 160ms ease",
                   }}
                 >
@@ -1873,6 +1913,120 @@ function ConfirmDrawer({
             })}
           </div>
 
+          {piece.custom ? (
+            <div
+              style={{
+                marginTop: 24,
+                paddingTop: 24,
+                borderTop: `1px solid ${BORDER}`,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 16,
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: MUTED,
+                  }}
+                >
+                  Target retail price
+                </div>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: "#B8876B",
+                  }}
+                >
+                  Required
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  border: hasValidPieceTargetMsrp ? "0.5px solid #A8B475" : `0.5px solid ${BORDER}`,
+                  background: "rgba(255,255,255,0.9)",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 15,
+                    color: MUTED,
+                  }}
+                >
+                  $
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 285"
+                  value={pieceTargetMsrp ?? ""}
+                  onChange={(event) => {
+                    const nextValue = Number(event.target.value);
+                    if (!event.target.value) {
+                      onPieceTargetMsrpChange(null);
+                      return;
+                    }
+                    onPieceTargetMsrpChange(Number.isFinite(nextValue) && nextValue > 0 ? nextValue : null);
+                  }}
+                  style={{
+                    flex: 1,
+                    border: "none",
+                    outline: "none",
+                    background: "transparent",
+                    padding: 0,
+                    fontFamily: "inherit",
+                    fontSize: 15,
+                    color: TEXT,
+                    minWidth: 0,
+                  }}
+                />
+              </div>
+
+              <div
+                style={{
+                  marginTop: 8,
+                  fontFamily: inter,
+                  fontSize: 11,
+                  color: MUTED,
+                }}
+              >
+                Used to evaluate margin viability as you build
+              </div>
+
+              {showPieceTargetMsrpError ? (
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontFamily: inter,
+                    fontSize: 12,
+                    color: "#B8876B",
+                  }}
+                >
+                  Set a price to unlock cost analysis
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
         </div>
 
         {/* Right: actions */}
@@ -1889,27 +2043,27 @@ function ConfirmDrawer({
         >
           <button
             onClick={onStartBuilding}
-            disabled={!canStart}
             style={{
-              background: canStart ? CHARTREUSE : "#ECE8E0",
-              color: canStart ? "#3A4020" : "#9A9388",
-              borderRadius: 100,
-              padding: "11px 22px",
-              fontSize: 11.5,
+              width: "100%",
+              background: "#191919",
+              color: "#FFFFFF",
+              borderRadius: 999,
+              padding: "12px 24px",
+              fontSize: 14,
               fontWeight: 500,
               fontFamily: inter,
               border: "none",
-              cursor: canStart ? "pointer" : "not-allowed",
+              cursor: canPressStart ? "pointer" : "not-allowed",
               whiteSpace: "nowrap" as const,
               letterSpacing: "0.02em",
               transition: "background 160ms ease, color 160ms ease, opacity 160ms ease",
-              opacity: canStart ? 1 : 0.86,
+              opacity: canPressStart ? 1 : 0.4,
             }}
             onMouseEnter={(e) => {
-              if (canStart) e.currentTarget.style.background = "#95A164";
+              if (canPressStart) e.currentTarget.style.background = "#2A2A2A";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = canStart ? CHARTREUSE : "#ECE8E0";
+              e.currentTarget.style.background = "#191919";
             }}
           >
             {ctaLabel}
@@ -1967,6 +2121,7 @@ function PiecesPageClient() {
     executionPulse,
     setSelectedKeyPiece,
     setCollectionRole,
+    setTargetMsrp: storeSetTargetMsrp,
     setCategory,
     setSubcategory,
     setMaterial,
@@ -1975,6 +2130,15 @@ function PiecesPageClient() {
     setActiveProductPieceId,
     setPieceBuildContext,
     setSavedAnalysisId,
+    askMukoLastResponse,
+    setAskMukoLastResponse,
+    lastSuggestedRole,
+    lastSuggestedRoleIsLocked,
+    lastSuggestionRationale,
+    lastAskMukoResponseTimestamp,
+    setLastSuggestedRole,
+    setLastSuggestedRoleIsLocked,
+    setLastSuggestionRationale,
   } = useSessionStore();
 
   // Confirmed pieces from Supabase
@@ -2514,6 +2678,7 @@ function PiecesPageClient() {
 
   const [synthesizedPiecesRead, setSynthesizedPiecesRead] = useState<PiecesReadOutput | null>(null);
   const [piecesReadStatus, setPiecesReadStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [piecesReadMeta, setPiecesReadMeta] = useState<PiecesReadResponseMeta | null>(null);
 
   const piecesReadRequestBody = useMemo(
     () => JSON.stringify(piecesReadInput),
@@ -2524,6 +2689,7 @@ function PiecesPageClient() {
     const controller = new AbortController();
     setSynthesizedPiecesRead(null);
     setPiecesReadStatus("loading");
+    setPiecesReadMeta(null);
 
     const run = async () => {
       try {
@@ -2540,7 +2706,7 @@ function PiecesPageClient() {
         }
 
         const data = (await response.json()) as PiecesReadOutput & {
-          _meta?: { latency_ms?: number };
+          _meta?: PiecesReadResponseMeta;
         };
 
         if (controller.signal.aborted) return;
@@ -2554,20 +2720,32 @@ function PiecesPageClient() {
             start_here_body: data.start_here_body,
             piece_microcopy: data.piece_microcopy,
           });
+          setPiecesReadMeta(data._meta ?? null);
           setPiecesReadStatus("ready");
         });
 
         if (process.env.NODE_ENV !== "production") {
-          console.debug("[Pieces Read] synthesized", {
-            latencyMs: data._meta?.latency_ms,
-            input: piecesReadInput,
-          });
+          console.debug(
+            data._meta?.source === "fallback" ? "[Pieces Read] fallback response" : "[Pieces Read] synthesized",
+            {
+              source: data._meta?.source,
+              reason: data._meta?.reason,
+              detail: data._meta?.detail,
+              latencyMs: data._meta?.latency_ms,
+              input: piecesReadInput,
+            }
+          );
         }
       } catch (error) {
         if ((error as Error).name === "AbortError") return;
 
         const message = error instanceof Error ? error.message : String(error);
         setSynthesizedPiecesRead(null);
+        setPiecesReadMeta({
+          source: "fallback",
+          reason: "network_error",
+          detail: [message],
+        });
         setPiecesReadStatus("error");
 
         if (process.env.NODE_ENV !== "production") {
@@ -2614,6 +2792,13 @@ function PiecesPageClient() {
   const [drawerCategory, setDrawerCategory] = useState("");
   const [drawerSubcategory, setDrawerSubcategory] = useState("");
   const [drawerRole, setDrawerRole] = useState<CollectionRoleId | null>(null);
+  const [pieceTargetMsrp, setPieceTargetMsrp] = useState<number | null>(null);
+  const [pieceTargetMsrpError, setPieceTargetMsrpError] = useState(false);
+  const [suggestedSheetOpen, setSuggestedSheetOpen] = useState(false);
+  const [selectedSuggestedPiece, setSelectedSuggestedPiece] = useState<SuggestedPiece | null>(null);
+  const [suggestedMsrp, setSuggestedMsrp] = useState<number | null>(null);
+  const [suggestedRole, setSuggestedRole] = useState<CollectionRoleId | null>(null);
+  const [suggestedMsrpError, setSuggestedMsrpError] = useState(false);
   const [customProposal, setCustomProposal] = useState("");
   const [customFinalExpression, setCustomFinalExpression] = useState("");
   const [customRefinement, setCustomRefinement] = useState<CustomPieceRefinement | null>(null);
@@ -2622,6 +2807,7 @@ function PiecesPageClient() {
   const [askMukoOpeningMessage, setAskMukoOpeningMessage] = useState<string | null>(null);
   const [askMukoOpeningMessageVersion, setAskMukoOpeningMessageVersion] = useState(0);
   const refinementAbortRef = React.useRef<AbortController | null>(null);
+  const isInferredPieceTypeUpdateRef = React.useRef(false);
   const lastInferredDrawerCategoryRef = React.useRef("");
   const lastInferredDrawerSubcategoryRef = React.useRef("");
 
@@ -2678,9 +2864,11 @@ function PiecesPageClient() {
 
   const commercialContext = useMemo(
     () => ({
-      target_msrp: targetMsrp || null,
+      target_msrp: targetMsrp != null && targetMsrp > 0 ? targetMsrp : null,
       margin: targetMargin || null,
-      cost_ceiling: (targetMsrp ?? 0) > 0 && targetMargin > 0 ? Math.round((targetMsrp ?? 0) * (1 - targetMargin / 100)) : null,
+      cost_ceiling: targetMsrp != null && targetMsrp > 0 && targetMargin > 0
+        ? Math.round(targetMsrp * (1 - targetMargin / 100))
+        : null,
     }),
     [targetMargin, targetMsrp]
   );
@@ -2708,25 +2896,34 @@ function PiecesPageClient() {
           direction: collectionAesthetic || directionInterpretationText || "",
         },
         user_input: customProposal.trim(),
-        current_expression: customFinalExpression.trim() || undefined,
-        selected_role: drawerRole ? getPieceRoleLabel(drawerRole) : undefined,
+        selected_category: drawerCategory || undefined,
+        selected_subcategory: drawerSubcategory || undefined,
+        selected_role: lastSuggestedRoleIsLocked ? lastSuggestedRole ?? undefined : undefined,
+        source_rationale: lastSuggestedRoleIsLocked ? lastSuggestionRationale ?? undefined : undefined,
         existing_pieces: confirmedPieces.map((p) => ({
           name: getDisplayPieceName(p),
           role: p.collection_role ? getPieceRoleLabel(p.collection_role as CollectionRoleId) : "",
           category: p.category ?? "",
         })),
+        ...(askMukoLastResponse?.trim()
+          ? { ask_muko_context: askMukoLastResponse.trim() }
+          : {}),
       }),
     [
+      askMukoLastResponse,
       collectionAesthetic,
       collectionLanguageLabels,
       collectionMaterials,
       collectionPriorities,
       commercialContext,
       conceptSilhouette,
-      customFinalExpression,
       customProposal,
       directionInterpretationText,
-      drawerRole,
+      drawerCategory,
+      drawerSubcategory,
+      lastSuggestedRole,
+      lastSuggestedRoleIsLocked,
+      lastSuggestionRationale,
       paletteName,
       season,
       confirmedPieces,
@@ -2738,17 +2935,38 @@ function PiecesPageClient() {
   );
 
   const openDrawer = useCallback((piece: KeyPiece, suggestion: StartingPointSuggestion | null = null) => {
+    const askMukoSuggestion =
+      piece.custom && lastAskMukoResponseTimestamp != null
+        ? inferRoleFromAskMukoResponse(askMukoLastResponse)
+        : null;
+    const lockedRole = suggestion?.role ?? askMukoSuggestion?.role ?? null;
+    const lockedRationale = suggestion
+      ? buildSuggestedRoleRationale(suggestion)
+      : askMukoSuggestion?.rationale ?? null;
+    const isLocked = Boolean(suggestion?.role);
+
     setDrawerPiece(piece);
     setDrawerSuggestion(suggestion);
     setDrawerPieceName(piece.item);
     setDrawerCategory(piece.category ?? "");
     setDrawerSubcategory(normalizeSpecSubcategoryId(piece.type) ?? piece.type ?? "");
-    setDrawerRole(null);
+    setDrawerRole(lockedRole);
+    setPieceTargetMsrp(null);
+    setPieceTargetMsrpError(false);
     setCustomProposal(piece.custom ? piece.item : "");
     setCustomFinalExpression(piece.custom ? piece.item : "");
     setCustomRefinement(null);
     setCustomRefinementState("idle");
-  }, []);
+    setLastSuggestedRole(lockedRole);
+    setLastSuggestedRoleIsLocked(isLocked);
+    setLastSuggestionRationale(lockedRationale);
+  }, [
+    askMukoLastResponse,
+    lastAskMukoResponseTimestamp,
+    setLastSuggestedRole,
+    setLastSuggestedRoleIsLocked,
+    setLastSuggestionRationale,
+  ]);
 
   const closeDrawer = useCallback(() => {
     refinementAbortRef.current?.abort();
@@ -2759,11 +2977,106 @@ function PiecesPageClient() {
     setDrawerCategory("");
     setDrawerSubcategory("");
     setDrawerRole(null);
+    setPieceTargetMsrp(null);
+    setPieceTargetMsrpError(false);
     setCustomProposal("");
     setCustomFinalExpression("");
     setCustomRefinement(null);
     setCustomRefinementState("idle");
+    setAskMukoLastResponse(null);
+    setLastSuggestedRole(null);
+    setLastSuggestedRoleIsLocked(false);
+    setLastSuggestionRationale(null);
+  }, [
+    setAskMukoLastResponse,
+    setLastSuggestedRole,
+    setLastSuggestedRoleIsLocked,
+    setLastSuggestionRationale,
+  ]);
+
+  const closeSuggestedSheet = useCallback(() => {
+    setSuggestedSheetOpen(false);
+    setSelectedSuggestedPiece(null);
+    setSuggestedMsrp(null);
+    setSuggestedRole(null);
+    setSuggestedMsrpError(false);
   }, []);
+
+  const openSuggestedSheet = useCallback((piece: SuggestedPiece) => {
+    setSelectedSuggestedPiece(piece);
+    setSuggestedRole(piece.role ?? "volume-driver");
+    setSuggestedMsrp(null);
+    setSuggestedMsrpError(false);
+    setSuggestedSheetOpen(true);
+  }, []);
+
+  const handleStartSuggestedPiece = useCallback(() => {
+    if (!selectedSuggestedPiece || !suggestedRole) return;
+    if (!suggestedMsrp || suggestedMsrp <= 0) {
+      setSuggestedMsrpError(true);
+      return;
+    }
+
+    const sourcePiece = selectedSuggestedPiece.sourcePiece;
+    const finalPieceName = sourcePiece.item;
+    const pieceBuildContext: PieceBuildContext = {
+      adaptedTitle: selectedSuggestedPiece.adapted_title ?? finalPieceName,
+      role: suggestedRole,
+      archetype: selectedSuggestedPiece.archetype ?? sourcePiece.item.toLowerCase().replace(/\s+/g, "_"),
+      originalLabel: selectedSuggestedPiece.original_label ?? sourcePiece.item,
+      expression: null,
+      translation: (selectedSuggestedPiece.version_label ?? directionInterpretationText) || null,
+      collectionLanguage: collectionLanguageExpression.map((chip) => ({
+        label: chip.label,
+        state: chip.state,
+      })),
+      expressionSignals: expressionSignalExpression.map((chip) => ({
+        label: chip.label,
+        state: chip.state,
+      })),
+      complexityBias,
+    };
+
+    setSelectedKeyPiece(sourcePiece);
+    setCollectionRole(suggestedRole);
+    storeSetTargetMsrp(suggestedMsrp);
+    setPieceBuildContext(pieceBuildContext);
+    setSavedAnalysisId(null);
+    setPieceRolesById({
+      ...pieceRolesById,
+      [finalPieceName]: suggestedRole,
+    });
+    setActiveProductPieceId(finalPieceName);
+    setLastSuggestedRole(null);
+    setLastSuggestedRoleIsLocked(false);
+    setLastSuggestionRationale(null);
+    setCategory(sourcePiece.category || "");
+    setSubcategory(sourcePiece.type || "");
+    setSuggestedSheetOpen(false);
+    router.push("/spec");
+  }, [
+    collectionLanguageExpression,
+    complexityBias,
+    directionInterpretationText,
+    expressionSignalExpression,
+    pieceRolesById,
+    router,
+    selectedSuggestedPiece,
+    setActiveProductPieceId,
+    setCategory,
+    setCollectionRole,
+    setLastSuggestedRole,
+    setLastSuggestedRoleIsLocked,
+    setLastSuggestionRationale,
+    setPieceBuildContext,
+    setPieceRolesById,
+    setSavedAnalysisId,
+    setSelectedKeyPiece,
+    setSubcategory,
+    storeSetTargetMsrp,
+    suggestedMsrp,
+    suggestedRole,
+  ]);
 
   useEffect(() => {
     if (!drawerPiece?.custom) return;
@@ -2776,7 +3089,12 @@ function PiecesPageClient() {
       setCustomRefinementState("idle");
       lastInferredDrawerCategoryRef.current = "";
       lastInferredDrawerSubcategoryRef.current = "";
-      setDrawerRole(null);
+      setDrawerRole(lastSuggestedRole ? (lastSuggestedRole as CollectionRoleId) : null);
+      return;
+    }
+
+    if (isInferredPieceTypeUpdateRef.current) {
+      isInferredPieceTypeUpdateRef.current = false;
       return;
     }
 
@@ -2801,7 +3119,14 @@ function PiecesPageClient() {
 
         setCustomRefinement(data);
         setCustomRefinementState("ready");
-        setDrawerRole(mapRoleLabelToId(data.role));
+        setDrawerRole((current) => {
+          if (lastSuggestedRoleIsLocked && lastSuggestedRole) {
+            return lastSuggestedRole as CollectionRoleId;
+          }
+          if (current) return current;
+          if (lastSuggestedRole) return lastSuggestedRole as CollectionRoleId;
+          return mapRoleLabelToId(data.role);
+        });
       } catch (error) {
         if ((error as Error).name === "AbortError") return;
         setCustomRefinement(null);
@@ -2821,20 +3146,11 @@ function PiecesPageClient() {
       }
     };
   }, [
-    collectionAesthetic,
-    conceptSilhouette,
     customRefinementRequestBody,
     customProposal,
-    customFinalExpression,
-    directionInterpretationText,
     drawerPiece?.custom,
-    drawerRole,
-    paletteName,
-    season,
-    sliderCreative,
-    sliderElevated,
-    sliderNovelty,
-    sliderTrend,
+    lastSuggestedRole,
+    lastSuggestedRoleIsLocked,
   ]);
 
   useEffect(() => {
@@ -2842,6 +3158,12 @@ function PiecesPageClient() {
 
     const nextCategory = customRefinement.category ?? "";
     const nextSubcategory = normalizeSpecSubcategoryId(customRefinement.subcategory) ?? customRefinement.subcategory ?? "";
+    const shouldUpdateCategory = !drawerCategory || drawerCategory === lastInferredDrawerCategoryRef.current;
+    const shouldUpdateSubcategory = !drawerSubcategory || drawerSubcategory === lastInferredDrawerSubcategoryRef.current;
+
+    if (shouldUpdateCategory || shouldUpdateSubcategory) {
+      isInferredPieceTypeUpdateRef.current = true;
+    }
 
     setDrawerCategory((current) => {
       if (!current || current === lastInferredDrawerCategoryRef.current) return nextCategory;
@@ -2854,10 +3176,14 @@ function PiecesPageClient() {
 
     lastInferredDrawerCategoryRef.current = nextCategory;
     lastInferredDrawerSubcategoryRef.current = nextSubcategory;
-  }, [customRefinement, drawerPiece?.custom]);
+  }, [customRefinement, drawerCategory, drawerPiece?.custom, drawerSubcategory]);
 
   const handleStartBuilding = useCallback(() => {
     if (!drawerPiece || !drawerRole) return;
+    if (drawerPiece.custom && (!pieceTargetMsrp || pieceTargetMsrp <= 0)) {
+      setPieceTargetMsrpError(true);
+      return;
+    }
     const finalPieceName = drawerPiece.custom
       ? drawerPieceName.trim() || customProposal.trim()
       : drawerPieceName.trim() || drawerPiece.item;
@@ -2895,7 +3221,10 @@ function PiecesPageClient() {
         drawerPiece.custom
           ? (customFinalExpression.trim() || finalPieceName).toLowerCase().replace(/\s+/g, "_")
           : drawerSuggestion?.archetype ?? drawerPiece.item.toLowerCase().replace(/\s+/g, "_"),
-      originalLabel: drawerPiece.custom ? customProposal.trim() || finalPieceName : drawerSuggestion?.original_label ?? drawerPiece.item,
+      originalLabel:
+        drawerPiece.custom
+          ? customProposal.trim() || finalPieceName
+          : (drawerSuggestion?.original_label ?? drawerPiece.item),
       expression:
         drawerPiece.custom && customFinalExpression.trim() && customFinalExpression.trim() !== finalPieceName
           ? customFinalExpression.trim()
@@ -2903,7 +3232,7 @@ function PiecesPageClient() {
       translation:
         (drawerPiece.custom
           ? customRefinement?.read || directionInterpretationText
-          : drawerSuggestion?.version_label ?? directionInterpretationText) || null,
+          : (drawerSuggestion?.version_label ?? directionInterpretationText)) || null,
       collectionLanguage: collectionLanguageExpression.map((chip) => ({
         label: chip.label,
         state: chip.state,
@@ -2918,11 +3247,17 @@ function PiecesPageClient() {
     setCollectionRole(drawerRole);
     setPieceBuildContext(pieceBuildContext);
     setSavedAnalysisId(null);
+    if (drawerPiece.custom && pieceTargetMsrp && pieceTargetMsrp > 0) {
+      storeSetTargetMsrp(pieceTargetMsrp);
+    }
     setPieceRolesById({
       ...pieceRolesById,
       [finalPieceName]: drawerRole,
     });
     setActiveProductPieceId(finalPieceName);
+    setLastSuggestedRole(null);
+    setLastSuggestedRoleIsLocked(false);
+    setLastSuggestionRationale(null);
     if (drawerPiece.custom) {
       setMaterial("");
       setCategory(drawerCategory || inferredCategory || "");
@@ -2943,8 +3278,10 @@ function PiecesPageClient() {
     customRefinement?.read,
     customRefinement?.category,
     customRefinement?.subcategory,
+    pieceTargetMsrp,
     setSelectedKeyPiece,
     setCollectionRole,
+    setPieceTargetMsrpError,
     setPieceBuildContext,
     setSavedAnalysisId,
     pieceRolesById,
@@ -2953,8 +3290,12 @@ function PiecesPageClient() {
     setCategory,
     setMaterial,
     setSubcategory,
+    storeSetTargetMsrp,
     router,
     drawerSuggestion,
+    setLastSuggestedRole,
+    setLastSuggestedRoleIsLocked,
+    setLastSuggestionRationale,
     directionInterpretationText,
     collectionLanguageExpression,
     expressionSignalExpression,
@@ -2965,7 +3306,7 @@ function PiecesPageClient() {
   const allSubcategories = subcategoriesData as Record<string, SubcategoryEntry[]>;
 
   return (
-    <div style={{ minHeight: "100vh", background: BG, fontFamily: inter }}>
+    <div style={{ position: "relative", minHeight: "100vh", background: BG, fontFamily: inter }}>
       <MukoNav
         activeTab="pieces"
         setupComplete={conceptLocked}
@@ -3247,7 +3588,7 @@ function PiecesPageClient() {
                   key={piece.original_label}
                   piece={piece}
                   microcopy={pieceMicrocopyByName[piece.adapted_title] ?? piece.shortRationale}
-                  onBuild={() => openDrawer(piece.sourcePiece, piece)}
+                  onBuild={() => openSuggestedSheet(piece)}
                 />
               ))}
             </div>
@@ -3279,6 +3620,19 @@ function PiecesPageClient() {
             >
               MUKO&apos;S READ
             </div>
+            {process.env.NODE_ENV !== "production" && piecesReadMeta?.reason ? (
+              <div
+                style={{
+                  ...BODY_SMALL_STYLE,
+                  marginBottom: 10,
+                  color: piecesReadMeta.source === "fallback" ? AMBER : MUTED,
+                }}
+              >
+                {piecesReadMeta.source === "fallback"
+                  ? `Fallback: ${piecesReadMeta.reason}`
+                  : `Read warning: ${piecesReadMeta.reason}`}
+              </div>
+            ) : null}
             {rightRailPiecesRead ? (
               <>
                 <div
@@ -3334,8 +3688,8 @@ function PiecesPageClient() {
                       <button
                         type="button"
                         onClick={() => {
-                          if (!recommendedStartSuggestion?.sourcePiece) return;
-                          openDrawer(recommendedStartSuggestion.sourcePiece, recommendedStartSuggestion);
+                          if (!recommendedStartSuggestion) return;
+                          openSuggestedSheet(recommendedStartSuggestion);
                         }}
                         style={{
                           padding: 0,
@@ -3437,7 +3791,14 @@ function PiecesPageClient() {
           allSubcategories={allSubcategories}
           selectedRole={drawerRole}
           suggestion={
-            drawerPiece.custom
+            lastSuggestedRole
+              ? {
+                  role: lastSuggestedRole as CollectionRoleId,
+                  rationale:
+                    lastSuggestionRationale ??
+                    (drawerSuggestion?.description || inferredDrawerSuggestion?.rationale || "Recommended by Muko for this collection context."),
+                }
+              : drawerPiece.custom
               ? inferredDrawerSuggestion
               : drawerSuggestion
               ? { role: drawerSuggestion.role, rationale: drawerSuggestion.description }
@@ -3456,20 +3817,360 @@ function PiecesPageClient() {
           onAcceptRefinedExpression={() => {
             if (!customRefinement) return;
             setCustomFinalExpression(customRefinement.refined_expression);
-            setDrawerRole(mapRoleLabelToId(customRefinement.role));
+            setDrawerRole((current) => {
+              if (lastSuggestedRoleIsLocked && lastSuggestedRole) {
+                return lastSuggestedRole as CollectionRoleId;
+              }
+              return current ?? (lastSuggestedRole ? (lastSuggestedRole as CollectionRoleId) : mapRoleLabelToId(customRefinement.role));
+            });
           }}
           onContinueWithOriginal={() => {
             const original = customProposal.trim();
             if (!original) return;
             setCustomFinalExpression(original);
-            if (customRefinement) {
+            if (lastSuggestedRoleIsLocked && lastSuggestedRole) {
+              setDrawerRole(lastSuggestedRole as CollectionRoleId);
+            } else if (!drawerRole && lastSuggestedRole) {
+              setDrawerRole(lastSuggestedRole as CollectionRoleId);
+            } else if (!drawerRole && customRefinement) {
               setDrawerRole(mapRoleLabelToId(customRefinement.role));
             }
           }}
           onStartBuilding={handleStartBuilding}
           onCancel={closeDrawer}
+          pieceTargetMsrp={pieceTargetMsrp}
+          onPieceTargetMsrpChange={(value) => {
+            setPieceTargetMsrp(value);
+            setPieceTargetMsrpError(false);
+          }}
+          showPieceTargetMsrpError={pieceTargetMsrpError}
+          roleLocked={Boolean(lastSuggestedRole && lastSuggestedRoleIsLocked)}
+          roleSoftSuggested={Boolean(lastSuggestedRole && !lastSuggestedRoleIsLocked)}
         />
       )}
+
+      {suggestedSheetOpen && selectedSuggestedPiece ? (
+        <div
+          onClick={closeSuggestedSheet}
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0,0,0,0.32)",
+            zIndex: 50,
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              maxHeight: "80vh",
+              overflowY: "auto",
+              padding: 20,
+              background: BG,
+              borderTop: `0.5px solid ${BORDER}`,
+              borderRadius: "16px 16px 0 0",
+              zIndex: 51,
+              boxShadow: "0 -18px 48px rgba(25,25,25,0.16)",
+            }}
+          >
+            <div
+              style={{
+                width: 32,
+                height: 3,
+                borderRadius: 999,
+                background: BG2,
+                margin: "0 auto 16px",
+              }}
+            />
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  border: `0.5px solid ${BORDER}`,
+                  background: BG2,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                  flexShrink: 0,
+                }}
+              >
+                {(() => {
+                  const previewType = resolvePieceImageType({
+                    type: selectedSuggestedPiece.sourcePiece.type,
+                    pieceName: selectedSuggestedPiece.adapted_title,
+                    category: selectedSuggestedPiece.sourcePiece.category ?? undefined,
+                  });
+                  const previewFlat = previewType
+                    ? getFlatForPiece(previewType, selectedSuggestedPiece.sourcePiece.signal) as {
+                        Flat: React.ComponentType<{ color: string }>;
+                        color: string;
+                      } | null
+                    : null;
+                  if (!previewFlat) return null;
+                  const PreviewFlat = previewFlat.Flat;
+                  return <PreviewFlat color={previewFlat.color} />;
+                })()}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: TEXT,
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {selectedSuggestedPiece.adapted_title}
+                </div>
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontFamily: inter,
+                    fontSize: 12,
+                    color: MUTED,
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {selectedSuggestedPiece.shortRationale}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ height: 1, background: BORDER, marginBottom: 16 }} />
+
+            <div style={{ marginBottom: 20 }}>
+              <div
+                style={{
+                  fontFamily: inter,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: MUTED,
+                  marginBottom: 10,
+                }}
+              >
+                Piece role
+              </div>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                {PIECE_ROLE_OPTIONS.map((option) => {
+                  const isSelected = suggestedRole === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setSuggestedRole(option.id)}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "14px 16px",
+                        borderRadius: 12,
+                        border: isSelected ? "1px solid #B8876B" : `1px solid ${BORDER}`,
+                        background: isSelected ? "rgba(184,135,107,0.07)" : "rgba(255,255,255,0.92)",
+                        cursor: "pointer",
+                        transition: "background 160ms ease, border-color 160ms ease",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontFamily: sohne,
+                          fontSize: 18,
+                          color: TEXT,
+                          lineHeight: 1.2,
+                          marginBottom: 4,
+                        }}
+                      >
+                        {option.label}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: inter,
+                          fontSize: 12,
+                          color: isSelected ? "#6F6A63" : MUTED,
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        {option.description}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 16,
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: MUTED,
+                  }}
+                >
+                  Target retail price
+                </div>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: "#B8876B",
+                  }}
+                >
+                  Required
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  border: suggestedMsrp != null && suggestedMsrp > 0 ? "0.5px solid #A8B475" : `0.5px solid ${BORDER}`,
+                  background: "rgba(255,255,255,0.9)",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 15,
+                    color: MUTED,
+                  }}
+                >
+                  $
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 285"
+                  value={suggestedMsrp ?? ""}
+                  onChange={(event) => {
+                    const nextValue = Number(event.target.value);
+                    if (!event.target.value) {
+                      setSuggestedMsrp(null);
+                      setSuggestedMsrpError(false);
+                      return;
+                    }
+                    setSuggestedMsrp(Number.isFinite(nextValue) && nextValue > 0 ? nextValue : null);
+                    setSuggestedMsrpError(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    border: "none",
+                    outline: "none",
+                    background: "transparent",
+                    padding: 0,
+                    fontFamily: "inherit",
+                    fontSize: 15,
+                    color: TEXT,
+                    minWidth: 0,
+                  }}
+                />
+              </div>
+
+              <div
+                style={{
+                  marginTop: 8,
+                  fontFamily: inter,
+                  fontSize: 11,
+                  color: MUTED,
+                }}
+              >
+                Used to evaluate margin viability as you build
+              </div>
+
+              {suggestedMsrpError ? (
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontFamily: inter,
+                    fontSize: 12,
+                    color: "#B8876B",
+                  }}
+                >
+                  Set a price to unlock cost analysis
+                </div>
+              ) : null}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleStartSuggestedPiece}
+              style={{
+                width: "100%",
+                border: "none",
+                borderRadius: 999,
+                padding: "12px 24px",
+                background: "#191919",
+                color: "#FFFFFF",
+                fontFamily: inter,
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: suggestedMsrp != null && suggestedMsrp > 0 ? "pointer" : "not-allowed",
+                opacity: suggestedMsrp != null && suggestedMsrp > 0 ? 1 : 0.4,
+                transition: "opacity 160ms ease, background 160ms ease",
+              }}
+              onMouseEnter={(event) => {
+                if (suggestedMsrp != null && suggestedMsrp > 0) {
+                  event.currentTarget.style.background = "#2A2A2A";
+                }
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.background = "#191919";
+              }}
+            >
+              Start Building →
+            </button>
+
+            <button
+              type="button"
+              onClick={closeSuggestedSheet}
+              style={{
+                width: "100%",
+                marginTop: 12,
+                padding: 0,
+                border: "none",
+                background: "none",
+                fontFamily: inter,
+                fontSize: 13,
+                color: MUTED,
+                cursor: "pointer",
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

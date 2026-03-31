@@ -14,7 +14,7 @@ export interface AnalysisInput {
   silhouette:        string;
   construction_tier: 'low' | 'moderate' | 'high';
   category:          string;
-  target_msrp:       number;
+  target_msrp:       number | null;
   season:            string;
   collection_name:   string;
   timeline_weeks:    number;
@@ -70,7 +70,7 @@ export interface AnalysisResult {
     execution:  number;
   };
   gates_passed: {
-    cost:           boolean;
+    cost:           boolean | null;
     sustainability: null;
   };
   narrative:          string;
@@ -102,7 +102,7 @@ export interface PipelineBlackboard {
   execution_score:      number;
   timeline_buffer:      number;
   cogs:                 number;
-  gate_passed:          boolean;
+  gate_passed:          boolean | null;
   cogs_delta:           number;
   final_score:          number;
   redirect:             RedirectObject | null;
@@ -150,7 +150,9 @@ export function buildAnalysisRow(
     collection_name: bb.input.collection_name,
     collection_role: bb.session.collectionRole ?? null,
     category:    bb.input.category?.toLowerCase()?.trim(),
-    target_msrp: bb.input.target_msrp,
+    target_msrp: (bb.input.target_msrp && bb.input.target_msrp > 0)
+      ? bb.input.target_msrp
+      : null,
     aesthetic_input:      bb.input.aesthetic_input,
     aesthetic_matched_id: result.aesthetic_matched_id ?? bb.input.aesthetic_input?.toLowerCase()?.replace(/\s+/g, '-'),
     collection_aesthetic: collAesthetic,

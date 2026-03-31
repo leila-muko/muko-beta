@@ -184,6 +184,13 @@ start_here_body
   - FAIL: "Start with one anchor piece"
   - PASS: "Next move: tops coverage — 1 top against 3 bottoms means the assortment reads bottom-heavy before it reads directional"
 
+piece_microcopy
+- This field is optional.
+- If you include it, only write entries for suggestedPieces using the exact suggestedPieces[].name values.
+- Never write piece_microcopy for confirmedPieces already in the collection.
+- Prefer 0-3 entries total, prioritized by suggestedPieces rank.
+- Each line should explain why that suggested piece matters structurally; do not restate the full read.
+
 TENSION RULE
 read_body must identify one specific tension or opportunity created by
 the current collection state. Name the conflict directly, for example:

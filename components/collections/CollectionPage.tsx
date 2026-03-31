@@ -2,8 +2,18 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import materialsData from '@/data/materials.json';
 import { createClient } from '@/lib/supabase/client';
 import { getFlatForPiece } from '@/components/flats';
+import { buildCollectionReport } from '@/lib/collection-report/buildCollectionReport';
+import type {
+  CollectionComplexity,
+  CollectionPieceRole,
+  CollectionReportBrandInput,
+  CollectionReportIntentInput,
+  CollectionReportInput,
+  CollectionReportPayload,
+} from '@/lib/collection-report/types';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { parseSelectedPieceImage, resolvePieceImageType } from '@/lib/piece-image';
 import { buildAssortmentIntelligence } from '@/lib/collection-report/buildAssortmentIntelligence';
@@ -48,6 +58,19 @@ interface CollectionPageProps {
   onPieceDeleted?: () => void;
 }
 
+interface BrandProfileRow {
+  brand_name: string | null;
+  keywords: string[] | null;
+  customer_profile: string | null;
+  price_tier: string | null;
+  tension_context: string | null;
+  reference_brands: string[] | null;
+}
+
+const materialNameById = new Map(
+  (materialsData as Array<{ id: string; name: string }>).map((material) => [material.id, material.name])
+);
+
 function normalizeToken(value: string | null | undefined) {
   return (value ?? '')
     .toLowerCase()
@@ -91,6 +114,132 @@ function getAssignedRole(analysis: AnalysisRow): AssignedRole | null {
   }
 
   return null;
+}
+
+function inferReportRole(analysis: AnalysisRow): CollectionPieceRole | null {
+  const storedRole = normalizeToken(
+    analysis.collection_role ?? getAgentString(analysis.agent_versions, 'collection_role')
+  );
+
+  if (
+    storedRole === 'hero' ||
+    storedRole === 'volume-driver' ||
+    storedRole === 'core-evolution' ||
+    storedRole === 'directional'
+  ) {
+    return storedRole;
+  }
+
+  return null;
+}
+
+function inferReportComplexity(value: AnalysisRow['construction_tier']): CollectionComplexity {
+  if (value === 'high') return 'high';
+  if (value === 'low') return 'low';
+  return 'medium';
+}
+
+function inferReportStatus(score: number | null | undefined) {
+  if ((score ?? 0) >= 80) return 'strong' as const;
+  if ((score ?? 0) >= 62) return 'watch' as const;
+  return 'revise' as const;
+}
+
+function readIntentFromStorage(): CollectionReportIntentInput | null {
+  try {
+    const raw = window.localStorage.getItem('muko_intent');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      success?: string[];
+      tradeoff?: string | null;
+      collectionRole?: string | null;
+      tensions?: {
+        trendForward_vs_timeless?: 'left' | 'center' | 'right';
+        creative_vs_commercial?: 'left' | 'center' | 'right';
+        elevated_vs_accessible?: 'left' | 'center' | 'right';
+        novelty_vs_continuity?: 'left' | 'center' | 'right';
+      };
+    };
+    const mapTension = (value?: 'left' | 'center' | 'right') =>
+      value === 'left' ? 20 : value === 'right' ? 80 : 50;
+
+    return {
+      primary_goals: parsed.success ?? [],
+      tradeoff: parsed.tradeoff ?? null,
+      collection_role: parsed.collectionRole ?? null,
+      tension_sliders: {
+        trend_forward: mapTension(parsed.tensions?.trendForward_vs_timeless),
+        creative_expression: mapTension(parsed.tensions?.creative_vs_commercial),
+        elevated_design: mapTension(parsed.tensions?.elevated_vs_accessible),
+        novelty: mapTension(parsed.tensions?.novelty_vs_continuity),
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchBrandProfile(userId: string): Promise<CollectionReportBrandInput | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('brand_profiles')
+    .select('brand_name, keywords, customer_profile, price_tier, tension_context, reference_brands')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const row = data as BrandProfileRow;
+  return {
+    brand_name: row.brand_name,
+    keywords: row.keywords,
+    customer_profile: row.customer_profile,
+    price_tier: row.price_tier,
+    tension_context: row.tension_context,
+    reference_brands: row.reference_brands,
+  };
+}
+
+function toCollectionReportInput({
+  collectionName,
+  season,
+  pieces,
+  brand,
+  intent,
+}: {
+  collectionName: string;
+  season: string;
+  pieces: AnalysisRow[];
+  brand?: CollectionReportBrandInput | null;
+  intent?: CollectionReportIntentInput | null;
+}): CollectionReportInput {
+  return {
+    collection_name: collectionName,
+    season,
+    version_label: 'Latest Snapshot',
+    snapshot_id: pieces[0]?.created_at ?? null,
+    narrative: pieces[0]?.narrative ?? null,
+    collection_aesthetic: pieces[0]?.collection_aesthetic ?? null,
+    aesthetic_inflection: pieces[0]?.aesthetic_inflection ?? null,
+    generated_at: new Date().toISOString(),
+    brand: brand ?? null,
+    intent: intent ?? null,
+    pieces: pieces.map((row) => ({
+      id: row.id,
+      piece_name: getPieceName(row),
+      category: row.category,
+      role: inferReportRole(row),
+      complexity: inferReportComplexity(row.construction_tier),
+      direction_tag: row.aesthetic_input,
+      material: row.material_id ? materialNameById.get(row.material_id) ?? row.material_id : null,
+      silhouette: row.silhouette,
+      score: row.score,
+      status: inferReportStatus(row.score),
+      dimensions: row.dimensions,
+      margin_passed: row.gates_passed?.cost ?? null,
+      construction: row.construction_tier,
+    })),
+  };
 }
 
 function getPieceRole(analysis: AnalysisRow): PieceRole {
@@ -504,6 +653,8 @@ export default function CollectionPage({
   const [isReadHovering, setIsReadHovering] = useState(false);
   const [isReadPinnedOpen, setIsReadPinnedOpen] = useState(false);
   const [isReadPinnedClosed, setIsReadPinnedClosed] = useState(false);
+  const [collectionReadReport, setCollectionReadReport] = useState<CollectionReportPayload | null>(null);
+  const [isRefreshingCollectionRead, setIsRefreshingCollectionRead] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -604,9 +755,28 @@ export default function CollectionPage({
       collectionScore,
     });
   }, [avgExecution, collectionScore, scoredAnalyses]);
+  const collectionReportInput = useMemo<CollectionReportInput | null>(() => {
+    if (analyses.length === 0) return null;
+
+    return toCollectionReportInput({
+      collectionName,
+      season: seasonLabel || 'Current Season',
+      pieces: analyses,
+    });
+  }, [analyses, collectionName, seasonLabel]);
+  const displayedCollectionRead = collectionReadReport?.assortment_intelligence ?? assortmentIntelligence;
   const isReadExpanded = reportExists
     ? isReadPinnedOpen || (isReadHovering && !isReadPinnedClosed)
     : true;
+
+  useEffect(() => {
+    if (!collectionReportInput) {
+      setCollectionReadReport(null);
+      return;
+    }
+
+    setCollectionReadReport(buildCollectionReport(collectionReportInput).collection_report);
+  }, [collectionReportInput]);
 
   function handleReadToggle() {
     if (!reportExists) return;
@@ -637,7 +807,7 @@ export default function CollectionPage({
       return directionInterpretationChips.slice(0, 4);
     }
     return [];
-  }, [analyses, collectionName, directionInterpretationChips, storeCollectionName]);
+  }, [collectionName, directionInterpretationChips, storeCollectionName]);
 
   const handleGenerateReport = () => {
     if (!canGenerateReport) return;
@@ -661,6 +831,93 @@ export default function CollectionPage({
     }
 
     router.push(`/report?${params.toString()}`);
+  };
+
+  const handleRerunCollectionAnalysis = async () => {
+    if (!collectionReportInput || isRefreshingCollectionRead) return;
+
+    setIsRefreshingCollectionRead(true);
+
+    const fallbackReport = buildCollectionReport(collectionReportInput).collection_report;
+    setCollectionReadReport(fallbackReport);
+
+    try {
+      const [brand, intent] = await Promise.all([
+        fetchBrandProfile(userId),
+        Promise.resolve(typeof window !== 'undefined' ? readIntentFromStorage() : null),
+      ]);
+
+      const response = await fetch('/api/synthesizer/collection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'collection_report',
+          payload: {
+            ...collectionReportInput,
+            brand,
+            intent,
+            generated_at: new Date().toISOString(),
+          },
+        }),
+      });
+      console.log('collection synth raw response', await response.clone().text());
+
+      if (!response.ok) {
+        throw new Error('Collection read request failed');
+      }
+
+      const contentType = response.headers.get('content-type') ?? '';
+
+      if (contentType.includes('text/event-stream') && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let nextReport: CollectionReportPayload | null = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            if (!raw) continue;
+
+            try {
+              const event = JSON.parse(raw) as {
+                type: 'fallback' | 'delta' | 'done';
+                payload?: CollectionReportPayload;
+              };
+
+              if (event.type === 'fallback' && event.payload) {
+                setCollectionReadReport(event.payload);
+              }
+
+              if (event.type === 'done' && event.payload) {
+                nextReport = event.payload;
+              }
+            } catch {
+              // Ignore malformed stream events and keep the last valid payload.
+            }
+          }
+        }
+
+        if (nextReport) {
+          setCollectionReadReport(nextReport);
+        }
+      } else {
+        const json = (await response.json()) as { collection_report: CollectionReportPayload };
+        setCollectionReadReport(json.collection_report);
+      }
+    } catch {
+      setCollectionReadReport(fallbackReport);
+    } finally {
+      setIsRefreshingCollectionRead(false);
+    }
   };
 
   const handleOpenExistingPiece = (analysis: AnalysisRow) => {
@@ -863,7 +1120,7 @@ export default function CollectionPage({
                       lineHeight: 1,
                     }}
                   >
-                    {assortmentIntelligence.collection_state}
+                    {displayedCollectionRead.collection_state}
                   </div>
                 </div>
 
@@ -873,14 +1130,14 @@ export default function CollectionPage({
                       style={{
                         fontFamily: sohne,
                         fontSize: 17,
-                        fontWeight: 500,
+                        fontWeight: 400,
                         color: '#191919',
                         lineHeight: 1.38,
                         letterSpacing: '-0.025em',
                         marginBottom: 14,
                       }}
                     >
-                      {assortmentIntelligence.supporting_line}
+                      {displayedCollectionRead.supporting_line}
                     </div>
 
                     <div
@@ -889,13 +1146,13 @@ export default function CollectionPage({
                         fontSize: 12.5,
                         color: 'rgba(67,67,43,0.6)',
                         lineHeight: 1.65,
-                        marginBottom: assortmentIntelligence.next_action ? 18 : 16,
+                        marginBottom: displayedCollectionRead.next_action ? 18 : 16,
                       }}
                     >
-                      {assortmentIntelligence.muko_insight}
+                      {displayedCollectionRead.muko_insight}
                     </div>
 
-                    {assortmentIntelligence.next_action ? (
+                    {displayedCollectionRead.next_action ? (
                       <div
                         style={{
                           display: 'inline-flex',
@@ -930,7 +1187,7 @@ export default function CollectionPage({
                             lineHeight: 1.58,
                           }}
                         >
-                          {assortmentIntelligence.next_action}
+                          {displayedCollectionRead.next_action}
                         </div>
                       </div>
                     ) : null}
@@ -1127,25 +1384,32 @@ export default function CollectionPage({
 
       {reportExists ? (
         <button
-          onClick={handleGenerateReport}
+          onClick={handleRerunCollectionAnalysis}
+          disabled={!collectionReportInput || isRefreshingCollectionRead}
           style={{
             position: 'fixed',
             right: 32,
             bottom: 6,
             fontFamily: inter,
             fontSize: 10,
-            color: '#888078',
+            color: !collectionReportInput || isRefreshingCollectionRead ? '#B9B1A9' : '#888078',
             background: 'transparent',
             border: 'none',
-            cursor: 'pointer',
+            cursor: !collectionReportInput || isRefreshingCollectionRead ? 'default' : 'pointer',
             padding: 0,
             textAlign: 'right',
             zIndex: 25,
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#191919'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = '#888078'; }}
+          onMouseEnter={(e) => {
+            if (!collectionReportInput || isRefreshingCollectionRead) return;
+            e.currentTarget.style.color = '#191919';
+          }}
+          onMouseLeave={(e) => {
+            if (!collectionReportInput || isRefreshingCollectionRead) return;
+            e.currentTarget.style.color = '#888078';
+          }}
         >
-          Re-run analysis
+          {isRefreshingCollectionRead ? 'Refreshing analysis...' : 'Re-run analysis'}
         </button>
       ) : null}
 

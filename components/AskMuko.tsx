@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
+import { useSessionStore } from "@/lib/store/sessionStore";
 
 /* ─── Types ─── */
 export type AskMukoStep = "concept" | "spec" | "pieces" | "report";
@@ -55,6 +56,7 @@ function AskMukoInner({
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [dynamicSuggestions, setDynamicSuggestions] = useState<string[]>([]);
+  const setAskMukoLastResponse = useSessionStore((state) => state.setAskMukoLastResponse);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastSuggestionContextRef = useRef<string | null>(null);
@@ -128,12 +130,15 @@ function AskMukoInner({
       const data = await response.json();
       const answer = data.answer ?? "Muko couldn't process that right now. Try rephrasing or ask something else.";
       setMessages(prev => [...prev, { role: "muko", content: answer }]);
+      setAskMukoLastResponse(answer);
     } catch {
-      setMessages(prev => [...prev, { role: "muko", content: "Muko couldn't process that right now. Try rephrasing or ask something else." }]);
+      const fallbackAnswer = "Muko couldn't process that right now. Try rephrasing or ask something else.";
+      setMessages(prev => [...prev, { role: "muko", content: fallbackAnswer }]);
+      setAskMukoLastResponse(fallbackAnswer);
     } finally {
       setIsTyping(false);
     }
-  }, [context, messages]);
+  }, [context, messages, setAskMukoLastResponse]);
 
   useEffect(() => {
     if (!isExpanded || isTyping) return;
