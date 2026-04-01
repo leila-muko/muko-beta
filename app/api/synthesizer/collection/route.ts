@@ -53,9 +53,10 @@ Rules you must follow:
 - If there are 3 or more pieces, give a real collection read based on what is present; do not default to "too thin" or similar holding-pattern language.
 - If there are fewer than 8 pieces, it is acceptable to use a caveat like "based on the pieces so far."
 - Tone: the tone of a trusted advisor in the room, not a consultant report. Sentences can be short. Directness is respect. The whole read — all three fields combined — should take under 20 seconds to read aloud.
+- If a sentence could apply to any collection without these exact inputs, rewrite it.
 - collection_read must be 2-3 sentences maximum. No more.
 - muko_insight must be 1-2 sentences maximum. It is the sharpest thing in the room — one observation, one implication. Not a paragraph.
-- collection_state, collection_read, and muko_insight are one continuous story, not three versions of the same observation. collection_state names what is structurally true. collection_read says what that means for the collection as a system. muko_insight names the specific tension or unlock that would change the read. Each must add something the others don't.
+- collection_state, collection_read, and muko_insight are one continuous story, not three versions of the same observation. collection_state names what is structurally true. collection_read says what that means for the collection as a system. muko_insight names the single most important thing that is true about this collection right now — the tension that would change the read if it exists, or the confirmation that the structure is holding if it does not. If the collection is well-balanced and all dimensions are strong, muko_insight should say so directly and name what that means for the line going forward. A positive muko_insight is valid and expected when the data supports it. Each must add something the others don't.
 - Do not reference "the data" or explain methodology.
 
 SILHOUETTE RULE: Never critique silhouette consistency across pieces as a weakness.
@@ -177,6 +178,18 @@ Return only valid JSON matching this schema exactly:
     "identity": 91,
     "resonance": 95,
     "execution": 52
+  }
+}
+
+Positive example:
+{
+  "collection_state": "Structurally Sound",
+  "collection_read": "The role distribution is holding and the material language is consistent across categories. The line reads as a coherent system rather than a set of individual pieces.",
+  "muko_insight": "The structure is working. The next move is depth, not correction — adding range within the existing silhouette language rather than filling gaps.",
+  "secondary_metrics": {
+    "identity": 91,
+    "resonance": 88,
+    "execution": 84
   }
 }
 

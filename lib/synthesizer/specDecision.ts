@@ -50,7 +50,7 @@ export interface SpecDecisionDiagnostics {
 export interface SpecRailInsight {
   feasibility_stance: SpecFeasibilityStance;
   headline: string;
-  core_tension: string;
+  core_tension: string | null;
   feasibility_breakdown: {
     cost: SpecBufferStatus;
     timeline: SpecTimelineStatus;
@@ -64,6 +64,9 @@ export interface SpecRailInsight {
   alternative_path: {
     title: string;
     description: string;
+    dimension?: 'material' | 'construction' | 'execution';
+    target_tier?: 'low' | 'moderate' | 'high';
+    method?: string;
   };
 }
 
@@ -410,7 +413,7 @@ function leverSet(ctx: SpecFallbackContext): [string, string, string] {
   return [levers[0], levers[1], levers[2]];
 }
 
-function buildAlternativePath(ctx: SpecFallbackContext, stance: SpecFeasibilityStance): { title: string; description: string } {
+function buildAlternativePath(ctx: SpecFallbackContext, stance: SpecFeasibilityStance): { title: string; description: string; dimension?: 'material' | 'construction' | 'execution'; target_tier?: 'low' | 'moderate' | 'high'; method?: string } {
   const d = ctx.diagnostics;
   const materialName = ctx.material_name ?? 'the current material';
   const cheaperMaterial = ctx.resolved_redirects?.cost_reduction?.material_id?.replace(/-/g, ' ');
@@ -422,37 +425,49 @@ function buildAlternativePath(ctx: SpecFallbackContext, stance: SpecFeasibilityS
         description: cheaperMaterial
           ? `Hold the same silhouette and expression, but move out of ${materialName} into ${cheaperMaterial}. That preserves the read while reopening margin and calendar buffer.`
           : `Hold the same silhouette and expression, but move into a fabric with similar behavior and shorter lead. The point is to preserve the idea while reopening margin and calendar buffer.`,
+        dimension: 'material' as const,
       };
-    case 'downgrade_construction':
+    case 'downgrade_construction': {
+      const currentTier = (ctx.construction_tier ?? 'moderate') as 'low' | 'moderate' | 'high';
+      const targetTier: 'low' | 'moderate' | 'high' = currentTier === 'high' ? 'moderate' : 'low';
       return {
         title: 'Keep the read, remove one layer of build',
         description: `Preserve ${materialName} and the current proportion, but take the construction down one tier. Concentrating precision in the visible areas keeps the idea intact with less sampling drag.`,
+        dimension: 'construction' as const,
+        target_tier: targetTier,
+        method: `${targetTier} complexity`,
       };
+    }
     case 'refocus_finish':
       return {
         title: 'Keep the attitude, narrow the finish',
         description: `Hold the same base spec and reduce finish to one deliberate accent. The idea stays intact, but the piece stops paying for surface activity that does not deepen the read.`,
+        dimension: 'execution' as const,
       };
     case 'reallocate':
       return {
         title: 'Move effort back to the lead signal',
         description: `Keep the concept exactly where it is, but push effort back into the current carrier and quiet the secondary gestures. That keeps the piece directional without letting burden scatter across the build.`,
+        dimension: 'execution' as const,
       };
     case 'simplify':
       return {
         title: 'Preserve the concept through subtraction',
         description: `Keep the same material story and overall silhouette, then strip out the move that the customer notices last. This keeps the piece recognisable while lowering execution drag.`,
+        dimension: 'execution' as const,
       };
     case 'hold':
     default:
       return stance === 'strong' || stance === 'viable'
         ? {
-            title: '',
-            description: '',
+            title: 'Material selection is working. No swap suggested.',
+            description: 'The current selection is carrying the direction without adding avoidable execution pressure. Hold the route and use execution notes to preserve what is already working.',
+            dimension: 'execution' as const,
           }
         : {
             title: 'Protect the current route',
             description: `The current path can still work if the team resists adding late articulation. Keep the idea intact and spend discipline on the execution choke point instead.`,
+            dimension: 'execution' as const,
           };
   }
 }
@@ -471,8 +486,16 @@ export function buildFallbackSpecRail(ctx: SpecFallbackContext): SpecRailInsight
         ? `${diagnostics.complexity_level} complexity is asking the factory to carry too many decisions at once`
         : `${diagnostics.burden_level} burden is spreading the read too wide`}.`;
 
-  const coreTension =
-    diagnostics.failure_mode === 'timeline_fragile'
+  const hasAllClear =
+    (stance === 'strong' || stance === 'viable') &&
+    diagnostics.best_next_move === 'hold' &&
+    diagnostics.buffer_status !== 'tight' &&
+    diagnostics.buffer_status !== 'negative' &&
+    diagnostics.timeline_status === 'on_track';
+
+  const coreTension = hasAllClear
+    ? null
+    : diagnostics.failure_mode === 'timeline_fragile'
       ? `${materialName} still carries the right tone, but the combination of ${diagnostics.primary_carrier} emphasis and ${diagnostics.complexity_level} complexity leaves the team solving calendar pressure and design expression at the same time.`
       : diagnostics.failure_mode === 'cost_without_read'
         ? `The spec is paying for burden in ${diagnostics.primary_carrier}, yet the customer is more likely to notice the overall idea than the extra work. That is the wrong cost architecture for this role.`
@@ -514,7 +537,7 @@ export function mapSpecRailToInsightData(rail: SpecRailInsight, mode: InsightMod
       ];
 
   return {
-    statements: [rail.headline, rail.core_tension, rail.decision.reason],
+    statements: [rail.headline, rail.core_tension ?? rail.decision.reason, rail.decision.reason],
     edit: rail.execution_levers,
     editLabel: 'WHAT TO GET RIGHT',
     secondary,
@@ -524,8 +547,16 @@ export function mapSpecRailToInsightData(rail: SpecRailInsight, mode: InsightMod
 }
 
 export function shouldShowBetterPath(rail: SpecRailInsight): boolean {
+  if (rail.core_tension == null && rail.feasibility_stance === 'viable') {
+    return false;
+  }
+
   return Boolean(rail.alternative_path.title && rail.alternative_path.description) &&
     (rail.feasibility_stance === 'strained' ||
       rail.feasibility_stance === 'not_recommended' ||
       rail.decision.direction !== 'hold');
+}
+
+export function shouldShowFeasibilityTension(rail: SpecRailInsight): boolean {
+  return !(rail.core_tension == null && rail.feasibility_stance === 'viable');
 }

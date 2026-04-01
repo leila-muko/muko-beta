@@ -344,9 +344,13 @@ function buildCollectionAwareFallbackDecisionGuidance(
     }
 
     commitmentSignal =
-      blackboard.identity_score >= 80 && blackboard.resonance_score >= 70
-        ? 'Maintain Exposure'
-        : 'Controlled Test';
+      blackboard.identity_score >= 84 &&
+      blackboard.resonance_score >= 74 &&
+      (blackboard.execution_score ?? 0) >= 72
+        ? 'Confirm Direction'
+        : blackboard.identity_score >= 80 && blackboard.resonance_score >= 70
+          ? 'Maintain Exposure'
+          : 'Controlled Test';
     recommendedDirection =
       summary.weakest_dimension === 'execution'
         ? `Hold the line on newness and simplify the most demanding ${summary.overrepresented_role ?? 'hero'} piece before expanding ${aestheticName} further${inflectionClause}.`
@@ -558,7 +562,7 @@ JSON.parse() must work directly.
   ],
   "decision_guidance": {
     "recommended_direction": "string",
-    "commitment_signal": "Increase Investment | Hero Expression | Controlled Test | Maintain Exposure | Reduce Exposure",
+    "commitment_signal": "Increase Investment | Hero Expression | Controlled Test | Maintain Exposure | Reduce Exposure | Confirm Direction",
     "execution_levers": ["string", "string"]
   },
   "confidence": 0.0
@@ -569,7 +573,7 @@ FIELD RULES
 insight_title
 One sentence, 90 characters preferred, 130 max.
 Decision-grade declaration: what is happening now plus what happens next.
-Must include urgency or timeframe and competitive implication.
+Must include urgency or timeframe and competitive implication when they are genuinely present in the data. If commitment_signal is Confirm Direction, the title should orient the team toward execution rather than framing a competitive race that doesn't exist.
 Never include numeric scores. Never include internal test names.
 Prioritize scan-ability over complexity.
 
@@ -924,6 +928,7 @@ Before writing, internally derive:
 5) Failure mode — how this becomes costume or wallpaper
 6) Intent Filter — aggressive or conservative stance given intent signals
 7) Opposition pass — draft a skeptical merchant counter-argument; refine to remove weak claims
+8) Falsifiability test — if a sentence could apply to any collection without these exact inputs, rewrite it
 
 STRATEGIC FRAMING (VOGUE BUSINESS OPENER)
 The first sentence of insight_description must:
@@ -959,7 +964,7 @@ JSON.parse() must work directly.
   },
   "decision_guidance": {
     "recommended_direction": "string",
-    "commitment_signal": "Increase Investment | Hero Expression | Controlled Test | Maintain Exposure | Reduce Exposure",
+    "commitment_signal": "Increase Investment | Hero Expression | Controlled Test | Maintain Exposure | Reduce Exposure | Confirm Direction",
     "execution_levers": ["string", "string"]
   },
   "confidence": 0.0
@@ -1019,6 +1024,7 @@ Must be exactly one of:
 - Controlled Test
 - Maintain Exposure
 - Reduce Exposure
+- Confirm Direction
 
 execution_levers
 Array of 2 to 4 strings.
@@ -1042,6 +1048,24 @@ Apply this logic:
 - Controlled Test = real opportunity, but timing, alignment, or execution introduces meaningful risk
 - Maintain Exposure = direction is valid but does not warrant broader expansion
 - Reduce Exposure = saturated, weakly aligned, or too risky to justify further commitment
+- Confirm Direction = the direction is strongly aligned, momentum is healthy, execution risk is low, and competitive pressure at this price tier is not yet acute. This is the positive verdict — use it when the data supports it.
+
+Positive example:
+{
+  "insight_title": "Heritage Hand has room at contemporary price — the craft-provenance lane is still underclaimed.",
+  "insight_description": "The structured-artisanal lane is consolidating at luxury price points but remains open at contemporary. [Brand] has the material equity and brand DNA to claim this before it follows the luxury signal down. One to two seasons before genericization risk becomes real.",
+  "positioning": {
+    "market_gap": "Craft-provenance knitwear at contemporary price is underclaimed — luxury has moved there, mass hasn't followed yet.",
+    "competitive_position": "Toteme and Aeron hold the architectural end; the hand-texture angle at contemporary price is still open.",
+    "brand_permission": "Established equity in considered materiality gives the brand a credible entry into visible craft without needing to explain it."
+  },
+  "decision_guidance": {
+    "recommended_direction": "Commit a hero knitwear piece with visible construction character — this is the direction, not a test.",
+    "commitment_signal": "Confirm Direction",
+    "execution_levers": ["chunky gauge", "natural undyed"]
+  },
+  "confidence": 0.87
+}
 
 VALIDATION STEP (DO NOT PRINT)
 Before returning output, check:
@@ -1086,6 +1110,7 @@ You will receive:
 Use the selected silhouette, palette, and signals as primary inputs.
 Ensure all outputs reflect the user’s actual selections.
 Return a concise editorial directive for how the product expression should come together.
+If a sentence could apply to any collection without these exact inputs, rewrite it.
 
 VOICE
 Senior fashion strategist. Decisive. Specific. Fashion-literate.
@@ -1114,6 +1139,17 @@ Return JSON only. No markdown. No preamble. No extra keys.
   "guardrail": "string"
 }
 
+Positive example:
+{
+  "headline": "The expression is already clean — keep the line precise and let the surface do the signaling.",
+  "core_read": "The silhouette, palette, and finish language are aligning into one controlled read. It already feels intentional rather than interpretive.",
+  "execution_moves": [
+    "Hold the proportion narrow and vertical",
+    "Keep texture concentrated in the surface, not the shape"
+  ],
+  "guardrail": "Keep: the restraint between line and surface — that balance is what makes the direction read as authored."
+}
+
 FIELD RULES
 headline
 One strong sentence.
@@ -1135,14 +1171,16 @@ Do not write paragraphs. Do not repeat the headline.
 
 guardrail
 One short line.
-Must begin with "Avoid:"
-Name the failure mode if the team pushes the read too far or interprets it incorrectly.
+If a genuine failure mode exists — a way the team could push the direction too far or misinterpret it — name it beginning with "Avoid:".
+If the direction is clear and the execution moves are specific enough that misinterpretation is unlikely, guardrail may instead begin with "Keep:" and name what to preserve.
+Do not invent a failure mode to fill this field.
 This is an execution guardrail, not a market risk statement.
 
 VALIDATION
 Before returning, check:
 • Output contains exactly 4 keys: headline, core_read, execution_moves, guardrail.
 • execution_moves contains 2 or 3 strings.
+• guardrail begins with either "Avoid:" or "Keep:" — never blank, never a third format.
 • No field feels bloated or repetitive.
 • No keyword exposure.
 • No markdown.
@@ -1272,7 +1310,7 @@ interface ConceptV5Output {
   positioning: string[] | ConceptPositioningObject;
   decision_guidance: {
     recommended_direction: string;
-    commitment_signal: 'Increase Investment' | 'Hero Expression' | 'Controlled Test' | 'Maintain Exposure' | 'Reduce Exposure';
+    commitment_signal: 'Increase Investment' | 'Hero Expression' | 'Controlled Test' | 'Maintain Exposure' | 'Reduce Exposure' | 'Confirm Direction';
     execution_levers: string[];
   };
   confidence: number;
@@ -1333,7 +1371,7 @@ export function parseConceptV5Output(raw: string): ParsedConceptV5Output | null 
     if (!normalizedPositioning) return null;
     if (!parsed.decision_guidance?.recommended_direction || !parsed.decision_guidance?.commitment_signal) return null;
     if (
-      !['Increase Investment', 'Hero Expression', 'Controlled Test', 'Maintain Exposure', 'Reduce Exposure']
+      !['Increase Investment', 'Hero Expression', 'Controlled Test', 'Maintain Exposure', 'Reduce Exposure', 'Confirm Direction']
         .includes(parsed.decision_guidance.commitment_signal)
     ) return null;
     if (

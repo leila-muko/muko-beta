@@ -113,6 +113,8 @@ Generic collection copy fails this test.
 
 FIELD RULES WITH FAIL/PASS EXAMPLES
 
+- Global falsifiability test: if a sentence could apply to any collection or piece without these exact inputs, rewrite it.
+
 read_headline
 - Must name one specific tension, gap, or signal present in THIS collection.
 - Must be falsifiable against the supplied piece data. If the same headline
@@ -139,15 +141,21 @@ how_to_lean_in
 - Prefer direct moves tied to a category gap, silhouette concentration,
   role gap, or repeated drag pattern.
 - The action must follow from the diagnosed tension in read_body.
-- The action must be one of two things:
+- The action must be one of three things:
   - go fix a specific piece by naming the piece and naming which tab to address
     in Spec: material, construction, or both
   - add a specific missing piece by naming the gap from categoryDistribution
     or coverageGapLabels
+- develop what's present — if role balance is healthy, category coverage is solid,
+  and no drag pattern dominates, name what to deepen or invest in within the
+  existing structure. Example: "Coverage is holding — deepen material specificity
+  across the knitwear pieces before adding more bottoms." This is a valid
+  how_to_lean_in when the assortment doesn't need correction.
 - Never end on an abstract quality instruction like "tighten execution" or
   "resolve surface clarity" with no named piece or category attached.
 - FAIL: "resolve the surface signal and turn quiet-structure into a legible product statement"
 - PASS: "Add tops before extending bottoms — 1 top against 3 bottoms is setting the balance before the direction can"
+- PASS (develop): "Coverage is holding across categories — invest in surface specificity on the two execution-drag pieces before extending the range."
 
 start_here_title
 - If collectionPhase is opening or building:

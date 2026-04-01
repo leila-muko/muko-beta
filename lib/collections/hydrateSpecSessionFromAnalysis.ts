@@ -17,12 +17,14 @@ export interface PersistedSpecAnalysisRow extends PersistedCollectionContextRow 
   aesthetic_matched_id?: string | null;
   season: string | null;
   material_id: string | null;
+  previous_material_id?: string | null;
   silhouette: string | null;
   construction_tier: "low" | "moderate" | "high" | null;
   construction_tier_override?: boolean | null;
   target_msrp?: number | null;
   aesthetic_inflection?: string | null;
   agent_versions?: Record<string, unknown> | null;
+  execution_notes?: string | null;
 }
 
 const categoryNameById = new Map(
@@ -164,6 +166,9 @@ export function hydrateSpecSessionFromAnalysis(collectionName: string, row: Pers
   state.setSelectedPieceImage(snapshot.selectedPieceImage);
   state.setSelectedKeyPiece(snapshot.selectedKeyPiece);
   state.setPieceBuildContext(snapshot.pieceBuildContext);
+
+  // Restore previousMaterialId so exclusion logic is active on return visits
+  useSessionStore.setState({ previousMaterialId: row.previous_material_id ?? null });
 
   // Restore brand_profile_id for returning users whose localStorage was cleared
   if (row.brand_profile_id && !useSessionStore.getState().brandProfileId) {

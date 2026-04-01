@@ -100,9 +100,11 @@ interface SessionState {
   subcategory: string; // garment type within category (e.g., 'trench', 'bomber')
   targetMsrp: number | null;
   materialId: string;
+  previousMaterialId: string | null;
   silhouette: string;
   constructionTier: 'low' | 'moderate' | 'high';
   constructionTierOverride: boolean;
+  constructionMethod: string | null;
 
   // Pulse states
   identityPulse: PulseState | null;
@@ -163,6 +165,7 @@ interface SessionState {
   setMaterial: (id: string) => void;
   setSilhouette: (silhouette: string) => void;
   setConstructionTier: (tier: 'low' | 'moderate' | 'high', override?: boolean) => void;
+  setConstructionMethod: (method: string | null) => void;
 
   updateIdentityPulse: (pulse: PulseState | null) => void;
   updateResonancePulse: (pulse: PulseState | null) => void;
@@ -233,9 +236,11 @@ function createInitialSessionState(targetMargin = 50) {
     subcategory: '',
     targetMsrp: null,
     materialId: '',
+    previousMaterialId: null,
     silhouette: '',
     constructionTier: 'moderate' as const,
     constructionTierOverride: false,
+    constructionMethod: null,
     identityPulse: null,
     resonancePulse: null,
     executionPulse: null,
@@ -299,10 +304,14 @@ export const useSessionStore = create<SessionState>()(
       },
       setSubcategory: (subcategory) => set({ subcategory }),
       setTargetMsrp: (targetMsrp) => set({ targetMsrp }),
-      setMaterial: (materialId) => set({ materialId }),
+      setMaterial: (id) => set((state) => ({
+        previousMaterialId: id !== state.materialId ? (state.materialId || null) : state.previousMaterialId,
+        materialId: id,
+      })),
       setSilhouette: (silhouette) => set({ silhouette }),
       setConstructionTier: (tier, override = false) =>
         set({ constructionTier: tier, constructionTierOverride: override }),
+      setConstructionMethod: (constructionMethod) => set({ constructionMethod }),
 
       updateIdentityPulse: (pulse) => set({ identityPulse: pulse }),
       updateResonancePulse: (pulse) => set({ resonancePulse: pulse }),
@@ -368,7 +377,7 @@ export const useSessionStore = create<SessionState>()(
     }),
     {
       name: 'muko-session',
-      version: 8,
+      version: 10,
       migrate: (persistedState, version) => {
         if (version < 2) {
           return {
@@ -419,11 +428,23 @@ export const useSessionStore = create<SessionState>()(
             brandProfileId: null,
           };
         }
+        if (version < 9) {
+          return {
+            ...(persistedState as object),
+            constructionMethod: null,
+          };
+        }
+        if (version < 10) {
+          return {
+            ...(persistedState as object),
+            previousMaterialId: null,
+          };
+        }
         return persistedState;
       },
       partialize: (state) => {
         // Persist everything except actions
-        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setStrategySummary, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setSuccessPriorities, setTargetMargin, setSliderTrend, setSliderCreative, setSliderElevated, setSliderNovelty, setCollectionRole, setSelectedKeyPiece, setSelectedPieceImage, setDecisionGuidanceState, setActiveProductPieceId, setPieceRolesById, setPieceBuildContext, setSavedAnalysisId, setBrandProfileId, setActiveCollection, setAssortmentInsightCache, setPreloadedCriticScores, setAskMukoLastResponse, setLastSuggestedRole, setLastSuggestedRoleIsLocked, setLastSuggestionRationale, lockConcept, unlockConcept, setCurrentStep, resetSession, lastAskMukoResponseTimestamp, ...rest } = state;
+        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setStrategySummary, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, setConstructionMethod, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setSuccessPriorities, setTargetMargin, setSliderTrend, setSliderCreative, setSliderElevated, setSliderNovelty, setCollectionRole, setSelectedKeyPiece, setSelectedPieceImage, setDecisionGuidanceState, setActiveProductPieceId, setPieceRolesById, setPieceBuildContext, setSavedAnalysisId, setBrandProfileId, setActiveCollection, setAssortmentInsightCache, setPreloadedCriticScores, setAskMukoLastResponse, setLastSuggestedRole, setLastSuggestedRoleIsLocked, setLastSuggestionRationale, lockConcept, unlockConcept, setCurrentStep, resetSession, lastAskMukoResponseTimestamp, ...rest } = state;
         return rest;
       },
     }

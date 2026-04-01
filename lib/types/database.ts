@@ -39,6 +39,7 @@ export interface BrandProfile {
     
     // Material specs
     material_id: string | null;
+    previous_material_id?: string | null;
     silhouette: string | null;
     construction_tier: 'low' | 'moderate' | 'high' | null;
     construction_tier_override: boolean;

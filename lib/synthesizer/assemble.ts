@@ -341,6 +341,8 @@ export interface SpecBlackboardInput {
   currentStep?: SpecStepId;
   constructionOverride?: boolean;
   diagnostics: SpecDecisionDiagnostics;
+  /** Material ID the user most recently swapped away from — excludes it from Better Path suggestions */
+  previousMaterialId?: string | null;
   /** Optional intent calibration from the Intent page */
   intent?: IntentCalibration;
 }
@@ -374,6 +376,10 @@ export function buildSpecBlackboard(
     brand_name: (input.brandName && input.brandName.trim()) ? input.brandName : (input.collectionName || undefined),
     aesthetic_context: aestheticContext,
     material_id: input.materialId,
+    previous_material_id: input.previousMaterialId ?? null,
+    previous_material_name: input.previousMaterialId
+      ? getMaterialName(input.previousMaterialId) ?? null
+      : null,
     available_materials: materials
       .filter((material): material is MaterialEntry & { name: string } => Boolean(material.id && material.name))
       .map((material) => ({ id: material.id, name: material.name })),

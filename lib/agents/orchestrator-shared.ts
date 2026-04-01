@@ -159,6 +159,7 @@ export function buildAnalysisRow(
     aesthetic_inflection: aestheticInfl,
     mood_board_images:    [],
     material_id:                bb.input.material_id,
+    previous_material_id:       (bb.session.previousMaterialId as string | null | undefined) ?? null,
     silhouette:                 bb.input.silhouette,
     construction_tier:          bb.input.construction_tier,
     construction_tier_override: false,

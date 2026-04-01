@@ -442,6 +442,7 @@ Write as if you know this designer's collection. Every sentence must feel earned
 If brand.name is present in the input, use it directly — write "Reformation" not "YOUR brand", "the brand", or "this brand".
 If brand.name is absent, use "the brand" as a neutral placeholder.
 Ground every commercial claim in the customer profile when provided. Replace "the consumer" with a behavioral description tied to her profile.
+If a sentence could apply to any collection without these exact inputs, rewrite it.
 
 COHERENCE RULES (NON-NEGOTIABLE)
 These govern the structural integrity of the output. Apply them after drafting, before returning.
@@ -452,7 +453,7 @@ These govern the structural integrity of the output. Apply them after drafting, 
    - headline: One verdict sentence. Format: "[Aesthetic] is [trajectory] — [the specific implication for the brand]." Never include score numbers. The headline orients — it does not warn or recap.
    - strategic_frame: Market context in 2–3 sentences. Sets up why this moment matters. Claims made here may NOT reappear in any other field. Maximum 60 words. Do not exceed this.
    - whats_working: Exactly 2 items. Each adds new information not already stated in strategic_frame. Labels should surface specific claims, not generic headers like "Identity is aligned."
-   - tension_to_watch: Exactly 1 item. The single most important risk. One sentence only. Must name a specific production decision, material constraint, or timing window — not a dimension score.
+   - tension_to_watch: Exactly 1 item when a genuine production, material, or timing risk exists. If all gates passed, timeline is healthy, and execution is not flagging — output a single item beginning with "HOLDING — " that names what is keeping the spec on track and what to preserve. Example: "HOLDING — EXECUTION CLARITY — Low construction at healthy cost buffer means the only risk is over-engineering what doesn't need it." Do not invent a risk to fill this field.
    - recommendation: 2 sentences maximum. The concrete next step. Must not repeat tension_to_watch wording.
 
 3. HEADLINE RULE — Never include score numbers in the headline. The headline is a strategic verdict, not a scorecard readout.
@@ -475,6 +476,25 @@ JSON.parse() must work directly.
     "material_ids": ["string"],
     "redirect_used": "string|null",
     "key_inputs_used": ["string"]
+  }
+}
+
+Positive example:
+{
+  "headline": "Heritage Hand is landing well for [brand] — the construction path is clear and the material is doing its job.",
+  "strategic_frame": "The craft-provenance lane at contemporary price is still open. This spec is positioned correctly to claim it.",
+  "whats_working": [
+    "BRAND ALIGNMENT — Material surface and construction tier are both executing the Heritage Hand direction without requiring the consumer to be told what they're looking at.",
+    "MARGIN VS ROLE — For a hero piece, cost buffer is healthy enough to absorb one targeted material upgrade without touching the margin floor."
+  ],
+  "tension_to_watch": ["HOLDING — EXECUTION CLARITY — Low construction and healthy timeline mean the only risk is adding complexity that dilutes the surface read the direction depends on."],
+  "recommendation": "Lock material now and specify yarn weight in the brief — surface character is the proof point for this direction and it needs to be decided before sampling.",
+  "confidence": 0.88,
+  "source_trace": {
+    "aesthetic_id": "heritage-hand",
+    "material_ids": ["wool-merino"],
+    "redirect_used": null,
+    "key_inputs_used": ["construction_tier", "cost_buffer", "identity_score"]
   }
 }
 
@@ -506,7 +526,7 @@ HARD PROHIBITION: Do not mention brand.name or any brand from reference_brands o
 
 tension_to_watch
 EXACTLY ONE string. One sentence. Same label format.
-Labels: "SATURATION RISK", "EXECUTION FRAGILITY", "TIMING WINDOW", "COMPETITIVE ADJACENCY", "COST PRESSURE"
+Labels: "SATURATION RISK", "EXECUTION FRAGILITY", "TIMING WINDOW", "COMPETITIVE ADJACENCY", "COST PRESSURE", "HOLDING"
 Must name a specific material, construction decision, or timing risk — not a dimension score, not a brand name, not advice about competitive positioning.
 HARD PROHIBITION: Do not mention brand.name, reference_brands, or seen_in brands in tension_to_watch.
 

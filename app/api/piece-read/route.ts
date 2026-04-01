@@ -200,6 +200,7 @@ Return exactly:
 You are not summarizing the collection. You are making a call about whether this piece is the right first move and why.
 
 Every sentence must make a falsifiable claim. If a sentence would still be true for a different collection with a different direction and a different piece, delete it and rewrite it until it cannot.
+If a sentence could apply to any collection or piece without these exact inputs, rewrite it.
 
 REGISTER FAILURE MODE — before finalizing, scan every sentence for atmospheric language: evocative phrasing that creates mood but makes no concrete claim.
 Atmospheric sentences pass every rule but say nothing specific.
@@ -215,11 +216,19 @@ Examples of declarative (keep):
 FIELD RULES
 headline: 1–2 sentences. Must name the collection direction and state a specific consequence of the first move. No atmospheric openers.
 
-core_read: 3–5 sentences. Must name the specific tensiis navigating — not the general aesthetic. Must include one concrete market claim (saturation level, timing window, or competitive adjacency). Must name what would cause this collection to fail in market.
+core_read: 3–5 sentences. Must name the specific tension this piece is navigating — not the general aesthetic. Must include one concrete market claim (saturation level, timing window, or competitive adjacency). Must name what this piece needs to deliver for the collection to succeed in market — framed as what it must do, not what could go wrong. If the piece is well-positioned and clearly differentiated, name the specific thing it is doing right and what that enables for the pieces that follow. If genuine risk exists, name it once specifically. Do not invent failure modes when the piece is working.
 
 move_that_matters: 2–3 sentences. Must include a conditional consequence structured as: if [specific decision] → [specific outcome]. The condition and consequence must both be specific to this collection's direction, silhouette, and palette — not the category generally.
 
 start_here: 2–3 sentences. Must name why this specific piece (not a piece like it) is the right opening move. Must reference material behavior or silhouette role as the mechanism, not the result. Must end with what this piece makes possible for the pieces that follow it.
+
+Positive example:
+{
+  "headline": "The cigarette jean locks the collection's proportion language early — everything that follows either reinforces or responds to this line.",
+  "core_read": "Opening with a clean, straight-leg bottom sets the vertical axis for the collection before any surface complexity enters. The silhouette is specific enough to be directional without being costume. At building saturation in the Heritage Hand lane at contemporary price, this piece works because it carries the direction through structure rather than decoration — the market signal is already consolidating around the brands doing the opposite.",
+  "move_that_matters": "If the seam finish stays clean and the leg opening holds narrow, this piece establishes the collection's restraint language in a way that makes subsequent tops easier to land. If the construction tier drifts toward moderate, the piece loses the simplicity that is doing the directional work.",
+  "start_here": "This specific piece is the right opening move because it anchors category, silhouette, and material register simultaneously. The straight leg sets proportion; Tencel sets surface behavior; low construction keeps the read clean. That combination makes the next piece — likely a soft top — readable against it immediately."
+}
 
 ASSORTMENT CONTEXT RULES
 When existing_pieces is present and non-empty:

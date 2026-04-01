@@ -433,12 +433,13 @@ Return exactly this JSON shape:
 Rules:
 - Produce exactly one refined expression.
 - The output must feel specific to this collection. If it could apply to another collection, it is wrong.
+- If a sentence could apply to any collection or piece without these exact inputs, rewrite it.
 - The garment_archetype object is non-negotiable. Treat it as structural law.
 - If confirmed_piece_type is present, treat that category/subcategory as the designer's confirmed piece type when writing the read and refined_expression. Do not ignore it or drift into a different garment family.
 - ${selectedRole ? "Treat selected_role as locked before evaluating the piece. Do not re-determine the role." : "Determine the natural role before evaluating the piece. Do not force foundational pieces into statement roles."}
 - Before writing, force a position for the piece: Anchoring, Carrying, or Diluting. You must choose one internally, but do not label the response with that word unless it reads naturally.
 - "read" is the Muko's Take field. It must be 1 or 2 sentences max.
-- "read" must answer three things at a high level: what role this piece plays in the collection, what makes it work or fail, and what the risk is if it is handled too generically.
+- "read" must answer: what role this piece plays in the collection, and what makes it work in this specific assortment context. If a genuine risk exists — the piece could slip into generic execution, or it is competing with another hero, or the role is overcrowded — name it once specifically. If the piece is well-positioned and clearly differentiated, the read should confirm that directly rather than inventing a risk to fill the slot. A read that says "this is working and here is why" is valid when the data supports it.
 - "read" must sound like a senior merchandiser or design director. It should stay grounded in assortment logic and product positioning, not garment engineering.
 - "refined_expression" is the Suggested Expression field. It must be 1 or 2 sentences max.
 - If current_expression is present in the payload, you are rewriting THAT text, not the original user_input. The current_expression is what the designer has settled on so far — treat it as the thing to transform.
@@ -471,6 +472,13 @@ Rules:
 - Prefer language like "this works as", "the risk is", "keep the line", "this should read as", "the value comes from", "avoid letting it slip into", "anchor it through", "let the piece carry".
 - Internal credibility filter before finalizing: would a senior merchandiser or design lead realistically say this given the information available? If not, rewrite it to be more grounded.
 - Do not ask for clarification. If the input is vague, sharpen it anyway.
+
+Positive example:
+{
+  "read": "This works as the collection's commercial anchor — the silhouette is specific enough to carry the direction without requiring the hero piece's level of surface investment. The role is right and the piece is filling it cleanly.",
+  "refined_expression": "Keep the straight leg at exactly this width — narrowing further pushes it into directional territory that competes with the hero, and widening loses the controlled proportion that makes it legible as a core evolution piece in this collection.",
+  "role": "Core Evolution"
+}
 
 ROLE AND ASSORTMENT RULES
 When selected_role is present:

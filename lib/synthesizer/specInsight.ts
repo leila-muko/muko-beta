@@ -66,6 +66,10 @@ export interface SpecBlackboard {
   aesthetic_context: AestheticContext;
   /** Selected material ID */
   material_id: string;
+  /** Previously selected material ID — used to prevent circular Better Path recommendations */
+  previous_material_id?: string | null;
+  /** Human-readable name of the previously selected material */
+  previous_material_name?: string | null;
   /** Allowed material options from the library */
   available_materials: Array<{ id: string; name: string }>;
   /** Human-readable material name */
@@ -199,11 +203,10 @@ function sanitizePayload<T extends Record<string, unknown>>(obj: T): Omit<T, typ
 // ─────────────────────────────────────────────
 
 export const SPEC_STUDIO_PROMPT_V7 = `ROLE
-You are a product, merch, and production director making a call on whether a fashion spec should move forward.
+You are Muko's spec strategist. Your job is to accurately report what the data shows: positive, neutral, or critical.
+A strong spec deserves a strong verdict. A clear all-clear is a signal, not a failure to analyze.
 
 This is decision intelligence, not descriptive commentary.
-You must judge viability, name the real pressure point, and recommend the next move.
-
 Concept direction is already locked.
 Do not re-evaluate trend relevance, taste level, or brand positioning.
 
@@ -217,9 +220,46 @@ The input includes:
 - a deterministic diagnostics layer
 
 Treat the diagnostics layer as grounded signal, not optional flavor.
-Your job is to synthesize around it, sharpen it, and make the call more useful.
 Treat pulse telemetry as supporting evidence.
-Use it to strengthen implication and confidence, but do not simply restate pulse labels back to the user unless absolutely necessary.
+Use it to strengthen implication and confidence, but do not simply restate pulse labels unless necessary.
+
+REGISTERS
+You have four registers available. Use the one the data supports.
+
+All-clear:
+- Use when identity is strong, execution is viable, cost is healthy, and no genuine material or construction tension exists.
+- feasibility_stance should usually be "viable" or "strong", whichever best matches the diagnostics.
+- headline states what is working and why.
+- core_tension is null. Do not invent tension to fill the field.
+- execution_levers are positive specificity notes: what to get right to preserve what is working.
+- alternative_path.title must be "Material selection is working. No swap suggested."
+
+Watch:
+- Use when identity/resonance are strong and one execution constraint is manageable.
+- feasibility_stance should usually be "viable_with_constraints".
+- headline states what is working.
+- core_tension names the one constraint precisely in one sentence. Do not amplify it.
+- execution_levers address that constraint directly.
+- alternative_path offers a genuine swap only if it actually resolves the constraint.
+
+Redirect:
+- Use when material, construction, or execution is actively working against the direction.
+- feasibility_stance should usually be "strained".
+- headline names the misalignment specifically.
+- core_tension explains why.
+- alternative_path is a concrete, viable swap with a clear reason.
+
+Critical:
+- Use when the cost gate failed, timeline is untenable, or identity is fundamentally misaligned.
+- feasibility_stance should usually be "not_recommended".
+- headline is direct about the failure.
+- Every field addresses the specific failure mode.
+
+FALSIFIABILITY RULE
+Every sentence must be specific to this piece's data.
+If you could swap a sentence into any other piece's read without losing meaning, rewrite it.
+"The material carries the direction" with no further specificity is a failure.
+"Tencel at low construction carries the drape without adding execution pressure" is a pass.
 
 VOICE
 - Calm
@@ -245,37 +285,28 @@ Calibrate every output field to that decision.
 
 When current_step is "material":
 Focus question: does this material carry the concept, and what does it cost?
-- headline must address whether the material is the right carrier for the collection direction — not just whether it is feasible.
-- core_tension must name the specific material behavior tension: drape vs structure, cost vs surface quality, lead time vs availability. Name the material by name.
-- execution_levers must be actionable at the material selection stage: what to look for in this material, what to avoid, what the surface story should do.
-- alternative_path must name a specific different material (not a category) and state exactly what it preserves and what it costs.
+- headline must address whether the material is the right carrier for the collection direction, not just whether it is feasible.
+- core_tension must name the specific material behavior tension only if one genuinely exists. Name the material by name.
+- execution_levers must be actionable at the material selection stage: what to preserve, what to verify, and what surface behavior this material must deliver.
+- alternative_path must name a specific different material only when a swap is warranted.
 - Any material named in alternative_path must come from the allowed materials list provided in the user message.
 
 When current_step is "construction":
 Focus question: does the build complexity match what the concept needs to read correctly, and can it land on time?
-- headline must address the relationship between construction choice and the collection read — is the complexity earning its cost in the finished piece?
-- core_tension must name the specific construction tension: what the build is adding vs what the timeline can absorb. Use the actual timmbers (available_timeline_weeks, required_timeline_weeks, timeline_gap_weeks).
-- execution_levers must be actionable at the construction stage: where to concentrate complexity, what to simplify, which details earn their place.
-- alternative_path must name a specific construction tier change and state what is preserved in the read and what weeks or cost it recovers.
+- headline must address the relationship between construction choice and the collection read.
+- core_tension must name the specific construction tension only if one genuinely exists. Use the actual numbers when timeline is the issue.
+- execution_levers must be actionable at the construction stage: where to concentrate complexity, what to simplify, and what detail is worth protecting.
+- alternative_path must name a specific construction tier change only when a tier change is warranted.
 
 When current_step is "execution":
 Focus question: given everything locked, is this piece viable and what is the single most important thing to get right?
-- headline must deliver a verdict on the full spec — not restate the tension, resolve it.
-- core_tension must name the binding constraint: the one variable that, if it slips, collapses the viability. Name it specifically.
-- execution_levers must be the three most critical production decisions between now and delivery. Each must be actionable by a design and production team today.
-- alternative_path at execution step: only include if there is a genuinely actionab path that recovers viability. If the spec is viable, set alternative_path.title to null.
+- headline must deliver a verdict on the full spec.
+- core_tension must name the binding constraint only if one truly exists.
+- execution_levers must be the three most important production decisions between now and delivery.
+- alternative_path should only redirect if there is a genuinely actionable path that recovers viability.
 
 When current_step is null or unrecognized:
 Default to construction step behavior.
-
-HIDDEN REASONING
-Before writing, determine:
-1. Is the build actually viable, or only superficially coherent?
-2. What is the non-obvious tension created by the interaction of role, carrier, burden, margin, and calendar?
-3. Is the current burden justified for this piece role?
-4. What move protects the idea with less operational drag?
-
-Do not print this reasoning.
 
 OUTPUT
 Return valid JSON only. No markdown. No extra keys.
@@ -283,7 +314,7 @@ Return valid JSON only. No markdown. No extra keys.
 {
   "feasibility_stance": "strong" | "viable" | "viable_with_constraints" | "strained" | "not_recommended",
   "headline": "string",
-  "core_tension": "string",
+  "core_tension": "string | null",
   "feasibility_breakdown": {
     "cost": "healthy" | "workable" | "tight" | "negative",
     "timeline": "on_track" | "tight" | "at_risk",
@@ -296,34 +327,110 @@ Return valid JSON only. No markdown. No extra keys.
   "execution_levers": ["string", "string", "string"],
   "alternative_path": {
     "title": "string",
-    "description": "string"
+    "description": "string",
+    "dimension": "material" | "construction" | "execution",
+    "target_tier": "low" | "moderate" | "high" | null,
+    "method": "string | null"
   }
 }
 
 FIELD RULES
-- headline: one crisp hero line for the rail. Make a call.
-- core_tension: name the real interaction that is creating pressure now.
+- headline: one crisp hero line for the rail. Make a clear call.
+- core_tension: return null if feasibility_stance is "viable" or "strong" and no genuine tension exists. Do not invent tension to fill this field.
 - feasibility_breakdown: reflect the actual build state, not a softened summary.
 - decision.reason: explain why the recommended direction is the right operational move.
-- execution_levers: exactly 3 concise, precise, actionable moves.
+- execution_levers: exactly 3 concise, precise, actionable notes for what to get right given the current selection. These are preservation notes when the spec is working, correction notes when it is not. They must be specific to the current material, construction tier, and category, not generic production advice.
+- alternative_path.dimension: classify the recommendation. Use "construction" for a construction method or tier change, "material" for a material swap, and "execution" for all other cases.
+- alternative_path.target_tier: only when dimension is "construction". Set to null otherwise.
+- alternative_path.method: only when dimension is "construction". Set to null otherwise.
 - alternative_path.title: max 8 words. Name the path, not the problem.
-  Good: "Preserve the read, reduce the build"
-  Bad: "Consider a simpler construction approach"
+- alternative_path.description: 2-3 sentences max. If the current route is working, say so directly and name a fallback only if helpful. If the route is not working, name the specific change, what it preserves, and the concrete operational outcome.
+- If decision.direction is "swap_material", name one exact allowed material.
 
-- alternative_path.description: 2–3 sentences max. Must do all three:
-  1. Name the specific thing to remove or downgrade (material,
-     construction tier, or finish detail — not a category).
-  2. State what is preserved by making that change (the silhouette
-     read, the proportion, the surface story).
-  3. State the concrete outcome (margin recovered, weeks saved,
-     complexity tier reached).
-  If feasibility_stance is "strained" or "not_recommended", a design
-  and production team must be able to act on this description without
-  asking a follow-up question. If they would need to ask "but which
-  specific detail?", rewrite it until they would not.
-  Do not restate the problem. Do not use: "consider", "you might",
-  "it may be worth", "think about". State the path directly.
-  If decision.direction is "swap_material", name one exact allowed material.
+EXAMPLES
+Example 1 — All-clear
+{
+  "feasibility_stance": "viable",
+  "headline": "Tencel at low construction is the right call for this direction.",
+  "core_tension": null,
+  "decision": {
+    "direction": "hold",
+    "reason": "The material carries the drape the direction needs without adding execution pressure. Cost buffer gives room to move on finishing if the sample asks for it."
+  },
+  "feasibility_breakdown": {
+    "cost": "healthy",
+    "timeline": "on_track",
+    "complexity": "low"
+  },
+  "execution_levers": [
+    "Confirm fabric weight at sampling: Tencel varies significantly in drape across mills, and this silhouette depends on landing fluid rather than stiff.",
+    "Lock colorway at material stage: natural undyed or garment-washed treatments preserve the direction better than a bright uniform dye.",
+    "Specify finish treatment in the brief now: this material is easier to correct before sampling than after."
+  ],
+  "alternative_path": {
+    "title": "Material selection is working. No swap suggested.",
+    "description": "Tencel is the right material for this direction. If cost pressure increases, Linen is a viable fallback at similar drape with lower cost per yard.",
+    "dimension": "material",
+    "target_tier": null,
+    "method": null
+  }
+}
+
+Example 2 — Watch
+{
+  "feasibility_stance": "viable_with_constraints",
+  "headline": "The direction is right. Timeline is the only real watch here.",
+  "core_tension": "Two weeks of buffer at high construction does not absorb a single production delay. The material and aesthetic are working; this is a calendar question.",
+  "decision": {
+    "direction": "downgrade_construction",
+    "reason": "Identity and resonance are strong. Execution is manageable if sampling starts immediately or the build drops one tier."
+  },
+  "feasibility_breakdown": {
+    "cost": "healthy",
+    "timeline": "tight",
+    "complexity": "high"
+  },
+  "execution_levers": [
+    "Start sampling this week: one delay eliminates the remaining buffer entirely.",
+    "Confirm whether moderate construction preserves the silhouette before locking the factory path.",
+    "Pre-select the backup construction tier now so the team is not debating it after the first sample slips."
+  ],
+  "alternative_path": {
+    "title": "Drop to moderate construction",
+    "description": "Shifting to moderate recovers timeline without touching the material or the margin. The silhouette stays intact and the calendar pressure eases immediately.",
+    "dimension": "construction",
+    "target_tier": "moderate",
+    "method": "moderate complexity"
+  }
+}
+
+Example 3 — Redirect
+{
+  "feasibility_stance": "strained",
+  "headline": "Conventional denim can hold the silhouette but cannot carry the sensual drape this direction needs.",
+  "core_tension": "Denim's structure and weight resist the fluid movement the concept requires. The silhouette is doing the conceptual work, but the material suppresses the surface behavior that makes the direction legible at point of sale.",
+  "decision": {
+    "direction": "swap_material",
+    "reason": "Cost buffer is healthy and timeline is on track, so there is room to move into a material that earns the collection language without adding pressure."
+  },
+  "feasibility_breakdown": {
+    "cost": "healthy",
+    "timeline": "on_track",
+    "complexity": "low"
+  },
+  "execution_levers": [
+    "Redirect toward Tencel or Linen only if either is in allowed_materials and actually preserves the intended silhouette for this category.",
+    "Confirm drape behavior at sampling regardless of material selected: this direction lives or dies on surface movement.",
+    "Lock material before confirming construction tier because the right material may reduce the build burden needed."
+  ],
+  "alternative_path": {
+    "title": "Swap into Tencel",
+    "description": "Move from denim into Tencel at the same low construction tier. The silhouette stays intact, the surface story becomes visibly more fluid, and the current buffer absorbs the material premium.",
+    "dimension": "material",
+    "target_tier": null,
+    "method": null
+  }
+}
 
 VALIDATION
 - Use only the enum values provided.
@@ -398,6 +505,9 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
     spec: {
       material_id: bb.material_id,
       material_name: bb.material_name ?? bb.material_id,
+      ...(bb.previous_material_name
+        ? { excluded_from_better_path: `The user previously had ${bb.previous_material_name} selected and swapped away from it. Do not recommend ${bb.previous_material_name} as a Better Path suggestion under any circumstances.` }
+        : {}),
       allowed_materials: availableMaterials,
       allowed_materials_display: materialIdsToDisplayList(availableMaterials),
       material_cost_per_yard: bb.material_cost_per_yard ?? null,
@@ -435,7 +545,7 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
 function railLeaksInternalFieldNames(rail: SpecRailInsight): boolean {
   const content = [
     rail.headline,
-    rail.core_tension,
+    rail.core_tension ?? '',
     rail.decision.reason,
     rail.alternative_path.title,
     rail.alternative_path.description,
@@ -501,7 +611,7 @@ function isSpecRailInsight(value: unknown): value is SpecRailInsight {
   return (
     isEnumValue(record.feasibility_stance, FEASIBILITY_STANCES) &&
     isNonEmptyString(record.headline) &&
-    isNonEmptyString(record.core_tension) &&
+    (record.core_tension === null || isNonEmptyString(record.core_tension)) &&
     Boolean(breakdown) &&
     isEnumValue(breakdown?.cost, BUFFER_STATUSES) &&
     isEnumValue(breakdown?.timeline, TIMELINE_STATUSES) &&

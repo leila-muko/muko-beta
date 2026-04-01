@@ -45,6 +45,7 @@ import {
   buildFallbackSpecRail,
   deriveSpecDiagnostics,
   shouldShowBetterPath,
+  shouldShowFeasibilityTension,
   type SpecRailInsight,
 } from "@/lib/synthesizer/specDecision";
 import { buildAnalysisRow, AGENT_VERSIONS } from "@/lib/agents/orchestrator-shared";
@@ -216,6 +217,16 @@ function getMissingSchemaColumn(error: unknown) {
   return match?.[1] ?? null;
 }
 
+function getAlternativePathDimension(rail: import('@/lib/synthesizer/specDecision').SpecRailInsight | null): 'material' | 'construction' | 'execution' | null {
+  if (!rail) return null;
+  if (rail.alternative_path.dimension) return rail.alternative_path.dimension;
+  // Fallback: derive from decision direction
+  const dir = rail.decision.direction;
+  if (dir === 'swap_material') return 'material';
+  if (dir === 'downgrade_construction') return 'construction';
+  return 'execution';
+}
+
 function resolveBetterPathConstructionTier(
   title: string | null | undefined,
   description: string | null | undefined,
@@ -241,6 +252,23 @@ function resolveBetterPathConstructionTier(
   }
 
   return null;
+}
+
+function resolveBetterPathMaterialCandidate(
+  rail: import('@/lib/synthesizer/specDecision').SpecRailInsight | null,
+  materials: Material[],
+  currentMaterialId: string,
+): Material | null {
+  if (!rail || getAlternativePathDimension(rail) !== 'material') return null;
+
+  const source = `${rail.alternative_path.title} ${rail.alternative_path.description}`;
+  const exact = resolveMaterialMention(source, materials);
+  if (exact && exact.id !== currentMaterialId) return exact;
+
+  const closest = findClosestMaterialMatch(source, materials);
+  if (closest && closest.id !== currentMaterialId) return closest;
+
+  return exact ?? closest;
 }
 
 async function runAnalysisMutationWithSchemaFallback(
@@ -916,11 +944,13 @@ function getRoleLabel(role: CollectionRoleId | null | undefined) {
 function SpecStudioPageContent() {
   const contextBarRef = useRef<HTMLDivElement | null>(null);
   const [contextBarHeight, setContextBarHeight] = useState(COLLECTION_CONTEXT_BAR_OFFSET);
+  const [isClientMounted, setIsClientMounted] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const previousMaterialIdRef = useRef<string | null>(null);
   const materialDeltaTimeoutRef = useRef<number | null>(null);
   const { setCategory, setSubcategory: setStoreSubcategory, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setSelectedKeyPiece, setActiveProductPieceId, setPieceBuildContext, setCollectionName, setSeason, setActiveCollection } = useSessionStore();
+  const previousMaterialId = useSessionStore((s) => s.previousMaterialId);
   // parent_analysis_id — deferred to Phase 2
   const categories: Category[] = categoriesData.categories as unknown as Category[];
   const materials: Material[] = materialsData as unknown as Material[];
@@ -939,6 +969,8 @@ function SpecStudioPageContent() {
     return useSessionStore.getState().subcategory || "";
   });
   const constructionTierOverride = useSessionStore((s) => s.constructionTierOverride);
+  const constructionMethod = useSessionStore((s) => s.constructionMethod);
+  const setConstructionMethod = useSessionStore((s) => s.setConstructionMethod);
   // targetMSRP is captured per piece and read-only here
   const targetMSRP = useSessionStore((s) => s.targetMsrp) ?? null;
   const askMukoTargetMSRP = useSessionStore((s) => s.targetMsrp);
@@ -974,7 +1006,7 @@ function SpecStudioPageContent() {
   const [hoveredComplexity, setHoveredComplexity] = useState<ConstructionTier | null>(null);
   const [constructionConfirmed, setConstructionConfirmed] = useState(false);
   const [showAllMaterials, setShowAllMaterials] = useState(false);
-  const [specStep, setSpecStep] = useState<"material" | "construction" | "execution">("material");
+  const [specStep, setSpecStep] = useState<"material" | "construction">("material");
   const [specStepDirection, setSpecStepDirection] = useState<1 | -1>(1);
   const [executionNotes, setExecutionNotes] = useState<string[]>([]);
   const [selectedLevers, setSelectedLevers] = useState<Set<string>>(new Set());
@@ -1001,16 +1033,6 @@ function SpecStudioPageContent() {
   const backToMaterial = useCallback(() => {
     setSpecStepDirection(-1);
     setSpecStep("material");
-  }, []);
-
-  const advanceToExecution = useCallback(() => {
-    setSpecStepDirection(1);
-    setSpecStep("execution");
-  }, []);
-
-  const backToConstruction = useCallback(() => {
-    setSpecStepDirection(-1);
-    setSpecStep("construction");
   }, []);
 
   const storeAesthetic = useSessionStore((s) => s.aestheticMatchedId);
@@ -1111,6 +1133,10 @@ function SpecStudioPageContent() {
       setUserManuallySelected(Boolean(snapshot.materialId));
       setSpecStep("material");
       setSpecStepDirection(1);
+      const rawExecutionNotes = (data as Record<string, unknown>).execution_notes;
+      if (typeof rawExecutionNotes === "string" && rawExecutionNotes.trim()) {
+        setExecutionNotes(rawExecutionNotes.split("\n").filter(Boolean));
+      }
       if (snapshot.season) {
         const isFW =
           snapshot.season.toLowerCase().includes("fw") || snapshot.season.toLowerCase().includes("fall");
@@ -1127,6 +1153,10 @@ function SpecStudioPageContent() {
 
   const [headerCollectionName, setHeaderCollectionName] = useState("Desert Mirage");
   const [headerSeasonLabel, setHeaderSeasonLabel] = useState("SS26");
+  useEffect(() => {
+    setIsClientMounted(true);
+  }, []);
+
   useEffect(() => {
     if (storeCollectionName) {
       setHeaderCollectionName(storeCollectionName);
@@ -1943,12 +1973,28 @@ function SpecStudioPageContent() {
   const [specSynthInsightData, setSpecSynthInsightData] = useState<InsightData | null>(null);
   const [specRailInsight, setSpecRailInsight] = useState<SpecRailInsight | null>(null);
   const [specRailLoading, setSpecRailLoading] = useState(false);
-
+  const [specRailResolvedKey, setSpecRailResolvedKey] = useState<string | null>(null);
+  const specRailRequestKey = useMemo(() => JSON.stringify({
+    aesthetic: conceptContext.aestheticMatchedId,
+    categoryId,
+    constructionTier: constructionTier ?? "moderate",
+    materialId,
+    specStep,
+    targetMSRP: resolvedTargetMsrp,
+  }), [
+    categoryId,
+    conceptContext.aestheticMatchedId,
+    constructionTier,
+    materialId,
+    resolvedTargetMsrp,
+    specStep,
+  ]);
 
   useEffect(() => {
-    if (!userManuallySelected || !materialId || !conceptContext.aestheticMatchedId || !specFallbackRail) {
+    if (!materialId || !conceptContext.aestheticMatchedId || !specFallbackRail) {
       setSpecRailLoading(false);
       setSpecRailInsight(null);
+      setSpecRailResolvedKey(null);
       return;
     }
 
@@ -2020,6 +2066,7 @@ function SpecStudioPageContent() {
       tensionState: [
         ...expressionSignalContext.filter((chip) => chip.state === "emerging").map((chip) => `${chip.label} is emerging but still reads as incidental.`),
       ],
+      previousMaterialId: previousMaterialId ?? null,
       intent: intentPayload,
     });
     if (!blackboard) return;
@@ -2032,6 +2079,7 @@ function SpecStudioPageContent() {
     let settled = false;
     setSpecRailLoading(true);
     setSpecRailInsight(null);
+    setSpecSynthInsightData(null);
 
     const finishSpecRail = (nextRail: SpecRailInsight | null, nextData?: InsightData | null) => {
       if (settled || controller.signal.aborted) return;
@@ -2042,6 +2090,7 @@ function SpecStudioPageContent() {
       window.setTimeout(() => {
         if (controller.signal.aborted) return;
         setSpecRailInsight(nextRail);
+        setSpecRailResolvedKey(specRailRequestKey);
         if (nextData !== undefined) {
           setSpecSynthInsightData(nextData);
         }
@@ -2230,6 +2279,7 @@ function SpecStudioPageContent() {
                     };
 
                     const row = buildAnalysisRow(bb, analysisResult, userId);
+                    row.construction_method = useSessionStore.getState().constructionMethod ?? null;
                     const { data: upsertData, error: upsertError } = await persistAnalysisRow(supabase, row);
 
                     if (upsertError) {
@@ -2279,7 +2329,7 @@ function SpecStudioPageContent() {
       reportAbortRef.current?.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materialId, constructionTier, categoryId, targetMSRP, userManuallySelected]);
+  }, [materialId, constructionTier, categoryId, targetMSRP, specStep, specRailRequestKey]);
 
 
   // ─── Fix #1: Write execution state to store so report page gets real data ──
@@ -2650,17 +2700,38 @@ function SpecStudioPageContent() {
     timelineWeeks,
     targetMSRP,
   ]);
-  const activeSpecRail = specRailLoading ? null : (specRailInsight ?? specFallbackRail);
+  const shouldShowSpecRailLoading = Boolean(
+    materialId &&
+    conceptContext.aestheticMatchedId &&
+    specFallbackRail &&
+    (specRailLoading || specRailResolvedKey !== specRailRequestKey)
+  );
+  const activeSpecRail = shouldShowSpecRailLoading ? null : (specRailInsight ?? specFallbackRail);
   const showBetterPath = activeSpecRail ? shouldShowBetterPath(activeSpecRail) : false;
+  const betterPathDimension = useMemo(() => getAlternativePathDimension(activeSpecRail), [activeSpecRail]);
   const betterPathMaterial = useMemo(() => {
-    if (!activeSpecRail || activeSpecRail.decision.direction !== "swap_material") return null;
-    const source = `${activeSpecRail.alternative_path.title} ${activeSpecRail.alternative_path.description}`;
-    return resolveMaterialMention(source, materials);
-  }, [activeSpecRail, materials]);
+    return resolveBetterPathMaterialCandidate(activeSpecRail, materials, materialId);
+  }, [activeSpecRail, materialId, materials]);
   const displayRecommendedMaterialId =
     betterPathMaterial && recommendedMaterialId === materialId
       ? betterPathMaterial.id
       : recommendedMaterialId;
+
+  const betterPathTargetTier = useMemo((): ConstructionTier | null => {
+    if (!activeSpecRail || betterPathDimension !== 'construction') return null;
+    return activeSpecRail.alternative_path.target_tier
+      ?? resolveBetterPathConstructionTier(
+           activeSpecRail.alternative_path.title,
+           activeSpecRail.alternative_path.description,
+           constructionTier,
+         );
+  }, [activeSpecRail, betterPathDimension, constructionTier]);
+
+  const betterPathMethod = useMemo((): string | null => {
+    if (!activeSpecRail || betterPathDimension !== 'construction') return null;
+    return activeSpecRail.alternative_path.method
+      ?? (betterPathTargetTier ? `${betterPathTargetTier} complexity` : 'simplified construction');
+  }, [activeSpecRail, betterPathDimension, betterPathTargetTier]);
 
   useEffect(() => {
     const nextLevers = activeSpecRail?.execution_levers ?? [];
@@ -2754,17 +2825,6 @@ function SpecStudioPageContent() {
     marketSaturationSignal,
     selectedMaterial,
   ]);
-
-  const buildOutcomeRows = useMemo(() => [
-    { label: "Material", value: selectedMaterial?.name ?? "—" },
-    { label: "Construction", value: displayConstruction },
-    { label: "Estimated COGS", value: displayEstimatedCogs },
-    { label: "Lead Time", value: displayLeadTime },
-    {
-      label: "Margin Buffer",
-      value: marginBuffer == null ? "—" : marginBuffer >= 0 ? `$${marginBuffer}` : `-$${Math.abs(marginBuffer)}`,
-    },
-  ], [selectedMaterial, displayConstruction, displayEstimatedCogs, displayLeadTime, marginBuffer]);
 
   /* ─── RENDER ───────────────────────────────────────────────────────────── */
   const overallScore = Math.round((dynamicIdentityScore + commercialPotentialScore + executionScore) / 3);
@@ -2861,31 +2921,43 @@ function SpecStudioPageContent() {
     if (!activeSpecRail) return;
     setBetterPathApplyMessage(null);
 
+    const actionableDimension = getAlternativePathDimension(activeSpecRail);
+
     const nextNote = `${activeSpecRail.alternative_path.title}: ${activeSpecRail.alternative_path.description}`;
     const nextNotes = Array.from(new Set([...executionNotes, nextNote]));
     setExecutionNotes(nextNotes);
     await persistExecutionNotes(nextNotes);
 
-    const nextTier = resolveBetterPathConstructionTier(
-      activeSpecRail.alternative_path.title,
-      activeSpecRail.alternative_path.description,
-      constructionTier,
-    );
-    let appliedMaterialId: string | null = null;
-    if (activeSpecRail.decision.direction === "swap_material") {
-      const source = `${activeSpecRail.alternative_path.title} ${activeSpecRail.alternative_path.description}`;
-      const exactMaterial = resolveMaterialMention(source, materials);
-      const closestMaterial = exactMaterial ?? findClosestMaterialMatch(source, materials);
+    // Resolve construction tier: first trust the structured field, then try text patterns,
+    // then fall back to a one-tier drop for downgrade-construction guidance.
+    let nextTier =
+      actionableDimension === "construction"
+        ? activeSpecRail.alternative_path.target_tier
+          ?? resolveBetterPathConstructionTier(
+            activeSpecRail.alternative_path.title,
+            activeSpecRail.alternative_path.description,
+            constructionTier,
+          )
+        : null;
+    if (!nextTier && activeSpecRail.decision.direction === "downgrade_construction") {
+      if (constructionTier === "high") nextTier = "moderate";
+      else if (constructionTier === "moderate") nextTier = "low";
+    }
 
-      if (closestMaterial && closestMaterial.id !== materialId) {
-        handleMaterialSelection(closestMaterial.id);
-        appliedMaterialId = closestMaterial.id;
-        if (!exactMaterial) {
-          setBetterPathApplyMessage(`Applied closest library match: ${closestMaterial.name}.`);
+    let appliedMaterialId: string | null = null;
+    if (actionableDimension === "material") {
+      const resolved = betterPathMaterial
+        ?? resolveBetterPathMaterialCandidate(activeSpecRail, materials, materialId);
+
+      if (resolved && resolved.id !== materialId) {
+        handleMaterialSelection(resolved.id);
+        appliedMaterialId = resolved.id;
+        if (!betterPathMaterial) {
+          setBetterPathApplyMessage(`Applied closest library match: ${resolved.name}.`);
         }
-      } else if (closestMaterial && closestMaterial.id === materialId) {
+      } else if (resolved && resolved.id === materialId) {
         setBetterPathApplyMessage("Better Path resolved to the material already selected, so nothing changed.");
-      } else if (!closestMaterial) {
+      } else {
         setBetterPathApplyMessage("Better Path could not be mapped to a library material, so nothing changed.");
       }
     }
@@ -2893,13 +2965,20 @@ function SpecStudioPageContent() {
     if (nextTier) {
       handleComplexityChange(nextTier);
     }
-    if (!appliedMaterialId && !nextTier && activeSpecRail.decision.direction !== "swap_material") {
-      setBetterPathApplyMessage("Better Path did not include an actionable material or construction change.");
+    if (!appliedMaterialId && !nextTier) {
+      if (actionableDimension === "material") {
+        setBetterPathApplyMessage("Better Path could not be mapped to a library material, so nothing changed.");
+      } else if (actionableDimension === "construction") {
+        setBetterPathApplyMessage("Better Path did not resolve to a construction tier change, so nothing changed.");
+      } else {
+        setBetterPathApplyMessage("Better Path did not include an actionable material or construction change.");
+      }
     }
 
     setShowBetterPathConfirm(false);
   }, [
     activeSpecRail,
+    betterPathMaterial,
     constructionTier,
     executionNotes,
     handleComplexityChange,
@@ -2976,6 +3055,7 @@ function SpecStudioPageContent() {
         category: categoryId || null,
         targetMSRP: targetMSRP,
         materialId: materialId || null,
+        previousMaterialId: previousMaterialId ?? null,
         silhouette: conceptSilhouette || null,
         constructionTier: constructionTier ?? null,
         timelineWeeks: timelineWeeks,
@@ -3033,6 +3113,7 @@ function SpecStudioPageContent() {
     if (executionNotes.length > 0) {
       row.execution_notes = executionNotes.join("\n");
     }
+    row.construction_method = constructionMethod ?? null;
     const { data: upsertData, error: upsertError } = await persistAnalysisRow(supabase, row);
 
     if (upsertError) throw upsertError;
@@ -3148,6 +3229,10 @@ function SpecStudioPageContent() {
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
+
+  if (!isClientMounted) {
+    return null;
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#FAF9F6", overflowX: "hidden" }}>
@@ -3347,7 +3432,6 @@ function SpecStudioPageContent() {
                 {[
                   { id: "material", label: "Material" },
                   { id: "construction", label: "Construction" },
-                  { id: "execution", label: "Execution" },
                 ].map((step, index) => (
                   <React.Fragment key={step.id}>
                     <div
@@ -3362,7 +3446,7 @@ function SpecStudioPageContent() {
                     >
                       {step.label}
                     </div>
-                    {index < 2 && <div style={{ width: 34, height: 1, background: "#E2DDD6" }} />}
+                    {index < 1 && <div style={{ width: 34, height: 1, background: "#E2DDD6" }} />}
                   </React.Fragment>
                 ))}
               </div>
@@ -3553,11 +3637,104 @@ function SpecStudioPageContent() {
                             <div style={{ fontFamily: inter, fontSize: 11.4, color: "rgba(67,67,43,0.48)", lineHeight: 1.58 }}>
                               {info.note}
                             </div>
+                            {betterPathDimension === "construction" && betterPathTargetTier === tier && betterPathMethod && (
+                              <div style={{ marginTop: 10 }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConstructionMethod(constructionMethod === betterPathMethod ? null : betterPathMethod);
+                                  }}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 5,
+                                    padding: "4px 10px",
+                                    borderRadius: 999,
+                                    fontFamily: inter,
+                                    fontSize: 11,
+                                    cursor: "pointer",
+                                    ...(constructionMethod === betterPathMethod
+                                      ? {
+                                          background: "rgba(184,135,107,0.15)",
+                                          border: "1px solid #B8876B",
+                                          color: "#B8876B",
+                                        }
+                                      : {
+                                          background: "transparent",
+                                          border: "0.5px solid rgba(67,67,43,0.25)",
+                                          color: "rgba(67,67,43,0.56)",
+                                        }),
+                                  }}
+                                >
+                                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#B8876B", flexShrink: 0 }} />
+                                  {betterPathMethod}
+                                </button>
+                              </div>
+                            )}
                           </button>
                         );
                       })}
                     </div>
                     {overrideWarning && <div style={{ marginTop: 12, fontSize: 12, color: "rgba(67,67,43,0.56)", fontFamily: inter }}>{overrideWarning}</div>}
+                    {executionNotes.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: 18,
+                          padding: "16px 18px",
+                          borderRadius: 18,
+                          border: "1px solid rgba(67,67,43,0.08)",
+                          background: "rgba(255,255,255,0.64)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontFamily: inter,
+                            fontSize: 9,
+                            fontWeight: 600,
+                            letterSpacing: "0.16em",
+                            textTransform: "uppercase",
+                            color: "rgba(67,67,43,0.4)",
+                            marginBottom: 10,
+                          }}
+                        >
+                          Applied notes
+                        </div>
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {executionNotes.map((note) => (
+                            <div
+                              key={note}
+                              style={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: 10,
+                              }}
+                            >
+                              <span
+                                aria-hidden
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: "50%",
+                                  marginTop: 7,
+                                  flexShrink: 0,
+                                  background: "rgba(168,180,117,0.9)",
+                                }}
+                              />
+                              <div
+                                style={{
+                                  fontFamily: inter,
+                                  fontSize: 12,
+                                  lineHeight: 1.58,
+                                  color: "rgba(25,25,25,0.82)",
+                                }}
+                              >
+                                {note}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </section>
 
                         <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
@@ -3566,87 +3743,6 @@ function SpecStudioPageContent() {
                             style={{ padding: "12px 18px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", color: "rgba(67,67,43,0.62)", fontFamily: sohne, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
                           >
                             ← Back to Material
-                          </button>
-                          <button
-                            onClick={advanceToExecution}
-                            disabled={!selectedMaterial || !constructionConfirmed}
-                            style={{
-                              padding: "11px 24px",
-                              borderRadius: 999,
-                              border: "none",
-                              background: (selectedMaterial && constructionConfirmed) ? "#191919" : "#E2DDD6",
-                              color: (selectedMaterial && constructionConfirmed) ? "#FFFFFF" : "#888078",
-                              fontFamily: inter,
-                              fontSize: 13,
-                              fontWeight: 500,
-                              letterSpacing: "0.02em",
-                              cursor: (selectedMaterial && constructionConfirmed) ? "pointer" : "not-allowed",
-                            }}
-                            onMouseEnter={(e) => { if (selectedMaterial && constructionConfirmed) e.currentTarget.style.background = "#2A2622"; }}
-                            onMouseLeave={(e) => { if (selectedMaterial && constructionConfirmed) e.currentTarget.style.background = "#191919"; }}
-                          >
-                            Continue to Execution →
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {specStep === "execution" && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-                        <section id="execution-section">
-                          <div style={{ marginBottom: 28 }}>
-                            <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, color: OLIVE, letterSpacing: "-0.03em" }}>
-                              Execution direction
-                            </div>
-                          </div>
-
-                          <div style={{ display: "grid", gap: 18 }}>
-                            <div style={{ display: "grid", gap: 10 }}>
-                              {buildOutcomeRows.map((row) => (
-                                <div key={row.label} style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 12 }}>
-                                  <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.34)" }}>
-                                    {row.label}
-                                  </div>
-                                  <div style={{ fontFamily: inter, fontSize: 12.5, color: "rgba(67,67,43,0.72)", lineHeight: 1.5 }}>
-                                    {row.value}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-
-                            {executionNotes.length > 0 ? (
-                              <div style={{ paddingTop: 18, borderTop: "1px solid rgba(67,67,43,0.08)" }}>
-                                <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.34)", marginBottom: 10 }}>
-                                  Execution Notes
-                                </div>
-                                <div style={{ display: "grid", gap: 10 }}>
-                                  {executionNotes.map((note) => (
-                                    <div
-                                      key={note}
-                                      style={{
-                                        padding: "10px 12px",
-                                        borderRadius: 12,
-                                        background: "#F9F7F4",
-                                        fontFamily: inter,
-                                        fontSize: 12.5,
-                                        color: "rgba(67,67,43,0.72)",
-                                        lineHeight: 1.5,
-                                      }}
-                                    >
-                                      {note}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        </section>
-
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                          <button
-                            onClick={backToConstruction}
-                            style={{ padding: "12px 18px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", color: "rgba(67,67,43,0.62)", fontFamily: sohne, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                          >
-                            ← Back to Construction
                           </button>
                           <button
                             onClick={async () => {
@@ -3718,7 +3814,7 @@ function SpecStudioPageContent() {
           <div style={{ padding: "36px 28px 44px" }}>
             <section style={{ marginBottom: 30 }}>
               <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 20 }}>Muko&apos;s Read</div>
-              {specRailLoading ? (
+              {shouldShowSpecRailLoading ? (
                 <div style={{ display: "grid", gap: 12 }}>
                   <div style={{ height: 54, borderRadius: 18, background: "linear-gradient(90deg, rgba(226,221,214,0.56) 0%, rgba(250,249,246,0.95) 50%, rgba(226,221,214,0.56) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
                   <div style={{ height: 34, width: "88%", borderRadius: 14, background: "linear-gradient(90deg, rgba(226,221,214,0.48) 0%, rgba(250,249,246,0.92) 50%, rgba(226,221,214,0.48) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
@@ -3785,92 +3881,24 @@ function SpecStudioPageContent() {
               </div>
             )}
 
-            <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
-            <section style={{ marginBottom: 24 }}>
-              <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>What to get right</div>
-              {specRailLoading ? (
-                <div style={{ display: "grid", gap: 12 }}>
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div key={index} style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                      <div style={{ width: 13, height: 13, borderRadius: 4, background: "rgba(226,221,214,0.9)" }} />
-                      <div style={{ height: 18, flex: index === 2 ? "0 1 72%" : "0 1 84%", borderRadius: 999, background: "linear-gradient(90deg, rgba(226,221,214,0.5) 0%, rgba(250,249,246,0.94) 50%, rgba(226,221,214,0.5) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
-                    </div>
-                  ))}
-                  <div style={{ marginTop: 4, width: 124, height: 36, borderRadius: 999, background: "rgba(226,221,214,0.85)" }} />
-                </div>
-              ) : (
-                <>
+            {(shouldShowSpecRailLoading || (activeSpecRail && shouldShowFeasibilityTension(activeSpecRail))) && (
+              <section style={{ marginBottom: 24 }}>
+                <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
+                <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>Feasibility tension</div>
+                {shouldShowSpecRailLoading ? (
                   <div style={{ display: "grid", gap: 12 }}>
-                    {(activeSpecRail?.execution_levers ?? []).map((item) => (
-                      <div key={item} style={{ display: "flex", gap: 10, alignItems: "start" }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedLevers.has(item)}
-                          onChange={() => {
-                            setSelectedLevers((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(item)) {
-                                next.delete(item);
-                              } else {
-                                next.add(item);
-                              }
-                              return next;
-                            });
-                          }}
-                          style={{ accentColor: "#43432B", width: 13, height: 13, marginTop: 3, cursor: "pointer", flexShrink: 0 }}
-                        />
-                        <label style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58, cursor: "pointer" }}>
-                          {item}
-                        </label>
-                      </div>
-                    ))}
+                    <div style={{ height: 48, borderRadius: 16, background: "linear-gradient(90deg, rgba(226,221,214,0.5) 0%, rgba(250,249,246,0.94) 50%, rgba(226,221,214,0.5) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {Array.from({ length: 3 }).map((_, index) => (
+                        <div key={index} style={{ width: index === 1 ? 92 : 106, height: 26, borderRadius: 999, background: "rgba(226,221,214,0.8)" }} />
+                      ))}
+                    </div>
                   </div>
-                  <div style={{ marginTop: 16 }}>
-                    <button
-                      onClick={() => { void handleApplySelectedLevers(); }}
-                      disabled={selectedLevers.size === 0}
-                      style={{
-                        padding: "8px 16px",
-                        borderRadius: 999,
-                        border: "none",
-                        background: selectedLevers.size === 0 ? "#E2DDD6" : "#191919",
-                        color: selectedLevers.size === 0 ? "#888078" : "#FFFFFF",
-                        fontFamily: inter,
-                        fontSize: 11,
-                        fontWeight: 500,
-                        cursor: selectedLevers.size === 0 ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      Apply Selected
-                    </button>
-                    {leverNotesSaved ? (
-                      <div style={{ marginTop: 8, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.5)" }}>
-                        Notes saved
-                      </div>
-                    ) : null}
-                  </div>
-                </>
-              )}
-            </section>
-
-            <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
-            <section style={{ marginBottom: 24 }}>
-              <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>Feasibility tension</div>
-              {specRailLoading ? (
-                <div style={{ display: "grid", gap: 12 }}>
-                  <div style={{ height: 48, borderRadius: 16, background: "linear-gradient(90deg, rgba(226,221,214,0.5) 0%, rgba(250,249,246,0.94) 50%, rgba(226,221,214,0.5) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {Array.from({ length: 3 }).map((_, index) => (
-                      <div key={index} style={{ width: index === 1 ? 92 : 106, height: 26, borderRadius: 999, background: "rgba(226,221,214,0.8)" }} />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.62 }}>
-                    {activeSpecRail?.core_tension ?? "The rail will sharpen once feasibility numbers and execution context are in place."}
-                  </div>
-                  {activeSpecRail && (
+                ) : activeSpecRail ? (
+                  <>
+                    <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.62 }}>
+                      {activeSpecRail.core_tension}
+                    </div>
                     <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
                       {[
                         `Cost: ${activeSpecRail.feasibility_breakdown.cost.replace(/_/g, " ")}`,
@@ -3894,89 +3922,177 @@ function SpecStudioPageContent() {
                         </span>
                       ))}
                     </div>
-                  )}
-                </>
-              )}
-            </section>
+                  </>
+                ) : null}
+              </section>
+            )}
 
             {showBetterPath && activeSpecRail && (
               <>
                 <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
                 <section style={{ marginBottom: 24 }}>
                   <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>Better path</div>
-                  <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: "#191919", marginBottom: 8 }}>
-                    {activeSpecRail.alternative_path.title}
-                  </div>
-                  <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58 }}>
-                    {activeSpecRail.alternative_path.description}
-                  </div>
-                  <button
-                    onClick={() => setShowBetterPathConfirm(true)}
-                    style={{
-                      marginTop: 12,
-                      padding: "7px 14px",
-                      borderRadius: 999,
-                      border: "1px solid rgba(67,67,43,0.25)",
-                      background: "transparent",
-                      color: "#43432B",
-                      fontFamily: inter,
-                      fontSize: 11,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Apply
-                  </button>
-                  {showBetterPathConfirm ? (
-                    <div style={{ marginTop: 12 }}>
-                      <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.7)", lineHeight: 1.58, marginBottom: 10 }}>
-                        {activeSpecRail.decision.direction === "swap_material"
-                          ? betterPathMaterial
-                            ? `This will switch the material to ${betterPathMaterial.name}. Apply better path?`
-                            : "This will try to switch to the recommended library material. Apply better path?"
-                          : "This will update your construction detail. Apply better path?"}
+                  {specStep === "material" && executionScore >= 75 ? (
+                    <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.56)", lineHeight: 1.58 }}>
+                      Material selection is working. No swap suggested.
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: "#191919", marginBottom: 8 }}>
+                        {activeSpecRail.alternative_path.title}
                       </div>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58 }}>
+                        {activeSpecRail.alternative_path.description}
+                      </div>
+                      {betterPathDimension === "construction" ? (
+                        <div style={{ marginTop: 10, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.44)", lineHeight: 1.5 }}>
+                          Applies on Construction tab
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setShowBetterPathConfirm(true)}
+                            style={{
+                              marginTop: 12,
+                              padding: "7px 14px",
+                              borderRadius: 999,
+                              border: "1px solid rgba(67,67,43,0.25)",
+                              background: "transparent",
+                              color: "#43432B",
+                              fontFamily: inter,
+                              fontSize: 11,
+                              fontWeight: 500,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Apply
+                          </button>
+                          {showBetterPathConfirm ? (
+                            <div style={{ marginTop: 12 }}>
+                              <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.7)", lineHeight: 1.58, marginBottom: 10 }}>
+                                {betterPathDimension === "material"
+                                  ? betterPathMaterial
+                                    ? `This will switch the material to ${betterPathMaterial.name}. Apply better path?`
+                                    : "This will try to switch to the recommended library material. Apply better path?"
+                                  : "This will update your construction detail. Apply better path?"}
+                              </div>
+                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                <button
+                                  onClick={() => { void handleConfirmBetterPath(); }}
+                                  style={{
+                                    padding: "8px 16px",
+                                    borderRadius: 999,
+                                    border: "none",
+                                    background: "#191919",
+                                    color: "#FFFFFF",
+                                    fontFamily: inter,
+                                    fontSize: 11,
+                                    fontWeight: 500,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={() => setShowBetterPathConfirm(false)}
+                                  style={{
+                                    padding: "7px 14px",
+                                    borderRadius: 999,
+                                    border: "1px solid rgba(67,67,43,0.25)",
+                                    background: "transparent",
+                                    color: "#43432B",
+                                    fontFamily: inter,
+                                    fontSize: 11,
+                                    fontWeight: 500,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+                          {betterPathApplyMessage ? (
+                            <div style={{ marginTop: 10, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.56)", lineHeight: 1.5 }}>
+                              {betterPathApplyMessage}
+                            </div>
+                          ) : null}
+                        </>
+                      )}
+                    </>
+                  )}
+                </section>
+              </>
+            )}
+
+            {specStep === "construction" && constructionConfirmed && (
+              <>
+                <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
+                <section style={{ marginBottom: 24 }}>
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>What to get right</div>
+                  {shouldShowSpecRailLoading ? (
+                    <div style={{ display: "grid", gap: 12 }}>
+                      {Array.from({ length: 3 }).map((_, index) => (
+                        <div key={index} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                          <div style={{ width: 13, height: 13, borderRadius: 4, background: "rgba(226,221,214,0.9)" }} />
+                          <div style={{ height: 18, flex: index === 2 ? "0 1 72%" : "0 1 84%", borderRadius: 999, background: "linear-gradient(90deg, rgba(226,221,214,0.5) 0%, rgba(250,249,246,0.94) 50%, rgba(226,221,214,0.5) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
+                        </div>
+                      ))}
+                      <div style={{ marginTop: 4, width: 124, height: 36, borderRadius: 999, background: "rgba(226,221,214,0.85)" }} />
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: "grid", gap: 12 }}>
+                        {(activeSpecRail?.execution_levers ?? []).map((item) => (
+                          <div key={item} style={{ display: "flex", gap: 10, alignItems: "start" }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedLevers.has(item)}
+                              onChange={() => {
+                                setSelectedLevers((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(item)) {
+                                    next.delete(item);
+                                  } else {
+                                    next.add(item);
+                                  }
+                                  return next;
+                                });
+                              }}
+                              style={{ accentColor: "#43432B", width: 13, height: 13, marginTop: 3, cursor: "pointer", flexShrink: 0 }}
+                            />
+                            <label style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58, cursor: "pointer" }}>
+                              {item}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ marginTop: 16 }}>
                         <button
-                          onClick={() => { void handleConfirmBetterPath(); }}
+                          onClick={() => { void handleApplySelectedLevers(); }}
+                          disabled={selectedLevers.size === 0}
                           style={{
                             padding: "8px 16px",
                             borderRadius: 999,
                             border: "none",
-                            background: "#191919",
-                            color: "#FFFFFF",
+                            background: selectedLevers.size === 0 ? "#E2DDD6" : "#191919",
+                            color: selectedLevers.size === 0 ? "#888078" : "#FFFFFF",
                             fontFamily: inter,
                             fontSize: 11,
                             fontWeight: 500,
-                            cursor: "pointer",
+                            cursor: selectedLevers.size === 0 ? "not-allowed" : "pointer",
                           }}
                         >
-                          Confirm
+                          Apply Selected
                         </button>
-                        <button
-                          onClick={() => setShowBetterPathConfirm(false)}
-                          style={{
-                            padding: "7px 14px",
-                            borderRadius: 999,
-                            border: "1px solid rgba(67,67,43,0.25)",
-                            background: "transparent",
-                            color: "#43432B",
-                            fontFamily: inter,
-                            fontSize: 11,
-                            fontWeight: 500,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Cancel
-                        </button>
+                        {leverNotesSaved ? (
+                          <div style={{ marginTop: 8, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.5)" }}>
+                            Notes saved
+                          </div>
+                        ) : null}
                       </div>
-                    </div>
-                  ) : null}
-                  {betterPathApplyMessage ? (
-                    <div style={{ marginTop: 10, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.56)", lineHeight: 1.5 }}>
-                      {betterPathApplyMessage}
-                    </div>
-                  ) : null}
+                    </>
+                  )}
                 </section>
               </>
             )}
