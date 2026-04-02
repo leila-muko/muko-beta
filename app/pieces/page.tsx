@@ -2764,7 +2764,6 @@ function PiecesPageClient() {
   const piecesReadContent = synthesizedPiecesRead ?? piecesReadFallback;
   const rightRailPiecesRead =
     synthesizedPiecesRead ?? (piecesReadStatus === "error" ? piecesReadFallback : null);
-  const collectionPhase = piecesReadInput.currentCollectionState.collectionPhase;
   const askMukoDirectionalGap = Math.max(
     0,
     piecesReadInput.currentCollectionState.roleTargets.directional -
@@ -2823,7 +2822,11 @@ function PiecesPageClient() {
         ? askMukoCoverageGapLabel
         : `a ${askMukoCoverageGapLabel}`
       : "a coverage gap";
-    const openingMessage = `The collection needs ${askMukoDirectionalGap} more directional pieces and has ${coverageGapClause}. What specific pieces should I make for ${collectionLabel} in ${movementLabel}?`;
+    const openingContext =
+      askMukoDirectionalGap > 0
+        ? `The collection needs ${askMukoDirectionalGap} more directional pieces and has ${coverageGapClause}.`
+        : `The collection is taking shape and still has ${coverageGapClause}.`;
+    const openingMessage = `${openingContext} What specific pieces should I make for ${collectionLabel} in ${movementLabel}?`;
 
     setAskMukoOpeningMessage(openingMessage);
     setAskMukoOpeningMessageVersion((version) => version + 1);
@@ -3707,27 +3710,25 @@ function PiecesPageClient() {
                       >
                         Build this starting point →
                       </button>
-                      {(collectionPhase === "forming" || collectionPhase === "complete") && (
-                        <button
-                          type="button"
-                          onClick={handleOpenAskMukoStartingPoint}
-                          style={{
-                            padding: 0,
-                            border: "none",
-                            background: "none",
-                            fontFamily: inter,
-                            fontSize: 12.5,
-                            fontWeight: 600,
-                            color: "#B07C88",
-                            letterSpacing: "0.01em",
-                            cursor: "pointer",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.76")}
-                          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-                        >
-                          Ask Muko what to make →
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={handleOpenAskMukoStartingPoint}
+                        style={{
+                          padding: 0,
+                          border: "none",
+                          background: "none",
+                          fontFamily: inter,
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          color: "#B07C88",
+                          letterSpacing: "0.01em",
+                          cursor: "pointer",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.76")}
+                        onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+                      >
+                        Ask Muko what to make →
+                      </button>
                     </div>
                   </div>
                 </div>

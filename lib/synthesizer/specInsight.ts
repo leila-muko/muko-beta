@@ -16,6 +16,7 @@ import {
 } from '@/lib/spec-studio/material-resolver';
 import {
   buildFallbackSpecRail,
+  isBelowConstructionFloor,
   mapSpecRailToInsightData,
   type SpecDecisionDiagnostics,
   type SpecRailInsight,
@@ -297,6 +298,9 @@ Focus question: does the build complexity match what the concept needs to read c
 - core_tension must name the specific construction tension only if one genuinely exists. Use the actual numbers when timeline is the issue.
 - execution_levers must be actionable at the construction stage: where to concentrate complexity, what to simplify, and what detail is worth protecting.
 - alternative_path must name a specific construction tier change only when a tier change is warranted.
+- Important: never recommend a construction tier below the category minimum.
+- For outerwear and tailored pieces, the minimum is moderate.
+- Do not set target_tier to "low" for jackets, coats, blazers, or structured garments.
 
 When current_step is "execution":
 Focus question: given everything locked, is this piece viable and what is the single most important thing to get right?
@@ -547,8 +551,8 @@ function railLeaksInternalFieldNames(rail: SpecRailInsight): boolean {
     rail.headline,
     rail.core_tension ?? '',
     rail.decision.reason,
-    rail.alternative_path.title,
-    rail.alternative_path.description,
+    rail.alternative_path?.title ?? '',
+    rail.alternative_path?.description ?? '',
     ...rail.execution_levers,
   ].join(' ').toLowerCase();
 
@@ -558,15 +562,44 @@ function railLeaksInternalFieldNames(rail: SpecRailInsight): boolean {
 function railHasValidMaterialSwap(rail: SpecRailInsight, bb: SpecBlackboard): boolean {
   if (rail.decision.direction !== 'swap_material') return true;
   if (!Array.isArray(bb.available_materials) || bb.available_materials.length === 0) return false;
+  if (!rail.alternative_path) return false;
   const source = `${rail.alternative_path.title} ${rail.alternative_path.description}`;
   const material = findMaterialMention(source, bb.available_materials);
   return Boolean(material && material.id !== bb.material_id);
 }
 
+function stripInvalidConstructionRedirect(rail: SpecRailInsight, bb: SpecBlackboard): SpecRailInsight {
+  if (
+    rail.alternative_path?.dimension === 'construction' &&
+    rail.alternative_path.target_tier &&
+    isBelowConstructionFloor(bb.category ?? '', rail.alternative_path.target_tier)
+  ) {
+    rail.alternative_path = null;
+  }
+
+  return rail;
+}
+
 export function validateSpecRailOutput(rail: SpecRailInsight, bb: SpecBlackboard): boolean {
+  const parsed = stripInvalidConstructionRedirect(rail, bb);
   if (railLeaksInternalFieldNames(rail)) return false;
-  if (!railHasValidMaterialSwap(rail, bb)) return false;
+  if (!railHasValidMaterialSwap(parsed, bb)) return false;
   return true;
+}
+
+export function repairSpecRailOutput(rail: SpecRailInsight, bb: SpecBlackboard): SpecRailInsight | null {
+  const parsed = stripInvalidConstructionRedirect(rail, bb);
+  if (railLeaksInternalFieldNames(rail)) return null;
+  if (railHasValidMaterialSwap(parsed, bb)) return parsed;
+  if (parsed.decision.direction !== 'swap_material') return parsed;
+
+  const fallback = buildSpecFallbackRail(bb);
+
+  return {
+    ...parsed,
+    decision: fallback.decision,
+    alternative_path: fallback.alternative_path,
+  };
 }
 
 // ─────────────────────────────────────────────
@@ -606,7 +639,7 @@ function isSpecRailInsight(value: unknown): value is SpecRailInsight {
   const record = value as Record<string, unknown>;
   const breakdown = record.feasibility_breakdown as Record<string, unknown> | undefined;
   const decision = record.decision as Record<string, unknown> | undefined;
-  const alternative = record.alternative_path as Record<string, unknown> | undefined;
+  const alternative = record.alternative_path as Record<string, unknown> | null | undefined;
 
   return (
     isEnumValue(record.feasibility_stance, FEASIBILITY_STANCES) &&
@@ -622,9 +655,11 @@ function isSpecRailInsight(value: unknown): value is SpecRailInsight {
     Array.isArray(record.execution_levers) &&
     record.execution_levers.length === 3 &&
     record.execution_levers.every(isNonEmptyString) &&
-    Boolean(alternative) &&
-    typeof alternative?.title === 'string' &&
-    typeof alternative?.description === 'string'
+    (
+      alternative == null ||
+      (typeof alternative?.title === 'string' &&
+        typeof alternative?.description === 'string')
+    )
   );
 }
 

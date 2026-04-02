@@ -790,24 +790,36 @@ export default function CollectionPage({
     setIsReadPinnedClosed(false);
   }
 
+  const storeMatchesCollection = useMemo(
+    () => storeCollectionName?.trim().toLowerCase() === collectionName.trim().toLowerCase(),
+    [collectionName, storeCollectionName]
+  );
+
   const editorialDirection = useMemo(() => {
     const preferred = [
-      collectionAesthetic,
-      aestheticInflection,
-      directionInterpretationText,
+      storeMatchesCollection ? collectionAesthetic : null,
+      storeMatchesCollection ? aestheticInflection : null,
+      storeMatchesCollection ? directionInterpretationText : null,
+      analyses[0]?.collection_aesthetic,
+      analyses[0]?.aesthetic_inflection,
       analyses[0]?.aesthetic_input,
     ].find((value) => value?.trim());
 
     return preferred?.trim() ?? null;
-  }, [aestheticInflection, analyses, collectionAesthetic, directionInterpretationText]);
+  }, [
+    aestheticInflection,
+    analyses,
+    collectionAesthetic,
+    directionInterpretationText,
+    storeMatchesCollection,
+  ]);
 
   const editorialChips = useMemo(() => {
-    const storeMatchesCollection = storeCollectionName?.trim().toLowerCase() === collectionName.trim().toLowerCase();
     if (storeMatchesCollection && directionInterpretationChips.length > 0) {
       return directionInterpretationChips.slice(0, 4);
     }
     return [];
-  }, [collectionName, directionInterpretationChips, storeCollectionName]);
+  }, [directionInterpretationChips, storeMatchesCollection]);
 
   const handleGenerateReport = () => {
     if (!canGenerateReport) return;

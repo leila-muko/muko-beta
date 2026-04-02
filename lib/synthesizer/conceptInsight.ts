@@ -35,6 +35,8 @@ export interface ConceptBlackboard {
   identity_score: number;
   /** Resonance score 0–100 */
   resonance_score: number;
+  /** Execution score 0–100 */
+  execution_score?: number;
   /** Number of collections analyzed for this aesthetic (from aesthetics.json) */
   collections_analyzed?: number;
   /** Season key, e.g. "fw26" */
@@ -347,7 +349,7 @@ function buildCollectionAwareFallbackDecisionGuidance(
       blackboard.identity_score >= 84 &&
       blackboard.resonance_score >= 74 &&
       (blackboard.execution_score ?? 0) >= 72
-        ? 'Confirm Direction'
+        ? 'Increase Investment'
         : blackboard.identity_score >= 80 && blackboard.resonance_score >= 70
           ? 'Maintain Exposure'
           : 'Controlled Test';
@@ -1563,7 +1565,10 @@ export async function generateConceptInsight(
       editLabel: 'POSITIONING',
       decision_guidance: {
         recommended_direction: parsed.decision_guidance.recommended_direction,
-        commitment_signal: parsed.decision_guidance.commitment_signal,
+        commitment_signal:
+          parsed.decision_guidance.commitment_signal === 'Confirm Direction'
+            ? 'Increase Investment'
+            : parsed.decision_guidance.commitment_signal,
         execution_levers: normalizeExecutionLevers(
           blackboard.aesthetic_matched_id,
           parsed.decision_guidance.execution_levers,

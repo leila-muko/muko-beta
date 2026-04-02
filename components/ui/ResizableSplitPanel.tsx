@@ -14,14 +14,12 @@ interface ResizableSplitPanelProps {
   constrainToViewport?: boolean;
 }
 
-function getInitialLeftPercent(
+function getStoredLeftPercent(
   storageKey: string,
   defaultLeftPercent: number,
   minLeftPercent: number,
   maxLeftPercent: number
 ) {
-  if (typeof window === "undefined") return defaultLeftPercent;
-
   try {
     const stored = window.localStorage.getItem(storageKey);
     if (!stored) return defaultLeftPercent;
@@ -45,13 +43,15 @@ export function ResizableSplitPanel({
   className,
   constrainToViewport = true,
 }: ResizableSplitPanelProps) {
-  const [leftPercent, setLeftPercent] = useState(() =>
-    getInitialLeftPercent(storageKey, defaultLeftPercent, minLeftPercent, maxLeftPercent)
-  );
+  const [leftPercent, setLeftPercent] = useState(defaultLeftPercent);
   const [isMobile, setIsMobile] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+
+  useEffect(() => {
+    setLeftPercent(getStoredLeftPercent(storageKey, defaultLeftPercent, minLeftPercent, maxLeftPercent));
+  }, [storageKey, defaultLeftPercent, minLeftPercent, maxLeftPercent]);
 
   // Listen for mobile breakpoint
   useEffect(() => {

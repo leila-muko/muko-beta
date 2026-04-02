@@ -26,7 +26,7 @@ function buildMaterialAliases(material: MaterialLike): string[] {
   if (material.id === "organic-cotton") {
     ["organic cotton", "cotton organic"].forEach(add);
   } else if (material.id === "conventional-cotton") {
-    ["conventional cotton", "cotton"].forEach(add);
+    ["conventional cotton", "cotton", "cotton woven", "cotton poplin"].forEach(add);
   } else if (material.id === "tencel") {
     ["tencel", "lyocell", "tencel lyocell"].forEach(add);
   } else if (material.id === "rayon-viscose") {
@@ -43,6 +43,16 @@ function buildMaterialAliases(material: MaterialLike): string[] {
     ["virgin polyester", "polyester"].forEach(add);
   } else if (material.id === "vegan-leather") {
     ["vegan leather", "faux leather", "pu leather"].forEach(add);
+  } else if (material.id === "leather") {
+    ["leather", "genuine leather", "real leather"].forEach(add);
+  } else if (material.id === "linen") {
+    ["linen", "flax linen"].forEach(add);
+  } else if (material.id === "hemp") {
+    ["hemp", "hemp canvas", "hemp twill"].forEach(add);
+  } else if (material.id === "denim-conventional") {
+    ["denim", "conventional denim", "standard denim", "blue denim"].forEach(add);
+  } else if (material.id === "denim-raw-selvedge") {
+    ["raw denim", "selvedge denim", "selvedge", "raw selvedge denim", "rigid denim"].forEach(add);
   }
 
   return Array.from(aliases);

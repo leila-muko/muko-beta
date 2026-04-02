@@ -68,8 +68,105 @@ function commercialPotentialCue(score: number): SpecPulseTelemetrySignal {
   return { label: "limited pull", tone: "warning" };
 }
 
-function summaryLabel(label: string, value: string): string {
-  return `${label} ${value}`;
+function buildSpecHeadline(telemetry: SpecPulseTelemetry): PulseMicroInsight["headline"] {
+  const identityTone = telemetry.identity.tone;
+  const commercialTone = telemetry.commercial_potential.tone;
+  const executionTone = telemetry.execution.tone;
+  const executionLocked = telemetry.execution.label === "locked" || telemetry.execution.label === "pending";
+
+  if (executionLocked) {
+    return [
+      { text: "Identity is " },
+      { text: identityTone === "positive" ? "locked in" : identityTone === "warning" ? "still uneven" : "forming", tone: identityTone },
+      { text: ", commercial pull is " },
+      { text: commercialTone === "positive" ? "strong" : commercialTone === "warning" ? "limited" : "viable", tone: commercialTone },
+      { text: ", but execution is still " },
+      { text: "locked", tone: "muted" },
+      { text: "." },
+    ];
+  }
+
+  if (identityTone === "positive" && commercialTone === "positive" && executionTone === "positive") {
+    return [
+      { text: "Identity is " },
+      { text: "locked in", tone: "positive" },
+      { text: ", commercial pull is " },
+      { text: "strong", tone: "positive" },
+      { text: ", and execution is " },
+      { text: "holding", tone: "positive" },
+      { text: "." },
+    ];
+  }
+
+  if (executionTone === "warning" && commercialTone === "positive") {
+    return [
+      { text: "Identity is " },
+      { text: identityTone === "positive" ? "locked in" : "still uneven", tone: identityTone === "positive" ? "positive" : "warning" },
+      { text: ", commercial pull is " },
+      { text: "strong", tone: "positive" },
+      { text: ", but execution needs " },
+      { text: "attention", tone: "warning" },
+      { text: "." },
+    ];
+  }
+
+  if (executionTone === "warning") {
+    return [
+      { text: "Identity feels " },
+      { text: identityTone === "positive" ? "clear" : "uneven", tone: identityTone === "positive" ? "positive" : "warning" },
+      { text: ", commercial pull looks " },
+      { text: commercialTone === "warning" ? "limited" : "viable", tone: commercialTone },
+      { text: ", but execution is now " },
+      { text: "strained", tone: "warning" },
+      { text: "." },
+    ];
+  }
+
+  if (identityTone === "warning" && commercialTone === "positive" && executionTone === "positive") {
+    return [
+      { text: "Commercial pull is " },
+      { text: "strong", tone: "positive" },
+      { text: " and execution is " },
+      { text: "steady", tone: "positive" },
+      { text: ", but identity still feels " },
+      { text: "loose", tone: "warning" },
+      { text: "." },
+    ];
+  }
+
+  if (commercialTone === "warning" && identityTone === "positive") {
+    return [
+      { text: "Identity is " },
+      { text: "locked in", tone: "positive" },
+      { text: ", execution is " },
+      { text: executionTone === "positive" ? "steady" : "workable", tone: executionTone === "positive" ? "positive" : "neutral" },
+      { text: ", but commercial pull remains " },
+      { text: "limited", tone: "warning" },
+      { text: "." },
+    ];
+  }
+
+  if (identityTone === "warning" && commercialTone === "warning") {
+    return [
+      { text: "Identity still feels " },
+      { text: "loose", tone: "warning" },
+      { text: ", commercial pull is " },
+      { text: "limited", tone: "warning" },
+      { text: ", and execution is only " },
+      { text: executionTone === "positive" ? "holding" : "partly workable", tone: executionTone === "positive" ? "positive" : "neutral" },
+      { text: "." },
+    ];
+  }
+
+  return [
+    { text: "Identity feels " },
+    { text: identityTone === "positive" ? "clear" : "mixed", tone: identityTone === "positive" ? "positive" : identityTone },
+    { text: ", commercial pull looks " },
+    { text: commercialTone === "positive" ? "strong" : commercialTone === "warning" ? "limited" : "viable", tone: commercialTone },
+    { text: ", and execution is " },
+    { text: executionTone === "positive" ? "steady" : "workable", tone: executionTone === "positive" ? "positive" : executionTone },
+    { text: "." },
+  ];
 }
 
 export function buildSpecPulseTelemetry(input: SpecPulseInsightInput): SpecPulseTelemetry {
@@ -106,17 +203,7 @@ export function buildSpecPulseInsight(input: SpecPulseInsightInput): PulseMicroI
   const telemetry = buildSpecPulseTelemetry(input);
 
   return {
-    headline: [
-      {
-        text: [
-          summaryLabel("Identity", telemetry.identity.label),
-          summaryLabel("Commercial", telemetry.commercial_potential.label),
-          summaryLabel("Execution", telemetry.execution.label),
-          summaryLabel("Saturation", telemetry.saturation.label),
-        ].join(" • "),
-        tone: "neutral",
-      },
-    ],
+    headline: buildSpecHeadline(telemetry),
     cues: [
       {
         key: "identity",
@@ -129,12 +216,6 @@ export function buildSpecPulseInsight(input: SpecPulseInsightInput): PulseMicroI
         label: "Commercial Potential",
         value: telemetry.commercial_potential.label,
         tone: telemetry.commercial_potential.tone,
-      },
-      {
-        key: "market-saturation",
-        label: "Market Saturation",
-        value: telemetry.saturation.label,
-        tone: telemetry.saturation.tone,
       },
       {
         key: "execution",

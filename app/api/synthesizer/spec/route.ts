@@ -14,6 +14,7 @@ import {
   determineSpecMode,
   buildSpecFallbackRail,
   parseSpecRailOutput,
+  repairSpecRailOutput,
   validateSpecRailOutput,
 } from '@/lib/synthesizer/specInsight';
 import { mapSpecRailToInsightData } from '@/lib/synthesizer/specDecision';
@@ -91,14 +92,15 @@ export async function POST(req: NextRequest) {
         // Parse v7.0 JSON output and emit complete event
         try {
           const parsed = parseSpecRailOutput(accumulated);
-          if (!parsed || !validateSpecRailOutput(parsed, blackboard)) {
+          const repaired = parsed ? repairSpecRailOutput(parsed, blackboard) : null;
+          if (!repaired || !validateSpecRailOutput(repaired, blackboard)) {
             console.warn('[SpecRoute] Invalid JSON in response, emitting fallback');
             emit('fallback', JSON.stringify(makeFallback(blackboard)));
             return;
           }
 
-          const data = mapSpecRailToInsightData(parsed, mode);
-          emit('complete', JSON.stringify({ rail: parsed, data, meta: { method: 'llm', latency_ms: 0 } }));
+          const data = mapSpecRailToInsightData(repaired, mode);
+          emit('complete', JSON.stringify({ rail: repaired, data, meta: { method: 'llm', latency_ms: 0 } }));
         } catch {
           emit('fallback', JSON.stringify(makeFallback(blackboard)));
         }

@@ -112,7 +112,10 @@ export async function POST(req: NextRequest) {
             editLabel: 'POSITIONING',
             decision_guidance: {
               recommended_direction: parsed.decision_guidance.recommended_direction,
-              commitment_signal: parsed.decision_guidance.commitment_signal,
+              commitment_signal:
+                parsed.decision_guidance.commitment_signal === 'Confirm Direction'
+                  ? 'Increase Investment'
+                  : parsed.decision_guidance.commitment_signal,
               execution_levers: normalizedExecutionLevers.length > 0
                 ? normalizedExecutionLevers
                 : buildFallbackDecisionGuidance(blackboard, mode).execution_levers,

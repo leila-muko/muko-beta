@@ -1290,6 +1290,7 @@ export default function ConceptStudioPage() {
     score: number;
     dimensions: Record<string, number> | null;
     collection_role: string | null;
+    collection_aesthetic: string | null;
     category: string | null;
     silhouette: string | null;
     aesthetic_matched_id: string | null;
@@ -1303,6 +1304,7 @@ export default function ConceptStudioPage() {
     if (lockedCollectionAesthetic || isAestheticSelectionUnlocked || collectionPieces.length === 0) return;
     const inferredCollectionAesthetic =
       storeCollectionAesthetic ??
+      collectionPieces.find((piece) => piece.collection_aesthetic)?.collection_aesthetic ??
       collectionPieces.find((piece) => piece.aesthetic_matched_id)?.aesthetic_matched_id ??
       null;
     if (!inferredCollectionAesthetic) return;
@@ -1770,6 +1772,7 @@ export default function ConceptStudioPage() {
             .select('*')
             .eq('collection_name', collectionName)
             .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
         : Promise.resolve({ data: [], error: null });
 
       Promise.all([brandProfilePromise, collectionPiecesPromise]).then(
@@ -1781,6 +1784,7 @@ export default function ConceptStudioPage() {
             score: number;
             dimensions: Record<string, number> | null;
             collection_role: string | null;
+            collection_aesthetic: string | null;
             category: string | null;
             silhouette: string | null;
             aesthetic_matched_id: string | null;
@@ -1795,6 +1799,7 @@ export default function ConceptStudioPage() {
             score: number;
             dimensions: Record<string, number> | null;
             collection_role: string | null;
+            collection_aesthetic: string | null;
             category: string | null;
             silhouette: string | null;
             aesthetic_matched_id: string | null;
@@ -1816,6 +1821,7 @@ export default function ConceptStudioPage() {
               score: number;
               dimensions: Record<string, number> | null;
               collection_role: string | null;
+              collection_aesthetic: string | null;
               category: string | null;
               silhouette: string | null;
               aesthetic_matched_id: string | null;
@@ -2243,14 +2249,24 @@ export default function ConceptStudioPage() {
           data: { user },
         } = await supabase.auth.getUser();
 
-        await supabase
+        const { data: latestAnalysis } = await supabase
           .from("analyses")
-          .update({
-            collection_aesthetic: selectedAestheticSlug,
-            aesthetic_inflection: aestheticInflection.trim() || null,
-          })
           .eq("user_id", user?.id ?? "")
-          .eq("collection_name", storeCollectionName);
+          .eq("collection_name", storeCollectionName)
+          .select("id")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestAnalysis?.id) {
+          await supabase
+            .from("analyses")
+            .update({
+              collection_aesthetic: selectedAestheticSlug,
+              aesthetic_inflection: aestheticInflection.trim() || null,
+            })
+            .eq("id", latestAnalysis.id);
+        }
       } catch {
         // Local state remains the source of truth if this best-effort write fails.
       }
@@ -2750,6 +2766,7 @@ export default function ConceptStudioPage() {
     });
   }, [combinedDirection, selectedAestheticData?.palette_options]);
   const [showAllInterpretationSuggestions, setShowAllInterpretationSuggestions] = useState(false);
+  const [showAllExpressionSignals, setShowAllExpressionSignals] = useState(false);
   const [currentStageState, setCurrentStageState] = useState<ConceptStageId>(
     () => (Object.keys(pieceRolesById).length > 0 ? "language" : "direction")
   );
@@ -2765,7 +2782,11 @@ export default function ConceptStudioPage() {
   }, [isSubsequentPiece]);
   const visibleInterpretationSuggestions = showAllInterpretationSuggestions ? interpretationSuggestions : interpretationSuggestions.slice(0, 4);
   const hiddenInterpretationSuggestionCount = Math.max(interpretationSuggestions.length - visibleInterpretationSuggestions.length, 0);
-  const visibleSignals = topDisplayChips;
+  useEffect(() => {
+    setShowAllExpressionSignals(false);
+  }, [selectedAesthetic, aestheticInflection, selectedInterpretationChips, topDisplayChips.length]);
+  const visibleSignals = showAllExpressionSignals ? topDisplayChips : topDisplayChips.slice(0, 9);
+  const hiddenSignalCount = Math.max(topDisplayChips.length - visibleSignals.length, 0);
   const expressionSelectionCount = topDisplayChips.reduce((count, chip) => {
     const chipKey = `${topAesthetic}::${chip.label}`;
     return selectedElements.has(chipKey) ? count + 1 : count;
@@ -3886,6 +3907,28 @@ export default function ConceptStudioPage() {
                                       );
                                     })}
                                   </div>
+                                  {hiddenSignalCount > 0 && (
+                                    <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-start" }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowAllExpressionSignals(true)}
+                                        style={{
+                                          height: 32,
+                                          padding: "0 14px",
+                                          borderRadius: 999,
+                                          border: "1px solid rgba(67,67,43,0.08)",
+                                          background: "rgba(255,255,255,0.36)",
+                                          color: "rgba(67,67,43,0.58)",
+                                          fontFamily: inter,
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        Show more
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               )}
 
@@ -4083,6 +4126,28 @@ export default function ConceptStudioPage() {
                                       );
                                     })}
                                   </div>
+                                  {hiddenSignalCount > 0 && (
+                                    <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-start" }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowAllExpressionSignals(true)}
+                                        style={{
+                                          height: 32,
+                                          padding: "0 14px",
+                                          borderRadius: 999,
+                                          border: "1px solid rgba(67,67,43,0.08)",
+                                          background: "rgba(255,255,255,0.36)",
+                                          color: "rgba(67,67,43,0.58)",
+                                          fontFamily: inter,
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        Show more
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               )}
 

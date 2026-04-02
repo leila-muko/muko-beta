@@ -42,11 +42,13 @@ import type { PulseChipProps } from "@/components/ui/PulseChip";
 import type { InsightData, SpecInsightMode } from "@/lib/types/insight";
 import { buildReportBlackboard, buildSpecBlackboard } from "@/lib/synthesizer/assemble";
 import {
+  assessViability,
   buildFallbackSpecRail,
   deriveSpecDiagnostics,
   shouldShowBetterPath,
   shouldShowFeasibilityTension,
   type SpecRailInsight,
+  type ViabilityState,
 } from "@/lib/synthesizer/specDecision";
 import { buildAnalysisRow, AGENT_VERSIONS } from "@/lib/agents/orchestrator-shared";
 import type { PipelineBlackboard, AnalysisResult as AnalysisResultOrch } from "@/lib/agents/orchestrator-shared";
@@ -219,7 +221,7 @@ function getMissingSchemaColumn(error: unknown) {
 
 function getAlternativePathDimension(rail: import('@/lib/synthesizer/specDecision').SpecRailInsight | null): 'material' | 'construction' | 'execution' | null {
   if (!rail) return null;
-  if (rail.alternative_path.dimension) return rail.alternative_path.dimension;
+  if (rail.alternative_path?.dimension) return rail.alternative_path.dimension;
   // Fallback: derive from decision direction
   const dir = rail.decision.direction;
   if (dir === 'swap_material') return 'material';
@@ -260,6 +262,7 @@ function resolveBetterPathMaterialCandidate(
   currentMaterialId: string,
 ): Material | null {
   if (!rail || getAlternativePathDimension(rail) !== 'material') return null;
+  if (!rail.alternative_path) return null;
 
   const source = `${rail.alternative_path.title} ${rail.alternative_path.description}`;
   const exact = resolveMaterialMention(source, materials);
@@ -949,7 +952,7 @@ function SpecStudioPageContent() {
   const searchParams = useSearchParams();
   const previousMaterialIdRef = useRef<string | null>(null);
   const materialDeltaTimeoutRef = useRef<number | null>(null);
-  const { setCategory, setSubcategory: setStoreSubcategory, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setSelectedKeyPiece, setActiveProductPieceId, setPieceBuildContext, setCollectionName, setSeason, setActiveCollection } = useSessionStore();
+  const { setCategory, setSubcategory: setStoreSubcategory, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setSelectedKeyPiece, setActiveProductPieceId, setPieceBuildContext, setCollectionName, setSeason, setActiveCollection, setTargetMsrp } = useSessionStore();
   const previousMaterialId = useSessionStore((s) => s.previousMaterialId);
   // parent_analysis_id — deferred to Phase 2
   const categories: Category[] = categoriesData.categories as unknown as Category[];
@@ -1005,7 +1008,6 @@ function SpecStudioPageContent() {
   const [materialCategory, setMaterialCategory] = useState<string>("all");
   const [hoveredComplexity, setHoveredComplexity] = useState<ConstructionTier | null>(null);
   const [constructionConfirmed, setConstructionConfirmed] = useState(false);
-  const [showAllMaterials, setShowAllMaterials] = useState(false);
   const [specStep, setSpecStep] = useState<"material" | "construction">("material");
   const [specStepDirection, setSpecStepDirection] = useState<1 | -1>(1);
   const [executionNotes, setExecutionNotes] = useState<string[]>([]);
@@ -2586,6 +2588,34 @@ function SpecStudioPageContent() {
   const displayLeadTime = selectedMaterial ? `${selectedMaterial.lead_time_weeks} weeks` : "—";
   const displayEstimatedCogs = insight ? `$${insight.cogs}` : "—";
   const marginBuffer = insight ? insight.ceiling - insight.cogs : null;
+  const viabilityState: ViabilityState | null = useMemo(() => {
+    if (!insight || !hasValidTargetMSRP || !resolvedTargetMsrp) return null;
+    const currentMaterial = materials.find((m) => m.id === materialId);
+    if (!currentMaterial) return null;
+
+    return assessViability(
+      {
+        category: categoryId || selectedCategory?.name || "",
+        constructionTier: constructionTier ?? "moderate",
+        cogsUsd: insight.cogs,
+        targetMsrp: resolvedTargetMsrp,
+        targetMargin: brandTargetMargin,
+        materialCostPerYard: currentMaterial.cost_per_yard,
+        currentMaterialId: currentMaterial.id,
+      },
+      materials
+    );
+  }, [
+    insight,
+    hasValidTargetMSRP,
+    resolvedTargetMsrp,
+    materials,
+    materialId,
+    categoryId,
+    selectedCategory?.name,
+    constructionTier,
+    brandTargetMargin,
+  ]);
   const activeRole = pieceBuildContext?.role ?? storeCollectionRole;
   const selectedMaterialProperties = useMemo(
     () => getMaterialProperties(selectedMaterial),
@@ -2718,7 +2748,7 @@ function SpecStudioPageContent() {
       : recommendedMaterialId;
 
   const betterPathTargetTier = useMemo((): ConstructionTier | null => {
-    if (!activeSpecRail || betterPathDimension !== 'construction') return null;
+    if (!activeSpecRail || !activeSpecRail.alternative_path || betterPathDimension !== 'construction') return null;
     return activeSpecRail.alternative_path.target_tier
       ?? resolveBetterPathConstructionTier(
            activeSpecRail.alternative_path.title,
@@ -2728,7 +2758,7 @@ function SpecStudioPageContent() {
   }, [activeSpecRail, betterPathDimension, constructionTier]);
 
   const betterPathMethod = useMemo((): string | null => {
-    if (!activeSpecRail || betterPathDimension !== 'construction') return null;
+    if (!activeSpecRail || !activeSpecRail.alternative_path || betterPathDimension !== 'construction') return null;
     return activeSpecRail.alternative_path.method
       ?? (betterPathTargetTier ? `${betterPathTargetTier} complexity` : 'simplified construction');
   }, [activeSpecRail, betterPathDimension, betterPathTargetTier]);
@@ -2748,15 +2778,11 @@ function SpecStudioPageContent() {
 
   const displayCogs = insight ? `$${insight.cogs}` : "—";
   const executionSubLabel = selectedMaterial
-    ? [
-        timelineStatus === "red"
-          ? "Timeline Risk"
-          : timelineStatus === "yellow"
-            ? "Timeline Tight"
-            : "Timeline Stable",
-        `Score ${executionScore}`,
-        `COGS ${displayCogs}`,
-      ].join(" · ")
+    ? timelineStatus === "red"
+      ? "Timeline at risk"
+      : timelineStatus === "yellow"
+        ? "Timeline is tight"
+        : "Timeline stable"
     : "Select a material to activate execution.";
   const specPulseTelemetry = useMemo(() => buildSpecPulseTelemetry({
     commercialPotentialScore,
@@ -2806,7 +2832,7 @@ function SpecStudioPageContent() {
       numericPercent: executionScore,
       scoreColor: executionColor,
       pill: executionChipData ? { variant: executionChipData.variant, label: executionChipData.status } : null,
-      subLabel: `Signal ${specPulseTelemetry.execution.label} · ${executionSubLabel}`,
+      subLabel: executionSubLabel,
       whatItMeans: "Execution telemetry tracks how much production pressure the current material, construction, cost, and calendar are creating.",
       howCalculated: "Derived from cost gate status, timeline feasibility, and the selected build path.",
       isPending: !selectedMaterial,
@@ -2922,6 +2948,7 @@ function SpecStudioPageContent() {
     setBetterPathApplyMessage(null);
 
     const actionableDimension = getAlternativePathDimension(activeSpecRail);
+    if (!activeSpecRail.alternative_path) return;
 
     const nextNote = `${activeSpecRail.alternative_path.title}: ${activeSpecRail.alternative_path.description}`;
     const nextNotes = Array.from(new Set([...executionNotes, nextNote]));
@@ -3491,7 +3518,7 @@ function SpecStudioPageContent() {
                       return (
                         <button
                           key={cat}
-                          onClick={() => { setMaterialCategory(cat); setShowAllMaterials(false); }}
+                          onClick={() => { setMaterialCategory(cat); }}
                           style={{ padding: "4px 10px", borderRadius: 999, fontSize: 10.5, fontWeight: isActive ? 600 : 500, fontFamily: inter, cursor: "pointer", border: "1px solid rgba(67,67,43,0.07)", background: isActive ? "rgba(245,242,235,0.9)" : "transparent", color: isActive ? "rgba(67,67,43,0.72)" : "rgba(67,67,43,0.44)" }}
                         >
                           {label}
@@ -3503,7 +3530,6 @@ function SpecStudioPageContent() {
                   <div className="specMaterialGrid">
                     {materials
                       .filter((mat) => materialCategory === "all" || MATERIAL_CATEGORY_MAP[mat.id] === materialCategory)
-                      .slice(0, showAllMaterials ? undefined : 6)
                       .map((mat) => {
                         const isSel = materialId === mat.id;
                         const isRecommended = mat.id === displayRecommendedMaterialId;
@@ -3560,14 +3586,6 @@ function SpecStudioPageContent() {
                         );
                       })}
                   </div>
-                  {!showAllMaterials && materials.filter((mat) => materialCategory === "all" || MATERIAL_CATEGORY_MAP[mat.id] === materialCategory).length > 6 && (
-                    <button
-                      onClick={() => setShowAllMaterials(true)}
-                      style={{ marginTop: 10, background: "none", border: "none", padding: 0, fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.48)", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
-                    >
-                      Show all materials
-                    </button>
-                  )}
                   <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
                     <button
                       onClick={() => {
@@ -3608,9 +3626,17 @@ function SpecStudioPageContent() {
                         const isSel = constructionConfirmed && constructionTier === tier;
                         const isRec = tier === baselineComplexity;
                         return (
-                          <button
+                          <div
                             key={tier}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => handleComplexityChange(tier)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleComplexityChange(tier);
+                              }
+                            }}
                             onMouseEnter={() => setHoveredComplexity(tier)}
                             onMouseLeave={() => setHoveredComplexity(null)}
                             style={{
@@ -3639,10 +3665,19 @@ function SpecStudioPageContent() {
                             </div>
                             {betterPathDimension === "construction" && betterPathTargetTier === tier && betterPathMethod && (
                               <div style={{ marginTop: 10 }}>
-                                <button
+                                <span
+                                  role="button"
+                                  tabIndex={0}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setConstructionMethod(constructionMethod === betterPathMethod ? null : betterPathMethod);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setConstructionMethod(constructionMethod === betterPathMethod ? null : betterPathMethod);
+                                    }
                                   }}
                                   style={{
                                     display: "inline-flex",
@@ -3666,12 +3701,12 @@ function SpecStudioPageContent() {
                                         }),
                                   }}
                                 >
-                                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#B8876B", flexShrink: 0 }} />
-                                  {betterPathMethod}
-                                </button>
+                                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#A97B8F", flexShrink: 0 }} />
+                                  <span style={{ color: "#A97B8F", fontWeight: 600 }}>Better Path</span>
+                                </span>
                               </div>
                             )}
-                          </button>
+                          </div>
                         );
                       })}
                     </div>
@@ -3927,96 +3962,264 @@ function SpecStudioPageContent() {
               </section>
             )}
 
-            {showBetterPath && activeSpecRail && (
+            {((showBetterPath && activeSpecRail) || viabilityState?.state === "reprice" || viabilityState?.state === "not_viable") && (
               <>
                 <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
                 <section style={{ marginBottom: 24 }}>
-                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>Better path</div>
-                  {specStep === "material" && executionScore >= 75 ? (
-                    <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.56)", lineHeight: 1.58 }}>
-                      Material selection is working. No swap suggested.
-                    </div>
+                  {viabilityState?.state === "reprice" && selectedMaterial ? (
+                    <>
+                      <div style={{ fontFamily: inter, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9A9187", fontWeight: 500, marginBottom: 14 }}>Better path</div>
+                      <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 500, color: "#4D302F", lineHeight: 1.35, marginBottom: 12 }}>
+                        Material is right. The margin gap is a pricing problem, not a construction problem.
+                      </div>
+                      <div style={{ background: "#F5F2EC", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
+                        <div style={{ fontFamily: inter, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9A9187", fontWeight: 500, marginBottom: 8 }}>Target MSRP</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ fontFamily: sohne, fontSize: 15, fontWeight: 500, color: "#9A9187", textDecoration: "line-through" }}>${viabilityState.currentMsrp}</span>
+                          <span style={{ fontFamily: inter, fontSize: 14, color: "#9A9187" }}>→</span>
+                          <span style={{ fontFamily: sohne, fontSize: 18, fontWeight: 500, color: "#4D302F" }}>${viabilityState.suggestedMsrp}</span>
+                        </div>
+                        <div style={{ fontFamily: inter, fontSize: 12, color: "#9A9187", marginTop: 6 }}>
+                          Closes the margin gap at {Math.round(brandTargetMargin * 100)}%. Keeps {selectedMaterial.name} and {constructionTier ?? "moderate"} intact.
+                        </div>
+                      </div>
+                      <div style={{ fontFamily: inter, fontSize: 13, color: "#7A6E66", lineHeight: 1.6, marginBottom: 10 }}>
+                        {alternativeMaterial
+                          ? `If $${viabilityState.suggestedMsrp} exceeds your customer's ceiling, the material swap path is still open: ${alternativeMaterial.name} closes $${Math.round((selectedMaterial.cost_per_yard - alternativeMaterial.cost_per_yard) * 2.5)} of the gap and preserves the surface character.`
+                          : `If $${viabilityState.suggestedMsrp} exceeds your customer's ceiling, the material swap path is still open if a lower-cost material with similar surface behavior becomes acceptable.`}
+                      </div>
+                      <div style={{ fontFamily: inter, fontSize: 11, color: "#B8A89E", lineHeight: 1.6, marginBottom: 14 }}>
+                        Applies on pricing · or return to material
+                      </div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        <button
+                          onClick={() => setTargetMsrp(viabilityState.suggestedMsrp)}
+                          style={{
+                            background: "#4D302F",
+                            color: "#F9F7F4",
+                            border: "none",
+                            borderRadius: 8,
+                            padding: "10px 14px",
+                            fontFamily: inter,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Update MSRP to ${viabilityState.suggestedMsrp}
+                        </button>
+                        <button
+                          style={{
+                            background: "transparent",
+                            color: "#7A6E66",
+                            border: "0.5px solid #C8C0B8",
+                            borderRadius: 8,
+                            padding: "10px 14px",
+                            fontFamily: inter,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Keep current pricing
+                        </button>
+                      </div>
+                    </>
+                  ) : viabilityState?.state === "not_viable" ? (
+                    <>
+                      <div style={{ fontFamily: inter, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9A9187", fontWeight: 500, marginBottom: 14 }}>Viability assessment</div>
+                      <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 500, color: "#4D302F", lineHeight: 1.35, marginBottom: 12 }}>
+                        All three levers have been applied. The gap does not close.
+                      </div>
+                      <div style={{ background: "#F5EDE8", borderRadius: 8, padding: "12px 14px", marginBottom: 14, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#B8876B", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+                            <path d="M2 2L8 8M8 2L2 8" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                        </div>
+                        <div style={{ fontFamily: inter, fontSize: 13, color: "#6B3A25", lineHeight: 1.5 }}>
+                          This piece cannot be made viable within your current collection constraints. Muko has assessed all available levers below.
+                        </div>
+                      </div>
+                      <div style={{ border: "0.5px solid #E0DAD4", borderRadius: 12, background: "#F9F7F4", marginBottom: 14 }}>
+                        {viabilityState.levers.map((lever, index) => {
+                          const statusStyle =
+                            lever.status === "exhausted"
+                              ? { background: "#EDE8E6", color: "#7A5050" }
+                              : lever.status === "partial"
+                                ? { background: "#F0EDE6", color: "#7A5A2A" }
+                                : { background: "#EAF0E8", color: "#3B6011" };
+                          return (
+                            <div
+                              key={lever.lever}
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr auto auto",
+                                gap: 10,
+                                alignItems: "center",
+                                padding: "12px 14px",
+                                borderBottom: index === viabilityState.levers.length - 1 ? "none" : "0.5px solid #F0EAE5",
+                              }}
+                            >
+                              <div style={{ fontFamily: inter, fontSize: 12, color: "#7A6E66", textTransform: "capitalize" }}>{lever.lever}</div>
+                              <span style={{ ...statusStyle, fontFamily: inter, fontSize: 11, borderRadius: 20, padding: "3px 10px", whiteSpace: "nowrap" }}>{lever.status}</span>
+                              <div style={{ fontFamily: inter, fontSize: 12, color: "#B8A89E", textAlign: "right", whiteSpace: "nowrap" }}>${lever.deltaUsd}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ borderTop: "0.5px solid #E0DAD4", paddingTop: 14 }}>
+                        <div style={{ fontFamily: inter, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9A9187", fontWeight: 500, marginBottom: 12 }}>Your options</div>
+                        {[
+                          "Keep as a collection anchor if editorial impact justifies the loss. Price to recover on simpler pieces.",
+                          "Replace with a piece that carries the same aesthetic signal at a buildable cost structure.",
+                          "Defer to next season when timeline pressure is not compounding the cost gap.",
+                        ].map((item) => (
+                          <div key={item} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 10 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#CDAAB3", flexShrink: 0, marginTop: 6 }} />
+                            <span style={{ fontFamily: inter, fontSize: 13, color: "#7A6E66", lineHeight: 1.5 }}>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12, marginBottom: 10 }}>
+                        <button
+                          style={{
+                            background: "#4D302F",
+                            color: "#F9F7F4",
+                            border: "none",
+                            borderRadius: 8,
+                            padding: "10px 14px",
+                            fontFamily: inter,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Find a replacement piece
+                        </button>
+                        <button
+                          style={{
+                            background: "transparent",
+                            color: "#7A6E66",
+                            border: "0.5px solid #C8C0B8",
+                            borderRadius: 8,
+                            padding: "10px 14px",
+                            fontFamily: inter,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Keep as anchor
+                        </button>
+                      </div>
+                      <button
+                        style={{
+                          width: "100%",
+                          background: "transparent",
+                          color: "#B8876B",
+                          border: "0.5px solid #D4B4A4",
+                          borderRadius: 8,
+                          padding: "10px 14px",
+                          fontFamily: inter,
+                          fontSize: 13,
+                          fontWeight: 500,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Remove from collection
+                      </button>
+                    </>
                   ) : (
                     <>
-                      <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: "#191919", marginBottom: 8 }}>
-                        {activeSpecRail.alternative_path.title}
-                      </div>
-                      <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58 }}>
-                        {activeSpecRail.alternative_path.description}
-                      </div>
-                      {betterPathDimension === "construction" ? (
-                        <div style={{ marginTop: 10, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.44)", lineHeight: 1.5 }}>
-                          Applies on Construction tab
+                      <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>Better path</div>
+                      {specStep === "material" && executionScore >= 75 ? (
+                        <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.56)", lineHeight: 1.58 }}>
+                          Material selection is working. No swap suggested.
                         </div>
                       ) : (
                         <>
-                          <button
-                            onClick={() => setShowBetterPathConfirm(true)}
-                            style={{
-                              marginTop: 12,
-                              padding: "7px 14px",
-                              borderRadius: 999,
-                              border: "1px solid rgba(67,67,43,0.25)",
-                              background: "transparent",
-                              color: "#43432B",
-                              fontFamily: inter,
-                              fontSize: 11,
-                              fontWeight: 500,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Apply
-                          </button>
-                          {showBetterPathConfirm ? (
-                            <div style={{ marginTop: 12 }}>
-                              <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.7)", lineHeight: 1.58, marginBottom: 10 }}>
-                                {betterPathDimension === "material"
-                                  ? betterPathMaterial
-                                    ? `This will switch the material to ${betterPathMaterial.name}. Apply better path?`
-                                    : "This will try to switch to the recommended library material. Apply better path?"
-                                  : "This will update your construction detail. Apply better path?"}
-                              </div>
-                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                <button
-                                  onClick={() => { void handleConfirmBetterPath(); }}
-                                  style={{
-                                    padding: "8px 16px",
-                                    borderRadius: 999,
-                                    border: "none",
-                                    background: "#191919",
-                                    color: "#FFFFFF",
-                                    fontFamily: inter,
-                                    fontSize: 11,
-                                    fontWeight: 500,
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  Confirm
-                                </button>
-                                <button
-                                  onClick={() => setShowBetterPathConfirm(false)}
-                                  style={{
-                                    padding: "7px 14px",
-                                    borderRadius: 999,
-                                    border: "1px solid rgba(67,67,43,0.25)",
-                                    background: "transparent",
-                                    color: "#43432B",
-                                    fontFamily: inter,
-                                    fontSize: 11,
-                                    fontWeight: 500,
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
+                          <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: "#191919", marginBottom: 8 }}>
+                            {activeSpecRail?.alternative_path?.title}
+                          </div>
+                          <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58 }}>
+                            {activeSpecRail?.alternative_path?.description}
+                          </div>
+                          {betterPathDimension === "construction" ? (
+                            <div style={{ marginTop: 10, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.44)", lineHeight: 1.5 }}>
+                              Applies on Construction tab
                             </div>
-                          ) : null}
-                          {betterPathApplyMessage ? (
-                            <div style={{ marginTop: 10, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.56)", lineHeight: 1.5 }}>
-                              {betterPathApplyMessage}
-                            </div>
-                          ) : null}
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => setShowBetterPathConfirm(true)}
+                                style={{
+                                  marginTop: 12,
+                                  padding: "7px 14px",
+                                  borderRadius: 999,
+                                  border: "1px solid rgba(67,67,43,0.25)",
+                                  background: "transparent",
+                                  color: "#43432B",
+                                  fontFamily: inter,
+                                  fontSize: 11,
+                                  fontWeight: 500,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Apply
+                              </button>
+                              {showBetterPathConfirm ? (
+                                <div style={{ marginTop: 12 }}>
+                                  <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.7)", lineHeight: 1.58, marginBottom: 10 }}>
+                                    {betterPathDimension === "material"
+                                      ? betterPathMaterial
+                                        ? `This will switch the material to ${betterPathMaterial.name}. Apply better path?`
+                                        : "This will try to switch to the recommended library material. Apply better path?"
+                                      : "This will update your construction detail. Apply better path?"}
+                                  </div>
+                                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                    <button
+                                      onClick={() => { void handleConfirmBetterPath(); }}
+                                      style={{
+                                        padding: "8px 16px",
+                                        borderRadius: 999,
+                                        border: "none",
+                                        background: "#191919",
+                                        color: "#FFFFFF",
+                                        fontFamily: inter,
+                                        fontSize: 11,
+                                        fontWeight: 500,
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      Confirm
+                                    </button>
+                                    <button
+                                      onClick={() => setShowBetterPathConfirm(false)}
+                                      style={{
+                                        padding: "7px 14px",
+                                        borderRadius: 999,
+                                        border: "1px solid rgba(67,67,43,0.25)",
+                                        background: "transparent",
+                                        color: "#43432B",
+                                        fontFamily: inter,
+                                        fontSize: 11,
+                                        fontWeight: 500,
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : null}
+                              {betterPathApplyMessage ? (
+                                <div style={{ marginTop: 10, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.56)", lineHeight: 1.5 }}>
+                                  {betterPathApplyMessage}
+                                </div>
+                              ) : null}
+                            </>
+                          )}
                         </>
                       )}
                     </>

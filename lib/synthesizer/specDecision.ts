@@ -1,4 +1,5 @@
 import type { InsightData, InsightMode } from '@/lib/types/insight';
+import type { Material } from '@/lib/types/spec-studio';
 
 export type SpecPrimaryCarrier = 'material' | 'silhouette' | 'construction' | 'finish';
 export type SpecBurdenLevel = 'light' | 'moderate' | 'heavy';
@@ -67,7 +68,7 @@ export interface SpecRailInsight {
     dimension?: 'material' | 'construction' | 'execution';
     target_tier?: 'low' | 'moderate' | 'high';
     method?: string;
-  };
+  } | null;
 }
 
 export interface DeriveSpecDiagnosticsInput {
@@ -109,6 +110,134 @@ export interface SpecFallbackContext {
   resolved_redirects?: {
     cost_reduction?: { material_id: string; reason: string } | null;
   };
+}
+
+export type LeverAssessment = {
+  lever: 'construction' | 'material' | 'reprice'
+  status: 'exhausted' | 'partial' | 'available'
+  deltaUsd: number
+  note: string
+}
+
+export type ViabilityState =
+  | { state: 'viable' }
+  | { state: 'reprice'; currentMsrp: number; suggestedMsrp: number; gapUsd: number }
+  | { state: 'not_viable'; levers: LeverAssessment[] }
+
+const CONSTRUCTION_FLOOR: Record<string, 'low' | 'moderate' | 'high'> = {
+  jacket: 'moderate',
+  coat: 'moderate',
+  trench: 'moderate',
+  parka: 'moderate',
+  'puffer jacket': 'moderate',
+  'leather jacket': 'moderate',
+  'denim jacket': 'moderate',
+  outerwear: 'moderate',
+  blazer: 'moderate',
+  'suit jacket': 'moderate',
+  'structured dress': 'moderate',
+  'shirt dress': 'moderate',
+  tee: 'low',
+  't-shirt': 'low',
+  tank: 'low',
+  shorts: 'low',
+  'basic knit': 'low',
+  leggings: 'low',
+};
+
+const CONSTRUCTION_TIER_RANK: Record<string, number> = {
+  low: 0,
+  moderate: 1,
+  high: 2,
+};
+
+export function getConstructionFloor(category: string): 'low' | 'moderate' | 'high' {
+  const normalized = category.toLowerCase().trim();
+  return CONSTRUCTION_FLOOR[normalized] ?? 'low';
+}
+
+export function isBelowConstructionFloor(
+  category: string,
+  targetTier: string
+): boolean {
+  const floor = getConstructionFloor(category);
+  return (CONSTRUCTION_TIER_RANK[targetTier] ?? 0) < (CONSTRUCTION_TIER_RANK[floor] ?? 0);
+}
+
+export function assessViability(
+  ctx: {
+    category: string
+    constructionTier: string
+    cogsUsd: number
+    targetMsrp: number
+    targetMargin: number
+    materialCostPerYard: number
+    currentMaterialId: string
+  },
+  materials: Material[]
+): ViabilityState {
+  const marginCeiling = ctx.targetMsrp * (1 - ctx.targetMargin);
+  const gap = ctx.cogsUsd - marginCeiling;
+
+  if (gap <= 0) return { state: 'viable' };
+
+  const maxMsrp = ctx.targetMsrp * 1.25;
+  const requiredMsrp = ctx.cogsUsd / (1 - ctx.targetMargin);
+  if (requiredMsrp <= maxMsrp) {
+    return {
+      state: 'reprice',
+      currentMsrp: ctx.targetMsrp,
+      suggestedMsrp: Math.ceil(requiredMsrp / 5) * 5,
+      gapUsd: gap,
+    };
+  }
+
+  const isStructurallyNotViable = gap > 75 && gap / ctx.targetMsrp > 0.18;
+  if (!isStructurallyNotViable) return { state: 'viable' };
+
+  const levers: LeverAssessment[] = [];
+  const atFloor = isBelowConstructionFloor(ctx.category, 'low') ||
+    ctx.constructionTier === getConstructionFloor(ctx.category);
+  levers.push({
+    lever: 'construction',
+    status: atFloor ? 'exhausted' : 'partial',
+    deltaUsd: atFloor ? 0 : Math.round(gap * 0.3),
+    note: atFloor
+      ? `${ctx.constructionTier} is the minimum viable tier for ${ctx.category}`
+      : `Dropping to ${getConstructionFloor(ctx.category)} recovers partial margin`,
+  });
+
+  const cheaper = materials
+    .filter((m) => m.id !== ctx.currentMaterialId && m.cost_per_yard < ctx.materialCostPerYard)
+    .sort((a, b) => b.cost_per_yard - a.cost_per_yard)[0];
+
+  if (cheaper) {
+    const materialDelta = Math.round(
+      (ctx.materialCostPerYard - cheaper.cost_per_yard) * 2.5
+    );
+    levers.push({
+      lever: 'material',
+      status: materialDelta >= gap ? 'available' : 'partial',
+      deltaUsd: materialDelta,
+      note: `${cheaper.name} closes $${materialDelta} of the gap`,
+    });
+  } else {
+    levers.push({
+      lever: 'material',
+      status: 'exhausted',
+      deltaUsd: 0,
+      note: 'No cheaper material available for this category',
+    });
+  }
+
+  levers.push({
+    lever: 'reprice',
+    status: 'exhausted',
+    deltaUsd: gap,
+    note: `Closing the gap requires $${Math.ceil(requiredMsrp)} — exceeds 25% reprice ceiling`,
+  });
+
+  return { state: 'not_viable', levers };
 }
 
 const CARRIER_ORDER: SpecPrimaryCarrier[] = ['material', 'silhouette', 'construction', 'finish'];
@@ -413,7 +542,7 @@ function leverSet(ctx: SpecFallbackContext): [string, string, string] {
   return [levers[0], levers[1], levers[2]];
 }
 
-function buildAlternativePath(ctx: SpecFallbackContext, stance: SpecFeasibilityStance): { title: string; description: string; dimension?: 'material' | 'construction' | 'execution'; target_tier?: 'low' | 'moderate' | 'high'; method?: string } {
+function buildAlternativePath(ctx: SpecFallbackContext, stance: SpecFeasibilityStance): { title: string; description: string; dimension?: 'material' | 'construction' | 'execution'; target_tier?: 'low' | 'moderate' | 'high'; method?: string } | null {
   const d = ctx.diagnostics;
   const materialName = ctx.material_name ?? 'the current material';
   const cheaperMaterial = ctx.resolved_redirects?.cost_reduction?.material_id?.replace(/-/g, ' ');
@@ -430,6 +559,9 @@ function buildAlternativePath(ctx: SpecFallbackContext, stance: SpecFeasibilityS
     case 'downgrade_construction': {
       const currentTier = (ctx.construction_tier ?? 'moderate') as 'low' | 'moderate' | 'high';
       const targetTier: 'low' | 'moderate' | 'high' = currentTier === 'high' ? 'moderate' : 'low';
+      if (isBelowConstructionFloor(ctx.category ?? '', targetTier)) {
+        return null;
+      }
       return {
         title: 'Keep the read, remove one layer of build',
         description: `Preserve ${materialName} and the current proportion, but take the construction down one tier. Concentrating precision in the visible areas keeps the idea intact with less sampling drag.`,
@@ -478,6 +610,7 @@ export function buildFallbackSpecRail(ctx: SpecFallbackContext): SpecRailInsight
   const materialName = ctx.material_name ?? 'the selected material';
   const availableWeeks = ctx.timeline_weeks;
   const requiredWeeks = ctx.required_timeline_weeks ?? Math.max(0, availableWeeks - (ctx.timeline_gap_weeks ?? 0));
+  const alternativePath = buildAlternativePath(ctx, stance);
   const headline = `${normalizeHeadlineLabel(stance)}: ${carrierPhrase(diagnostics.primary_carrier, materialName, ctx.silhouette)}, but ${diagnostics.pressure_type === 'calendar'
     ? `${requiredWeeks} weeks of work are pressing against a ${availableWeeks}-week window`
     : diagnostics.pressure_type === 'margin'
@@ -519,12 +652,12 @@ export function buildFallbackSpecRail(ctx: SpecFallbackContext): SpecRailInsight
       reason: decisionReason(ctx),
     },
     execution_levers: leverSet(ctx),
-    alternative_path: buildAlternativePath(ctx, stance),
+    alternative_path: alternativePath,
   };
 }
 
 export function mapSpecRailToInsightData(rail: SpecRailInsight, mode: InsightMode): InsightData {
-  const secondary = rail.alternative_path.title && rail.alternative_path.description
+  const secondary = rail.alternative_path?.title && rail.alternative_path.description
     ? [
         `${rail.alternative_path.title} — ${rail.alternative_path.description}`,
         `Decision — ${rail.decision.reason}`,
@@ -551,7 +684,7 @@ export function shouldShowBetterPath(rail: SpecRailInsight): boolean {
     return false;
   }
 
-  return Boolean(rail.alternative_path.title && rail.alternative_path.description) &&
+  return Boolean(rail.alternative_path?.title && rail.alternative_path.description) &&
     (rail.feasibility_stance === 'strained' ||
       rail.feasibility_stance === 'not_recommended' ||
       rail.decision.direction !== 'hold');
