@@ -1,9 +1,10 @@
 "use client";
 
 import categoriesData from "@/data/categories.json";
+import { getCollectionLanguageLabels, getExpressionSignalLabels } from "@/lib/collection-signals";
 import { parseSelectedPieceImage, resolvePieceImageType } from "@/lib/piece-image";
 import { normalizeSpecSubcategoryId } from "@/lib/spec-studio/smart-defaults";
-import { useSessionStore, type CollectionRoleId, type KeyPiece, type PieceBuildContext } from "@/lib/store/sessionStore";
+import { useSessionStore, type ActivatedChip, type ChipSelection, type CollectionRoleId, type KeyPiece, type PieceBuildContext } from "@/lib/store/sessionStore";
 import { hydrateCollectionContextFromAnalysis, type PersistedCollectionContextRow } from "@/lib/collections/hydrateCollectionContext";
 
 export interface PersistedSpecAnalysisRow extends PersistedCollectionContextRow {
@@ -46,6 +47,40 @@ function normalizeToken(value: string | null | undefined) {
 function titleCase(value: string | null | undefined) {
   if (!value) return "";
   return value.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function parseJsonValue(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function toStringArray(value: unknown): string[] {
+  const parsed = parseJsonValue(value);
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter(Boolean);
+}
+
+function toChipSelection(value: unknown): ChipSelection | null {
+  const parsed = parseJsonValue(value);
+  if (!parsed || typeof parsed !== "object") return null;
+
+  const candidate = parsed as Partial<ChipSelection>;
+  if (typeof candidate.directionId !== "string" || !Array.isArray(candidate.activatedChips)) {
+    return null;
+  }
+
+  return {
+    directionId: candidate.directionId,
+    activatedChips: candidate.activatedChips as ActivatedChip[],
+  };
 }
 
 function getPieceName(row: PersistedSpecAnalysisRow) {
@@ -95,6 +130,25 @@ export function deriveSpecSessionSnapshot(row: PersistedSpecAnalysisRow) {
     typeof row.agent_versions?.saved_piece_expression === "string"
       ? row.agent_versions.saved_piece_expression.trim() || null
       : null;
+  const directionInterpretationText = row.aesthetic_inflection?.trim() || "";
+  const directionInterpretationChips = toStringArray(row.agent_versions?.direction_interpretation_chips);
+  const chipSelection = toChipSelection(row.agent_versions?.chip_selection);
+  const persistedCollectionLanguage = toStringArray(row.agent_versions?.collection_language);
+  const persistedExpressionSignals = toStringArray(row.agent_versions?.expression_signals);
+  const collectionLanguageLabels = persistedCollectionLanguage.length > 0
+    ? persistedCollectionLanguage
+    : getCollectionLanguageLabels(directionInterpretationChips, directionInterpretationText);
+  const expressionSignalLabels = persistedExpressionSignals.length > 0
+    ? persistedExpressionSignals
+    : getExpressionSignalLabels(chipSelection);
+  const collectionLanguage = collectionLanguageLabels.map((label) => ({
+    label,
+    state: "strong" as const,
+  }));
+  const expressionSignals = expressionSignalLabels.map((label) => ({
+    label,
+    state: "strong" as const,
+  }));
 
   const selectedKeyPiece: KeyPiece = {
     item: pieceName,
@@ -113,8 +167,8 @@ export function deriveSpecSessionSnapshot(row: PersistedSpecAnalysisRow) {
     originalLabel: pieceName,
     expression: savedPieceExpression,
     translation: row.aesthetic_inflection?.trim() || null,
-    collectionLanguage: [],
-    expressionSignals: [],
+    collectionLanguage,
+    expressionSignals,
     complexityBias: null,
   };
 
@@ -132,6 +186,8 @@ export function deriveSpecSessionSnapshot(row: PersistedSpecAnalysisRow) {
     selectedPieceImage: storedPieceImage,
     selectedKeyPiece,
     pieceBuildContext,
+    chipSelection,
+    directionInterpretationChips,
     season: row.season?.trim() || "",
     aestheticInput: row.aesthetic_input?.trim() || "",
     aestheticMatchedId: row.aesthetic_matched_id?.trim() || null,
@@ -147,6 +203,8 @@ export function hydrateSpecSessionFromAnalysis(collectionName: string, row: Pers
   useSessionStore.setState({
     aestheticMatchedId: snapshot.aestheticMatchedId,
     aestheticInput: snapshot.aestheticInput,
+    chipSelection: snapshot.chipSelection,
+    directionInterpretationChips: snapshot.directionInterpretationChips,
   });
 
   state.setCollectionName(collectionName);

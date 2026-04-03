@@ -680,14 +680,34 @@ export function mapSpecRailToInsightData(rail: SpecRailInsight, mode: InsightMod
 }
 
 export function shouldShowBetterPath(rail: SpecRailInsight): boolean {
-  if (rail.core_tension == null && rail.feasibility_stance === 'viable') {
+  if (!rail.alternative_path?.title || !rail.alternative_path.description) {
     return false;
   }
 
-  return Boolean(rail.alternative_path?.title && rail.alternative_path.description) &&
-    (rail.feasibility_stance === 'strained' ||
-      rail.feasibility_stance === 'not_recommended' ||
-      rail.decision.direction !== 'hold');
+  if (rail.alternative_path.title === 'Material selection is working. No swap suggested.') {
+    return false;
+  }
+
+  if (
+    rail.alternative_path.dimension === 'construction' ||
+    rail.alternative_path.dimension === 'material'
+  ) {
+    return true;
+  }
+
+  if (
+    rail.core_tension == null &&
+    (rail.feasibility_stance === 'viable' || rail.feasibility_stance === 'strong') &&
+    rail.decision.direction === 'hold'
+  ) {
+    return false;
+  }
+
+  return (
+    rail.feasibility_stance === 'strained' ||
+    rail.feasibility_stance === 'not_recommended' ||
+    rail.decision.direction !== 'hold'
+  );
 }
 
 export function shouldShowFeasibilityTension(rail: SpecRailInsight): boolean {

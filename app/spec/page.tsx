@@ -64,6 +64,7 @@ import type { SelectedPieceImage } from "@/lib/piece-image";
 import { buildSelectedPieceImage } from "@/lib/piece-image";
 import { getCollectionLanguageLabels, getExpressionSignalLabels } from "@/lib/collection-signals";
 import { buildSpecPulseInsight, buildSpecPulseTelemetry, getSpecMarketSaturationSignal } from "@/lib/pulse/specPulseInsight";
+import { buildStrategySummary } from "@/lib/strategy-summary";
 
 /* ─── Icons: matched to Concept Studio (star, users, cog) ─── */
 function IconIdentity({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
@@ -137,6 +138,7 @@ const PULSE_RED = "#8A3A3A";
 const PULSE_YELLOW = "#B8876B";
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
+const GENERIC_STRATEGY_SUMMARY = "Define your collection stance";
 
 /* ─── Icons ─── */
 function IconExecution({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
@@ -217,6 +219,12 @@ function getMissingSchemaColumn(error: unknown) {
   if (record.code !== "PGRST204" || typeof record.message !== "string") return null;
   const match = record.message.match(/'([^']+)' column/);
   return match?.[1] ?? null;
+}
+
+function getStrategySliderLabel(value: number, labels: [string, string, string]): string {
+  if (value <= 30) return labels[0];
+  if (value <= 69) return labels[1];
+  return labels[2];
 }
 
 function getAlternativePathDimension(rail: import('@/lib/synthesizer/specDecision').SpecRailInsight | null): 'material' | 'construction' | 'execution' | null {
@@ -1049,6 +1057,11 @@ function SpecStudioPageContent() {
   const conceptPalette = useSessionStore((s) => s.conceptPalette);
   const directionInterpretationText = useSessionStore((s) => s.directionInterpretationText);
   const directionInterpretationChips = useSessionStore((s) => s.directionInterpretationChips);
+  const strategySummary = useSessionStore((s) => s.strategySummary);
+  const sliderTrend = useSessionStore((s) => s.sliderTrend);
+  const sliderCreative = useSessionStore((s) => s.sliderCreative);
+  const sliderElevated = useSessionStore((s) => s.sliderElevated);
+  const sliderNovelty = useSessionStore((s) => s.sliderNovelty);
 
   const conceptContext = useMemo<ConceptContextType>(() => {
     if (!storeAesthetic) return FALLBACK_CONCEPT;
@@ -1089,9 +1102,12 @@ function SpecStudioPageContent() {
     });
   }, []);
 
+  const [headerCollectionName, setHeaderCollectionName] = useState("");
+  const [headerSeasonLabel, setHeaderSeasonLabel] = useState("");
+
   useEffect(() => {
     const analysisId = searchParams.get("analysis")?.trim();
-    if (!analysisId) return;
+    if (!analysisId && !(savedAnalysisId && !headerCollectionName && !headerSeasonLabel)) return;
 
     let cancelled = false;
 
@@ -1102,47 +1118,75 @@ function SpecStudioPageContent() {
       } = await supabase.auth.getUser();
       if (!user || cancelled) return;
 
-      const { data, error } = await supabase
-        .from("analyses")
-        .select("*")
-        .eq("id", analysisId)
-        .eq("user_id", user.id)
-        .single();
+      if (analysisId) {
+        const { data, error } = await supabase
+          .from("analyses")
+          .select("*")
+          .eq("id", analysisId)
+          .eq("user_id", user.id)
+          .single();
 
-      if (cancelled || error || !data) return;
+        if (cancelled || error || !data) return;
 
-      const row = data as PersistedSpecAnalysisRow;
-      const resolvedCollectionName =
-        row.collection_name?.trim() ||
-        useSessionStore.getState().collectionName ||
-        "";
-      if (!resolvedCollectionName) return;
+        const row = data as PersistedSpecAnalysisRow;
+        const resolvedCollectionName =
+          row.collection_name?.trim() ||
+          useSessionStore.getState().collectionName ||
+          "";
+        if (!resolvedCollectionName) return;
 
-      const snapshot = hydrateSpecSessionFromAnalysis(resolvedCollectionName, row);
-      const restoredCategoryId =
-        categories.find(
-          (category) =>
-            category.id === snapshot.categoryId ||
-            category.name.toLowerCase() === snapshot.categoryName.toLowerCase()
-        )?.id ?? categories[0].id;
+        const snapshot = hydrateSpecSessionFromAnalysis(resolvedCollectionName, row);
+        const restoredCategoryId =
+          categories.find(
+            (category) =>
+              category.id === snapshot.categoryId ||
+              category.name.toLowerCase() === snapshot.categoryName.toLowerCase()
+          )?.id ?? categories[0].id;
 
-      setCategoryId(restoredCategoryId);
-      setSubcategoryId(snapshot.subcategoryId);
-      setMaterialId(snapshot.materialId);
-      setConstructionTier(snapshot.constructionTier);
-      setConstructionConfirmed(Boolean(snapshot.constructionTier));
-      setOverrideWarning(null);
-      setUserManuallySelected(Boolean(snapshot.materialId));
-      setSpecStep("material");
-      setSpecStepDirection(1);
-      const rawExecutionNotes = (data as Record<string, unknown>).execution_notes;
-      if (typeof rawExecutionNotes === "string" && rawExecutionNotes.trim()) {
-        setExecutionNotes(rawExecutionNotes.split("\n").filter(Boolean));
-      }
-      if (snapshot.season) {
-        const isFW =
-          snapshot.season.toLowerCase().includes("fw") || snapshot.season.toLowerCase().includes("fall");
-        setTimelineWeeks(isFW ? 24 : 20);
+        setCategoryId(restoredCategoryId);
+        setSubcategoryId(snapshot.subcategoryId);
+        setMaterialId(snapshot.materialId);
+        setConstructionTier(snapshot.constructionTier);
+        setConstructionConfirmed(Boolean(snapshot.constructionTier));
+        setOverrideWarning(null);
+        setUserManuallySelected(Boolean(snapshot.materialId));
+        setSpecStep("material");
+        setSpecStepDirection(1);
+        const rawExecutionNotes = (data as Record<string, unknown>).execution_notes;
+        if (typeof rawExecutionNotes === "string" && rawExecutionNotes.trim()) {
+          setExecutionNotes(rawExecutionNotes.split("\n").filter(Boolean));
+        }
+        if (snapshot.season) {
+          const isFW =
+            snapshot.season.toLowerCase().includes("fw") || snapshot.season.toLowerCase().includes("fall");
+          setTimelineWeeks(isFW ? 24 : 20);
+        }
+      } else if (savedAnalysisId && !headerCollectionName && !headerSeasonLabel) {
+        try {
+          const { data, error } = await supabase
+            .from("analyses")
+            .select("collection_name, season")
+            .eq("id", savedAnalysisId)
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+          if (cancelled || error || !data) return;
+
+          const dbCollectionName = data.collection_name?.trim() || "";
+          const dbSeason = data.season?.trim() || "";
+
+          if (dbCollectionName) {
+            setCollectionName(dbCollectionName);
+            setHeaderCollectionName(dbCollectionName);
+          }
+
+          if (dbSeason) {
+            setSeason(dbSeason);
+            setHeaderSeasonLabel(dbSeason);
+          }
+        } catch (error) {
+          console.error("Failed to hydrate spec header context", error);
+        }
       }
     };
 
@@ -1151,10 +1195,8 @@ function SpecStudioPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [categories, searchParams]);
+  }, [categories, headerCollectionName, headerSeasonLabel, savedAnalysisId, searchParams, setCollectionName, setSeason]);
 
-  const [headerCollectionName, setHeaderCollectionName] = useState("Desert Mirage");
-  const [headerSeasonLabel, setHeaderSeasonLabel] = useState("SS26");
   useEffect(() => {
     setIsClientMounted(true);
   }, []);
@@ -1270,6 +1312,37 @@ function SpecStudioPageContent() {
       state: "emerging" as const,
     }));
   }, [chipSelection, pieceBuildContext?.expressionSignals]);
+  const effectiveStrategySummary = useMemo(() => {
+    const trimmed = strategySummary?.trim();
+    if (trimmed && trimmed !== GENERIC_STRATEGY_SUMMARY) return trimmed;
+
+    const derived = buildStrategySummary({
+      priorities: intentGoals,
+      trendLabel: getStrategySliderLabel(sliderTrend, ["Trend-forward", "Balanced Horizon", "Timeless"]),
+      creativeLabel: getStrategySliderLabel(sliderCreative, ["Creative-led", "Balanced Creativity", "Commercially safe"]),
+      elevatedLabel: getStrategySliderLabel(sliderElevated, ["Design-elevated", "Balanced Value", "Accessible"]),
+      noveltyLabel: getStrategySliderLabel(sliderNovelty, ["Novelty-forward", "Continuity-aware", "Continuity-first"]),
+      targetMargin: storeTargetMargin || brandProfileTargetMargin,
+      targetMsrp: targetMSRP,
+      sliderTrendValue: sliderTrend,
+      sliderCreativeValue: sliderCreative,
+      sliderElevatedValue: sliderElevated,
+      sliderNoveltyValue: sliderNovelty,
+    })?.trim();
+
+    if (!derived || derived === GENERIC_STRATEGY_SUMMARY) return null;
+    return derived;
+  }, [
+    intentGoals,
+    sliderCreative,
+    sliderElevated,
+    sliderNovelty,
+    sliderTrend,
+    brandProfileTargetMargin,
+    storeTargetMargin,
+    strategySummary,
+    targetMSRP,
+  ]);
   const strongExpressionLabels = useMemo(
     () => expressionSignalContext.filter((chip) => chip.state === "strong").map((chip) => chip.label),
     [expressionSignalContext]
@@ -3091,6 +3164,9 @@ function SpecStudioPageContent() {
         collectionAesthetic: useSessionStore.getState().collectionAesthetic,
         aestheticInflection: useSessionStore.getState().aestheticInflection,
         directionInterpretationText: useSessionStore.getState().directionInterpretationText,
+        strategySummary: useSessionStore.getState().strategySummary,
+        collectionLanguage: collectionLanguageContext.filter((chip) => chip.state !== "missing").map((chip) => chip.label),
+        expressionSignals: expressionSignalContext.filter((chip) => chip.state !== "missing").map((chip) => chip.label),
         intent: intentPayload,
         selectedKeyPiece,
         pieceBuildContext,
@@ -3284,6 +3360,7 @@ function SpecStudioPageContent() {
         }}
       >
         <CollectionContextBar
+          strategySummary={effectiveStrategySummary || undefined}
           collectionName={headerCollectionName}
           season={headerSeasonLabel}
           titleOverride={contextBarTitle || specHeaderTitle}

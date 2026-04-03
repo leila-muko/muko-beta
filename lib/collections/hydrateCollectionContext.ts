@@ -2,6 +2,8 @@
 
 import { useSessionStore, type ChipSelection } from "@/lib/store/sessionStore";
 
+const GENERIC_STRATEGY_SUMMARY = "Define your collection stance";
+
 type PersistedAgentVersions = Record<string, unknown> | null | undefined;
 
 export interface PersistedCollectionContextRow {
@@ -10,6 +12,7 @@ export interface PersistedCollectionContextRow {
   aesthetic_matched_id?: string | null;
   silhouette?: string | null;
   season?: string | null;
+  mood_board_images?: string[] | null;
   agent_versions?: PersistedAgentVersions;
 }
 
@@ -68,9 +71,28 @@ export function hydrateCollectionContextFromAnalysis(
   const agentVersions = row?.agent_versions;
   const directionChips = toStringArray(agentVersions?.["direction_interpretation_chips"]);
   const chipSelection = toChipSelection(agentVersions?.["chip_selection"]);
+  const strategySummary =
+    typeof agentVersions?.["strategy_summary"] === "string"
+      ? (() => {
+          const trimmed = agentVersions["strategy_summary"].trim();
+          return trimmed && trimmed !== GENERIC_STRATEGY_SUMMARY ? trimmed : null;
+        })()
+      : null;
+  const selectedPalette =
+    typeof agentVersions?.["selected_palette"] === "string"
+      ? agentVersions["selected_palette"].trim() || null
+      : null;
+  const moodboardImages = Array.isArray(row?.mood_board_images)
+    ? row.mood_board_images
+        .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+        .filter(Boolean)
+    : [];
 
   state.setDirectionInterpretationChips(directionChips);
   state.setChipSelection(chipSelection);
+  state.setStrategySummary(strategySummary);
+  state.setConceptPalette(selectedPalette);
+  useSessionStore.setState({ moodboardImages });
 
   if (row?.collection_aesthetic || row?.aesthetic_matched_id || inflection) {
     state.lockConcept();

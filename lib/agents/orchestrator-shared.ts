@@ -8,6 +8,8 @@ export const AGENT_VERSIONS = {
   synthesizer:  '1.0.0',
 } as const;
 
+const GENERIC_STRATEGY_SUMMARY = 'Define your collection stance';
+
 export interface AnalysisInput {
   aesthetic_input:   string;
   material_id:       string;
@@ -135,6 +137,18 @@ export function buildAnalysisRow(
   const directionInterpretationChips =
     ((bb.session.directionInterpretationChips as string[] | null | undefined) ?? []).filter(Boolean);
   const chipSelection = (bb.session.chipSelection as { directionId?: string; activatedChips?: unknown[] } | null | undefined) ?? null;
+  const moodboardImages =
+    ((bb.session.moodboardImages as string[] | null | undefined) ?? []).filter(Boolean);
+  const selectedPalette = (bb.session.conceptPalette as string | null | undefined)?.trim() || null;
+  const strategySummaryCandidate = (bb.session.strategySummary as string | null | undefined)?.trim() || null;
+  const strategySummary =
+    strategySummaryCandidate && strategySummaryCandidate !== GENERIC_STRATEGY_SUMMARY
+      ? strategySummaryCandidate
+      : null;
+  const collectionLanguage =
+    ((bb.session.collectionLanguage as string[] | null | undefined) ?? []).filter(Boolean);
+  const expressionSignals =
+    ((bb.session.expressionSignals as string[] | null | undefined) ?? []).filter(Boolean);
   const savedPieceName =
     selectedKeyPiece?.item?.trim()
     || pieceBuildContext?.adaptedTitle?.trim()
@@ -157,7 +171,7 @@ export function buildAnalysisRow(
     aesthetic_matched_id: result.aesthetic_matched_id ?? bb.input.aesthetic_input?.toLowerCase()?.replace(/\s+/g, '-'),
     collection_aesthetic: collAesthetic,
     aesthetic_inflection: aestheticInfl,
-    mood_board_images:    [],
+    mood_board_images:    moodboardImages,
     material_id:                bb.input.material_id,
     previous_material_id:       (bb.session.previousMaterialId as string | null | undefined) ?? null,
     silhouette:                 bb.input.silhouette,
@@ -184,6 +198,10 @@ export function buildAnalysisRow(
       saved_piece_name: savedPieceName,
       saved_piece_expression: savedPieceExpression,
       selected_piece_image: selectedPieceImage ? JSON.stringify(selectedPieceImage) : null,
+      selected_palette: selectedPalette,
+      strategy_summary: strategySummary,
+      collection_language: JSON.stringify(collectionLanguage),
+      expression_signals: JSON.stringify(expressionSignals),
       direction_interpretation_chips: JSON.stringify(directionInterpretationChips),
       chip_selection: chipSelection ? JSON.stringify(chipSelection) : null,
     },

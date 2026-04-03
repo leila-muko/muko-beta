@@ -180,7 +180,7 @@ export function CollectionContextBar({
     if (matchesPhrase(value, pointOfViewValue)) return;
     attributeItems.push({ icon: <IconLanguage />, value });
   });
-  dedupePhrases(expressionSignals, 2).forEach((value) => {
+  dedupePhrases(expressionSignals, Math.max(expressionSignals.length, 2)).forEach((value) => {
     if (matchesPhrase(value, pointOfViewValue)) return;
     attributeItems.push({ icon: <ContextBarSignalIcon />, value });
   });

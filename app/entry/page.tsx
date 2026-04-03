@@ -171,7 +171,6 @@ export default function EntryScreen() {
   };
 
   const handleContinue = () => {
-    window.localStorage.removeItem('muko_intent');
     setTouchedName(true);
     setTouchedSeason(true);
     if (!canContinue) return;
@@ -179,6 +178,10 @@ export default function EntryScreen() {
     window.localStorage.setItem('muko_collectionName', nextCollectionName);
     const seasonLabel = allSeasons.find((s) => s.id === selectedSeason)?.label ?? '';
     window.localStorage.setItem('muko_seasonLabel', seasonLabel);
+    window.localStorage.removeItem('muko_collection_aesthetic');
+    window.localStorage.removeItem('muko_aesthetic_inflection');
+    window.localStorage.removeItem('muko_intent');
+    useSessionStore.getState().resetSession();
     setStoreCollectionName(nextCollectionName);
     setActiveCollection(nextCollectionName);
     setSeason(seasonLabel);

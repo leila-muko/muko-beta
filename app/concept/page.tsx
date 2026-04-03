@@ -82,6 +82,7 @@ const PULSE_RED = "#A97B8F";     // Rose — brand tension
 const OLIVE = BRAND.oliveInk;
 const TEXT = OLIVE;
 const MUTED = "rgba(67,67,43,0.44)";
+const GENERIC_STRATEGY_SUMMARY = "Define your collection stance";
 const EDITORIAL_INTERPRETATION_PROMPTS = [
   "sensual fabric tension",
   "restrained emotional depth",
@@ -971,6 +972,8 @@ export default function ConceptStudioPage() {
     sliderNovelty,
     collectionRole: storeCollectionRole,
     setCollectionRole,
+    setCollectionName,
+    setSeason,
     activeProductPieceId,
     setActiveProductPieceId,
     pieceRolesById,
@@ -982,6 +985,7 @@ export default function ConceptStudioPage() {
     strategySummary,
     isProxyMatch,
     setIsProxyMatch,
+    savedAnalysisId,
     preloadedCriticScores,
     setPreloadedCriticScores,
   } = useSessionStore(
@@ -1021,6 +1025,8 @@ export default function ConceptStudioPage() {
       sliderNovelty: state.sliderNovelty,
       collectionRole: state.collectionRole,
       setCollectionRole: state.setCollectionRole,
+      setCollectionName: state.setCollectionName,
+      setSeason: state.setSeason,
       activeProductPieceId: state.activeProductPieceId,
       setActiveProductPieceId: state.setActiveProductPieceId,
       pieceRolesById: state.pieceRolesById,
@@ -1032,6 +1038,7 @@ export default function ConceptStudioPage() {
       strategySummary: state.strategySummary,
       isProxyMatch: state.isProxyMatch,
       setIsProxyMatch: state.setIsProxyMatch,
+      savedAnalysisId: state.savedAnalysisId,
       preloadedCriticScores: state.preloadedCriticScores,
       setPreloadedCriticScores: state.setPreloadedCriticScores,
     }))
@@ -1063,14 +1070,57 @@ export default function ConceptStudioPage() {
 
   useEffect(() => { setCurrentStep(2); }, [setCurrentStep]);
   useEffect(() => {
+    let storedCollectionName = "";
+    let storedSeason = "";
+
     try {
       const n = window.localStorage.getItem("muko_collectionName");
       const s = window.localStorage.getItem("muko_seasonLabel");
+      storedCollectionName = n?.trim() || "";
+      storedSeason = s?.trim() || "";
       if (n) setHeaderCollectionName(n);
       if (s) setHeaderSeasonLabel(s);
       else setHeaderSeasonLabel(season || "—");
     } catch { setHeaderSeasonLabel(season || "—"); }
-  }, [season]);
+
+    const needsCollectionName = !storedCollectionName;
+    const needsSeasonLabel = !storedSeason;
+    if ((!needsCollectionName && !needsSeasonLabel) || !savedAnalysisId) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("analyses")
+          .select("collection_name, season")
+          .eq("id", savedAnalysisId)
+          .maybeSingle();
+
+        if (cancelled || error || !data) return;
+
+        const dbCollectionName = data.collection_name?.trim() || "";
+        const dbSeason = data.season?.trim() || "";
+
+        if (needsCollectionName && dbCollectionName) {
+          setCollectionName(dbCollectionName);
+          setHeaderCollectionName(dbCollectionName);
+        }
+
+        if (needsSeasonLabel && dbSeason) {
+          setSeason(dbSeason);
+          setHeaderSeasonLabel(dbSeason);
+        }
+      } catch (error) {
+        console.error("Failed to hydrate concept header context", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [savedAnalysisId, season, setCollectionName, setSeason]);
 
   // Real Critic identity scores for all aesthetics, populated once brandProfileId resolves.
   // Empty until the batch fetch completes — falls back to static scoring in the meantime.
@@ -1609,6 +1659,10 @@ export default function ConceptStudioPage() {
     storeTargetMsrp,
     strategySummary,
   ]);
+  const effectiveConceptBarSummary = useMemo(() => {
+    const strategy = conceptStrategySummary?.trim();
+    return strategy && strategy !== GENERIC_STRATEGY_SUMMARY ? strategy : null;
+  }, [conceptStrategySummary]);
   const conceptStrategyRead = useMemo(
     () =>
       buildProgressiveStrategySummary({
@@ -3416,7 +3470,7 @@ export default function ConceptStudioPage() {
           }}
         >
           <CollectionContextBar
-            strategySummary={conceptStrategySummary}
+            strategySummary={effectiveConceptBarSummary}
             collectionName={headerCollectionName}
             season={headerSeasonLabel}
             direction={selectedAesthetic ?? undefined}
@@ -4353,6 +4407,13 @@ export default function ConceptStudioPage() {
                     pageMode="concept"
                     conceptStage={currentStage}
                     languageRead={step2ReadData}
+                    productPieceRead={activePieceRead ? {
+                      title: activePieceRead.headline,
+                      body: activePieceRead.core_read,
+                    } : undefined}
+                    pieceStreamingTitle={pieceStreamingTitle}
+                    pieceStreamingBody={pieceStreamingBody}
+                    hasSelectedProductPiece={!!activePieceRead}
                     nextMove={{
                       mode: "concept",
                       guidance: step1ReadData?.decision_guidance ?? null,
