@@ -71,6 +71,21 @@ const materialNameById = new Map(
   (materialsData as Array<{ id: string; name: string }>).map((material) => [material.id, material.name])
 );
 
+const headerActionButtonBase: React.CSSProperties = {
+  borderRadius: 999,
+  padding: '11px 18px',
+  minHeight: 42,
+  fontFamily: inter,
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.12em',
+  textTransform: 'uppercase',
+  cursor: 'pointer',
+  transition: 'background 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease',
+  boxShadow: '0 12px 30px rgba(67,67,43,0.08)',
+  whiteSpace: 'nowrap',
+};
+
 function normalizeToken(value: string | null | undefined) {
   return (value ?? '')
     .toLowerCase()
@@ -797,12 +812,12 @@ export default function CollectionPage({
 
   const editorialDirection = useMemo(() => {
     const preferred = [
-      storeMatchesCollection ? collectionAesthetic : null,
-      storeMatchesCollection ? aestheticInflection : null,
-      storeMatchesCollection ? directionInterpretationText : null,
       analyses[0]?.collection_aesthetic,
       analyses[0]?.aesthetic_inflection,
       analyses[0]?.aesthetic_input,
+      storeMatchesCollection ? collectionAesthetic : null,
+      storeMatchesCollection ? aestheticInflection : null,
+      storeMatchesCollection ? directionInterpretationText : null,
     ].find((value) => value?.trim());
 
     return preferred?.trim() ?? null;
@@ -1051,7 +1066,15 @@ export default function CollectionPage({
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      marginTop: editorialDirection || editorialChips.length > 0 ? 8 : 2,
+                    }}
+                  >
                     <button
                       onClick={() => router.push('/intent')}
                       style={{
@@ -1257,7 +1280,10 @@ export default function CollectionPage({
             style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16,
               marginBottom: 16,
+              flexWrap: 'wrap',
             }}
           >
             <span
@@ -1272,6 +1298,134 @@ export default function CollectionPage({
             >
               Pieces{analyses.length > 0 ? ` · ${analyses.length} total` : ''}
             </span>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 10,
+                flexWrap: 'wrap',
+                marginLeft: 'auto',
+              }}
+            >
+              {reportExists ? (
+                <>
+                  <button
+                    onClick={handleRerunCollectionAnalysis}
+                    disabled={!collectionReportInput || isRefreshingCollectionRead}
+                    style={{
+                      ...headerActionButtonBase,
+                      border: !collectionReportInput || isRefreshingCollectionRead
+                        ? '1px solid rgba(67,67,43,0.08)'
+                        : '1px solid rgba(67,67,43,0.12)',
+                      background: !collectionReportInput || isRefreshingCollectionRead
+                        ? 'rgba(244,240,233,0.95)'
+                        : 'rgba(248,245,239,0.96)',
+                      color: !collectionReportInput || isRefreshingCollectionRead ? '#AAA198' : '#6B6459',
+                      cursor: !collectionReportInput || isRefreshingCollectionRead ? 'not-allowed' : 'pointer',
+                      boxShadow: !collectionReportInput || isRefreshingCollectionRead
+                        ? 'none'
+                        : headerActionButtonBase.boxShadow,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!collectionReportInput || isRefreshingCollectionRead) return;
+                      e.currentTarget.style.borderColor = 'rgba(67,67,43,0.2)';
+                      e.currentTarget.style.background = '#F2EDE4';
+                      e.currentTarget.style.color = '#43432B';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!collectionReportInput || isRefreshingCollectionRead) return;
+                      e.currentTarget.style.borderColor = 'rgba(67,67,43,0.12)';
+                      e.currentTarget.style.background = 'rgba(248,245,239,0.96)';
+                      e.currentTarget.style.color = '#6B6459';
+                    }}
+                  >
+                    {isRefreshingCollectionRead ? 'Refreshing...' : 'Re-run Analysis'}
+                  </button>
+
+                  <button
+                    onClick={onNewPiece}
+                    style={{
+                      ...headerActionButtonBase,
+                      border: '1px solid rgba(67,67,43,0.14)',
+                      background: 'rgba(255,255,255,0.92)',
+                      color: '#575143',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(168,180,117,0.9)';
+                      e.currentTarget.style.color = '#43432B';
+                      e.currentTarget.style.background = '#F8F5EF';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(67,67,43,0.14)';
+                      e.currentTarget.style.color = '#575143';
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.92)';
+                    }}
+                  >
+                    Add Piece
+                  </button>
+
+                  <button
+                    onClick={handleGenerateReport}
+                    style={{
+                      ...headerActionButtonBase,
+                      border: '1px solid #A8B475',
+                      background: '#A8B475',
+                      color: '#3A4020',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#96A461';
+                      e.currentTarget.style.borderColor = '#96A461';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#A8B475';
+                      e.currentTarget.style.borderColor = '#A8B475';
+                    }}
+                  >
+                    View Report
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={onNewPiece}
+                    style={{
+                      ...headerActionButtonBase,
+                      border: '1px solid rgba(67,67,43,0.14)',
+                      background: 'rgba(255,255,255,0.92)',
+                      color: '#575143',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(168,180,117,0.9)';
+                      e.currentTarget.style.color = '#43432B';
+                      e.currentTarget.style.background = '#F8F5EF';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(67,67,43,0.14)';
+                      e.currentTarget.style.color = '#575143';
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.92)';
+                    }}
+                  >
+                    Add Piece
+                  </button>
+
+                  <button
+                    disabled
+                    style={{
+                      ...headerActionButtonBase,
+                      border: '1px solid rgba(67,67,43,0.08)',
+                      background: '#E2DDD6',
+                      color: '#888078',
+                      cursor: 'not-allowed',
+                      boxShadow: 'none',
+                    }}
+                  >
+                    Generate Report
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <div
@@ -1315,115 +1469,6 @@ export default function CollectionPage({
           </div>
         </div>
       </div>
-
-      <div
-        style={{
-          position: 'fixed',
-          right: 32,
-          bottom: 28,
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'flex-end',
-          gap: 10,
-          zIndex: 25,
-        }}
-      >
-        <button
-          onClick={onNewPiece}
-          style={{
-            border: '1px solid #D9D3CB',
-            background: 'rgba(255,255,255,0.94)',
-            color: '#6F675F',
-            borderRadius: 999,
-            padding: '10px 18px',
-            fontSize: 12,
-            fontWeight: 600,
-            fontFamily: inter,
-            cursor: 'pointer',
-            transition: 'border-color 150ms ease, color 150ms ease',
-            minWidth: 136,
-            boxShadow: '0 10px 28px rgba(67,67,43,0.08)',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#A8B475'; e.currentTarget.style.color = '#A8B475'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#D9D3CB'; e.currentTarget.style.color = '#6F675F'; }}
-        >
-          Add Piece
-        </button>
-
-        {reportExists ? (
-          <>
-            <button
-              onClick={handleGenerateReport}
-              style={{
-                background: '#A8B475',
-                color: '#3A4020',
-                borderRadius: 999,
-                border: 'none',
-                padding: '10px 18px',
-                fontSize: 12,
-                fontWeight: 600,
-                fontFamily: inter,
-                cursor: 'pointer',
-                minWidth: 136,
-                boxShadow: '0 10px 28px rgba(67,67,43,0.08)',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#95A164'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#A8B475'; }}
-            >
-              View Report
-            </button>
-          </>
-        ) : (
-          <button
-            disabled
-            style={{
-              background: '#E2DDD6',
-              color: '#888078',
-              borderRadius: 999,
-              border: 'none',
-              padding: '10px 18px',
-              fontSize: 12,
-              fontFamily: inter,
-              cursor: 'not-allowed',
-              minWidth: 136,
-              boxShadow: '0 10px 28px rgba(67,67,43,0.08)',
-            }}
-          >
-            Generate Report
-          </button>
-        )}
-      </div>
-
-      {reportExists ? (
-        <button
-          onClick={handleRerunCollectionAnalysis}
-          disabled={!collectionReportInput || isRefreshingCollectionRead}
-          style={{
-            position: 'fixed',
-            right: 32,
-            bottom: 6,
-            fontFamily: inter,
-            fontSize: 10,
-            color: !collectionReportInput || isRefreshingCollectionRead ? '#B9B1A9' : '#888078',
-            background: 'transparent',
-            border: 'none',
-            cursor: !collectionReportInput || isRefreshingCollectionRead ? 'default' : 'pointer',
-            padding: 0,
-            textAlign: 'right',
-            zIndex: 25,
-          }}
-          onMouseEnter={(e) => {
-            if (!collectionReportInput || isRefreshingCollectionRead) return;
-            e.currentTarget.style.color = '#191919';
-          }}
-          onMouseLeave={(e) => {
-            if (!collectionReportInput || isRefreshingCollectionRead) return;
-            e.currentTarget.style.color = '#888078';
-          }}
-        >
-          {isRefreshingCollectionRead ? 'Refreshing analysis...' : 'Re-run analysis'}
-        </button>
-      ) : null}
 
       {toastMessage ? <Toast message={toastMessage} /> : null}
 

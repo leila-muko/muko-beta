@@ -2,6 +2,13 @@ export type PieceStrategicRole = "stabilize_core" | "express_signal" | "extend_d
 export type PieceDimension = "identity" | "resonance" | "execution";
 export type CollectionPhase = "opening" | "building" | "forming" | "complete";
 
+export const ROLE_DISPLAY_LABELS: Record<string, string> = {
+  hero: "Hero",
+  directional: "Directional",
+  coreEvolution: "Core Evolution",
+  volumeDriver: "Volume Driver",
+};
+
 export type PiecesReadInput = {
   season: string;
   collectionName: string;
@@ -39,6 +46,12 @@ export type PiecesReadInput = {
       directional: number;
       coreEvolution: number;
       volumeDriver: number;
+    };
+    roleTargetRanges?: {
+      hero: string;
+      directional: string;
+      coreEvolution: string;
+      volumeDriver: string;
     };
     scoreSignals: {
       averageScore?: number | null;

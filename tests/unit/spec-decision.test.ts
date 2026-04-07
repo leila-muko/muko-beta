@@ -16,7 +16,11 @@ function buildRail(overrides: Partial<SpecRailInsight> = {}): SpecRailInsight {
       direction: "hold",
       reason: "Base reason",
     },
-    execution_levers: ["One", "Two", "Three"],
+    execution_levers: [
+      { text: "One" },
+      { text: "Two" },
+      { text: "Three" },
+    ],
     alternative_path: {
       title: "Drop one tier",
       description: "Shift to moderate construction to ease the schedule.",

@@ -18,6 +18,7 @@ interface SpecPulseInsightInput {
   marketSaturation: SpecMarketSaturationSignal;
   identityStatus?: SpecSignalStatus;
   executionStatus?: SpecSignalStatus;
+  executionScore?: number;
   executionPending?: boolean;
 }
 
@@ -68,11 +69,47 @@ function commercialPotentialCue(score: number): SpecPulseTelemetrySignal {
   return { label: "limited pull", tone: "warning" };
 }
 
-function buildSpecHeadline(telemetry: SpecPulseTelemetry): PulseMicroInsight["headline"] {
+function buildExecutionHeadlineClause(executionScore?: number): PulseMicroInsight["headline"] {
+  if (typeof executionScore !== "number") {
+    return [
+      { text: "execution needs " },
+      { text: "attention", tone: "warning" },
+    ];
+  }
+
+  if (executionScore >= 72) {
+    return [
+      { text: "execution is " },
+      { text: "on track", tone: "positive" },
+    ];
+  }
+
+  if (executionScore >= 55) {
+    return [
+      { text: "execution needs " },
+      { text: "watching", tone: "warning" },
+    ];
+  }
+
+  if (executionScore > 35) {
+    return [
+      { text: "execution needs " },
+      { text: "attention", tone: "warning" },
+    ];
+  }
+
+  return [
+    { text: "execution is " },
+    { text: "at risk", tone: "warning" },
+  ];
+}
+
+function buildSpecHeadline(telemetry: SpecPulseTelemetry, input: SpecPulseInsightInput): PulseMicroInsight["headline"] {
   const identityTone = telemetry.identity.tone;
   const commercialTone = telemetry.commercial_potential.tone;
   const executionTone = telemetry.execution.tone;
   const executionLocked = telemetry.execution.label === "locked" || telemetry.execution.label === "pending";
+  const executionClause = buildExecutionHeadlineClause(input.executionScore);
 
   if (executionLocked) {
     return [
@@ -92,8 +129,8 @@ function buildSpecHeadline(telemetry: SpecPulseTelemetry): PulseMicroInsight["he
       { text: "locked in", tone: "positive" },
       { text: ", commercial pull is " },
       { text: "strong", tone: "positive" },
-      { text: ", and execution is " },
-      { text: "holding", tone: "positive" },
+      { text: ", and " },
+      ...executionClause,
       { text: "." },
     ];
   }
@@ -104,8 +141,8 @@ function buildSpecHeadline(telemetry: SpecPulseTelemetry): PulseMicroInsight["he
       { text: identityTone === "positive" ? "locked in" : "still uneven", tone: identityTone === "positive" ? "positive" : "warning" },
       { text: ", commercial pull is " },
       { text: "strong", tone: "positive" },
-      { text: ", but execution needs " },
-      { text: "attention", tone: "warning" },
+      { text: ", but " },
+      ...executionClause,
       { text: "." },
     ];
   }
@@ -203,7 +240,7 @@ export function buildSpecPulseInsight(input: SpecPulseInsightInput): PulseMicroI
   const telemetry = buildSpecPulseTelemetry(input);
 
   return {
-    headline: buildSpecHeadline(telemetry),
+    headline: buildSpecHeadline(telemetry, input),
     cues: [
       {
         key: "identity",

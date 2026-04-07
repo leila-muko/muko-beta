@@ -69,7 +69,21 @@ const MAX_READ_SENTENCES = 3;
 const SENTENCE_SPLIT_REGEX = /(?<=[.!?])\s+/;
 const OVERPRECISION_REGEX =
   /\b(\d+(?:\.\d+)?\s?(?:cm|mm|inches|inch|in|oz|gsm|%))\b|\b(\$\d+|\d+\s?(?:usd|eur))\b|\b(msrp|margin|markup|price point|cost ceiling|opening|inseam|outseam|rise|waistband|fly|yoke|dart|topstitch|top-stitch|seam allowance|placket|zipper|zip fly|button fly|pocket bag|belt loop|hem width|ankle opening|sweep)\b/i;
-const MATERIAL_REGEX = /\b(cotton|wool|silk|denim|leather|linen|viscose|tencel|cashmere|nylon|polyester|satin)\b/i;
+const MATERIAL_TERMS = [
+  "cotton",
+  "wool",
+  "silk",
+  "denim",
+  "leather",
+  "linen",
+  "viscose",
+  "tencel",
+  "cashmere",
+  "nylon",
+  "polyester",
+  "satin",
+] as const;
+const MATERIAL_REGEX = new RegExp(`\\b(${MATERIAL_TERMS.join("|")})\\b`, "i");
 const ROLE_SCOPE_TERMS = [
   "anchor",
   "anchoring",
@@ -153,6 +167,23 @@ function stripExistingPieceNames(
     .sort((a, b) => b.length - a.length);
 
   return names.reduce((value, name) => value.replace(new RegExp(escapeRegex(name), "gi"), " "), combined);
+}
+
+function extractInputMaterialWords(input: string) {
+  const normalized = input.toLowerCase();
+  return MATERIAL_TERMS.filter((term) => new RegExp(`\\b${escapeRegex(term)}\\b`, "i").test(normalized));
+}
+
+function stripAllowedInputMaterials(value: string, allowedMaterials: readonly string[]) {
+  if (allowedMaterials.length === 0) return value;
+
+  return allowedMaterials
+    .reduce(
+      (current, material) => current.replace(new RegExp(`\\b${escapeRegex(material)}\\b`, "gi"), " "),
+      value
+    )
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function looksCredibleForStage(output: Pick<PieceRefinementResponse, "read" | "refined_expression">) {
@@ -331,6 +362,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ message: "user_input is required" }, { status: 400 });
   }
 
+  const inputMaterials = extractInputMaterialWords(userInput);
   const archetype = inferGarmentArchetype(userInput);
   const aestheticEntry = getAestheticEntry(body.market?.direction ?? body.collection?.direction ?? null);
   const market: {
@@ -516,9 +548,10 @@ ${JSON.stringify(structuredPayload, null, 2)}`;
     const parsed = parseJsonResponse(content.text);
     const baseValidation = validateArchetypeOutput(parsed, archetype);
     const strippedOutput = stripExistingPieceNames(parsed, body.existing_pieces);
+    const materialScopedOutput = stripAllowedInputMaterials(strippedOutput, inputMaterials);
     const validation = {
       ...baseValidation,
-      mentionsMaterial: MATERIAL_REGEX.test(strippedOutput.toLowerCase()),
+      mentionsMaterial: MATERIAL_REGEX.test(materialScopedOutput.toLowerCase()),
     };
     validation.valid = !validation.hasDisallowed && !validation.mentionsMaterial && !validation.violatesCategory;
     const scopedOutput = {

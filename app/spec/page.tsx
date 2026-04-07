@@ -12,7 +12,7 @@ import type {
   ConstructionTier,
   ConceptContext as ConceptContextType,
 } from "@/lib/types/spec-studio";
-import { calculateCOGS, generateInsight, checkExecutionFeasibility, applyRoleModifiers } from "@/lib/spec-studio/calculator";
+import { calculateCOGS, generateInsight, checkExecutionFeasibility } from "@/lib/spec-studio/calculator";
 import { findAlternativeMaterial, findUpgradeMaterial, checkSelectedMaterialConflict } from "@/lib/spec-studio/material-matcher";
 import { getMaterialProperties } from "@/lib/spec-studio/material-properties";
 import {
@@ -264,6 +264,37 @@ function resolveBetterPathConstructionTier(
   return null;
 }
 
+function findFirstDifferentMaterialMention(
+  source: string,
+  materials: Material[],
+  currentMaterialId: string,
+): Material | null {
+  const normalized = normalizeMaterialText(source);
+  if (!normalized) return null;
+
+  let bestMatch: { material: Material; index: number; aliasLength: number } | null = null;
+
+  for (const material of materials) {
+    if (material.id === currentMaterialId) continue;
+
+    for (const alias of buildMaterialAliases(material)) {
+      if (!alias) continue;
+      const index = normalized.indexOf(alias);
+      if (index === -1) continue;
+
+      if (
+        !bestMatch ||
+        index < bestMatch.index ||
+        (index === bestMatch.index && alias.length > bestMatch.aliasLength)
+      ) {
+        bestMatch = { material, index, aliasLength: alias.length };
+      }
+    }
+  }
+
+  return bestMatch?.material ?? null;
+}
+
 function resolveBetterPathMaterialCandidate(
   rail: import('@/lib/synthesizer/specDecision').SpecRailInsight | null,
   materials: Material[],
@@ -272,14 +303,24 @@ function resolveBetterPathMaterialCandidate(
   if (!rail || getAlternativePathDimension(rail) !== 'material') return null;
   if (!rail.alternative_path) return null;
 
-  const source = `${rail.alternative_path.title} ${rail.alternative_path.description}`;
-  const exact = resolveMaterialMention(source, materials);
-  if (exact && exact.id !== currentMaterialId) return exact;
+  const sources = [
+    rail.alternative_path.title,
+    rail.alternative_path.description,
+    `${rail.alternative_path.title} ${rail.alternative_path.description}`,
+  ];
 
-  const closest = findClosestMaterialMatch(source, materials);
-  if (closest && closest.id !== currentMaterialId) return closest;
+  for (const source of sources) {
+    const exact = resolveMaterialMention(source, materials);
+    if (exact && exact.id !== currentMaterialId) return exact;
 
-  return exact ?? closest;
+    const firstDifferent = findFirstDifferentMaterialMention(source, materials, currentMaterialId);
+    if (firstDifferent) return firstDifferent;
+
+    const closest = findClosestMaterialMatch(source, materials);
+    if (closest && closest.id !== currentMaterialId) return closest;
+  }
+
+  return null;
 }
 
 async function runAnalysisMutationWithSchemaFallback(
@@ -1023,6 +1064,7 @@ function SpecStudioPageContent() {
   const [leverNotesSaved, setLeverNotesSaved] = useState(false);
   const [showBetterPathConfirm, setShowBetterPathConfirm] = useState(false);
   const [betterPathApplyMessage, setBetterPathApplyMessage] = useState<string | null>(null);
+  const [dismissedRepriceKey, setDismissedRepriceKey] = useState<string | null>(null);
   const [materialSelectionDelta, setMaterialSelectionDelta] = useState<{
     cogs: number;
     leadTime: number;
@@ -1085,6 +1127,7 @@ function SpecStudioPageContent() {
 
   const [brandProfileName, setBrandProfileName] = useState<string | null>(null);
   const [brandProfileTargetMargin, setBrandProfileTargetMargin] = useState<number | null>(null);
+  const [brandProfilePriceTier, setBrandProfilePriceTier] = useState<string | null>(null);
   const brandProfileId = useSessionStore((s) => s.brandProfileId);
   useEffect(() => {
     const supabase = createClient();
@@ -1092,12 +1135,13 @@ function SpecStudioPageContent() {
       if (!user) return;
       supabase
         .from('brand_profiles')
-        .select('brand_name, target_margin')
+        .select('brand_name, target_margin, price_tier')
         .eq('user_id', user.id)
         .single()
         .then(({ data }) => {
           if (data?.brand_name) setBrandProfileName(data.brand_name);
           if (typeof data?.target_margin === "number") setBrandProfileTargetMargin(data.target_margin);
+          if (typeof data?.price_tier === "string") setBrandProfilePriceTier(data.price_tier);
         });
     });
   }, []);
@@ -1223,6 +1267,10 @@ function SpecStudioPageContent() {
   const selectedCategory = useMemo(
     () => categories.find((c) => c.id === categoryId) || categories[0],
     [categoryId, categories]
+  );
+  const selectedCategoryLaborBase = useMemo(
+    () => ((selectedCategory as Category & { labor_base_usd?: number }).labor_base_usd ?? 0),
+    [selectedCategory]
   );
   const selectedMaterial = useMemo(
     () => materials.find((m) => m.id === materialId) || null,
@@ -1461,7 +1509,8 @@ function SpecStudioPageContent() {
       constructionTier,
       false,
       resolvedTargetMsrp,
-      brandTargetMargin
+      brandTargetMargin,
+      selectedCategoryLaborBase
     );
     return generateInsight(
       breakdown,
@@ -1501,6 +1550,7 @@ function SpecStudioPageContent() {
     : insight.type === "warning" ? "red"
     : insight.type === "viable"  ? "yellow"
     : "green";
+  const marginGatePassed = hasValidTargetMSRP ? (!insight || insight.type !== "warning") : null;
 
   // Timeline feasibility signal
   const timelineFeasibility = constructionTier && selectedMaterial
@@ -1508,9 +1558,12 @@ function SpecStudioPageContent() {
         construction_tier: constructionTier,
         material: selectedMaterial,
         timeline_weeks: timelineWeeks,
+        costStatus,
+        role: storeCollectionRole ?? '',
       })
     : null;
   const timelineStatus = timelineFeasibility?.status ?? null;
+  const timelineSubStatus = timelineFeasibility?.timelineSubStatus ?? null;
 
   // Blended execution status — worst of the two signals wins
   const executionStatus: 'green' | 'yellow' | 'red' | null = (() => {
@@ -1521,15 +1574,6 @@ function SpecStudioPageContent() {
     if (costStatus === 'yellow' || timelineStatus === 'yellow') return 'yellow';
     return 'green';
   })();
-
-  const executionColor =
-    executionStatus === "green"
-      ? CHARTREUSE
-      : executionStatus === "yellow"
-        ? BRAND.rose
-        : executionStatus === "red"
-          ? BRAND.camel
-          : "rgba(67, 67, 43, 0.22)";
 
   const handleCategoryChange = (newId: string) => {
     setCategoryId(newId);
@@ -1677,7 +1721,8 @@ function SpecStudioPageContent() {
       comparisonTier,
       false,
       resolvedTargetMsrp,
-      brandTargetMargin
+      brandTargetMargin,
+      selectedCategoryLaborBase
     );
     const nextBreakdown = calculateCOGS(
       nextMaterial,
@@ -1685,7 +1730,8 @@ function SpecStudioPageContent() {
       comparisonTier,
       false,
       resolvedTargetMsrp,
-      brandTargetMargin
+      brandTargetMargin,
+      selectedCategoryLaborBase
     );
 
     setMaterialSelectionDelta({
@@ -2010,27 +2056,13 @@ function SpecStudioPageContent() {
   })();
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Blended execution score: both fail = 35, one fails = 50, yellow = 65, green = 80
-  const baseExecutionScore = (() => {
-    const costRed      = costStatus === 'red';
-    const timelineRed  = timelineStatus === 'red';
-    const timelineYellow = timelineStatus === 'yellow';
-    if (costRed && timelineRed) return 35;
-    if (costRed || timelineRed) return 50;
-    if (timelineYellow) return 65;
-    if (executionStatus === 'yellow') return 55;
-    if (executionStatus === 'green') return 80;
-    return 0;
-  })();
-
-  const marginGatePassed = hasValidTargetMSRP ? (!insight || insight.type !== "warning") : null;
-
-  const executionScore = applyRoleModifiers(
-    baseExecutionScore,
-    storeCollectionRole ?? '',
-    { cost: marginGatePassed },
-    constructionTier ?? ''
-  );
+  const executionScore = timelineFeasibility?.executionScore ?? 0;
+  const executionScoreColor =
+    executionScore >= 72
+      ? CHARTREUSE
+      : executionScore >= 55
+        ? BRAND.rose
+        : BRAND.camel;
 
   const timelineBuffer = selectedMaterial
     ? (selectedMaterial.lead_time_weeks ?? 0) <= 6 ? 6
@@ -2047,6 +2079,11 @@ function SpecStudioPageContent() {
   const leverNotesSavedTimeoutRef = useRef<number | null>(null);
   const [specSynthInsightData, setSpecSynthInsightData] = useState<InsightData | null>(null);
   const [specRailInsight, setSpecRailInsight] = useState<SpecRailInsight | null>(null);
+  const [priorTabRecommendation, setPriorTabRecommendation] = useState<{
+    dimension: string;
+    title: string;
+    description: string;
+  } | null>(null);
   const [specRailLoading, setSpecRailLoading] = useState(false);
   const [specRailResolvedKey, setSpecRailResolvedKey] = useState<string | null>(null);
   const specRailRequestKey = useMemo(() => JSON.stringify({
@@ -2143,6 +2180,7 @@ function SpecStudioPageContent() {
       ],
       previousMaterialId: previousMaterialId ?? null,
       intent: intentPayload,
+      priorRecommendation: priorTabRecommendation ?? null,
     });
     if (!blackboard) return;
 
@@ -2165,6 +2203,13 @@ function SpecStudioPageContent() {
       window.setTimeout(() => {
         if (controller.signal.aborted) return;
         setSpecRailInsight(nextRail);
+        if (specStep === "material" && nextRail?.alternative_path) {
+          setPriorTabRecommendation({
+            dimension: nextRail.alternative_path.dimension ?? "execution",
+            title: nextRail.alternative_path.title,
+            description: nextRail.alternative_path.description,
+          });
+        }
         setSpecRailResolvedKey(specRailRequestKey);
         if (nextData !== undefined) {
           setSpecSynthInsightData(nextData);
@@ -2492,7 +2537,15 @@ function SpecStudioPageContent() {
     const currentMatId = materialId;
 
     const projCOGS = (mat: Material, yardage: number, tier: ConstructionTier) =>
-      calculateCOGS(mat, yardage, tier, false, resolvedTargetMsrp, brandTargetMargin).totalCOGS;
+      calculateCOGS(
+        mat,
+        yardage,
+        tier,
+        false,
+        resolvedTargetMsrp,
+        brandTargetMargin,
+        selectedCategoryLaborBase
+      ).totalCOGS;
 
     const suggestions: SpecSuggestion[] = [];
 
@@ -2673,6 +2726,7 @@ function SpecStudioPageContent() {
         cogsUsd: insight.cogs,
         targetMsrp: resolvedTargetMsrp,
         targetMargin: brandTargetMargin,
+        priceTier: brandProfilePriceTier ?? 'Contemporary',
         materialCostPerYard: currentMaterial.cost_per_yard,
         currentMaterialId: currentMaterial.id,
       },
@@ -2688,6 +2742,7 @@ function SpecStudioPageContent() {
     selectedCategory?.name,
     constructionTier,
     brandTargetMargin,
+    brandProfilePriceTier,
   ]);
   const activeRole = pieceBuildContext?.role ?? storeCollectionRole;
   const selectedMaterialProperties = useMemo(
@@ -2696,20 +2751,26 @@ function SpecStudioPageContent() {
   );
   const materialBehavior = useMemo(() => {
     if (!selectedMaterial) return null;
-    if (
-      selectedMaterialProperties.some((property) => /drape|fluid|soft|silky|slinky/i.test(property)) ||
-      /tencel|silk|rayon|viscose/i.test(selectedMaterial.id)
-    ) {
+    if (selectedMaterialProperties.some((property) => /drape|fluid|soft|silky|slinky/i.test(property))) {
       return "fluid";
     }
-    if (
-      selectedMaterialProperties.some((property) => /structured|crisp|firm|body|hold/i.test(property)) ||
-      /linen|hemp|nylon|leather|vegan-leather/i.test(selectedMaterial.id)
-    ) {
+    if (selectedMaterialProperties.some((property) => /structured|crisp|firm|body|hold/i.test(property))) {
       return "structured";
     }
     if (selectedMaterialProperties.some((property) => /texture|slub|grain|tactile|brushed/i.test(property))) {
       return "textural";
+    }
+    if (selectedMaterial.drape_quality === "fluid") {
+      return "fluid";
+    }
+    if (selectedMaterial.drape_quality === "structured") {
+      return "structured";
+    }
+    if (selectedMaterial.drape_quality === "medium") {
+      return "medium";
+    }
+    if (selectedMaterial.drape_quality === "varies") {
+      return null;
     }
     return "balanced";
   }, [selectedMaterial, selectedMaterialProperties]);
@@ -2835,10 +2896,25 @@ function SpecStudioPageContent() {
     return activeSpecRail.alternative_path.method
       ?? (betterPathTargetTier ? `${betterPathTargetTier} complexity` : 'simplified construction');
   }, [activeSpecRail, betterPathDimension, betterPathTargetTier]);
+  const repriceRecommendationKey = useMemo(() => {
+    if (viabilityState?.state !== "reprice" || !selectedMaterial) return null;
+    return [
+      viabilityState.state,
+      viabilityState.currentMsrp,
+      viabilityState.suggestedMsrp,
+      viabilityState.msrpCeilingHit ? "ceiling" : "open",
+      selectedMaterial.id,
+      constructionTier ?? "moderate",
+    ].join(":");
+  }, [constructionTier, selectedMaterial, viabilityState]);
+  const showRepriceRecommendation =
+    viabilityState?.state === "reprice" &&
+    Boolean(repriceRecommendationKey) &&
+    repriceRecommendationKey !== dismissedRepriceKey;
 
   useEffect(() => {
     const nextLevers = activeSpecRail?.execution_levers ?? [];
-    setSelectedLevers(new Set(nextLevers));
+    setSelectedLevers(new Set(nextLevers.map((lever) => lever.text)));
     setShowBetterPathConfirm(false);
     setBetterPathApplyMessage(null);
   }, [activeSpecRail]);
@@ -2849,14 +2925,40 @@ function SpecStudioPageContent() {
     }
   }, []);
 
+  useEffect(() => {
+    if (repriceRecommendationKey !== dismissedRepriceKey) {
+      setDismissedRepriceKey(null);
+    }
+  }, [dismissedRepriceKey, repriceRecommendationKey]);
+
   const displayCogs = insight ? `$${insight.cogs}` : "—";
-  const executionSubLabel = selectedMaterial
-    ? timelineStatus === "red"
-      ? "Timeline at risk"
-      : timelineStatus === "yellow"
-        ? "Timeline is tight"
-        : "Timeline stable"
+  const executionLabelMap: Record<"green" | "yellow_comfortable" | "yellow_tight" | "yellow_at_risk" | "red", string> = {
+    green: "Timeline comfortable",
+    yellow_comfortable: "Timeline manageable",
+    yellow_tight: "Timeline tight",
+    yellow_at_risk: "Timeline at risk",
+    red: "Timeline critical",
+  };
+  const executionPillMap: Record<
+    "green" | "yellow_comfortable" | "yellow_tight" | "yellow_at_risk" | "red",
+    { label: string; color: "chartreuse" | "yellow" | "camel" }
+  > = {
+    green: { label: "comfortable", color: "chartreuse" },
+    yellow_comfortable: { label: "manageable", color: "chartreuse" },
+    yellow_tight: { label: "tight", color: "yellow" },
+    yellow_at_risk: { label: "at risk", color: "camel" },
+    red: { label: "critical", color: "camel" },
+  };
+  const executionLabel = selectedMaterial
+    ? timelineSubStatus
+      ? executionLabelMap[timelineSubStatus]
+      : "Checking timeline"
     : "Select a material to activate execution.";
+  const executionPill = selectedMaterial
+    ? timelineSubStatus
+      ? executionPillMap[timelineSubStatus]
+      : { label: "checking", color: "yellow" as const }
+    : null;
   const specPulseTelemetry = useMemo(() => buildSpecPulseTelemetry({
     commercialPotentialScore,
     marketSaturation: marketSaturationSignal,
@@ -2900,12 +3002,12 @@ function SpecStudioPageContent() {
     {
       key: "execution",
       label: "Execution",
-      icon: <IconExecution color={executionColor} />,
+      icon: <IconExecution color={executionScoreColor} />,
       displayScore: String(executionScore),
       numericPercent: executionScore,
-      scoreColor: executionColor,
-      pill: executionChipData ? { variant: executionChipData.variant, label: executionChipData.status } : null,
-      subLabel: executionSubLabel,
+      scoreColor: executionScoreColor,
+      pill: executionPill ? { variant: executionPill.color === "chartreuse" ? "green" as const : "amber" as const, label: executionPill.label } : null,
+      subLabel: executionLabel,
       whatItMeans: "Execution telemetry tracks how much production pressure the current material, construction, cost, and calendar are creating.",
       howCalculated: "Derived from cost gate status, timeline feasibility, and the selected build path.",
       isPending: !selectedMaterial,
@@ -2916,10 +3018,12 @@ function SpecStudioPageContent() {
     marketSaturation: marketSaturationSignal,
     identityStatus: dynamicIdentityScore >= 80 ? "green" : dynamicIdentityScore >= 60 ? "yellow" : "red",
     executionStatus: executionChipData?.variant === "green" ? "green" : executionChipData?.variant === "red" ? "red" : executionChipData?.variant === "amber" ? "yellow" : null,
+    executionScore,
     executionPending: !selectedMaterial,
   }), [
     dynamicIdentityScore,
     commercialPotentialScore,
+    executionScore,
     executionChipData,
     marketSaturationSignal,
     selectedMaterial,
@@ -2928,6 +3032,11 @@ function SpecStudioPageContent() {
   /* ─── RENDER ───────────────────────────────────────────────────────────── */
   const overallScore = Math.round((dynamicIdentityScore + commercialPotentialScore + executionScore) / 3);
   const specInsightNarrative = specInsightData.statements.join(" ");
+  const executionLevers = activeSpecRail?.execution_levers ?? [];
+  const prioritizedExecutionLever = executionLevers.find((lever) => lever.priority === true) ?? null;
+  const standardExecutionLevers = prioritizedExecutionLever
+    ? executionLevers.filter((lever) => lever.text !== prioritizedExecutionLever.text)
+    : executionLevers;
 
   const persistAnalysisRow = useCallback(async (
     supabase: ReturnType<typeof createClient>,
@@ -3007,7 +3116,9 @@ function SpecStudioPageContent() {
   }, []);
 
   const handleApplySelectedLevers = useCallback(async () => {
-    const checkedLevers = (activeSpecRail?.execution_levers ?? []).filter((item) => selectedLevers.has(item));
+    const checkedLevers = (activeSpecRail?.execution_levers ?? [])
+      .filter((item) => selectedLevers.has(item.text))
+      .map((item) => item.text);
     if (checkedLevers.length === 0) return;
 
     const nextNotes = Array.from(new Set([...executionNotes, ...checkedLevers]));
@@ -3022,11 +3133,6 @@ function SpecStudioPageContent() {
 
     const actionableDimension = getAlternativePathDimension(activeSpecRail);
     if (!activeSpecRail.alternative_path) return;
-
-    const nextNote = `${activeSpecRail.alternative_path.title}: ${activeSpecRail.alternative_path.description}`;
-    const nextNotes = Array.from(new Set([...executionNotes, nextNote]));
-    setExecutionNotes(nextNotes);
-    await persistExecutionNotes(nextNotes);
 
     // Resolve construction tier: first trust the structured field, then try text patterns,
     // then fall back to a one-tier drop for downgrade-construction guidance.
@@ -3080,12 +3186,10 @@ function SpecStudioPageContent() {
     activeSpecRail,
     betterPathMaterial,
     constructionTier,
-    executionNotes,
     handleComplexityChange,
     handleMaterialSelection,
     materialId,
     materials,
-    persistExecutionNotes,
   ]);
 
   const persistCurrentPiece = useCallback(async () => {
@@ -3345,7 +3449,7 @@ function SpecStudioPageContent() {
         piecesComplete={false}
         collectionName={headerCollectionName}
         seasonLabel={headerSeasonLabel}
-        onBack={() => window.history.back()}
+        onBack={() => router.push("/pieces")}
         onSaveClose={() => {}}
       />
 
@@ -3701,7 +3805,6 @@ function SpecStudioPageContent() {
                       {(["low", "moderate", "high"] as ConstructionTier[]).map((tier) => {
                         const info = COMPLEXITY_CONTEXT[tier];
                         const isSel = constructionConfirmed && constructionTier === tier;
-                        const isRec = tier === baselineComplexity;
                         return (
                           <div
                             key={tier}
@@ -3730,9 +3833,9 @@ function SpecStudioPageContent() {
                           >
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8, alignItems: "center" }}>
                               <div style={{ fontFamily: sohne, fontSize: 17, fontWeight: 600, color: OLIVE }}>{info.label}</div>
-                              {(isRec || isSel) && (
+                              {isSel && (
                                 <span className="specSelectionChip">
-                                  {isSel ? "Selected" : "Default"}
+                                  Selected
                                 </span>
                               )}
                             </div>
@@ -4039,11 +4142,11 @@ function SpecStudioPageContent() {
               </section>
             )}
 
-            {((showBetterPath && activeSpecRail) || viabilityState?.state === "reprice" || viabilityState?.state === "not_viable") && (
+            {((showBetterPath && activeSpecRail) || showRepriceRecommendation || viabilityState?.state === "not_viable") && (
               <>
                 <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
                 <section style={{ marginBottom: 24 }}>
-                  {viabilityState?.state === "reprice" && selectedMaterial ? (
+                  {showRepriceRecommendation && viabilityState?.state === "reprice" && selectedMaterial ? (
                     <>
                       <div style={{ fontFamily: inter, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9A9187", fontWeight: 500, marginBottom: 14 }}>Better path</div>
                       <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 500, color: "#4D302F", lineHeight: 1.35, marginBottom: 12 }}>
@@ -4056,14 +4159,19 @@ function SpecStudioPageContent() {
                           <span style={{ fontFamily: inter, fontSize: 14, color: "#9A9187" }}>→</span>
                           <span style={{ fontFamily: sohne, fontSize: 18, fontWeight: 500, color: "#4D302F" }}>${viabilityState.suggestedMsrp}</span>
                         </div>
-                        <div style={{ fontFamily: inter, fontSize: 12, color: "#9A9187", marginTop: 6 }}>
-                          Closes the margin gap at {Math.round(brandTargetMargin * 100)}%. Keeps {selectedMaterial.name} and {constructionTier ?? "moderate"} intact.
-                        </div>
+                      <div style={{ fontFamily: inter, fontSize: 12, color: "#9A9187", marginTop: 6 }}>
+                        Closes the margin gap at {Math.round(brandTargetMargin * 100)}%. Keeps {selectedMaterial.name} and {constructionTier ?? "moderate"} intact.
                       </div>
+                      {viabilityState.msrpCeilingHit ? (
+                        <div style={{ fontFamily: inter, fontSize: 12, color: "#9A9187", marginTop: 6 }}>
+                          ${viabilityState.suggestedMsrp} is the ceiling for your price tier. If this doesn’t close the gap, the material path is the remaining lever.
+                        </div>
+                      ) : null}
+                    </div>
                       <div style={{ fontFamily: inter, fontSize: 13, color: "#7A6E66", lineHeight: 1.6, marginBottom: 10 }}>
                         {alternativeMaterial
-                          ? `If $${viabilityState.suggestedMsrp} exceeds your customer's ceiling, the material swap path is still open: ${alternativeMaterial.name} closes $${Math.round((selectedMaterial.cost_per_yard - alternativeMaterial.cost_per_yard) * 2.5)} of the gap and preserves the surface character.`
-                          : `If $${viabilityState.suggestedMsrp} exceeds your customer's ceiling, the material swap path is still open if a lower-cost material with similar surface behavior becomes acceptable.`}
+                          ? `If $${viabilityState.suggestedMsrp} exceeds your customer’s ceiling, the material swap path is still open: ${alternativeMaterial.name} closes $${Math.round((selectedMaterial.cost_per_yard - alternativeMaterial.cost_per_yard) * 2.5)} of the gap and preserves the surface character.`
+                          : `If $${viabilityState.suggestedMsrp} exceeds your customer’s ceiling, the material swap path is still open if a lower-cost material with similar surface behavior becomes acceptable.`}
                       </div>
                       <div style={{ fontFamily: inter, fontSize: 11, color: "#B8A89E", lineHeight: 1.6, marginBottom: 14 }}>
                         Applies on pricing · or return to material
@@ -4086,6 +4194,12 @@ function SpecStudioPageContent() {
                           Update MSRP to ${viabilityState.suggestedMsrp}
                         </button>
                         <button
+                          onClick={() => {
+                            if (repriceRecommendationKey) {
+                              setDismissedRepriceKey(repriceRecommendationKey);
+                            }
+                            backToMaterial();
+                          }}
                           style={{
                             background: "transparent",
                             color: "#7A6E66",
@@ -4222,7 +4336,13 @@ function SpecStudioPageContent() {
                           <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58 }}>
                             {activeSpecRail?.alternative_path?.description}
                           </div>
-                          {betterPathDimension === "construction" ? (
+                          {betterPathDimension === "construction" && betterPathTargetTier ? (
+                            <div style={{ marginTop: 10, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.44)", lineHeight: 1.5 }}>
+                              Recommended tier: {CONSTRUCTION_INFO[betterPathTargetTier].label}
+                              {betterPathMethod ? ` via ${betterPathMethod}.` : "."}
+                            </div>
+                          ) : null}
+                          {betterPathDimension === "construction" && specStep !== "construction" ? (
                             <div style={{ marginTop: 10, fontFamily: inter, fontSize: 11, color: "rgba(67,67,43,0.44)", lineHeight: 1.5 }}>
                               Applies on Construction tab
                             </div>
@@ -4323,29 +4443,123 @@ function SpecStudioPageContent() {
                   ) : (
                     <>
                       <div style={{ display: "grid", gap: 12 }}>
-                        {(activeSpecRail?.execution_levers ?? []).map((item) => (
-                          <div key={item} style={{ display: "flex", gap: 10, alignItems: "start" }}>
-                            <input
-                              type="checkbox"
-                              checked={selectedLevers.has(item)}
-                              onChange={() => {
-                                setSelectedLevers((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(item)) {
-                                    next.delete(item);
-                                  } else {
-                                    next.add(item);
-                                  }
-                                  return next;
-                                });
-                              }}
-                              style={{ accentColor: "#43432B", width: 13, height: 13, marginTop: 3, cursor: "pointer", flexShrink: 0 }}
-                            />
-                            <label style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58, cursor: "pointer" }}>
-                              {item}
-                            </label>
-                          </div>
-                        ))}
+                        {prioritizedExecutionLever ? (
+                          <>
+                            {(() => {
+                              const leverText = prioritizedExecutionLever.text;
+                              const isChecked = selectedLevers.has(leverText);
+
+                              return (
+                                <div key={leverText} style={{ display: "flex", gap: 10, alignItems: "start" }}>
+                                  <div className="priorityLeverWrap" style={{ position: "relative", flexShrink: 0, marginTop: 2 }}>
+                                    <button
+                                      type="button"
+                                      aria-label={`Toggle priority lever: ${leverText}`}
+                                      aria-pressed={isChecked}
+                                      onClick={() => {
+                                        setSelectedLevers((prev) => {
+                                          const next = new Set(prev);
+                                          if (next.has(leverText)) {
+                                            next.delete(leverText);
+                                          } else {
+                                            next.add(leverText);
+                                          }
+                                          return next;
+                                        });
+                                      }}
+                                      style={{
+                                        width: 14,
+                                        height: 14,
+                                        borderRadius: 4,
+                                        border: `1px solid ${BRAND.camel}`,
+                                        background: isChecked ? BRAND.camel : "transparent",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        cursor: "pointer",
+                                        padding: 0,
+                                        position: "relative",
+                                      }}
+                                    >
+                                      {isChecked ? (
+                                        <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden>
+                                          <path d="M2 5.2L4.2 7.2L8 2.8" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                      ) : (
+                                        <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden>
+                                          <path d="M5 1.5V5.5M5 7.5V8" stroke="#B8876B" strokeWidth="1.5" strokeLinecap="round" />
+                                        </svg>
+                                      )}
+                                    </button>
+                                    <div className="priorityLeverTooltip">Prioritize this</div>
+                                  </div>
+                                  <label
+                                    style={{
+                                      fontFamily: inter,
+                                      fontSize: 12,
+                                      color: BRAND.camel,
+                                      fontWeight: 500,
+                                      lineHeight: 1.58,
+                                      cursor: "pointer",
+                                    }}
+                                    onClick={() => {
+                                      setSelectedLevers((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(leverText)) {
+                                          next.delete(leverText);
+                                        } else {
+                                          next.add(leverText);
+                                        }
+                                        return next;
+                                      });
+                                    }}
+                                  >
+                                    {leverText}
+                                  </label>
+                                </div>
+                              );
+                            })()}
+                            {standardExecutionLevers.length > 0 ? (
+                              <div style={{ height: 0.5, background: "#E2DDD6", margin: "2px 0 0" }} />
+                            ) : null}
+                          </>
+                        ) : null}
+                        {standardExecutionLevers.map((item) => {
+                          const leverText = item.text;
+                          const isChecked = selectedLevers.has(leverText);
+
+                          return (
+                            <div key={leverText} style={{ display: "flex", gap: 10, alignItems: "start" }}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  setSelectedLevers((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(leverText)) {
+                                      next.delete(leverText);
+                                    } else {
+                                      next.add(leverText);
+                                    }
+                                    return next;
+                                  });
+                                }}
+                                style={{ accentColor: "#43432B", width: 13, height: 13, marginTop: 3, cursor: "pointer", flexShrink: 0 }}
+                              />
+                              <label
+                                style={{
+                                  fontFamily: inter,
+                                  fontSize: 12,
+                                  color: "#191919",
+                                  lineHeight: 1.58,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {leverText}
+                              </label>
+                            </div>
+                          );
+                        })}
                       </div>
                       <div style={{ marginTop: 16 }}>
                         <button
@@ -4392,7 +4606,7 @@ function SpecStudioPageContent() {
                 howCalculated: row.howCalculated,
                 isPending: row.isPending,
               }))}
-              helperText={!selectedMaterial ? "Pulse activates once material and build inputs are in play." : "Telemetry only: Pulse shows the current signal state; Muko’s Read makes the call."}
+              helperText={!selectedMaterial ? "Pulse activates once material and build inputs are in play." : undefined}
             />
 
           </div>
@@ -4461,6 +4675,41 @@ function SpecStudioPageContent() {
         }
         .specNextMoveRow:hover {
           background: rgba(255,255,255,0.72);
+        }
+        .priorityLeverWrap:hover .priorityLeverTooltip {
+          opacity: 1;
+          visibility: visible;
+        }
+        .priorityLeverTooltip {
+          position: absolute;
+          left: 100%;
+          top: 50%;
+          transform: translateY(-50%);
+          margin-left: 8px;
+          background: #4D302F;
+          color: #F5EDE8;
+          font-family: ${inter};
+          font-size: 11px;
+          line-height: 1;
+          white-space: nowrap;
+          padding: 7px 9px;
+          border-radius: 8px;
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+          z-index: 2;
+        }
+        .priorityLeverTooltip::before {
+          content: "";
+          position: absolute;
+          top: 50%;
+          left: -5px;
+          transform: translateY(-50%);
+          width: 0;
+          height: 0;
+          border-top: 5px solid transparent;
+          border-bottom: 5px solid transparent;
+          border-right: 5px solid #4D302F;
         }
         @media (max-width: 1180px) {
           .specStudioLayout {

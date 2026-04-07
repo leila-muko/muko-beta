@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import { createClient } from "@/lib/supabase/client";
 import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
+import { getCollectionLanguageLabels, getExpressionSignalLabels } from "@/lib/collection-signals";
 import type { SpecSuggestion } from "@/lib/types/next-move";
 import type { ScorecardInsight, Consideration } from "@/app/api/synthesizer/scorecard/route";
 import type {
@@ -271,6 +272,14 @@ export function ScorecardModal({
     setCurrentStep,
     aestheticInput,
     aestheticMatchedId,
+    collectionAesthetic,
+    aestheticInflection,
+    directionInterpretationText,
+    directionInterpretationChips,
+    chipSelection,
+    conceptPalette,
+    moodboardImages,
+    strategySummary,
     materialId,
     category,
     season,
@@ -301,6 +310,8 @@ export function ScorecardModal({
   const [actionLoading, setActionLoading] = useState(false);
   const [hasConflict, setHasConflict] = useState(false);
   const [conflictTypeState, setConflictTypeState] = useState<ConflictType>("none");
+  const collectionLanguage = getCollectionLanguageLabels(directionInterpretationChips, directionInterpretationText);
+  const expressionSignals = getExpressionSignalLabels(chipSelection);
 
   const animatedScore = useCountUp(mukoScore);
 
@@ -443,6 +454,9 @@ export function ScorecardModal({
         target_msrp: storeTargetMsrp != null && storeTargetMsrp > 0 ? storeTargetMsrp : null,
         aesthetic_input: aestheticInput || null,
         aesthetic_matched_id: aestheticMatchedId ?? aestheticInput?.toLowerCase()?.replace(/\s+/g, '-') ?? null,
+        collection_aesthetic: collectionAesthetic || (aestheticMatchedId ?? aestheticInput) || null,
+        aesthetic_inflection: aestheticInflection || directionInterpretationText || null,
+        mood_board_images: moodboardImages,
         material_id: materialId || null,
         silhouette: silhouette || null,
         construction_tier: constructionTier ?? null,
@@ -458,7 +472,16 @@ export function ScorecardModal({
         },
         collection_role: collectionRole || null,
         narrative: scorecardData?.insight ?? fallbackText ?? mukoInsight ?? '',
-        agent_versions: {},
+        agent_versions: {
+          collection_role: collectionRole || null,
+          selected_piece_image: selectedPieceImage ? JSON.stringify(selectedPieceImage) : null,
+          selected_palette: conceptPalette || null,
+          strategy_summary: strategySummary || null,
+          collection_language: JSON.stringify(collectionLanguage),
+          expression_signals: JSON.stringify(expressionSignals),
+          direction_interpretation_chips: JSON.stringify(directionInterpretationChips),
+          chip_selection: chipSelection ? JSON.stringify(chipSelection) : null,
+        },
         // parent_analysis_id removed — branching deferred to Phase 2
       };
 

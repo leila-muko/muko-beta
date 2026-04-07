@@ -985,6 +985,7 @@ export default function ConceptStudioPage() {
     strategySummary,
     isProxyMatch,
     setIsProxyMatch,
+    setCollectionContextSnapshot,
     savedAnalysisId,
     preloadedCriticScores,
     setPreloadedCriticScores,
@@ -1038,6 +1039,7 @@ export default function ConceptStudioPage() {
       strategySummary: state.strategySummary,
       isProxyMatch: state.isProxyMatch,
       setIsProxyMatch: state.setIsProxyMatch,
+      setCollectionContextSnapshot: state.setCollectionContextSnapshot,
       savedAnalysisId: state.savedAnalysisId,
       preloadedCriticScores: state.preloadedCriticScores,
       setPreloadedCriticScores: state.setPreloadedCriticScores,
@@ -1049,6 +1051,7 @@ export default function ConceptStudioPage() {
   const [lockedCollectionAesthetic, setLockedCollectionAesthetic] = useState<string | null>(storeCollectionAesthetic);
   const [isAestheticSelectionUnlocked, setIsAestheticSelectionUnlocked] = useState(false);
   const [showAestheticChangeModal, setShowAestheticChangeModal] = useState(false);
+  const [pendingAestheticChange, setPendingAestheticChange] = useState<string | null>(null);
   const [aestheticInflection, setAestheticInflection] = useState(storeDirectionInterpretationText);
   const [selectedInterpretationChips, setSelectedInterpretationChips] = useState<string[]>(storeDirectionInterpretationChips);
   // Draft states — user types/clicks here; committed after a short pause.
@@ -1151,12 +1154,17 @@ export default function ConceptStudioPage() {
     scored.sort((a, b) => b.identityScore - a.identityScore);
     return { recommendedAesthetic: scored[0]?.aesthetic ?? computeRecommendedAesthetic(brandKeywordSource) };
   }, [allCriticScores, brandKeywordSource]);
-  const selectedAesthetic = AESTHETICS.includes(aestheticInput as (typeof AESTHETICS)[number]) ? aestheticInput : null;
-  const selectedIsAlternative = Boolean(selectedAesthetic && selectedAesthetic !== recommendedAesthetic);
   const lockedAestheticName = useMemo(
     () => resolveAestheticName(lockedCollectionAesthetic),
     [lockedCollectionAesthetic]
   );
+  const selectedAesthetic =
+    AESTHETICS.includes(aestheticInput as (typeof AESTHETICS)[number])
+      ? aestheticInput
+      : lockedAestheticName && AESTHETICS.includes(lockedAestheticName as (typeof AESTHETICS)[number])
+      ? lockedAestheticName
+      : null;
+  const selectedIsAlternative = Boolean(selectedAesthetic && selectedAesthetic !== recommendedAesthetic);
   const isAestheticSelectorLocked = Boolean(lockedCollectionAesthetic) && !isAestheticSelectionUnlocked;
 
   // Top-slot card: which aesthetic occupies the hero position
@@ -1353,9 +1361,9 @@ export default function ConceptStudioPage() {
   useEffect(() => {
     if (lockedCollectionAesthetic || isAestheticSelectionUnlocked || collectionPieces.length === 0) return;
     const inferredCollectionAesthetic =
-      storeCollectionAesthetic ??
       collectionPieces.find((piece) => piece.collection_aesthetic)?.collection_aesthetic ??
       collectionPieces.find((piece) => piece.aesthetic_matched_id)?.aesthetic_matched_id ??
+      storeCollectionAesthetic ??
       null;
     if (!inferredCollectionAesthetic) return;
     setLockedCollectionAesthetic(inferredCollectionAesthetic);
@@ -1663,6 +1671,44 @@ export default function ConceptStudioPage() {
     const strategy = conceptStrategySummary?.trim();
     return strategy && strategy !== GENERIC_STRATEGY_SUMMARY ? strategy : null;
   }, [conceptStrategySummary]);
+  const persistLockedCollectionContext = useCallback(() => {
+    const resolvedCollectionName = storeCollectionName.trim() || headerCollectionName.trim();
+    if (!resolvedCollectionName || resolvedCollectionName === "Collection") return;
+
+    setCollectionContextSnapshot(resolvedCollectionName, {
+      collection_aesthetic: selectedAesthetic?.trim() || storeCollectionAesthetic?.trim() || null,
+      aesthetic_inflection: aestheticInflection.trim() || null,
+      aesthetic_matched_id: selectedAesthetic?.toLowerCase().replace(/\s+/g, "-") || null,
+      silhouette: conceptSilhouette?.trim() || null,
+      season: season?.trim() || headerSeasonLabel.trim() || null,
+      mood_board_images: topMoodboardImages,
+      agent_versions: {
+        strategy_summary: effectiveConceptBarSummary,
+        selected_palette: conceptPalette?.trim() || null,
+        direction_interpretation_chips: JSON.stringify(selectedInterpretationChips),
+        collection_language: JSON.stringify(selectedCollectionLanguage),
+        expression_signals: JSON.stringify(selectedExpressionSignals),
+        chip_selection: storeChipSelection ? JSON.stringify(storeChipSelection) : null,
+      },
+    });
+  }, [
+    aestheticInflection,
+    conceptPalette,
+    conceptSilhouette,
+    effectiveConceptBarSummary,
+    headerCollectionName,
+    headerSeasonLabel,
+    season,
+    selectedAesthetic,
+    selectedCollectionLanguage,
+    selectedExpressionSignals,
+    selectedInterpretationChips,
+    setCollectionContextSnapshot,
+    storeChipSelection,
+    storeCollectionAesthetic,
+    storeCollectionName,
+    topMoodboardImages,
+  ]);
   const conceptStrategyRead = useMemo(
     () =>
       buildProgressiveStrategySummary({
@@ -2305,9 +2351,9 @@ export default function ConceptStudioPage() {
 
         const { data: latestAnalysis } = await supabase
           .from("analyses")
+          .select("id")
           .eq("user_id", user?.id ?? "")
           .eq("collection_name", storeCollectionName)
-          .select("id")
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -2537,8 +2583,7 @@ export default function ConceptStudioPage() {
   const scoreColor = (score: number) => score >= 80 ? CHARTREUSE : score >= 65 ? BRAND.camel : BRAND.rose;
 
   /* ─── Select handler ──────────────────────────────────────────────────────── */
-  const handleSelectAesthetic = (aesthetic: string) => {
-    if (isAestheticSelectorLocked) return;
+  const applyAestheticSelection = useCallback((aesthetic: string) => {
     const aestheticSlug = toAestheticSlug(aesthetic);
     setCurrentStageState("direction");
     setStageTransitionDirection(1);
@@ -2587,20 +2632,37 @@ export default function ConceptStudioPage() {
     useSessionStore.setState({ conceptLocked: true });
     try { lockConcept?.(); } catch {}
     setTimeout(() => { yourConceptRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
-  };
+  }, [
+    clearConceptInsight,
+    computeAndSetResonance,
+    identityPulse,
+    lockConcept,
+    setAestheticInput,
+    setCollectionAesthetic,
+    setConceptPalette,
+    setConceptSilhouette,
+    setDirectionInterpretationModifiers,
+  ]);
+
+  const handleSelectAesthetic = useCallback((aesthetic: string) => {
+    if (isAestheticSelectorLocked) {
+      if (aesthetic === selectedAesthetic) {
+        setCurrentStageState("direction");
+        setStageTransitionDirection(-1);
+        return;
+      }
+      setPendingAestheticChange(aesthetic);
+      setShowAestheticChangeModal(true);
+      return;
+    }
+    applyAestheticSelection(aesthetic);
+  }, [applyAestheticSelection, isAestheticSelectorLocked, selectedAesthetic]);
 
   const handleBackToDirection = useCallback(() => {
-    setIsAestheticSelectionUnlocked(true);
-    setLockedCollectionAesthetic(null);
-    setCollectionAesthetic(null);
-    setAestheticInput("");
-    setDirectionInterpretationModifiers([]);
-    try {
-      window.localStorage.removeItem(COLLECTION_AESTHETIC_STORAGE_KEY);
-    } catch {
-      // Ignore storage failures.
-    }
-  }, [setAestheticInput, setCollectionAesthetic, setDirectionInterpretationModifiers]);
+    setStageTransitionDirection(-1);
+    setCurrentStageState("direction");
+    setTimeout(() => { yourConceptRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
+  }, []);
 
   /* ─── Sorted base list ────────────────────────────────────────────────────── */
   const aestheticSorter = (rec: string) => (a: string, b: string) => {
@@ -2698,6 +2760,30 @@ export default function ConceptStudioPage() {
       }),
     };
   }, [curatedRecommendations, hoveredCard, recommendedAesthetic]);
+  const selectedRecommendation = useMemo(() => {
+    if (!selectedAesthetic) return null;
+    const existing = curatedRecommendations.find((item) => item.aesthetic === selectedAesthetic);
+    if (existing) return existing;
+    const content = AESTHETIC_CONTENT[selectedAesthetic];
+    const entry = (aestheticsData as unknown as AestheticDataEntry[]).find((item) => item.name === selectedAesthetic);
+    if (!content || !entry) return null;
+    return {
+      aesthetic: selectedAesthetic,
+      role: (selectedAesthetic === recommendedAesthetic ? "primary" : "stretch") as RecommendationRole,
+      descriptor: content.description ?? "",
+      identityScore: content.identityScore ?? 0,
+      resonanceScore: content.resonanceScore ?? 0,
+      saturationScore: entry.saturation_score ?? 60,
+      velocity: entry.trend_velocity ?? "peak",
+      insight: buildRecommendationInsight({
+        role: (selectedAesthetic === recommendedAesthetic ? "primary" : "stretch") as RecommendationRole,
+        isRecommended: selectedAesthetic === recommendedAesthetic,
+        identityScore: content.identityScore ?? 0,
+        resonanceScore: content.resonanceScore ?? 0,
+        saturationScore: entry.saturation_score ?? 60,
+      }),
+    };
+  }, [curatedRecommendations, recommendedAesthetic, selectedAesthetic]);
   const directionSelectionRead = useMemo(() => {
     return buildDirectionSelectionRead({
       recommendations: hoveredRecommendation
@@ -3039,7 +3125,6 @@ export default function ConceptStudioPage() {
     { id: "product" as const, label: "Build Product Expression", helper: "Evaluate pieces one by one and assign their role in the assortment." },
   ];
   const conceptStepperSteps = [
-    { id: "direction" as const, label: "Direction" },
     { id: "language" as const, label: "Language" },
     { id: "product" as const, label: "Product" },
   ];
@@ -3365,6 +3450,7 @@ export default function ConceptStudioPage() {
       if (!shouldContinue) return;
     }
     await handleConfirmDirection();
+    persistLockedCollectionContext();
     useSessionStore.setState({
       aestheticMatchedId: selectedAesthetic,
       moodboardImages: topMoodboardImages,
@@ -3384,6 +3470,7 @@ export default function ConceptStudioPage() {
     conceptSilhouette,
     handleConfirmDirection,
     heroAssignedPieceId,
+    persistLockedCollectionContext,
     router,
     selectedAesthetic,
     selectedInterpretationChips,
@@ -3394,6 +3481,7 @@ export default function ConceptStudioPage() {
   const handleLockAndStartPieces = useCallback(async () => {
     if (!canAdvanceToStage3 || !selectedAesthetic) return;
     await handleConfirmDirection();
+    persistLockedCollectionContext();
     useSessionStore.setState({
       aestheticMatchedId: selectedAesthetic,
       moodboardImages: topMoodboardImages,
@@ -3412,6 +3500,7 @@ export default function ConceptStudioPage() {
     conceptPalette,
     conceptSilhouette,
     handleConfirmDirection,
+    persistLockedCollectionContext,
     router,
     selectedAesthetic,
     selectedInterpretationChips,
@@ -3482,7 +3571,7 @@ export default function ConceptStudioPage() {
             moodboardImages={topMoodboardImages}
             action={
               <button
-                onClick={() => setShowAestheticChangeModal(true)}
+                onClick={handleBackToDirection}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -3500,7 +3589,7 @@ export default function ConceptStudioPage() {
                   opacity: 0.72,
                 }}
               >
-                Change direction
+                Review direction
               </button>
             }
           />
@@ -3538,7 +3627,7 @@ export default function ConceptStudioPage() {
               </div>
             </div>
 
-            {selectedAesthetic && (
+            {selectedAesthetic && currentStage !== "direction" && (
               <>
                 <div ref={yourConceptRef} />
 
@@ -3550,7 +3639,13 @@ export default function ConceptStudioPage() {
                     marginBottom: 38,
                   }}
                 >
-                  {conceptStepperSteps.map((step, index) => (
+                  {conceptStepperSteps.map((step, index) => {
+                    const isActive =
+                      step.id === "language"
+                        ? currentStage === "direction"
+                        : currentStage === "language" || currentStage === "product";
+
+                    return (
                     <React.Fragment key={step.id}>
                       <div
                         style={{
@@ -3559,7 +3654,7 @@ export default function ConceptStudioPage() {
                           fontWeight: 600,
                           letterSpacing: "0.16em",
                           textTransform: "uppercase",
-                          color: currentStage === step.id ? TEXT : MUTED,
+                          color: isActive ? TEXT : MUTED,
                         }}
                       >
                         {step.label}
@@ -3568,7 +3663,8 @@ export default function ConceptStudioPage() {
                         <div style={{ width: 34, height: 1, background: "rgba(67,67,43,0.12)" }} />
                       )}
                     </React.Fragment>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div
@@ -3986,7 +4082,23 @@ export default function ConceptStudioPage() {
                                 </div>
                               )}
 
-                              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                                <button
+                                  onClick={() => navigateStage("direction")}
+                                  style={{
+                                    padding: "12px 18px",
+                                    borderRadius: 999,
+                                    border: "1px solid rgba(67,67,43,0.14)",
+                                    background: "transparent",
+                                    color: "rgba(67,67,43,0.62)",
+                                    fontFamily: sohne,
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Back to Language
+                                </button>
                                 <button
                                   onClick={() => setCurrentStageState("product")}
                                   style={{
@@ -4242,16 +4354,50 @@ export default function ConceptStudioPage() {
               </>
             )}
 
-            {!selectedAesthetic && !isAestheticSelectorLocked && (
+            {selectedAesthetic && currentStage === "direction" && <div ref={yourConceptRef} />}
+
+            {currentStage === "direction" && (
               <>
+                {selectedAesthetic && selectedRecommendation && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 30 }}>
+                    <div>
+                      <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(67,67,43,0.36)", marginBottom: 6 }}>
+                        Locked Direction
+                      </div>
+                      <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.50)", lineHeight: 1.55 }}>
+                        This is the direction currently set for the collection. Choosing another one will restart the concept and piece setup.
+                      </div>
+                    </div>
+
+                    <motion.div layout transition={{ duration: 0.22, ease: "easeInOut" }} style={{ borderRadius: 18 }}>
+                      <DirectionCard
+                        aesthetic={selectedAesthetic}
+                        isHovered={hoveredCard === selectedAesthetic}
+                        moodboardImages={loadMoodboardImages(selectedAesthetic)}
+                        onHoverEnter={() => setHoveredCard(selectedAesthetic)}
+                        onHoverLeave={() => setHoveredCard(null)}
+                        onSelect={() => handleSelectAesthetic(selectedAesthetic)}
+                        inter={inter}
+                        sohne={sohne}
+                        chartreuse={CHARTREUSE}
+                        recommendation={selectedRecommendation}
+                        ctaLabel="Locked"
+                        locked
+                      />
+                    </motion.div>
+                  </div>
+                )}
+
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(67,67,43,0.36)", marginBottom: 6 }}>
-                    Muko Edit
+                    {selectedAesthetic ? "Change Direction" : "Muko Edit"}
                   </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 30 }}>
-                  {curatedRecommendations.map((recommendation) => {
+                  {curatedRecommendations
+                    .filter((recommendation) => recommendation.aesthetic !== selectedAesthetic)
+                    .map((recommendation) => {
                     const aesthetic = recommendation.aesthetic;
                     const isHovered = hoveredCard === aesthetic;
                     const cardImages = loadMoodboardImages(aesthetic);
@@ -4277,7 +4423,7 @@ export default function ConceptStudioPage() {
 
                 <div style={{ marginBottom: 20 }}>
                   <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 5 }}>
-                    Explore Outside Your Recommended Frame
+                    {selectedAesthetic ? "Explore More Directions" : "Explore Outside Your Recommended Frame"}
                   </div>
                   <div style={{ fontFamily: inter, fontSize: 12, fontStyle: "italic", color: "rgba(67,67,43,0.44)", marginBottom: 12 }}>
                     Type a direction and we&apos;ll match it, or review the broader set below.
@@ -4307,7 +4453,9 @@ export default function ConceptStudioPage() {
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {exploreDirections.map((aesthetic) => {
+                  {exploreDirections
+                    .filter((aesthetic) => aesthetic !== selectedAesthetic)
+                    .map((aesthetic) => {
                     const isHovered = hoveredCard === aesthetic;
                     const content = AESTHETIC_CONTENT[aesthetic];
                     const entry = (aestheticsData as unknown as AestheticDataEntry[]).find((item) => item.name === aesthetic);
@@ -4458,29 +4606,70 @@ export default function ConceptStudioPage() {
 
 
       {showAestheticChangeModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(17,17,12,0.28)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }}>
-          <div style={{ width: "min(420px, calc(100vw - 32px))", borderRadius: 16, border: "1px solid rgba(67,67,43,0.10)", background: "#F8F5EF", boxShadow: "0 24px 64px rgba(17,17,12,0.18)", padding: "22px 22px 18px" }}>
-            <div style={{ fontFamily: sohne, fontSize: 18, fontWeight: 500, color: OLIVE, marginBottom: 10 }}>
-              Change collection aesthetic?
+        <div style={{ position: "fixed", inset: 0, background: "rgba(23,23,18,0.34)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, padding: 16 }}>
+          <div style={{ width: "min(520px, calc(100vw - 32px))", borderRadius: 24, border: "1px solid rgba(67,67,43,0.10)", background: "linear-gradient(180deg, rgba(248,245,239,0.98) 0%, rgba(255,255,255,0.96) 100%)", boxShadow: "0 28px 80px rgba(17,17,12,0.18)", padding: "24px 24px 20px" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(168,180,117,0.28)", background: "rgba(168,180,117,0.10)", color: "#6F7C46", fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 14 }}>
+              Direction Change
             </div>
-            <p style={{ margin: "0 0 18px", fontFamily: inter, fontSize: 13, lineHeight: 1.6, color: "rgba(67,67,43,0.60)" }}>
-              Changing your collection aesthetic will affect how all future pieces are evaluated. Past pieces will not change.
+            <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, color: OLIVE, marginBottom: 10, letterSpacing: "-0.03em", lineHeight: 1.04 }}>
+              Change the collection direction?
+            </div>
+            <p style={{ margin: "0 0 14px", fontFamily: inter, fontSize: 13.5, lineHeight: 1.65, color: "rgba(67,67,43,0.62)" }}>
+              {pendingAestheticChange
+                ? `You’re about to switch from ${selectedAesthetic ?? "your current direction"} to ${pendingAestheticChange}.`
+                : "You’re about to switch away from the current locked direction."}
+            </p>
+            <div style={{ marginBottom: 18, padding: "14px 16px", borderRadius: 18, border: "1px solid rgba(77,48,47,0.10)", background: "rgba(255,255,255,0.58)" }}>
+              <div style={{ fontFamily: inter, fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(77,48,47,0.52)", marginBottom: 8 }}>
+                What Changes
+              </div>
+              <div style={{ fontFamily: inter, fontSize: 13, lineHeight: 1.65, color: "rgba(67,67,43,0.72)" }}>
+                Changing direction clears the current language setup, product choices, and piece selections so Muko can restart the collection from the new lens.
+              </div>
+            </div>
+            <p style={{ margin: "0 0 20px", fontFamily: inter, fontSize: 12, lineHeight: 1.6, color: "rgba(67,67,43,0.48)" }}>
+              Your existing direction stays locked unless you confirm.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button
-                onClick={() => setShowAestheticChangeModal(false)}
-                style={{ padding: "8px 14px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", fontFamily: inter, fontSize: 12, fontWeight: 600, color: "rgba(67,67,43,0.62)", cursor: "pointer" }}
+                onClick={() => {
+                  setPendingAestheticChange(null);
+                  setShowAestheticChangeModal(false);
+                }}
+                style={{ padding: "10px 15px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "rgba(255,255,255,0.68)", fontFamily: inter, fontSize: 12, fontWeight: 600, color: "rgba(67,67,43,0.62)", cursor: "pointer" }}
               >
-                Cancel
+                Keep current direction
               </button>
               <button
                 onClick={() => {
+                  const nextAesthetic = pendingAestheticChange;
+                  if (!nextAesthetic) {
+                    setShowAestheticChangeModal(false);
+                    return;
+                  }
+                  useSessionStore.setState({
+                    aestheticInput: "",
+                    conceptLocked: false,
+                    collectionAesthetic: null,
+                    selectedKeyPiece: null,
+                    selectedPieceImage: null,
+                    activeProductPieceId: null,
+                    pieceRolesById: {},
+                    pieceBuildContext: null,
+                    collectionRole: null,
+                  });
+                  setCollectionPieces([]);
+                  setCustomProductPieces([]);
+                  setSelectedKeyPieceLocal(null);
+                  setDecisionGuidanceState({ is_confirmed: false, selected_anchor_piece: null });
                   setShowAestheticChangeModal(false);
-                  handleBackToDirection();
+                  setPendingAestheticChange(null);
+                  setIsAestheticSelectionUnlocked(false);
+                  applyAestheticSelection(nextAesthetic);
                 }}
-                style={{ padding: "8px 14px", borderRadius: 999, border: "none", background: OLIVE, fontFamily: inter, fontSize: 12, fontWeight: 600, color: "#F5F0E8", cursor: "pointer" }}
+                style={{ padding: "10px 16px", borderRadius: 999, border: "none", background: OLIVE, boxShadow: "0 12px 30px rgba(67,67,43,0.16)", fontFamily: inter, fontSize: 12, fontWeight: 700, letterSpacing: "0.02em", color: "#F5F0E8", cursor: "pointer" }}
               >
-                Confirm
+                Restart with new direction
               </button>
             </div>
           </div>
@@ -4501,7 +4690,7 @@ export default function ConceptStudioPage() {
 function DirectionCard({
   aesthetic, isHovered, moodboardImages,
   onHoverEnter, onHoverLeave, onSelect,
-  inter, sohne, chartreuse, recommendation,
+  inter, sohne, chartreuse, recommendation, ctaLabel = "Select", locked = false,
 }: {
   aesthetic: string;
   isHovered: boolean;
@@ -4513,6 +4702,8 @@ function DirectionCard({
   sohne: string;
   chartreuse: string;
   recommendation: DirectionRecommendation;
+  ctaLabel?: string;
+  locked?: boolean;
 }) {
   const roleLabel =
     recommendation.role === "primary"
@@ -4581,7 +4772,7 @@ function DirectionCard({
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 5,
-                color: "rgba(67,67,43,0.62)",
+                color: locked ? "#6F7C46" : "rgba(67,67,43,0.62)",
                 fontFamily: inter,
                 fontSize: 10.5,
                 fontWeight: 600,
@@ -4589,8 +4780,8 @@ function DirectionCard({
                 textTransform: "uppercase",
               }}
             >
-              Select
-              <span style={{ color: chartreuse }}>→</span>
+              {ctaLabel}
+              <span style={{ color: locked ? "#6F7C46" : chartreuse }}>{locked ? "•" : "→"}</span>
             </span>
           </div>
           <div style={{ fontFamily: sohne, fontWeight: 500, fontSize: 24, color: "rgba(67,67,43,0.92)", letterSpacing: "-0.04em", lineHeight: 0.98, marginBottom: 6 }}>

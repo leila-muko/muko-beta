@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { sanitizeContextBarSummary } from "@/lib/collections/contextBarSummary";
 
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
@@ -23,11 +24,12 @@ export function CollectionReadBar({
   stickyTop?: number;
   isSticky?: boolean;
 }) {
+  const resolvedSummary = sanitizeContextBarSummary(summary);
   const summaryWeight = stage >= 3 ? 460 : stage === 2 ? 440 : stage === 1 ? 425 : 390;
   const [isHovering, setIsHovering] = useState(false);
   const [isPinnedOpen, setIsPinnedOpen] = useState(false);
   const [isPinnedClosed, setIsPinnedClosed] = useState(false);
-  const hasExpandableContent = Boolean(summary?.trim());
+  const hasExpandableContent = Boolean(resolvedSummary);
   const isExpanded = hasExpandableContent ? isPinnedOpen || (isHovering && !isPinnedClosed) : true;
 
   function handleToggle() {
@@ -130,46 +132,48 @@ export function CollectionReadBar({
               ) : null}
             </div>
 
-            <AnimatePresence initial={false} mode="wait">
-              <motion.div
-                key={isExpanded ? "expanded" : "collapsed"}
-                initial={{ opacity: 0, y: 4, height: isExpanded ? 24 : 0 }}
-                animate={{ opacity: 1, y: 0, height: "auto" }}
-                exit={{ opacity: 0, y: -4, height: 0 }}
-                transition={{ duration: 0.2, ease: "easeInOut" }}
-                style={{
-                  overflow: "hidden",
-                  width: "100%",
-                }}
-              >
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.p
-                    key={summary}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.2, ease: "easeInOut" }}
-                    style={{
-                      margin: 0,
-                      fontFamily: sohne,
-                      fontSize: isExpanded ? 18 : 15,
-                      fontWeight: summaryWeight,
-                      letterSpacing: "0.06em",
-                      textTransform: "lowercase",
-                      lineHeight: 1.3,
-                      color: stage === 0 ? "rgba(67,67,43,0.48)" : "rgba(67,67,43,0.74)",
-                      display: "-webkit-box",
-                      WebkitLineClamp: isExpanded ? 2 : 1,
-                      WebkitBoxOrient: "vertical" as const,
-                      overflow: "hidden",
-                      textWrap: "balance",
-                    }}
-                  >
-                    {summary}
-                  </motion.p>
-                </AnimatePresence>
-              </motion.div>
-            </AnimatePresence>
+            {resolvedSummary ? (
+              <AnimatePresence initial={false} mode="wait">
+                <motion.div
+                  key={isExpanded ? "expanded" : "collapsed"}
+                  initial={{ opacity: 0, y: 4, height: isExpanded ? 24 : 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto" }}
+                  exit={{ opacity: 0, y: -4, height: 0 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  style={{
+                    overflow: "hidden",
+                    width: "100%",
+                  }}
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.p
+                      key={resolvedSummary}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.2, ease: "easeInOut" }}
+                      style={{
+                        margin: 0,
+                        fontFamily: sohne,
+                        fontSize: isExpanded ? 18 : 15,
+                        fontWeight: summaryWeight,
+                        letterSpacing: "0.06em",
+                        textTransform: "lowercase",
+                        lineHeight: 1.3,
+                        color: stage === 0 ? "rgba(67,67,43,0.48)" : "rgba(67,67,43,0.74)",
+                        display: "-webkit-box",
+                        WebkitLineClamp: isExpanded ? 2 : 1,
+                        WebkitBoxOrient: "vertical" as const,
+                        overflow: "hidden",
+                        textWrap: "balance",
+                      }}
+                    >
+                      {resolvedSummary}
+                    </motion.p>
+                  </AnimatePresence>
+                </motion.div>
+              </AnimatePresence>
+            ) : null}
           </div>
         </motion.div>
       </div>

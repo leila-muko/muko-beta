@@ -58,6 +58,12 @@ Rules you must follow:
 - muko_insight must be 1-2 sentences maximum. It is the sharpest thing in the room — one observation, one implication. Not a paragraph.
 - collection_state, collection_read, and muko_insight are one continuous story, not three versions of the same observation. collection_state names what is structurally true. collection_read says what that means for the collection as a system. muko_insight names the single most important thing that is true about this collection right now — the tension that would change the read if it exists, or the confirmation that the structure is holding if it does not. If the collection is well-balanced and all dimensions are strong, muko_insight should say so directly and name what that means for the line going forward. A positive muko_insight is valid and expected when the data supports it. Each must add something the others don't.
 - Do not reference "the data" or explain methodology.
+- REGISTER RULE: Use benchmark ranges to calibrate your diagnosis
+internally. Do not quote percentages or targets in collection_read
+or muko_insight output. Speak in structural and directional terms.
+- FAIL: "Role balance shows Volume Driver at 20% against a 40–50% target"
+- PASS: "The commercial foundation is thin — the line is skewing
+directional before the volume structure is in place to support it"
 
 SILHOUETTE RULE: Never critique silhouette consistency across pieces as a weakness.
 Silhouette is a collection-level creative lock — uniformity is intentional. If
@@ -165,8 +171,21 @@ Flagged conflicts across pieces:
 ${conflictsSummary}
 
 Top materials: ${topMaterials}
+Evaluate material coherence as a required dimension:
+- a healthy collection uses 3–5 key fabrics across multiple pieces.
+- If the material count exceeds 5 unique fabrics with no repetition, flag it as fragmented.
+- If fewer than 3 fabrics anchor the line, note the material story as underdeveloped.
 Role distribution: ${roleDist}
+Benchmark ranges: Hero 10–15%, Volume Driver 40–50%, Core Evolution 25–30%, Directional 10–20%.
+Diagnose against these ranges, not absolute counts.
 Category distribution: ${catDist}
+Category benchmarks for contemporary collections:
+- Tops 30–35%
+- Bottoms 20–25%
+- Dresses/Jumpsuits 15–20%
+- Outerwear 10–15%
+- Sets 5–10%
+Flag material imbalance when a category exceeds 1.5x its benchmark.
 Silhouette distribution: ${silDist}
 
 Return only valid JSON matching this schema exactly:

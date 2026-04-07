@@ -240,7 +240,6 @@ export default function SpecStudio({
           <ConstructionTierComponent
             selectedTier={constructionTier}
             onSelect={handleConstructionChange}
-            defaultTier={SMART_DEFAULTS[categoryId] || 'moderate'}
             overrideWarning={overrideWarning}
           />
 

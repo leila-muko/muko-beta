@@ -21,6 +21,11 @@ import { buildPiecesReadFallback } from "@/lib/pieces/buildPiecesReadFallback";
 import { buildPiecesReadInput } from "@/lib/pieces/buildPiecesReadInput";
 import { normalizeSpecSubcategoryId } from "@/lib/spec-studio/smart-defaults";
 import {
+  hydrateCollectionContextFromAnalysis,
+  restoreCollectionContextFromCache,
+} from "@/lib/collections/hydrateCollectionContext";
+import { getLatestCollectionContextRow } from "@/lib/collections/getLatestCollectionContextRow";
+import {
   assignStrategicRole,
   buildDeterministicPieceMicrocopy,
   buildStrategicReasonTags,
@@ -50,12 +55,12 @@ const RED = "#B85C5C";
 const sohne = "var(--font-sohne-breit), -ui-sans-serif, sans-serif";
 const inter = "var(--font-inter), -ui-sans-serif, sans-serif";
 const EYEBROW_STYLE = {
-  fontFamily: inter,
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: "0.16em",
+  fontFamily: "Inter, sans-serif",
+  fontSize: 11,
+  fontWeight: 500,
+  letterSpacing: "0.08em",
   textTransform: "uppercase" as const,
-  color: "rgba(67,67,43,0.4)",
+  color: "rgba(67,67,43,0.45)",
 };
 const SECTION_TITLE_STYLE = {
   fontFamily: sohne,
@@ -64,10 +69,11 @@ const SECTION_TITLE_STYLE = {
   letterSpacing: "-0.03em",
 };
 const BODY_COPY_STYLE = {
-  fontFamily: inter,
-  fontSize: 13.5,
-  color: "rgba(67,67,43,0.56)",
-  lineHeight: 1.62,
+  fontFamily: "Inter, sans-serif",
+  fontSize: 14,
+  fontWeight: 400,
+  lineHeight: 1.65,
+  color: "rgba(67,67,43,0.7)",
 };
 const BODY_SMALL_STYLE = {
   fontFamily: inter,
@@ -137,6 +143,14 @@ interface BrandProfileRow {
   price_tier: string | null;
   target_margin: number | null;
   tension_context: string | null;
+}
+
+interface CollectionContextRow {
+  collection_aesthetic?: string | null;
+  aesthetic_inflection?: string | null;
+  mood_board_images?: string[] | null;
+  silhouette?: string | null;
+  agent_versions?: Record<string, string | null> | null;
 }
 
 type CategoriesData = { categories: Array<{ id: string; name: string }> };
@@ -215,6 +229,40 @@ function mapRoleLabelToId(role: CustomPieceRoleLabel): CollectionRoleId {
   if (role === "Volume Driver") return "volume-driver";
   if (role === "Directional Signal") return "directional";
   return "core-evolution";
+}
+
+function parseStoredStringArray(value: string | null | undefined) {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function parseStoredChipSelection(value: string | null | undefined) {
+  if (!value) return null;
+
+  try {
+    const parsed = JSON.parse(value) as { activatedChips?: Array<{ label?: string | null }> } | null;
+    if (!parsed || typeof parsed !== "object") return null;
+
+    const activatedChips = Array.isArray(parsed.activatedChips)
+      ? parsed.activatedChips
+          .map((chip) => (typeof chip?.label === "string" ? chip.label.trim() : ""))
+          .filter(Boolean)
+          .map((label) => ({ label }))
+      : undefined;
+
+    return { activatedChips };
+  } catch {
+    return null;
+  }
 }
 
 function extractRoleSentence(value: string, keyword: string) {
@@ -1265,6 +1313,7 @@ function ConfirmDrawer({
       : category
         ? getCategoryLabel(categories, category)
         : "Select piece type";
+  const suggestedRole = suggestion ? getPieceRoleLabel(suggestion.role) : null;
 
   const autoResizeTextarea = (event: React.FormEvent<HTMLTextAreaElement>) => {
     const target = event.currentTarget;
@@ -1569,83 +1618,6 @@ function ConfirmDrawer({
                   </div>
                 ) : null
               ) : null}
-
-              {customProposal.trim() ? (
-                <div style={{ marginBottom: 22 }}>
-                  {customRefinementState === "loading" && !customRefinement ? (
-                    <div style={{ marginBottom: 14 }}>
-                      <InlineLoadingState label="Refining your custom piece..." />
-                    </div>
-                  ) : null}
-
-                  {customRefinement ? (
-                    <div style={{ display: "grid", gap: 14 }}>
-                      <div
-                        style={{
-                          ...EYEBROW_STYLE,
-                          color: "#6E675F",
-                        }}
-                      >
-                        Muko&apos;s Take
-                      </div>
-                      <div>
-                        <div style={BODY_COPY_STYLE}>{customRefinement.read}</div>
-                      </div>
-                      <div>
-                        <div style={{ ...EYEBROW_STYLE, marginBottom: 6 }}>Suggested expression</div>
-                        <div
-                          style={{
-                            fontFamily: sohne,
-                            fontSize: 18,
-                            fontWeight: 400,
-                            color: "#43432B",
-                            letterSpacing: "-0.035em",
-                            lineHeight: 1.4,
-                          }}
-                        >
-                          {`— ${customRefinement.refined_expression}`}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                        <button
-                          type="button"
-                          onClick={onAcceptRefinedExpression}
-                          style={{
-                            border: "none",
-                            background: "rgba(168,180,117,0.16)",
-                            color: "#4F5B28",
-                            borderRadius: 999,
-                            padding: "9px 14px",
-                            fontFamily: inter,
-                            fontSize: 11.5,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Accept suggestion
-                        </button>
-                        <button
-                          type="button"
-                          onClick={onContinueWithOriginal}
-                          style={{
-                            border: `1px solid ${BORDER}`,
-                            background: "transparent",
-                            color: TEXT,
-                            borderRadius: 999,
-                            padding: "9px 14px",
-                            fontFamily: inter,
-                            fontSize: 11.5,
-                            fontWeight: 500,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Continue with original input
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
           ) : (
             <div
@@ -1767,150 +1739,246 @@ function ConfirmDrawer({
             </div>
           )}
 
-          {/* Piece role */}
           <div
             style={{
-              marginBottom: 8,
-              ...EYEBROW_STYLE,
+              border: "0.5px solid rgba(67,67,43,0.12)",
+              borderRadius: 12,
+              overflow: "hidden",
+              marginBottom: 24,
             }}
           >
-            Piece role
-          </div>
-          {suggestion && (
-            <div style={{ marginBottom: 16, padding: "0 2px" }}>
+            <div
+              style={{
+                padding: "13px 20px 11px",
+                borderBottom: "0.5px solid rgba(67,67,43,0.1)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
               <div
+                aria-hidden
                 style={{
-                  ...BODY_COPY_STYLE,
-                  color: TEXT,
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  background: "#A8B475",
                 }}
-              >
-                <span
-                  style={{
-                    fontFamily: sohne,
-                    color: "#43432B",
-                    fontWeight: 600,
-                  }}
-                >
-                  Muko Suggests:
-                </span>{" "}
-                <span style={{ fontWeight: 600 }}>{getPieceRoleLabel(suggestion.role)}</span>
-              </div>
-              <div
-                style={{
-                  fontFamily: sohne,
-                  fontSize: 12,
-                  fontWeight: 400,
-                  color: "#43432B",
-                  letterSpacing: "-0.02em",
-                  lineHeight: 1.4,
-                  marginTop: 6,
-                }}
-              >
-                {`— ${suggestion.rationale}`}
-              </div>
-              {roleLocked ? (
-                <div
-                  style={{
-                    ...BODY_SMALL_STYLE,
-                    marginTop: 8,
-                    color: "#6F6A63",
-                  }}
-                >
-                  Role locked from the prior Muko recommendation.
-                </div>
-              ) : roleSoftSuggested ? (
-                <div
-                  style={{
-                    ...BODY_SMALL_STYLE,
-                    marginTop: 8,
-                    color: "#6F6A63",
-                  }}
-                >
-                  Suggested by Muko · Change if needed
-                </div>
-              ) : null}
+              />
+              <span style={EYEBROW_STYLE}>Muko&apos;s Read</span>
             </div>
-          )}
 
-          <div
-            role="radiogroup"
-            aria-label="Piece role"
-            style={{ display: "flex", flexDirection: "column", gap: 10 }}
-          >
-            {PIECE_ROLE_OPTIONS.map((option) => {
-              const isSelected = selectedRole === option.id;
+            {piece.custom && customProposal.trim() ? (
+              <div
+                style={{
+                  padding: "15px 20px",
+                  borderBottom: "0.5px solid rgba(67,67,43,0.1)",
+                }}
+              >
+                <div style={{ ...EYEBROW_STYLE, marginBottom: 8 }}>Strategic Take</div>
+                <div style={BODY_COPY_STYLE}>
+                  {customRefinementState === "loading" && !customRefinement ? (
+                    <InlineLoadingState label="Refining your custom piece..." />
+                  ) : customRefinement ? (
+                    customRefinement.read
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
 
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={isSelected}
-                  aria-disabled={roleLocked}
-                  onClick={() => {
-                    if (roleLocked) return;
-                    onRoleSelect(option.id);
-                  }}
+            {piece.custom && customProposal.trim() && customRefinement?.refined_expression ? (
+              <div
+                style={{
+                  padding: "15px 20px",
+                  borderBottom: "0.5px solid rgba(67,67,43,0.1)",
+                }}
+              >
+                <div style={{ ...EYEBROW_STYLE, marginBottom: 10 }}>Refined Expression</div>
+                <div
                   style={{
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "14px 16px",
-                    borderRadius: 12,
-                    border: isSelected ? "1px solid rgba(168,180,117,0.52)" : `1px solid ${BORDER}`,
-                    background: isSelected ? "rgba(168,180,117,0.11)" : "rgba(250,249,246,0.92)",
-                    boxShadow: isSelected ? "0 0 0 1px rgba(168,180,117,0.08), 0 8px 20px rgba(67,67,43,0.05)" : "none",
-                    cursor: roleLocked ? "not-allowed" : "pointer",
-                    opacity: roleLocked && !isSelected ? 0.72 : 1,
-                    transition: "background 160ms ease, border-color 160ms ease, box-shadow 160ms ease",
+                    background: "rgba(168,180,117,0.06)",
+                    border: "0.5px solid rgba(168,180,117,0.2)",
+                    borderRadius: 8,
+                    padding: "13px 16px",
                   }}
                 >
                   <div
                     style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      justifyContent: "space-between",
-                      gap: 16,
+                      fontSize: 14,
+                      fontWeight: 400,
+                      fontStyle: "italic",
+                      lineHeight: 1.65,
+                      color: "rgba(67,67,43,0.85)",
                     }}
                   >
-                    <div>
-                      <div
-                        style={{
-                          ...SECTION_TITLE_STYLE,
-                          fontSize: 18,
-                          color: TEXT,
-                          lineHeight: 1.2,
-                          marginBottom: 4,
-                        }}
-                      >
-                        {option.label}
-                      </div>
-                      <div
-                        style={{
-                          ...BODY_SMALL_STYLE,
-                          color: isSelected ? "#6F6A63" : "rgba(67,67,43,0.56)",
-                        }}
-                      >
-                        {option.description}
-                      </div>
-                    </div>
-                    <div
-                      aria-hidden
-                      style={{
-                        width: 16,
-                        height: 16,
-                        marginTop: 3,
-                        borderRadius: "50%",
-                        border: isSelected ? "1px solid rgba(122,158,126,0.75)" : `1px solid ${BORDER}`,
-                        background: isSelected ? "rgba(168,180,117,0.22)" : "transparent",
-                        boxShadow: isSelected ? "inset 0 0 0 4px rgba(122,158,126,0.58)" : "none",
-                        flexShrink: 0,
-                        transition: "background 160ms ease, border-color 160ms ease, box-shadow 160ms ease",
-                      }}
-                    />
+                    {customRefinement.refined_expression}
                   </div>
-                </button>
-              );
-            })}
+                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <button
+                      type="button"
+                      onClick={onAcceptRefinedExpression}
+                      style={{
+                        borderRadius: 999,
+                        background: "#A8B475",
+                        border: "none",
+                        color: "#3a3e1f",
+                        fontSize: 12,
+                        fontWeight: 500,
+                        padding: "6px 16px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Accept this expression
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onContinueWithOriginal}
+                      style={{
+                        borderRadius: 999,
+                        background: "transparent",
+                        border: "0.5px solid rgba(67,67,43,0.25)",
+                        color: "rgba(67,67,43,0.6)",
+                        fontSize: 12,
+                        fontWeight: 400,
+                        padding: "6px 14px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Keep my original
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div style={{ padding: "15px 20px" }}>
+              <div style={{ ...EYEBROW_STYLE, marginBottom: 10 }}>Suggested Role</div>
+
+              {suggestedRole ? (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    background: "rgba(168,180,117,0.1)",
+                    borderRadius: 999,
+                    padding: "3px 10px 3px 8px",
+                    marginBottom: 10,
+                  }}
+                >
+                  <div
+                    aria-hidden
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: 3,
+                      background: "#A8B475",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: "#5a6030",
+                    }}
+                  >
+                    {`Muko suggests: ${suggestedRole}`}
+                  </div>
+                </div>
+              ) : null}
+
+              <div
+                role="radiogroup"
+                aria-label="Piece role"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                  gap: 8,
+                }}
+              >
+                {PIECE_ROLE_OPTIONS.map((option) => {
+                  const isSelected = selectedRole === option.id;
+
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      aria-disabled={roleLocked}
+                      onClick={() => {
+                        if (roleLocked) return;
+                        onRoleSelect(option.id);
+                      }}
+                      style={{
+                        border: isSelected ? "0.5px solid #A8B475" : "0.5px solid rgba(67,67,43,0.14)",
+                        background: isSelected ? "rgba(168,180,117,0.07)" : "transparent",
+                        borderRadius: 8,
+                        padding: "11px 13px",
+                        cursor: roleLocked ? "not-allowed" : "pointer",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        textAlign: "left",
+                        width: "100%",
+                        opacity: roleLocked && !isSelected ? 0.72 : 1,
+                      }}
+                    >
+                      <div>
+                        <div
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 500,
+                            color: "rgba(67,67,43,0.9)",
+                            marginBottom: 2,
+                          }}
+                        >
+                          {option.label}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 400,
+                            color: "rgba(67,67,43,0.5)",
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {option.description}
+                        </div>
+                      </div>
+                      <div
+                        aria-hidden
+                        style={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: 8,
+                          flexShrink: 0,
+                          marginTop: 2,
+                          background: isSelected ? "#A8B475" : "transparent",
+                          border: isSelected ? "1.5px solid #A8B475" : "1.5px solid rgba(67,67,43,0.2)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {isSelected ? (
+                          <div
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: 3,
+                              background: "white",
+                            }}
+                          />
+                        ) : null}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {piece.custom ? (
@@ -2095,9 +2163,11 @@ function ConfirmDrawer({
 function PiecesPageClient() {
   const router = useRouter();
   const suggestedPiecesRef = React.useRef<HTMLDivElement | null>(null);
+  const collectionContextHydrationRef = React.useRef<string | null>(null);
   const {
     collectionName,
     season,
+    activeCollection,
     collectionAesthetic,
     aestheticInflection,
     directionInterpretationText,
@@ -2120,11 +2190,14 @@ function PiecesPageClient() {
     resonancePulse,
     executionPulse,
     setSelectedKeyPiece,
+    setCollectionName,
     setCollectionRole,
+    setSeason,
     setTargetMsrp: storeSetTargetMsrp,
     setCategory,
     setSubcategory,
     setMaterial,
+    setActiveCollection,
     pieceRolesById,
     setPieceRolesById,
     setActiveProductPieceId,
@@ -2144,6 +2217,60 @@ function PiecesPageClient() {
   // Confirmed pieces from Supabase
   const [confirmedPieces, setConfirmedPieces] = useState<CollectionPiece[]>([]);
   const [brandProfile, setBrandProfile] = useState<BrandProfileRow | null>(null);
+  const [contextRow, setContextRow] = useState<CollectionContextRow | null>(null);
+
+  useEffect(() => {
+    const storedCollectionName =
+      typeof window !== "undefined" ? window.localStorage.getItem("muko_collectionName")?.trim() || "" : "";
+    const storedSeason =
+      typeof window !== "undefined" ? window.localStorage.getItem("muko_seasonLabel")?.trim() || "" : "";
+    const resolvedCollectionName = collectionName.trim() || activeCollection?.trim() || storedCollectionName;
+
+    if (!resolvedCollectionName) return;
+
+    if (collectionName !== resolvedCollectionName) {
+      setCollectionName(resolvedCollectionName);
+    }
+
+    if (activeCollection !== resolvedCollectionName) {
+      setActiveCollection(resolvedCollectionName);
+    }
+
+    if (!season && storedSeason) {
+      setSeason(storedSeason);
+    }
+
+    restoreCollectionContextFromCache(resolvedCollectionName);
+
+    if (collectionContextHydrationRef.current === resolvedCollectionName) {
+      return;
+    }
+
+    collectionContextHydrationRef.current = resolvedCollectionName;
+    let cancelled = false;
+    const supabase = createClient();
+
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user || cancelled) return;
+
+      const data = await getLatestCollectionContextRow(user.id, resolvedCollectionName);
+      if (cancelled) return;
+
+      setContextRow((data as CollectionContextRow | null) ?? null);
+      if (!data) return;
+
+      hydrateCollectionContextFromAnalysis(resolvedCollectionName, data);
+
+      const nextSeason = data.season?.trim() || storedSeason;
+      if (nextSeason) {
+        setSeason(nextSeason);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCollection, collectionName, season, setActiveCollection, setCollectionName, setSeason]);
 
   useEffect(() => {
     if (!collectionName) return;
@@ -2244,26 +2371,54 @@ function PiecesPageClient() {
   }, [confirmedPieces]);
 
   const totalConfirmed = confirmedPieces.length;
-  const directionName = collectionAesthetic ?? "—";
+  const storedDirectionChips = useMemo(
+    () => parseStoredStringArray((contextRow?.agent_versions?.direction_interpretation_chips as string | null | undefined) ?? undefined),
+    [contextRow]
+  );
+  const storedChipSelection = useMemo(
+    () => parseStoredChipSelection((contextRow?.agent_versions?.chip_selection as string | null | undefined) ?? undefined),
+    [contextRow]
+  );
+  const directionName = collectionAesthetic || contextRow?.collection_aesthetic || "—";
   const collectionEntry = useMemo(
     () =>
       (aestheticsData as unknown as AestheticDataEntry[]).find(
         (entry) =>
-          entry.name === collectionAesthetic ||
-          entry.id === collectionAesthetic?.toLowerCase().replace(/\s+/g, "-")
+          entry.name === directionName ||
+          entry.id === directionName?.toLowerCase().replace(/\s+/g, "-")
       ) ?? null,
-    [collectionAesthetic]
+    [directionName]
   );
   const paletteName = useMemo(
-    () => collectionEntry?.palette_options?.find((palette) => palette.id === conceptPalette)?.name ?? conceptPalette ?? null,
-    [collectionEntry, conceptPalette]
+    () =>
+      collectionEntry?.palette_options?.find(
+        (palette) => palette.id === (conceptPalette || contextRow?.agent_versions?.selected_palette)
+      )?.name ??
+      conceptPalette ??
+      contextRow?.agent_versions?.selected_palette ??
+      null,
+    [collectionEntry, conceptPalette, contextRow?.agent_versions?.selected_palette]
   );
 
   const collectionLanguageLabels = useMemo(() => {
-    return getCollectionLanguageLabels(directionInterpretationChips, directionInterpretationText);
-  }, [directionInterpretationChips, directionInterpretationText]);
+    const fromStore = getCollectionLanguageLabels(directionInterpretationChips, directionInterpretationText);
+    if (fromStore.length > 0) return fromStore;
 
-  const expressionSignalLabels = useMemo(() => getExpressionSignalLabels(chipSelection), [chipSelection]);
+    const fromStoredChips = getCollectionLanguageLabels(storedDirectionChips, contextRow?.aesthetic_inflection ?? "");
+    if (fromStoredChips.length > 0) return fromStoredChips;
+
+    return parseStoredStringArray((contextRow?.agent_versions?.collection_language as string | null | undefined) ?? undefined);
+  }, [contextRow, directionInterpretationChips, directionInterpretationText, storedDirectionChips]);
+
+  const expressionSignalLabels = useMemo(() => {
+    const fromStore = getExpressionSignalLabels(chipSelection);
+    if (fromStore.length > 0) return fromStore;
+
+    const fromStoredSelection = getExpressionSignalLabels(storedChipSelection);
+    if (fromStoredSelection.length > 0) return fromStoredSelection;
+
+    return parseStoredStringArray((contextRow?.agent_versions?.expression_signals as string | null | undefined) ?? undefined);
+  }, [chipSelection, contextRow, storedChipSelection]);
 
   const collectionLanguageExpression = useMemo(
     () => evaluateSignalExpression(collectionLanguageLabels, confirmedPieces),
@@ -3330,16 +3485,16 @@ function PiecesPageClient() {
         }}
       >
         <CollectionContextBar
-          strategySummary={strategySummary}
+          strategySummary={strategySummary || contextRow?.agent_versions?.strategy_summary || undefined}
           collectionName={collectionName}
           season={season}
           direction={directionName}
-          pointOfView={aestheticInflection || directionInterpretationText || undefined}
+          pointOfView={aestheticInflection || directionInterpretationText || contextRow?.aesthetic_inflection || undefined}
           collectionLanguage={collectionLanguageLabels}
-          silhouette={conceptSilhouette || undefined}
+          silhouette={conceptSilhouette || contextRow?.silhouette || undefined}
           palette={paletteName || undefined}
           expressionSignals={expressionSignalLabels}
-          moodboardImages={moodboardImages}
+          moodboardImages={moodboardImages.length > 0 ? moodboardImages : contextRow?.mood_board_images ?? []}
           action={
             <button
               onClick={() => router.push("/concept")}
@@ -3405,7 +3560,7 @@ function PiecesPageClient() {
                   lineHeight: 0.98,
                 }}
               >
-                Build from the locked collection frame.
+                Your vision is set. Let's make it wearable.
               </div>
               <button
                 type="button"
@@ -3468,7 +3623,7 @@ function PiecesPageClient() {
                 maxWidth: 620,
               }}
             >
-              Your direction and language are set. Start translating them piece by piece.
+              Start building piece by piece — Muko will keep you honest.
             </div>
           </div>
 
@@ -3623,19 +3778,6 @@ function PiecesPageClient() {
             >
               MUKO&apos;S READ
             </div>
-            {process.env.NODE_ENV !== "production" && piecesReadMeta?.reason ? (
-              <div
-                style={{
-                  ...BODY_SMALL_STYLE,
-                  marginBottom: 10,
-                  color: piecesReadMeta.source === "fallback" ? AMBER : MUTED,
-                }}
-              >
-                {piecesReadMeta.source === "fallback"
-                  ? `Fallback: ${piecesReadMeta.reason}`
-                  : `Read warning: ${piecesReadMeta.reason}`}
-              </div>
-            ) : null}
             {rightRailPiecesRead ? (
               <>
                 <div
@@ -3780,6 +3922,73 @@ function PiecesPageClient() {
           openingMessageVersion={askMukoOpeningMessageVersion}
         />
       </div>
+
+      {/* Floating readiness chip */}
+      {totalConfirmed < 5 ? (
+        <div style={{
+          position: "fixed",
+          bottom: "24px",
+          right: "24px",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          padding: "10px 16px",
+          borderRadius: "40px",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          background: "linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(245, 243, 238, 0.58) 100%)",
+          border: "0.5px solid var(--color-border-secondary)",
+          boxShadow: "0 10px 30px rgba(67,67,43,0.08), inset 0 1px 0 rgba(255,255,255,0.45)",
+          fontFamily: "\"Söhne Breit\", sans-serif",
+          fontSize: "12px",
+          fontWeight: 500,
+          color: "#4D302F",
+          zIndex: 50,
+        }}>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <circle cx="9" cy="9" r="7.5" stroke="var(--color-border-tertiary)" strokeWidth="1.5"/>
+            <path
+              d={`M 9 1.5 A 7.5 7.5 0 ${totalConfirmed / 5 > 0.5 ? 1 : 0} 1 ${
+                9 + 7.5 * Math.sin((2 * Math.PI * totalConfirmed) / 5)
+              } ${
+                9 - 7.5 * Math.cos((2 * Math.PI * totalConfirmed) / 5)
+              }`}
+              stroke="#A8B475"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </svg>
+          {totalConfirmed} of 5 pieces for full read
+        </div>
+      ) : (
+        <button
+          onClick={() => router.push("/report")}
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+          display: "flex",
+          alignItems: "center",
+            gap: "10px",
+            padding: "10px 16px",
+            borderRadius: "40px",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            background: "linear-gradient(180deg, rgba(92, 61, 59, 0.84) 0%, rgba(77, 48, 47, 0.76) 100%)",
+            border: "0.5px solid rgba(245, 243, 238, 0.15)",
+            boxShadow: "0 12px 32px rgba(49,31,30,0.18), inset 0 1px 0 rgba(245,243,238,0.14)",
+            fontFamily: "\"Söhne Breit\", sans-serif",
+            fontSize: "12px",
+            fontWeight: 500,
+            color: "#4D302F",
+            cursor: "pointer",
+            zIndex: 50,
+          }}
+        >
+          <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#A8B475", flexShrink: 0, display: "inline-block" }} />
+          Collection readable — see full read →
+        </button>
+      )}
 
       {/* ── Confirm Drawer ─────────────────────────────────── */}
       {drawerPiece && (

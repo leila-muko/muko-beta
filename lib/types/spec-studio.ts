@@ -13,6 +13,7 @@ export interface Material {
   properties: string[];
   hand_feel: string;
   weight: string;
+  drape_quality?: "fluid" | "structured" | "medium" | "varies";
 }
 
 export interface Silhouette {

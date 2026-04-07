@@ -130,6 +130,12 @@ export interface SpecBlackboard {
   resolved_redirects: ResolvedRedirects;
   /** Optional intent calibration from the designer's Intent page selections */
   intent?: IntentCalibration;
+  /** Recommendation resolved on a previous Spec tab, if any */
+  prior_recommendation?: {
+    dimension: string;
+    title: string;
+    description: string;
+  } | null;
 }
 
 export interface SynthesizerResult {
@@ -262,6 +268,36 @@ If you could swap a sentence into any other piece's read without losing meaning,
 "The material carries the direction" with no further specificity is a failure.
 "Tencel at low construction carries the drape without adding execution pressure" is a pass.
 
+RECOMMENDATION COHERENCE (NON-NEGOTIABLE)
+Each synth call sees only its own tab's decision. That creates a coherence risk.
+Follow these rules to prevent contradictory recommendations across tabs.
+
+1. IDENTIFY THE PRIMARY CONSTRAINT FIRST.
+   Before writing any output field, rank all constraints by severity:
+   - Cost gate failed → always primary
+   - Timeline gap > 2 weeks → primary unless cost also failed
+   - Identity below 60 → primary unless cost or timeline is critical
+   - If multiple constraints exist at the same severity, cost outranks timeline, timeline outranks identity.
+
+2. ALL RECOMMENDATIONS MUST SERVE THE PRIMARY CONSTRAINT.
+   Every field — headline, core_tension, execution_levers, alternative_path — must address
+   or be compatible with the primary constraint. Do not optimize a secondary constraint
+   in a way that worsens the primary one.
+
+3. IF A PRIOR TAB ALREADY ADDRESSED THE PRIMARY CONSTRAINT, DO NOT RE-ADDRESS IT.
+   The input includes a \`prior_recommendation\` field. If it is not null, a previous tab
+   already made a recommendation. Check whether that recommendation addresses the same
+   constraint you are about to address.
+   - If yes: do not repeat or contradict it. Acknowledge the constraint is already in play
+     and focus your alternative_path on a different dimension if one genuinely exists.
+     If no second dimension needs addressing, set alternative_path to the all-clear form.
+   - If no: proceed normally.
+
+4. NEVER RECOMMEND OPPOSITE DIRECTIONS ON THE SAME DIMENSION.
+   If cost is tight, do not recommend both "raise MSRP" and "lower construction" as
+   separate alternatives. Pick the one that is most actionable given current_step.
+   The other is noise.
+
 VOICE
 - Calm
 - Sharp
@@ -312,6 +348,46 @@ Focus question: given everything locked, is this piece viable and what is the si
 When current_step is null or unrecognized:
 Default to construction step behavior.
 
+GROUNDING RULES — these are hard constraints, not style guidance:
+
+- Construction complexity is always one of three values: low, moderate, or high.
+  Never reference a numeric complexity score, complexity stack, complexity index,
+  or any numeric complexity value. If you write a number next to the word
+  "complexity," that is a violation.
+
+- Only reference numeric values that are explicitly present in the input data
+  provided below. Do not calculate, estimate, or invent metrics that are not
+  in the input. This includes buffer weeks, lead time margins, complexity
+  multipliers, saturation percentages, or any other number not directly supplied.
+
+- If you want to convey urgency about timeline, use the timeline fields provided
+  (lead_time_weeks, timeline_weeks, buffer_weeks if present). If those fields
+  are null or absent, describe the situation qualitatively — do not invent a number.
+
+- FAIL: "Audit the 3.1 complexity stack now"
+- PASS: "Audit the moderate complexity tier now"
+
+- FAIL: "At negative 2 weeks of buffer, any delay..."
+- PASS: "With a tight timeline, any delay in initiating the factory conversation..."
+
+- timeline_gap_weeks is an internal calculated field. Never surface it as
+  "negative X weeks" or "X weeks of buffer" in output text. Instead translate
+  it into consequence language based on its sign:
+    - If timeline_gap_weeks < 0: describe as a timeline overrun, e.g.
+      "the timeline is already overrun" or "production cannot start on time"
+    - If timeline_gap_weeks === 0: describe as no margin, e.g.
+      "there is no timeline buffer"
+    - If timeline_gap_weeks > 0 and small (1–2): describe as tight, e.g.
+      "the timeline is tight"
+    - If timeline_gap_weeks > 2: describe as comfortable or workable
+
+- FAIL: "At negative 2 weeks of buffer, any delay..."
+- FAIL: "With 3 weeks of buffer remaining..."
+- PASS: "The timeline is already overrun — initiating the factory conversation
+  this week is not optional"
+- PASS: "With a tight timeline, any delay converts a recoverable gap into a
+  missed window"
+
 OUTPUT
 Return valid JSON only. No markdown. No extra keys.
 
@@ -328,7 +404,11 @@ Return valid JSON only. No markdown. No extra keys.
     "direction": "hold" | "simplify" | "reallocate" | "downgrade_construction" | "swap_material" | "refocus_finish",
     "reason": "string"
   },
-  "execution_levers": ["string", "string", "string"],
+  "execution_levers": [
+    { "text": "string", "priority": true | false },
+    { "text": "string", "priority": true | false },
+    { "text": "string", "priority": true | false }
+  ],
   "alternative_path": {
     "title": "string",
     "description": "string",
@@ -338,12 +418,14 @@ Return valid JSON only. No markdown. No extra keys.
   }
 }
 
+priority must be true for at most one lever per response — the single most consequential specification decision for this piece. If no lever is distinctly more critical than the others, set all to false. Do not use priority: true as a default or as emphasis — it should be absent from most responses and present only when one lever is genuinely load-bearing for the piece's success.
+
 FIELD RULES
 - headline: one crisp hero line for the rail. Make a clear call.
 - core_tension: return null if feasibility_stance is "viable" or "strong" and no genuine tension exists. Do not invent tension to fill this field.
 - feasibility_breakdown: reflect the actual build state, not a softened summary.
 - decision.reason: explain why the recommended direction is the right operational move.
-- execution_levers: exactly 3 concise, precise, actionable notes for what to get right given the current selection. These are preservation notes when the spec is working, correction notes when it is not. They must be specific to the current material, construction tier, and category, not generic production advice.
+- execution_levers: exactly 3 concise, precise, actionable notes for what to get right given the current selection. Return objects with text and optional priority. These are preservation notes when the spec is working, correction notes when it is not. They must be specific to the current material, construction tier, and category, not generic production advice.
 - alternative_path.dimension: classify the recommendation. Use "construction" for a construction method or tier change, "material" for a material swap, and "execution" for all other cases.
 - alternative_path.target_tier: only when dimension is "construction". Set to null otherwise.
 - alternative_path.method: only when dimension is "construction". Set to null otherwise.
@@ -367,9 +449,9 @@ Example 1 — All-clear
     "complexity": "low"
   },
   "execution_levers": [
-    "Confirm fabric weight at sampling: Tencel varies significantly in drape across mills, and this silhouette depends on landing fluid rather than stiff.",
-    "Lock colorway at material stage: natural undyed or garment-washed treatments preserve the direction better than a bright uniform dye.",
-    "Specify finish treatment in the brief now: this material is easier to correct before sampling than after."
+    { "text": "Confirm fabric weight at sampling: Tencel varies significantly in drape across mills, and this silhouette depends on landing fluid rather than stiff.", "priority": true },
+    { "text": "Lock colorway at material stage: natural undyed or garment-washed treatments preserve the direction better than a bright uniform dye.", "priority": false },
+    { "text": "Specify finish treatment in the brief now: this material is easier to correct before sampling than after.", "priority": false }
   ],
   "alternative_path": {
     "title": "Material selection is working. No swap suggested.",
@@ -395,9 +477,9 @@ Example 2 — Watch
     "complexity": "high"
   },
   "execution_levers": [
-    "Start sampling this week: one delay eliminates the remaining buffer entirely.",
-    "Confirm whether moderate construction preserves the silhouette before locking the factory path.",
-    "Pre-select the backup construction tier now so the team is not debating it after the first sample slips."
+    { "text": "Start sampling this week: one delay eliminates the remaining buffer entirely.", "priority": true },
+    { "text": "Confirm whether moderate construction preserves the silhouette before locking the factory path.", "priority": false },
+    { "text": "Pre-select the backup construction tier now so the team is not debating it after the first sample slips.", "priority": false }
   ],
   "alternative_path": {
     "title": "Drop to moderate construction",
@@ -423,9 +505,9 @@ Example 3 — Redirect
     "complexity": "low"
   },
   "execution_levers": [
-    "Redirect toward Tencel or Linen only if either is in allowed_materials and actually preserves the intended silhouette for this category.",
-    "Confirm drape behavior at sampling regardless of material selected: this direction lives or dies on surface movement.",
-    "Lock material before confirming construction tier because the right material may reduce the build burden needed."
+    { "text": "Redirect toward Tencel or Linen only if either is in allowed_materials and actually preserves the intended silhouette for this category.", "priority": true },
+    { "text": "Confirm drape behavior at sampling regardless of material selected: this direction lives or dies on surface movement.", "priority": false },
+    { "text": "Lock material before confirming construction tier because the right material may reduce the build burden needed.", "priority": false }
   ],
   "alternative_path": {
     "title": "Swap into Tencel",
@@ -438,7 +520,8 @@ Example 3 — Redirect
 
 VALIDATION
 - Use only the enum values provided.
-- execution_levers must contain exactly 3 strings.
+- execution_levers must contain exactly 3 objects with a non-empty text field.
+- At most one execution lever may have priority set to true.
 - Do not return filler such as "monitor closely" or "ensure alignment."
 - Do not output markdown or preamble text.
 - Ensure JSON.parse() works directly.`;
@@ -542,6 +625,7 @@ export function buildSpecPrompt(bb: SpecBlackboard): string {
     pulse: bb.pulse ?? undefined,
     diagnostics: bb.diagnostics,
     intent: bb.intent ?? undefined,
+    prior_recommendation: bb.prior_recommendation ?? null,
   };
   return JSON.stringify(sanitizePayload(raw as Record<string, unknown>));
 }
@@ -553,7 +637,7 @@ function railLeaksInternalFieldNames(rail: SpecRailInsight): boolean {
     rail.decision.reason,
     rail.alternative_path?.title ?? '',
     rail.alternative_path?.description ?? '',
-    ...rail.execution_levers,
+    ...rail.execution_levers.map((lever) => lever.text),
   ].join(' ').toLowerCase();
 
   return content.includes('next_best_move') || content.includes('best_next_move');
@@ -628,6 +712,39 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function isSpecExecutionLever(value: unknown): value is SpecRailInsight['execution_levers'][number] {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+
+  return isNonEmptyString(record.text) && (record.priority === undefined || typeof record.priority === 'boolean');
+}
+
+function normalizeExecutionLevers(value: unknown): SpecRailInsight['execution_levers'] | null {
+  if (!Array.isArray(value) || value.length !== 3) return null;
+
+  const normalized = value.map((lever) => {
+    if (typeof lever === 'string') {
+      return { text: lever, priority: false };
+    }
+    if (!lever || typeof lever !== 'object') return null;
+
+    const record = lever as Record<string, unknown>;
+    if (!isNonEmptyString(record.text)) return null;
+
+    return {
+      text: record.text.trim(),
+      ...(typeof record.priority === 'boolean' ? { priority: record.priority } : {}),
+    };
+  });
+
+  if (normalized.some((lever) => lever == null)) return null;
+
+  const priorityCount = normalized.filter((lever) => lever?.priority === true).length;
+  if (priorityCount > 1) return null;
+
+  return normalized as SpecRailInsight['execution_levers'];
+}
+
 const FEASIBILITY_STANCES = ['strong', 'viable', 'viable_with_constraints', 'strained', 'not_recommended'] as const;
 const BUFFER_STATUSES = ['healthy', 'workable', 'tight', 'negative'] as const;
 const TIMELINE_STATUSES = ['on_track', 'tight', 'at_risk'] as const;
@@ -640,6 +757,7 @@ function isSpecRailInsight(value: unknown): value is SpecRailInsight {
   const breakdown = record.feasibility_breakdown as Record<string, unknown> | undefined;
   const decision = record.decision as Record<string, unknown> | undefined;
   const alternative = record.alternative_path as Record<string, unknown> | null | undefined;
+  const executionLevers = normalizeExecutionLevers(record.execution_levers);
 
   return (
     isEnumValue(record.feasibility_stance, FEASIBILITY_STANCES) &&
@@ -652,9 +770,8 @@ function isSpecRailInsight(value: unknown): value is SpecRailInsight {
     Boolean(decision) &&
     isEnumValue(decision?.direction, DECISION_DIRECTIONS) &&
     isNonEmptyString(decision?.reason) &&
-    Array.isArray(record.execution_levers) &&
-    record.execution_levers.length === 3 &&
-    record.execution_levers.every(isNonEmptyString) &&
+    executionLevers != null &&
+    executionLevers.every(isSpecExecutionLever) &&
     (
       alternative == null ||
       (typeof alternative?.title === 'string' &&
@@ -666,7 +783,18 @@ function isSpecRailInsight(value: unknown): value is SpecRailInsight {
 export function parseSpecRailOutput(raw: string): SpecRailInsight | null {
   try {
     const parsed = JSON.parse(extractJsonObject(raw)) as unknown;
-    return isSpecRailInsight(parsed) ? parsed : null;
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    const record = parsed as Record<string, unknown>;
+    const executionLevers = normalizeExecutionLevers(record.execution_levers);
+    if (!executionLevers) return null;
+
+    const normalized: unknown = {
+      ...record,
+      execution_levers: executionLevers,
+    };
+
+    return isSpecRailInsight(normalized) ? normalized : null;
   } catch {
     return null;
   }

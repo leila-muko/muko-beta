@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MukoNav } from "@/components/MukoNav";
+import { CollectionContextBar, COLLECTION_CONTEXT_BAR_OFFSET } from "@/components/collection/CollectionContextBar";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import { preloadCriticScores } from "@/lib/concept-studio/preloadCriticScores";
 
@@ -200,10 +201,25 @@ export default function ConceptPrepPage() {
         onSaveClose={() => {}}
       />
 
+      <div
+        style={{
+          position: "fixed",
+          top: 72,
+          left: 0,
+          right: 0,
+          zIndex: 100,
+        }}
+      >
+        <CollectionContextBar
+          collectionName={collectionName || undefined}
+          season={season || undefined}
+        />
+      </div>
+
       <main
         style={{
           minHeight: "calc(100vh - 72px)",
-          padding: "116px 24px 48px",
+          padding: `${72 + COLLECTION_CONTEXT_BAR_OFFSET + 44}px 24px 48px`,
           display: "grid",
           placeItems: "center",
           position: "relative",

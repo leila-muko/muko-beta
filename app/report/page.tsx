@@ -3,8 +3,12 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import materialsData from '@/data/materials.json';
+import { MukoNav } from '@/components/MukoNav';
+import { CollectionContextBar, COLLECTION_CONTEXT_BAR_OFFSET } from '@/components/collection/CollectionContextBar';
 import { CollectionReportView } from '@/components/report/CollectionReportView';
 import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
+import { sanitizeContextBarSummary } from '@/lib/collections/contextBarSummary';
+import { getCollectionLanguageLabels, getExpressionSignalLabels } from '@/lib/collection-signals';
 import { buildCollectionReport } from '@/lib/collection-report/buildCollectionReport';
 import type {
   CollectionComplexity,
@@ -41,6 +45,7 @@ interface AnalysisRow {
   } | null;
   piece_name?: string | null;
   narrative?: string | null;
+  mood_board_images?: string[] | null;
   created_at: string;
   agent_versions?: Record<string, string | null> | null;
 }
@@ -89,6 +94,40 @@ function inferStatus(score: number | null | undefined) {
 
 function getPieceName(row: AnalysisRow) {
   return row.piece_name?.trim() || row.agent_versions?.saved_piece_name?.trim() || 'Untitled Piece';
+}
+
+function parseStoredStringArray(value: string | null | undefined) {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function parseStoredChipSelection(value: string | null | undefined) {
+  if (!value) return null;
+
+  try {
+    const parsed = JSON.parse(value) as { activatedChips?: Array<{ label?: string | null }> } | null;
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    const activatedChips = Array.isArray(parsed.activatedChips)
+      ? parsed.activatedChips
+          .map((chip) => (typeof chip?.label === 'string' ? chip.label.trim() : ''))
+          .filter(Boolean)
+          .map((label) => ({ label }))
+      : undefined;
+
+    return { activatedChips };
+  } catch {
+    return null;
+  }
 }
 
 function toCollectionInput({
@@ -177,9 +216,9 @@ async function fetchCollectionAnalyses(
 ): Promise<AnalysisRow[]> {
   const supabase = createClient();
   const primarySelect =
-    'id, collection_name, season, category, collection_role, aesthetic_input, collection_aesthetic, aesthetic_inflection, material_id, silhouette, construction_tier, score, dimensions, gates_passed, piece_name, narrative, created_at, agent_versions';
+    'id, collection_name, season, category, collection_role, aesthetic_input, collection_aesthetic, aesthetic_inflection, material_id, silhouette, construction_tier, score, dimensions, gates_passed, piece_name, narrative, mood_board_images, created_at, agent_versions';
   const fallbackSelect =
-    'id, collection_name, season, category, collection_role, aesthetic_input, collection_aesthetic, aesthetic_inflection, material_id, silhouette, construction_tier, score, dimensions, gates_passed, narrative, created_at, agent_versions';
+    'id, collection_name, season, category, collection_role, aesthetic_input, collection_aesthetic, aesthetic_inflection, material_id, silhouette, construction_tier, score, dimensions, gates_passed, narrative, mood_board_images, created_at, agent_versions';
 
   const primary = await supabase
     .from('analyses')
@@ -239,6 +278,15 @@ function ReportPageContent() {
   const category = useSessionStore((state) => state.category);
   const aestheticInput = useSessionStore((state) => state.aestheticInput);
   const aestheticMatchedId = useSessionStore((state) => state.aestheticMatchedId);
+  const collectionAesthetic = useSessionStore((state) => state.collectionAesthetic);
+  const aestheticInflection = useSessionStore((state) => state.aestheticInflection);
+  const directionInterpretationText = useSessionStore((state) => state.directionInterpretationText);
+  const directionInterpretationChips = useSessionStore((state) => state.directionInterpretationChips);
+  const chipSelection = useSessionStore((state) => state.chipSelection);
+  const conceptSilhouette = useSessionStore((state) => state.conceptSilhouette);
+  const conceptPalette = useSessionStore((state) => state.conceptPalette);
+  const moodboardImages = useSessionStore((state) => state.moodboardImages);
+  const strategySummary = useSessionStore((state) => state.strategySummary);
   const materialId = useSessionStore((state) => state.materialId);
   const silhouette = useSessionStore((state) => state.silhouette);
   const constructionTier = useSessionStore((state) => state.constructionTier);
@@ -326,9 +374,52 @@ function ReportPageContent() {
   ]);
 
   const [report, setReport] = useState<CollectionReportPayload | null>(null);
+  const [contextRow, setContextRow] = useState<AnalysisRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const collectionAbortRef = useRef<AbortController | null>(null);
+  const resolvedCollectionName = collectionFromUrl || activeCollection || collectionName || 'Untitled Collection';
+  const resolvedSeason = seasonFromUrl || season || 'Current Season';
+  const storedDirectionChips = useMemo(
+    () => (contextRow ? parseStoredStringArray(contextRow.agent_versions?.direction_interpretation_chips) : []),
+    [contextRow]
+  );
+  const storedChipSelection = useMemo(
+    () => (contextRow ? parseStoredChipSelection(contextRow.agent_versions?.chip_selection) : null),
+    [contextRow]
+  );
+  const barCollectionLanguage = useMemo(
+    () => getCollectionLanguageLabels(directionInterpretationChips, directionInterpretationText).length > 0
+      ? getCollectionLanguageLabels(directionInterpretationChips, directionInterpretationText)
+      : getCollectionLanguageLabels(storedDirectionChips, contextRow?.aesthetic_inflection),
+    [contextRow?.aesthetic_inflection, directionInterpretationChips, directionInterpretationText, storedDirectionChips]
+  );
+  const barExpressionSignals = useMemo(
+    () => getExpressionSignalLabels(chipSelection).length > 0
+      ? getExpressionSignalLabels(chipSelection)
+      : getExpressionSignalLabels(storedChipSelection),
+    [chipSelection, storedChipSelection]
+  );
+  const barSummary = useMemo(
+    () =>
+      sanitizeContextBarSummary(strategySummary) ??
+      sanitizeContextBarSummary(contextRow?.agent_versions?.strategy_summary),
+    [contextRow?.agent_versions?.strategy_summary, strategySummary]
+  );
+  const barDirection =
+    collectionAesthetic ||
+    contextRow?.collection_aesthetic ||
+    aestheticInput ||
+    aestheticMatchedId ||
+    undefined;
+  const barPointOfView =
+    aestheticInflection ||
+    directionInterpretationText ||
+    contextRow?.aesthetic_inflection ||
+    undefined;
+  const barSilhouette = conceptSilhouette || contextRow?.silhouette || silhouette || undefined;
+  const barPalette = conceptPalette || contextRow?.agent_versions?.selected_palette || undefined;
+  const barMoodboardImages = moodboardImages.length > 0 ? moodboardImages : contextRow?.mood_board_images ?? [];
 
   useEffect(() => {
     async function loadReport() {
@@ -356,6 +447,7 @@ function ReportPageContent() {
         if (user && activeCollectionName) {
           try {
             const data = await fetchCollectionAnalyses(user.id, activeCollectionName);
+            setContextRow(data[0] ?? null);
 
             if (data.length > 0) {
               input = toCollectionInput({
@@ -368,6 +460,7 @@ function ReportPageContent() {
                 intent,
               });
             } else if (input) {
+              setContextRow(null);
               input = {
                 ...input,
                 brand,
@@ -375,8 +468,11 @@ function ReportPageContent() {
               };
             }
           } catch {
+            setContextRow(null);
             // If collection fetch fails, keep any available session fallback instead of blanking the page.
           }
+        } else {
+          setContextRow(null);
         }
 
         if (!input && activeCollectionName) {
@@ -548,11 +644,44 @@ function ReportPageContent() {
           'radial-gradient(circle at top left, rgba(168,180,117,0.16), transparent 30%), radial-gradient(circle at top right, rgba(125,150,172,0.16), transparent 28%), linear-gradient(180deg, #FBF9F4 0%, #F4F0E7 100%)',
       }}
     >
+      <MukoNav
+        activeTab="report"
+        setupComplete
+        piecesComplete
+        collectionName={resolvedCollectionName}
+        seasonLabel={resolvedSeason}
+        onBack={() => router.push('/pieces')}
+        onSaveClose={() => {}}
+      />
+
+      <div
+        style={{
+          position: 'fixed',
+          top: 72,
+          left: 0,
+          right: 0,
+          zIndex: 100,
+        }}
+      >
+        <CollectionContextBar
+          strategySummary={barSummary}
+          collectionName={resolvedCollectionName}
+          season={resolvedSeason}
+          direction={barDirection}
+          pointOfView={barPointOfView}
+          collectionLanguage={barCollectionLanguage}
+          silhouette={barSilhouette}
+          palette={barPalette}
+          expressionSignals={barExpressionSignals}
+          moodboardImages={barMoodboardImages}
+        />
+      </div>
+
       <div
         style={{
           maxWidth: 1240,
           margin: '0 auto',
-          padding: '24px 20px 0',
+          padding: `${72 + COLLECTION_CONTEXT_BAR_OFFSET + 24}px 20px 0`,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',

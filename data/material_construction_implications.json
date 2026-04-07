@@ -17,7 +17,7 @@
   "linen": {
     "low": "Linen at low construction is straightforward — the fabric's natural texture carries the aesthetic without needing construction complexity.",
     "moderate": "Linen at moderate construction works well for structured pieces — it holds seam lines cleanly and tolerates finishing detail without significant handling risk.",
-    "high": "Linen at high construfraying at seam edges under heavy finishing detail is the primary risk, and sampling must validate edge treatment."
+    "high": "Linen at high construction requires careful edge finishing — the fabric's natural weave is prone to fraying under heavy seam detail, and sampling must validate that edge treatment holds before committing to production."
   },
   "silk": {
     "low": "Silk at low construction is the correct pairing — minimal seaming protects the hand and keeps slippage and handling time manageable.",

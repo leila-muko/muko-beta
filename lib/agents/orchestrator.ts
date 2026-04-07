@@ -330,8 +330,9 @@ export async function runAnalysis(
       console.warn('[CALCULATOR] skipping COGS — material not found:', input.material_id);
       // bb.cogs stays at 0 (safe default); pipeline continues
     } else {
-      const categoryForCOGS = CATEGORIES_MAP[input.category] as { yards_required?: number } | undefined;
+      const categoryForCOGS = CATEGORIES_MAP[input.category] as { yards_required?: number; labor_base_usd?: number } | undefined;
       const yardage = categoryForCOGS?.yards_required ?? 2.0;
+      const laborBaseUsd = categoryForCOGS?.labor_base_usd ?? 35;
       const cogsTargetMsrp = input.target_msrp != null && input.target_msrp > 0 ? input.target_msrp : 0;
       const cogsBreakdown = calculateCOGS(
         resolvedMaterial as unknown as Parameters<typeof calculateCOGS>[0],
@@ -340,6 +341,7 @@ export async function runAnalysis(
         input.lined ?? false,
         cogsTargetMsrp,
         brandProfile.target_margin,
+        laborBaseUsd,
       );
       bb.cogs = cogsBreakdown.totalCOGS;
     }

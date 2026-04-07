@@ -6,27 +6,22 @@ import { CONSTRUCTION_INFO } from '@/lib/spec-studio/smart-defaults';
 interface ConstructionTierProps {
   selectedTier: ConstructionTierType;
   onSelect: (tier: ConstructionTierType) => void;
-  defaultTier: ConstructionTierType;
   overrideWarning: string | null;
 }
 
 export default function ConstructionTier({
   selectedTier,
   onSelect,
-  defaultTier,
   overrideWarning,
 }: ConstructionTierProps) {
   const tiers: ConstructionTierType[] = ['low', 'moderate', 'high'];
 
   return (
     <div className="mb-7">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3">
         <label className="text-[11px] font-semibold uppercase tracking-[1.5px] text-[#43432B]">
           Construction
         </label>
-        <span className="text-[10px] text-[#A8B475] font-medium bg-[#A8B475]/10 px-2 py-0.5 rounded-full">
-          Default: {CONSTRUCTION_INFO[defaultTier].label}
-        </span>
       </div>
 
       <div className="flex gap-2">

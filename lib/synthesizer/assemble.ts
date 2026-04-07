@@ -345,6 +345,11 @@ export interface SpecBlackboardInput {
   previousMaterialId?: string | null;
   /** Optional intent calibration from the Intent page */
   intent?: IntentCalibration;
+  priorRecommendation?: {
+    dimension: string;
+    title: string;
+    description: string;
+  } | null;
 }
 
 /** Returns null when aestheticSlug or materialId is missing. */
@@ -409,6 +414,7 @@ export function buildSpecBlackboard(
       cost_reduction: resolveCostReduction(input.materialId, input.margin_pass),
     },
     intent: input.intent,
+    prior_recommendation: input.priorRecommendation ?? null,
   };
 }
 

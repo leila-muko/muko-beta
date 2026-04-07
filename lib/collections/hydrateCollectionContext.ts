@@ -1,6 +1,10 @@
 "use client";
 
-import { useSessionStore, type ChipSelection } from "@/lib/store/sessionStore";
+import {
+  useSessionStore,
+  type ChipSelection,
+  type PersistedCollectionContextSnapshot,
+} from "@/lib/store/sessionStore";
 
 const GENERIC_STRATEGY_SUMMARY = "Define your collection stance";
 
@@ -14,6 +18,94 @@ export interface PersistedCollectionContextRow {
   season?: string | null;
   mood_board_images?: string[] | null;
   agent_versions?: PersistedAgentVersions;
+}
+
+const CONTEXT_AGENT_VERSION_KEYS = [
+  "strategy_summary",
+  "selected_palette",
+  "direction_interpretation_chips",
+  "collection_language",
+  "expression_signals",
+  "chip_selection",
+] as const;
+
+function toTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function pickPreferredString(...values: Array<unknown>) {
+  for (const value of values) {
+    const trimmed = toTrimmedString(value);
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
+function normalizeMoodboardImages(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter(Boolean);
+}
+
+function pickPreferredMoodboardImages(...values: Array<unknown>) {
+  for (const value of values) {
+    const images = normalizeMoodboardImages(value);
+    if (images.length > 0) return images;
+  }
+  return [];
+}
+
+function mergeContextAgentVersions(
+  ...agentVersionSets: Array<PersistedAgentVersions>
+): Record<string, unknown> | null {
+  const merged: Record<string, unknown> = {};
+
+  CONTEXT_AGENT_VERSION_KEYS.forEach((key) => {
+    for (const agentVersions of agentVersionSets) {
+      const candidate = agentVersions?.[key];
+      const trimmed = toTrimmedString(candidate);
+      if (!trimmed) continue;
+      merged[key] = trimmed;
+      break;
+    }
+  });
+
+  return Object.keys(merged).length > 0 ? merged : null;
+}
+
+export function mergeCollectionContextRows(
+  ...rows: Array<PersistedCollectionContextRow | PersistedCollectionContextSnapshot | null | undefined>
+): PersistedCollectionContextSnapshot | null {
+  const validRows = rows.filter(Boolean);
+  if (validRows.length === 0) return null;
+
+  const merged: PersistedCollectionContextSnapshot = {
+    collection_aesthetic: pickPreferredString(...validRows.map((row) => row?.collection_aesthetic)) ?? null,
+    aesthetic_inflection: pickPreferredString(...validRows.map((row) => row?.aesthetic_inflection)) ?? null,
+    aesthetic_matched_id: pickPreferredString(...validRows.map((row) => row?.aesthetic_matched_id)) ?? null,
+    silhouette: pickPreferredString(...validRows.map((row) => row?.silhouette)) ?? null,
+    season: pickPreferredString(...validRows.map((row) => row?.season)) ?? null,
+    mood_board_images: pickPreferredMoodboardImages(...validRows.map((row) => row?.mood_board_images)),
+    agent_versions: mergeContextAgentVersions(...validRows.map((row) => row?.agent_versions)),
+  };
+
+  const hasContent = Boolean(
+    merged.collection_aesthetic ||
+      merged.aesthetic_inflection ||
+      merged.aesthetic_matched_id ||
+      merged.silhouette ||
+      merged.season ||
+      (merged.mood_board_images?.length ?? 0) > 0 ||
+      merged.agent_versions
+  );
+
+  return hasContent ? merged : null;
+}
+
+function getCollectionContextCacheKey(collectionName: string) {
+  return collectionName.trim().toLowerCase();
 }
 
 function parseJsonValue(value: unknown): unknown {
@@ -50,9 +142,9 @@ function toChipSelection(value: unknown): ChipSelection | null {
   };
 }
 
-export function hydrateCollectionContextFromAnalysis(
+function applyCollectionContextSnapshot(
   collectionName: string,
-  row: PersistedCollectionContextRow | null
+  row: PersistedCollectionContextRow | PersistedCollectionContextSnapshot | null
 ) {
   const state = useSessionStore.getState();
 
@@ -97,4 +189,45 @@ export function hydrateCollectionContextFromAnalysis(
   if (row?.collection_aesthetic || row?.aesthetic_matched_id || inflection) {
     state.lockConcept();
   }
+}
+
+export function hydrateCollectionContextFromAnalysis(
+  collectionName: string,
+  row: PersistedCollectionContextRow | null
+) {
+  const normalizedCollectionName = collectionName.trim().toLowerCase();
+  const cachedSnapshot = normalizedCollectionName
+    ? useSessionStore.getState().collectionContextSnapshots[normalizedCollectionName]
+    : null;
+  const mergedSnapshot = mergeCollectionContextRows(row, cachedSnapshot);
+
+  if (!row) {
+    if (mergedSnapshot) {
+      applyCollectionContextSnapshot(collectionName, mergedSnapshot);
+      useSessionStore.getState().setCollectionContextSnapshot(collectionName, mergedSnapshot);
+      return;
+    }
+
+    useSessionStore.getState().setCollectionName(collectionName);
+    return;
+  }
+
+  const snapshotToPersist = mergedSnapshot ?? mergeCollectionContextRows(row);
+
+  applyCollectionContextSnapshot(collectionName, snapshotToPersist ?? row);
+
+  if (snapshotToPersist) {
+    useSessionStore.getState().setCollectionContextSnapshot(collectionName, snapshotToPersist);
+  }
+}
+
+export function restoreCollectionContextFromCache(collectionName: string) {
+  const cacheKey = getCollectionContextCacheKey(collectionName);
+  if (!cacheKey) return false;
+
+  const cachedSnapshot = useSessionStore.getState().collectionContextSnapshots[cacheKey];
+  if (!cachedSnapshot) return false;
+
+  applyCollectionContextSnapshot(collectionName, cachedSnapshot);
+  return true;
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { createClient } from '@/lib/supabase/client';
 import { BRAND } from '@/lib/concept-studio/constants';
+import { resetCollectionScopedSession } from '@/lib/collections/resetCollectionScopedSession';
 
 /* ─── Design tokens — match Intent / Concept / Spec / Report ─────────────── */
 const OLIVE = BRAND.oliveInk; // #43432B
@@ -150,6 +151,7 @@ export default function EntryScreen() {
   }, []);
 
   const handleOpenCollection = (name: string) => {
+    resetCollectionScopedSession(name, null);
     setCollectionName(name);
     setStoreCollectionName(name);
     setActiveCollection(name);

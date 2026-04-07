@@ -66,30 +66,34 @@ function deriveCollectionPhase(confirmedPieceCount: number): PiecesReadInput["cu
 }
 
 function deriveRoleTargets(confirmedPieceCount: number): PiecesReadInput["currentCollectionState"]["roleTargets"] {
-  if (confirmedPieceCount <= 0) {
+  if (confirmedPieceCount < 4) {
     return {
-      hero: 0,
-      directional: 0,
-      coreEvolution: 0,
-      volumeDriver: 0,
+      hero: 1,
+      directional: 1,
+      volumeDriver: 1,
+      coreEvolution: 1,
     };
   }
 
-  const hero = Math.min(1, confirmedPieceCount);
-  let remaining = Math.max(0, confirmedPieceCount - hero);
-
-  const directionalTarget = confirmedPieceCount <= 3 ? 1 : 2;
-  const directional = Math.min(directionalTarget, remaining);
-  remaining -= directional;
-
-  const volumeDriver = Math.min(Math.round(confirmedPieceCount * 0.3), remaining);
-  remaining -= volumeDriver;
+  const hero = Math.max(1, Math.round(confirmedPieceCount * 0.12));
+  const directional = Math.max(1, Math.round(confirmedPieceCount * 0.15));
+  const volumeDriver = Math.max(1, Math.round(confirmedPieceCount * 0.45));
+  const coreEvolution = Math.max(1, Math.round(confirmedPieceCount * 0.28));
 
   return {
     hero,
     directional,
-    coreEvolution: remaining,
     volumeDriver,
+    coreEvolution,
+  };
+}
+
+function deriveRoleTargetRanges(): PiecesReadInput["currentCollectionState"]["roleTargetRanges"] {
+  return {
+    hero: "10–15%",
+    directional: "10–20%",
+    volumeDriver: "40–50%",
+    coreEvolution: "25–30%",
   };
 }
 
@@ -277,6 +281,7 @@ export function buildPiecesReadInput({
       materialSignals: compact(materialSignals),
       roleBalance,
       roleTargets: deriveRoleTargets(confirmedPieceCount),
+      roleTargetRanges: deriveRoleTargetRanges(),
       scoreSignals: {
         averageScore:
           typeof scoreSignals.averageScore === "number" && Number.isFinite(scoreSignals.averageScore)

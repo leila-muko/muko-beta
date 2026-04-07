@@ -6,7 +6,12 @@ import { createClient } from '@/lib/supabase/client';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import CollectionPage from '@/components/collections/CollectionPage';
 import { BRAND } from '@/lib/concept-studio/constants';
-import { hydrateCollectionContextFromAnalysis } from '@/lib/collections/hydrateCollectionContext';
+import {
+  hydrateCollectionContextFromAnalysis,
+  restoreCollectionContextFromCache,
+} from '@/lib/collections/hydrateCollectionContext';
+import { resetCollectionScopedSession } from '@/lib/collections/resetCollectionScopedSession';
+import { getLatestCollectionContextRow } from '@/lib/collections/getLatestCollectionContextRow';
 
 const SIDEBAR_WIDTH = 272;
 const OLIVE = BRAND.oliveInk;
@@ -110,15 +115,11 @@ export default function CollectionsHubPage() {
     const run = async () => {
       if (activeCollection) {
         const activeMeta = collections.find((collection) => collection.name === activeCollection);
-        const supabase = createClient();
-        const { data } = await supabase
-          .from('analyses')
-          .select('collection_aesthetic, aesthetic_inflection, aesthetic_matched_id, silhouette, season, agent_versions, created_at')
-          .eq('collection_name', activeCollection)
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        resetCollectionScopedSession(activeCollection, activeMeta?.season ?? null);
+        restoreCollectionContextFromCache(activeCollection);
+        const data = userId
+          ? await getLatestCollectionContextRow(userId, activeCollection)
+          : null;
 
         hydrateCollectionContextFromAnalysis(activeCollection, data);
 
@@ -256,7 +257,11 @@ export default function CollectionsHubPage() {
                     onMouseLeave={() => { setHoveredCollection(null); if (!isMenuOpen) setMenuOpenFor(null); }}
                   >
                     <button
-                      onClick={() => { setMenuOpenFor(null); setActiveCollection(collection.name); }}
+                      onClick={() => {
+                        setMenuOpenFor(null);
+                        resetCollectionScopedSession(collection.name, collection.season);
+                        setActiveCollection(collection.name);
+                      }}
                       style={{
                         textAlign: 'left',
                         fontSize: 13,

@@ -1,6 +1,28 @@
-import type { PiecesReadInput } from "@/lib/pieces/types";
+import { ROLE_DISPLAY_LABELS, type PiecesReadInput } from "@/lib/pieces/types";
+
+function withDisplayRoleLabels(input: PiecesReadInput): PiecesReadInput {
+  const relabelRoleRecord = (record?: Record<string, string | number>) =>
+    Object.fromEntries(
+      Object.entries(record ?? {}).map(([role, value]) => [ROLE_DISPLAY_LABELS[role] ?? role, value])
+    );
+
+  return {
+    ...input,
+    currentCollectionState: {
+      ...input.currentCollectionState,
+      roleBalance: relabelRoleRecord(input.currentCollectionState.roleBalance) as PiecesReadInput["currentCollectionState"]["roleBalance"],
+      roleTargets: relabelRoleRecord(input.currentCollectionState.roleTargets) as PiecesReadInput["currentCollectionState"]["roleTargets"],
+      roleTargetRanges: input.currentCollectionState.roleTargetRanges
+        ? (relabelRoleRecord(input.currentCollectionState.roleTargetRanges) as NonNullable<
+            PiecesReadInput["currentCollectionState"]["roleTargetRanges"]
+          >)
+        : input.currentCollectionState.roleTargetRanges,
+    },
+  };
+}
 
 export function buildPiecesReadPrompt(input: PiecesReadInput) {
+  const promptInput = withDisplayRoleLabels(input);
   const systemPrompt = `You are a fashion strategy editor and merchandising strategist writing collection-level editorial guidance.
 
 GOVERNING RULE
@@ -44,6 +66,7 @@ The primary inputs for read_headline and read_body are:
   - currentCollectionState.dominantSilhouette
   - currentCollectionState.roleBalance
   - currentCollectionState.roleTargets
+  - currentCollectionState.roleTargetRanges
   - currentCollectionState.scoreSignals
   - currentCollectionState.dimensionDragSummary
   - currentCollectionState.confirmedPieces
@@ -55,6 +78,9 @@ diagnosis first, aesthetic framing second.
 SUMMARIZED ASSORTMENT SIGNALS
 - categoryDistribution is the explicit category count map. Use it directly.
   If tops: 1 and bottoms: 3, name that imbalance. Do not merely imply it.
+- When diagnosing category imbalance, use benchmark proportions as
+  internal reasoning scaffolding only. Translate them into directional
+  language in the final output rather than quoting percentages or target ranges.
 - silhouetteDistribution is the explicit silhouette count map. Use it to name
   concentration or lack of range. If one shape dominates, say so directly.
 - dimensionDragSummary identifies the dominant underperforming pattern across
@@ -63,6 +89,9 @@ SUMMARIZED ASSORTMENT SIGNALS
   on one SKU.
 - roleBalance is actual role count. roleTargets is expected role count for
   this collection size. Use the gap between them as part of the diagnosis.
+- roleTargets includes both a target count and a percentage range for
+  each role. Use benchmark percentages as internal reasoning scaffolding,
+  then translate the imbalance into directional language in the final output.
 
 DIRECTION ANCHOR RULE
 The read must explicitly name movement.name at least once in either
@@ -114,6 +143,17 @@ Generic collection copy fails this test.
 FIELD RULES WITH FAIL/PASS EXAMPLES
 
 - Global falsifiability test: if a sentence could apply to any collection or piece without these exact inputs, rewrite it.
+- REGISTER RULE: Benchmark percentages are reasoning tools, not
+  output language. Never surface a percentage, ratio, or target range
+  in read_headline, read_body, how_to_lean_in, start_here_title, or
+  start_here_body. Translate quantitative signals into directional
+  language instead.
+- FAIL: "coreEvolution is at 17% against a 25–30% target"
+- FAIL: "volume drivers represent 20% of the collection"
+- PASS: "Core Evolution is thin — the line needs more pieces that
+  build on what's established before it reads as a system"
+- PASS: "Lean harder into Volume Drivers before adding more
+  directional pieces — the commercial foundation isn't holding yet"
 
 read_headline
 - Must name one specific tension, gap, or signal present in THIS collection.
@@ -137,25 +177,19 @@ read_body
 - PASS: "Execution is the drag across 3 of 7 pieces — the direction is landing but the production path isn't holding it"
 
 how_to_lean_in
-- Must name one specific action, not a category of action.
-- Prefer direct moves tied to a category gap, silhouette concentration,
-  role gap, or repeated drag pattern.
+- Only output this field when collectionPhase is opening or building.
+- When collectionPhase is forming or complete, omit this field entirely.
+  The next move body carries the action.
+- Must name one specific action tied to a category gap, silhouette
+  concentration, role gap, or repeated drag pattern.
 - The action must follow from the diagnosed tension in read_body.
-- The action must be one of three things:
-  - go fix a specific piece by naming the piece and naming which tab to address
-    in Spec: material, construction, or both
-  - add a specific missing piece by naming the gap from categoryDistribution
-    or coverageGapLabels
-- develop what's present — if role balance is healthy, category coverage is solid,
-  and no drag pattern dominates, name what to deepen or invest in within the
-  existing structure. Example: "Coverage is holding — deepen material specificity
-  across the knitwear pieces before adding more bottoms." This is a valid
-  how_to_lean_in when the assortment doesn't need correction.
-- Never end on an abstract quality instruction like "tighten execution" or
-  "resolve surface clarity" with no named piece or category attached.
+- Never end on an abstract quality instruction like "tighten execution"
+  or "resolve surface clarity" with no named piece or category attached.
 - FAIL: "resolve the surface signal and turn quiet-structure into a legible product statement"
-- PASS: "Add tops before extending bottoms — 1 top against 3 bottoms is setting the balance before the direction can"
-- PASS (develop): "Coverage is holding across categories — invest in surface specificity on the two execution-drag pieces before extending the range."
+- PASS: "Add tops before extending bottoms — the category balance is inverting,
+  and bottoms are doing all the structural work before tops establish the line's identity"
+- PASS (develop): "Coverage is holding across categories — invest in surface
+  specificity on the two execution-drag pieces before extending the range."
 
 start_here_title
 - If collectionPhase is opening or building:
@@ -179,18 +213,20 @@ start_here_body
   - FAIL: "This piece gives the collection a clear starting point and helps define the hierarchy"
   - PASS: "Start with the Cigarette Jean because it locks in the collection's narrow, sharp leg line while giving you a commercial bottom anchor. That makes it easier to add softer tops without losing the controlled structure the range is still missing."
 - If collectionPhase is forming or complete:
-  - This field becomes the Next Move body.
   - It must explain the next assortment correction using categoryDistribution,
     silhouetteDistribution, dimensionDragSummary, roleBalance vs roleTargets,
     and coverage gaps.
-  - It must end with a concrete next action: either the specific piece to add
-    next from suggestedPieces or coverageGaps, or the specific piece to fix
-    first from dimensionDragSummary.affectedPieces.
-  - The last sentence must be actionable, not conclusory.
-  - It may mention the recommendedStartPiece only if it supports the next move,
-    but it must not read like first-piece guidance.
-  - FAIL: "Start with one anchor piece"
-  - PASS: "Next move: tops coverage — 1 top against 3 bottoms means the assortment reads bottom-heavy before it reads directional"
+  - Must end with the specific mechanism: name the category, role slot, or
+    piece to add or fix, and what it stabilizes. For example: "Add one Core
+    Evolution piece in a confirmed category — tops or bottoms — that deepens
+    the hand already present. That stabilizes role balance and lets the volume
+    drivers read as extensions rather than alternatives."
+  - The mechanism sentence must be falsifiable: if the role gap or category
+    changed, the sentence should change too.
+  - FAIL: "Add a piece that fills the gap and resolves the tension."
+  - PASS: "Add one Core Evolution piece in tops or bottoms that deepens the
+    hand-dyed direction already present — that stabilizes role balance and
+    lets the volume drivers read as extensions rather than alternatives."
 
 piece_microcopy
 - This field is optional.
@@ -225,14 +261,13 @@ Hard limits:
 - read_body: max 70 words
 - how_to_lean_in: max 55 words
 - start_here_title: max 8 words
-- start_here_body: max 65 words
+- start_here_body: max 80 words
 - each piece_microcopy entry: max 20 words
 
 Return raw JSON only:
 {
   "read_headline": "string",
   "read_body": "string",
-  "how_to_lean_in": "string",
   "start_here_title": "string",
   "start_here_body": "string",
   "piece_microcopy": [
@@ -252,7 +287,7 @@ Failure condition:
   or coverage gaps from the input, it has failed and must be rewritten.
 
 Structured input:
-${JSON.stringify(input, null, 2)}`;
+${JSON.stringify(promptInput, null, 2)}`;
 
   return { systemPrompt, userPrompt };
 }

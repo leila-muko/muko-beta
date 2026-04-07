@@ -1,3 +1,4 @@
+// DEPRECATED: Not imported anywhere in the live app. Superseded by lib/spec-studio/calculator.ts. Do not use.
 /**
  * Muko Calculator Agent
  * calculateCOGS() — Deterministic cost analysis for fashion designs
@@ -168,12 +169,14 @@ function buildSuccessResult(args: {
 function calculateCOGS({
   material_id,
   category_id,
+  subcategoryYardage = null,
   construction_tier,
   target_msrp,
   target_margin = DEFAULT_TARGET_MARGIN,
 }: {
   material_id: string;
   category_id: string;
+  subcategoryYardage?: number | null;
   construction_tier: string;
   target_msrp: number;
   target_margin?: number;
@@ -196,7 +199,10 @@ function calculateCOGS({
     materialCost = knitCostPerKg * category.knit_weight_kg;
     materialNote = `Knit category: ${category.knit_weight_kg}kg @ $${knitCostPerKg.toFixed(2)}/kg`;
   } else {
-    materialCost = material.cost_per_yard * (category.yards_required ?? 0) * complexityModifier;
+    const resolvedYardage = subcategoryYardage && subcategoryYardage > 0
+      ? subcategoryYardage
+      : (category.yards_required ?? 0);
+    materialCost = material.cost_per_yard * resolvedYardage * complexityModifier;
   }
 
   const laborCost = category.labor_base_usd * multiplier;
@@ -265,6 +271,7 @@ function generateCostRedirects({
     const moderateResult = calculateCOGS({
       material_id: material.id,
       category_id: category.id,
+      subcategoryYardage: null,
       construction_tier: "moderate",
       target_msrp,
       target_margin,
@@ -286,6 +293,7 @@ function generateCostRedirects({
     const lowResult = calculateCOGS({
       material_id: material.id,
       category_id: category.id,
+      subcategoryYardage: null,
       construction_tier: "low",
       target_msrp,
       target_margin,
@@ -341,6 +349,7 @@ function findCheaperMaterials(
     const testResult = calculateCOGS({
       material_id: id,
       category_id: category.id,
+      subcategoryYardage: null,
       construction_tier,
       target_msrp: 99999,
       target_margin: 0,

@@ -33,6 +33,10 @@ export type SpecFeasibilityStance =
   | 'not_recommended';
 export type SpecComplexityLevel = 'low' | 'moderate' | 'high';
 export type SpecStepId = 'material' | 'construction' | 'execution';
+export interface SpecExecutionLever {
+  text: string;
+  priority?: boolean;
+}
 
 export interface SpecDecisionDiagnostics {
   primary_carrier: SpecPrimaryCarrier;
@@ -61,7 +65,7 @@ export interface SpecRailInsight {
     direction: SpecDecisionDirection;
     reason: string;
   };
-  execution_levers: [string, string, string];
+  execution_levers: [SpecExecutionLever, SpecExecutionLever, SpecExecutionLever];
   alternative_path: {
     title: string;
     description: string;
@@ -77,7 +81,7 @@ export interface DeriveSpecDiagnosticsInput {
   silhouette?: string | null;
   constructionTier: 'low' | 'moderate' | 'high';
   constructionOverride?: boolean;
-  materialBehavior: 'fluid' | 'structured' | 'textural' | 'balanced';
+  materialBehavior: 'fluid' | 'structured' | 'medium' | 'textural' | 'balanced';
   materialProperties?: string[];
   marginBuffer?: number | null;
   targetCogs?: number | null;
@@ -121,7 +125,7 @@ export type LeverAssessment = {
 
 export type ViabilityState =
   | { state: 'viable' }
-  | { state: 'reprice'; currentMsrp: number; suggestedMsrp: number; gapUsd: number }
+  | { state: 'reprice'; currentMsrp: number; suggestedMsrp: number; gapUsd: number; msrpCeilingHit: boolean }
   | { state: 'not_viable'; levers: LeverAssessment[] }
 
 const CONSTRUCTION_FLOOR: Record<string, 'low' | 'moderate' | 'high'> = {
@@ -171,6 +175,7 @@ export function assessViability(
     cogsUsd: number
     targetMsrp: number
     targetMargin: number
+    priceTier?: string
     materialCostPerYard: number
     currentMaterialId: string
   },
@@ -184,11 +189,23 @@ export function assessViability(
   const maxMsrp = ctx.targetMsrp * 1.25;
   const requiredMsrp = ctx.cogsUsd / (1 - ctx.targetMargin);
   if (requiredMsrp <= maxMsrp) {
+    const priceTierCeilings: Record<string, number> = {
+      contemporary: 450,
+      bridge: 800,
+      luxury: 2000,
+      unspecified: 600,
+    };
+    const tierKey = (ctx.priceTier ?? 'unspecified').toLowerCase();
+    const ceiling = priceTierCeilings[tierKey] ?? 600;
+    const uncappedSuggestedMsrp = Math.ceil(requiredMsrp / 5) * 5;
+    const suggestedMsrp = Math.min(uncappedSuggestedMsrp, ceiling);
+
     return {
       state: 'reprice',
       currentMsrp: ctx.targetMsrp,
-      suggestedMsrp: Math.ceil(requiredMsrp / 5) * 5,
+      suggestedMsrp,
       gapUsd: gap,
+      msrpCeilingHit: suggestedMsrp < uncappedSuggestedMsrp,
     };
   }
 
@@ -505,7 +522,7 @@ function decisionReason(ctx: SpecFallbackContext): string {
   }
 }
 
-function leverSet(ctx: SpecFallbackContext): [string, string, string] {
+function leverSet(ctx: SpecFallbackContext): [SpecExecutionLever, SpecExecutionLever, SpecExecutionLever] {
   const d = ctx.diagnostics;
   const materialName = ctx.material_name ?? 'the material';
   const silhouette = ctx.silhouette ?? 'the line';
@@ -539,7 +556,11 @@ function leverSet(ctx: SpecFallbackContext): [string, string, string] {
     levers.push('Balance novelty against repeatability so the piece feels owned, not overworked.');
   }
 
-  return [levers[0], levers[1], levers[2]];
+  return [
+    { text: levers[0] },
+    { text: levers[1] },
+    { text: levers[2] },
+  ];
 }
 
 function buildAlternativePath(ctx: SpecFallbackContext, stance: SpecFeasibilityStance): { title: string; description: string; dimension?: 'material' | 'construction' | 'execution'; target_tier?: 'low' | 'moderate' | 'high'; method?: string } | null {
@@ -671,7 +692,7 @@ export function mapSpecRailToInsightData(rail: SpecRailInsight, mode: InsightMod
 
   return {
     statements: [rail.headline, rail.core_tension ?? rail.decision.reason, rail.decision.reason],
-    edit: rail.execution_levers,
+    edit: rail.execution_levers.map((lever) => lever.text),
     editLabel: 'WHAT TO GET RIGHT',
     secondary,
     secondaryLabel: 'BETTER PATH',

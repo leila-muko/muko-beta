@@ -683,7 +683,7 @@
           "category": "dresses",
           "type": "column-dress",
           "recommended_material_id": "tencel",
-          "redirect_material_id": "rayon-viscose",
+          "redirect_material_id": "wool-merino",
           "implied_chips": [
             "column silhouettes",
             "matte fabrics"
@@ -696,7 +696,7 @@
           "category": "bottoms",
           "type": "trouser",
           "recommended_material_id": "tencel",
-          "redirect_material_id": "rayon-viscose",
+          "redirect_material_id": "wool-merino",
           "implied_chips": [
             "column silhouettes",
             "soft suiting"
@@ -1080,7 +1080,7 @@
           "category": "bottoms",
           "type": "trouser",
           "recommended_material_id": "tencel",
-          "redirect_material_id": "rayon-viscose",
+          "redirect_material_id": "wool-merino",
           "implied_chips": [
             "prairie references"
           ]
@@ -2137,8 +2137,8 @@
           "note": "Sweetened pastel hues in mochi-like bouncy fabric — bridges sensory and feminine for SS27.",
           "category": "dresses",
           "type": "slip-dress",
-          "recommended_material_id": "vegan-leather",
-          "redirect_material_id": "rayon-viscose",
+          "recommended_material_id": "rayon-viscose",
+          "redirect_material_id": "vegan-leather",
           "implied_chips": [
             "gel forms",
             "translucent layers"
@@ -2150,8 +2150,8 @@
           "note": "Recreates touch sensations through experimental flexible material technology — the innovation piece.",
           "category": "tops",
           "type": "top",
-          "recommended_material_id": "vegan-leather",
-          "redirect_material_id": "recycled-polyester",
+          "recommended_material_id": "recycled-polyester",
+          "redirect_material_id": "vegan-leather",
           "implied_chips": [
             "molded details",
             "translucent layers"
@@ -2176,7 +2176,7 @@
           "note": "Transitions from creamy to matte finishes for a joyful experimental feel — the SS27 skirt hero.",
           "category": "bottoms",
           "type": "mini-skirt",
-          "recommended_material_id": "vegan-leather",
+          "recommended_material_id": "nylon",
           "redirect_material_id": "recycled-polyester",
           "implied_chips": [
             "gel forms",
@@ -2497,8 +2497,8 @@
           "note": "Editorial High-Vis edge designed for maximum impact and recognition — the investment statement.",
           "category": "tops",
           "type": "blazer",
-          "recommended_material_id": "tencel",
-          "redirect_material_id": "rayon-viscose",
+          "recommended_material_id": "wool-merino",
+          "redirect_material_id": "tencel",
           "implied_chips": [
             "bold shoulders",
             "high-shine fabrication"

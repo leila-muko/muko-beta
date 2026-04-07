@@ -10,10 +10,10 @@ export interface MaterialAlternative {
 // Keys are normalised silhouette tokens. Values are material IDs to exclude.
 
 const SILHOUETTE_MATERIAL_CONFLICTS: Record<string, string[]> = {
-  relaxed:    ['leather-genuine', 'vegan-leather'],
-  asymmetric: ['leather-genuine', 'vegan-leather', 'recycled-polyester', 'linen'],
+  relaxed:    ['leather', 'vegan-leather'],
+  asymmetric: ['leather', 'vegan-leather', 'recycled-polyester', 'linen'],
   structured: ['jersey', 'recycled-polyester'],
-  draped:     ['linen', 'denim'],
+  draped:     ['denim-conventional', 'denim-raw-selvedge'],
 };
 
 /**

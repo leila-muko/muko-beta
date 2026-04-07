@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { sanitizeContextBarSummary } from "@/lib/collections/contextBarSummary";
 
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
@@ -66,23 +67,6 @@ function dedupePhrases(values: Array<string | null | undefined>, limit: number) 
   });
 
   return result.slice(0, limit);
-}
-
-function buildEditorialSummary(
-  collectionLanguage: string[],
-  expressionSignals: string[],
-  silhouette: string | null | undefined,
-  palette: string | null | undefined
-) {
-  const fragments = dedupePhrases(
-    [silhouette, palette, ...normalizeList(collectionLanguage), ...normalizeList(expressionSignals)],
-    4
-  );
-
-  if (fragments.length === 0) return null;
-  if (fragments.length === 1) return fragments[0];
-  if (fragments.length === 2) return `${fragments[0]} with ${fragments[1].toLowerCase()}`;
-  return `${fragments.slice(0, -1).join(" · ")} · ${fragments[fragments.length - 1]}`;
 }
 
 function EditorialMark({ children }: { children: React.ReactNode }) {
@@ -164,12 +148,13 @@ export function CollectionContextBar({
   action,
   stickyTop,
   isSticky = false,
-  forceLowercase = false,
+  forceLowercase: _forceLowercase = false,
 }: CollectionContextBarProps) {
+  void _forceLowercase;
   const collectionValue = [collectionName, season].filter(Boolean).join(" · ");
   const collectionTitleValue = renderValue(titleOverride) ?? renderValue(collectionName) ?? "Collection";
   const seasonValue = renderValue(season);
-  const strategyValue = renderValue(strategySummary);
+  const strategyValue = sanitizeContextBarSummary(renderValue(strategySummary));
   const directionValue = renderValue(direction);
   const collectionMeta = renderValue(collectionValue);
   const pointOfViewValue = renderValue(pointOfView);

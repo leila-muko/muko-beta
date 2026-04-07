@@ -2,11 +2,10 @@ import type { Material, Category, Silhouette, ConstructionTier } from '@/lib/typ
 import { getMaterialProperties } from '@/lib/spec-studio/material-properties';
 
 // Labor multipliers by construction tier
-const LABOR_BASE = 35;
 const LABOR_MULTIPLIERS: Record<ConstructionTier, number> = {
-  low: 1.2,
-  moderate: 1.8,
-  high: 2.5,
+  low: 0.75,
+  moderate: 1.0,
+  high: 1.35,
 };
 
 const LINING_COST = 18;
@@ -30,10 +29,11 @@ export function calculateCOGS(
   constructionTier: ConstructionTier,
   lined: boolean,
   targetMSRP: number,
-  targetMargin: number
+  targetMargin: number,
+  laborBaseUsd = 35
 ): COGSBreakdown {
   const materialCost = material.cost_per_yard * yardage;
-  const laborCost = LABOR_BASE * LABOR_MULTIPLIERS[constructionTier];
+  const laborCost = laborBaseUsd * LABOR_MULTIPLIERS[constructionTier];
   const liningCost = lined ? LINING_COST : 0;
   const totalCOGS = materialCost + laborCost + liningCost;
   const marginCeiling = targetMSRP * (1 - targetMargin);
@@ -75,36 +75,60 @@ export interface FeasibilityResult {
   message: string;
   required_weeks: number;
   timeline_gap: number;
+  executionScore: number;
+  timelineSubStatus: 'green' | 'yellow_comfortable' | 'yellow_tight' | 'yellow_at_risk' | 'red';
 }
 
 export function checkExecutionFeasibility({
   construction_tier,
   material,
   timeline_weeks,
+  costStatus = null,
+  role = '',
 }: {
   construction_tier: 'low' | 'moderate' | 'high';
   material: { lead_time_weeks: number };
   timeline_weeks: number;
+  costStatus?: 'green' | 'yellow' | 'red' | null;
+  role?: string;
 }): FeasibilityResult {
   const complexity_weeks = { low: 6, moderate: 10, high: 16 };
   const required_weeks = complexity_weeks[construction_tier] + material.lead_time_weeks;
   const gap = timeline_weeks - required_weeks;
+  const timelineStatus =
+    gap >= 4  ? "green" :
+    gap >= 2  ? "yellow_comfortable" :
+    gap >= 0  ? "yellow_tight" :
+    gap >= -4 ? "yellow_at_risk" :
+                "red";
+  const executionStatus =
+    timelineStatus === "red" || costStatus === "red" ? "red" :
+    timelineStatus === "green" ? "green" :
+    "yellow";
+  const baseExecutionScore = (() => {
+    if (costStatus === "red" && timelineStatus === "red") return 35;
+    if (costStatus === "red") return 48;
+    if (timelineStatus === "red") return 35;
+    if (timelineStatus === "yellow_at_risk") return 48;
+    if (timelineStatus === "yellow_tight") return 60;
+    if (timelineStatus === "yellow_comfortable") return 72;
+    if (timelineStatus === "green") return 85;
+    return 60;
+  })();
+  const executionScore = applyRoleModifiers(
+    baseExecutionScore,
+    role,
+    { cost: costStatus === null ? null : costStatus !== 'red' },
+    construction_tier
+  );
+  const message =
+    executionStatus === 'green'
+      ? 'Feasible timeline'
+      : executionStatus === 'yellow'
+        ? 'Tight but possible'
+        : 'Significant timeline risk';
 
-  let status: 'green' | 'yellow' | 'red';
-  let message: string;
-
-  if (gap >= 4) {
-    status = 'green';
-    message = 'Feasible timeline';
-  } else if (gap > -4) {
-    status = 'yellow';
-    message = 'Tight but possible';
-  } else {
-    status = 'red';
-    message = 'Significant timeline risk';
-  }
-
-  return { status, message, required_weeks, timeline_gap: gap };
+  return { status: executionStatus, message, required_weeks, timeline_gap: gap, executionScore, timelineSubStatus: timelineStatus };
 }
 
 export function applyRoleModifiers(
