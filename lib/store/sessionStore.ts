@@ -130,6 +130,8 @@ interface SessionState {
   intentTradeoff: string;
   successPriorities: string[];
   targetMargin: number;
+  timelineWeeks: number | null;
+  timelineWeeksOverride: boolean;
   sliderTrend: number;
   sliderCreative: number;
   sliderElevated: number;
@@ -186,6 +188,8 @@ interface SessionState {
   setIntentTradeoff: (tradeoff: string) => void;
   setSuccessPriorities: (priorities: string[]) => void;
   setTargetMargin: (margin: number) => void;
+  setTimelineWeeks: (weeks: number | null) => void;
+  setTimelineWeeksOverride: (override: boolean) => void;
   setSliderTrend: (value: number) => void;
   setSliderCreative: (value: number) => void;
   setSliderElevated: (value: number) => void;
@@ -265,6 +269,8 @@ function createInitialSessionState(targetMargin = 50) {
     intentTradeoff: '',
     successPriorities: [],
     targetMargin,
+    timelineWeeks: null,
+    timelineWeeksOverride: false,
     sliderTrend: 50,
     sliderCreative: 50,
     sliderElevated: 50,
@@ -337,6 +343,8 @@ export const useSessionStore = create<SessionState>()(
       setIntentTradeoff: (intentTradeoff) => set({ intentTradeoff }),
       setSuccessPriorities: (successPriorities) => set({ successPriorities }),
       setTargetMargin: (targetMargin) => set({ targetMargin }),
+      setTimelineWeeks: (timelineWeeks) => set({ timelineWeeks }),
+      setTimelineWeeksOverride: (timelineWeeksOverride) => set({ timelineWeeksOverride }),
       setSliderTrend: (sliderTrend) => set({ sliderTrend }),
       setSliderCreative: (sliderCreative) => set({ sliderCreative }),
       setSliderElevated: (sliderElevated) => set({ sliderElevated }),

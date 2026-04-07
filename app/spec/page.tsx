@@ -18,6 +18,7 @@ import { getMaterialProperties } from "@/lib/spec-studio/material-properties";
 import {
   findMaterialMention as resolveMaterialMention,
   findClosestMaterialMatch,
+  getMaterialAliases,
 } from "@/lib/spec-studio/material-resolver";
 import {
   CONSTRUCTION_INFO,
@@ -1002,6 +1003,8 @@ function SpecStudioPageContent() {
   const previousMaterialIdRef = useRef<string | null>(null);
   const materialDeltaTimeoutRef = useRef<number | null>(null);
   const { setCategory, setSubcategory: setStoreSubcategory, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setSelectedKeyPiece, setActiveProductPieceId, setPieceBuildContext, setCollectionName, setSeason, setActiveCollection, setTargetMsrp } = useSessionStore();
+  const storedTimelineWeeks = useSessionStore((s) => s.timelineWeeks);
+  const storedTimelineWeeksOverride = useSessionStore((s) => s.timelineWeeksOverride);
   const previousMaterialId = useSessionStore((s) => s.previousMaterialId);
   // parent_analysis_id — deferred to Phase 2
   const categories: Category[] = categoriesData.categories as unknown as Category[];
@@ -1057,6 +1060,11 @@ function SpecStudioPageContent() {
   const [materialCategory, setMaterialCategory] = useState<string>("all");
   const [hoveredComplexity, setHoveredComplexity] = useState<ConstructionTier | null>(null);
   const [constructionConfirmed, setConstructionConfirmed] = useState(false);
+  const [customPieceName, setCustomPieceName] = useState<string | null>(null);
+  const [isPieceNameEditing, setIsPieceNameEditing] = useState(false);
+  const [renamePrompt, setRenamePrompt] = useState<{ suggestedName: string } | null>(null);
+  const [isRenamePromptEditing, setIsRenamePromptEditing] = useState(false);
+  const [renamePromptDraft, setRenamePromptDraft] = useState("");
   const [specStep, setSpecStep] = useState<"material" | "construction">("material");
   const [specStepDirection, setSpecStepDirection] = useState<1 | -1>(1);
   const [executionNotes, setExecutionNotes] = useState<string[]>([]);
@@ -1078,9 +1086,19 @@ function SpecStudioPageContent() {
   };
 
   const advanceToConstruction = useCallback(() => {
+    if (!constructionTier) {
+      const defaultTier = getSmartDefault(
+        categoryId,
+        useSessionStore.getState().conceptSilhouette || undefined,
+      );
+      if (defaultTier) {
+        setConstructionTier(defaultTier);
+      }
+    }
+    setConstructionConfirmed(true);
     setSpecStepDirection(1);
     setSpecStep("construction");
-  }, []);
+  }, [categoryId, constructionTier]);
 
   const backToMaterial = useCallback(() => {
     setSpecStepDirection(-1);
@@ -1191,6 +1209,7 @@ function SpecStudioPageContent() {
         setSubcategoryId(snapshot.subcategoryId);
         setMaterialId(snapshot.materialId);
         setConstructionTier(snapshot.constructionTier);
+        setCustomPieceName(snapshot.pieceName ?? null);
         setConstructionConfirmed(Boolean(snapshot.constructionTier));
         setOverrideWarning(null);
         setUserManuallySelected(Boolean(snapshot.materialId));
@@ -1293,6 +1312,7 @@ function SpecStudioPageContent() {
     if (selectedSubcategory?.name) return selectedSubcategory.name;
     return selectedCategory.name;
   }, [selectedKeyPiece, selectedSubcategory, selectedCategory]);
+  const displayPieceName = customPieceName ?? pieceAnchorName;
   // Compute yardage from subcategory base_yardage + silhouette modifier (falls back to category base)
   const conceptYardage = useMemo(() => {
     const base = selectedSubcategory
@@ -1586,10 +1606,96 @@ function SpecStudioPageContent() {
   };
 
   const handleMaterialSelection = (nextMaterialId: string) => {
+    const prevMaterial = materials.find((material) => material.id === materialId);
+    const nextMaterial = materials.find((material) => material.id === nextMaterialId);
+    const currentName = customPieceName ?? pieceAnchorName;
+
+    setRenamePrompt(null);
+    setIsRenamePromptEditing(false);
+    setRenamePromptDraft("");
     setMaterialId(nextMaterialId);
     setUserManuallySelected(true);
     setConstructionConfirmed(false);
+
+    if (prevMaterial && nextMaterial && currentName) {
+      const lower = currentName.toLowerCase();
+      const exactMatch = lower.includes(prevMaterial.name.toLowerCase());
+      const aliases = getMaterialAliases(prevMaterial.id, materials);
+      const shorthandMatch = !exactMatch && aliases.some((alias) => lower.includes(alias.toLowerCase()));
+
+      if (exactMatch || shorthandMatch) {
+        let suggestedName: string;
+
+        if (exactMatch) {
+          const regex = new RegExp(prevMaterial.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+          suggestedName = currentName.replace(regex, nextMaterial.name);
+        } else {
+          suggestedName = `${nextMaterial.name} ${currentName}`;
+        }
+
+        suggestedName = suggestedName.replace(/\s{2,}/g, " ").trim();
+        setRenamePrompt({ suggestedName });
+      }
+    }
   };
+
+  const resolvedAnalysisId = useMemo(
+    () => savedAnalysisId || searchParams.get("analysis")?.trim() || null,
+    [savedAnalysisId, searchParams]
+  );
+
+  const persistPieceName = useCallback(async (analysisId: string, pieceName: string) => {
+    const supabase = createClient();
+    const { result } = await runAnalysisMutationWithSchemaFallback(
+      { piece_name: pieceName },
+      async (nextPayload) => supabase
+        .from("analyses")
+        .update(nextPayload)
+        .eq("id", analysisId)
+        .select("id")
+        .maybeSingle()
+    );
+
+    if (result.error && !isMissingPieceNameColumnError(result.error)) {
+      throw result.error;
+    }
+  }, []);
+
+  const commitPieceName = useCallback(async (rawName: string) => {
+    const trimmedName = rawName.trim();
+    if (!trimmedName) {
+      setIsPieceNameEditing(false);
+      return;
+    }
+
+    setCustomPieceName(trimmedName);
+
+    if (resolvedAnalysisId) {
+      try {
+        await persistPieceName(resolvedAnalysisId, trimmedName);
+      } catch (error) {
+        console.error("[Spec] Failed to update piece name:", serializePersistError(error));
+      }
+    }
+
+    setIsPieceNameEditing(false);
+  }, [persistPieceName, resolvedAnalysisId]);
+
+  const handleAcceptRenamePrompt = useCallback(async () => {
+    if (!renamePrompt) return;
+    const nextName = (isRenamePromptEditing ? renamePromptDraft : renamePrompt.suggestedName).trim();
+    if (!nextName) {
+      setRenamePrompt(null);
+      setIsRenamePromptEditing(false);
+      setRenamePromptDraft("");
+      return;
+    }
+
+    await commitPieceName(nextName);
+    setRenamePrompt(null);
+    setIsRenamePromptEditing(false);
+    setRenamePromptDraft("");
+  }, [commitPieceName, isRenamePromptEditing, renamePrompt, renamePromptDraft]);
 
   const handleComplexityChange = (tier: ConstructionTier) => {
     setConstructionTier(tier);
@@ -2202,10 +2308,21 @@ function SpecStudioPageContent() {
 
       window.setTimeout(() => {
         if (controller.signal.aborted) return;
+        if (
+          specStep === "material" &&
+          nextRail?.alternative_path?.dimension === "construction"
+        ) {
+          nextRail = { ...nextRail, alternative_path: null };
+        }
         setSpecRailInsight(nextRail);
-        if (specStep === "material" && nextRail?.alternative_path) {
+        if (
+          specStep === "material" &&
+          nextRail?.alternative_path &&
+          nextRail.alternative_path.dimension !== "construction" &&
+          nextRail.alternative_path.dimension !== "execution"
+        ) {
           setPriorTabRecommendation({
-            dimension: nextRail.alternative_path.dimension ?? "execution",
+            dimension: nextRail.alternative_path.dimension ?? "material",
             title: nextRail.alternative_path.title,
             description: nextRail.alternative_path.description,
           });
@@ -2399,6 +2516,7 @@ function SpecStudioPageContent() {
                     };
 
                     const row = buildAnalysisRow(bb, analysisResult, userId);
+                    row.piece_name = customPieceName ?? row.piece_name;
                     row.construction_method = useSessionStore.getState().constructionMethod ?? null;
                     const { data: upsertData, error: upsertError } = await persistAnalysisRow(supabase, row);
 
@@ -3317,6 +3435,9 @@ function SpecStudioPageContent() {
     };
 
     const row = buildAnalysisRow(bb, analysisResult, userId);
+    row.timeline_weeks = storedTimelineWeeks ?? row.timeline_weeks;
+    row.timeline_weeks_override = storedTimelineWeeksOverride;
+    row.piece_name = customPieceName ?? row.piece_name;
     if (executionNotes.length > 0) {
       row.execution_notes = executionNotes.join("\n");
     }
@@ -3372,6 +3493,7 @@ function SpecStudioPageContent() {
     storeCollectionRole,
     storeSeason,
     targetMSRP,
+    customPieceName,
     executionNotes,
     timelineBuffer,
     timelineWeeks,
@@ -3502,9 +3624,187 @@ function SpecStudioPageContent() {
               <PieceFlatPreview
                 selectedPieceImage={resolvedSelectedPieceImage}
               />
-              <div style={{ marginTop: 14, fontFamily: sohne, fontSize: 22, fontWeight: 500, color: OLIVE, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
-                {pieceAnchorName}
-              </div>
+              {isPieceNameEditing ? (
+                <div style={{ marginTop: 14, display: "flex", alignItems: "flex-end", gap: 8 }}>
+                  <input
+                    defaultValue={displayPieceName}
+                    autoFocus
+                    onBlur={(event) => {
+                      void commitPieceName(event.currentTarget.value);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void commitPieceName(event.currentTarget.value);
+                      } else if (event.key === "Escape") {
+                        event.preventDefault();
+                        setIsPieceNameEditing(false);
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: 0,
+                      fontFamily: sohne,
+                      fontSize: 22,
+                      fontWeight: 500,
+                      color: OLIVE,
+                      letterSpacing: "-0.02em",
+                      lineHeight: 1.1,
+                      border: "none",
+                      borderBottom: "1px solid rgba(77, 48, 47, 0.4)",
+                      background: "transparent",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Save piece name"
+                    title="Save name"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      const input = event.currentTarget.previousElementSibling as HTMLInputElement | null;
+                      if (!input) return;
+                      void commitPieceName(input.value);
+                    }}
+                    style={{
+                      padding: 0,
+                      border: "none",
+                      background: "transparent",
+                      color: CHARTREUSE,
+                      fontFamily: inter,
+                      fontSize: 18,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    ✓
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => setIsPieceNameEditing(true)}
+                  title="Click to rename"
+                  style={{ marginTop: 14, fontFamily: sohne, fontSize: 22, fontWeight: 500, color: OLIVE, letterSpacing: "-0.02em", lineHeight: 1.1, cursor: "text" }}
+                >
+                  {displayPieceName}
+                </div>
+              )}
+              <AnimatePresence initial={false}>
+                {renamePrompt ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                    style={{
+                      marginTop: 6,
+                      padding: "6px 10px",
+                      borderRadius: 4,
+                      background: "rgba(168, 180, 117, 0.08)",
+                      fontFamily: inter,
+                      fontSize: 12,
+                      color: "#4D302F",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <span>Rename to </span>
+                    {isRenamePromptEditing ? (
+                      <input
+                        value={renamePromptDraft}
+                        autoFocus
+                        onChange={(event) => setRenamePromptDraft(event.currentTarget.value)}
+                        onBlur={() => setIsRenamePromptEditing(false)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            setIsRenamePromptEditing(false);
+                          } else if (event.key === "Escape") {
+                            event.preventDefault();
+                            setRenamePromptDraft(renamePrompt.suggestedName);
+                            setIsRenamePromptEditing(false);
+                          }
+                        }}
+                        style={{
+                          padding: 0,
+                          fontFamily: inter,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "#4D302F",
+                          lineHeight: 1.5,
+                          border: "none",
+                          borderBottom: "1px solid rgba(77, 48, 47, 0.4)",
+                          background: "transparent",
+                          outline: "none",
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRenamePromptDraft(renamePrompt.suggestedName);
+                          setIsRenamePromptEditing(true);
+                        }}
+                        style={{
+                          padding: 0,
+                          border: "none",
+                          background: "transparent",
+                          color: "#4D302F",
+                          fontFamily: inter,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          lineHeight: 1.5,
+                          cursor: "text",
+                          textAlign: "left",
+                        }}
+                      >
+                        {renamePrompt.suggestedName}
+                      </button>
+                    )}
+                    <span>?</span>
+                    <div style={{ marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => { void handleAcceptRenamePrompt(); }}
+                        style={{
+                          padding: 0,
+                          border: "none",
+                          background: "transparent",
+                          color: "#A8B475",
+                          fontFamily: inter,
+                          fontSize: 12,
+                          lineHeight: 1.5,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Accept
+                      </button>
+                      <span style={{ color: "rgba(77, 48, 47, 0.4)" }}>·</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRenamePrompt(null);
+                          setIsRenamePromptEditing(false);
+                          setRenamePromptDraft("");
+                        }}
+                        style={{
+                          padding: 0,
+                          border: "none",
+                          background: "transparent",
+                          color: "rgba(77, 48, 47, 0.4)",
+                          fontFamily: inter,
+                          fontSize: 12,
+                          lineHeight: 1.5,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
               {pieceRoleLabel || pieceSignalLabel || pieceCategoryLabel ? (
                 <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: "4px 8px", alignItems: "center" }}>
                   {[pieceRoleLabel !== "Piece" ? pieceRoleLabel : null, pieceSignalLabel, pieceCategoryLabel]

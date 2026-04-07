@@ -170,7 +170,7 @@ function FrameValueField({
   label: string;
   prefix?: string;
   suffix?: string;
-  value: number;
+  value: number | null;
   placeholder: string;
   min?: number;
   max?: number;
@@ -218,7 +218,7 @@ function FrameValueField({
           className="intent-card-field"
           type="number"
           placeholder={placeholder}
-          value={value || ""}
+          value={value ?? ""}
           min={min}
           max={max}
           onChange={(e) => onChange(e.target.value ? Number(e.target.value) : 0)}
@@ -374,6 +374,8 @@ export default function IntentCalibrationPage() {
 
   const {
     setTargetMargin: storeTargetMargin,
+    setTimelineWeeks: storeTimelineWeeks,
+    setTimelineWeeksOverride: storeTimelineWeeksOverride,
     setSuccessPriorities: storeSuccessPriorities,
     setSliderTrend: storeSliderTrend,
     setSliderCreative: storeSliderCreative,
@@ -395,6 +397,8 @@ export default function IntentCalibrationPage() {
   const [sliderCreative, setSliderCreative] = useState(50);
   const [sliderElevated, setSliderElevated] = useState(50);
   const [sliderNovelty, setSliderNovelty] = useState(50);
+  const [timelineWeeksInput, setTimelineWeeksInput] = useState<number | null>(null);
+  const [timelineWeeksOverride, setTimelineWeeksOverride] = useState(false);
   const [brandDnaChips, setBrandDnaChips] = useState<string[]>([]);
 
   const resolvedSeason = hasMounted ? season : "";
@@ -413,6 +417,8 @@ export default function IntentCalibrationPage() {
       setSliderCreative(persistedState.sliderCreative ?? 50);
       setSliderElevated(persistedState.sliderElevated ?? 50);
       setSliderNovelty(persistedState.sliderNovelty ?? 50);
+      setTimelineWeeksInput(persistedState.timelineWeeks ?? null);
+      setTimelineWeeksOverride(persistedState.timelineWeeksOverride ?? false);
       setHasMounted(true);
     }, 0);
 
@@ -442,7 +448,12 @@ export default function IntentCalibrationPage() {
       }
     })();
   }, [storeTargetMargin, targetMargin]);
-  const weeksOut = deliveryWeeks(resolvedSeason);
+  useEffect(() => {
+    if (!hasMounted || timelineWeeksOverride) return;
+    setTimelineWeeksInput(deliveryWeeks(resolvedSeason));
+  }, [hasMounted, resolvedSeason, timelineWeeksOverride]);
+
+  const weeksOut = timelineWeeksInput;
 
   const sliderLabels = {
     trend: positionLabel(sliderTrend, SLIDERS[0].labels),
@@ -488,6 +499,11 @@ export default function IntentCalibrationPage() {
     storeTargetMargin(v);
   };
 
+  const handleTimelineWeeksChange = (v: number) => {
+    setTimelineWeeksInput(v);
+    setTimelineWeeksOverride(true);
+  };
+
   const togglePriority = (id: SuccessId) => {
     let next: SuccessId[];
     if (successPriorities.includes(id)) {
@@ -525,6 +541,8 @@ export default function IntentCalibrationPage() {
     setIntentGoals(titles);
     setIntentTradeoff("");
     setStrategySummary(strategySummary);
+    storeTimelineWeeks(timelineWeeksInput);
+    storeTimelineWeeksOverride(timelineWeeksOverride);
     useSessionStore.setState({
       aestheticInput: "",
       aestheticMatchedId: null,
@@ -844,6 +862,14 @@ export default function IntentCalibrationPage() {
                   max={100}
                   onChange={handleTargetMargin}
                 />
+                <FrameValueField
+                  label="Delivery Window"
+                  suffix="weeks"
+                  value={timelineWeeksInput}
+                  placeholder="43"
+                  min={0}
+                  onChange={handleTimelineWeeksChange}
+                />
               </div>
 
               <div
@@ -907,9 +933,11 @@ export default function IntentCalibrationPage() {
                       lineHeight: 1.45,
                     }}
                   >
-                    {weeksOut !== null
-                      ? `${weeksOut} weeks to ${resolvedSeason} delivery`
-                      : "Select a season to understand the delivery window."}
+                    {timelineWeeksOverride
+                      ? "Custom delivery window"
+                      : weeksOut !== null
+                        ? `${weeksOut} weeks to ${resolvedSeason} delivery`
+                        : "Select a season to understand the delivery window."}
                   </div>
                 </div>
               </div>

@@ -360,6 +360,7 @@ const CATEGORY_KEYWORDS: Array<{ category: string; terms: string[] }> = [
   { category: "blazer", terms: ["blazer"] },
   { category: "skirt", terms: ["slip skirt", "slip-skirt", "skirt", "mini skirt", "mini-skirt", "maxi skirt", "maxi-skirt"] },
   { category: "dress", terms: ["dress", "gown"] },
+  { category: "shorts", terms: ["micro shorts", "micro-shorts", "short shorts", "short-shorts", "short", "shorts"] },
   { category: "trouser", terms: ["trouser", "pant", "pants"] },
   { category: "shirt", terms: ["shirt", "button-down", "button down", "blouse", "tee", "t-shirt", "t shirt", "polo", "vest", "waistcoat"] },
   { category: "knit", terms: ["knit", "sweater", "cardigan"] },

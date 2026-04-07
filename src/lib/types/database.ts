@@ -37,6 +37,7 @@ export interface BrandProfile {
     construction_tier: 'low' | 'moderate' | 'high' | null;
     construction_tier_override: boolean;
     timeline_weeks: number | null;
+    timeline_weeks_override?: boolean;
     
     // Analysis results
     score: number | null;

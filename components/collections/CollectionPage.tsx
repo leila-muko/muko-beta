@@ -1368,22 +1368,14 @@ export default function CollectionPage({
 
                   <button
                     onClick={handleGenerateReport}
-                    style={{
-                      ...headerActionButtonBase,
-                      border: '1px solid #A8B475',
-                      background: '#A8B475',
-                      color: '#3A4020',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#96A461';
-                      e.currentTarget.style.borderColor = '#96A461';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#A8B475';
-                      e.currentTarget.style.borderColor = '#A8B475';
-                    }}
+                    className="collection-read-ready-pill"
                   >
-                    View Report
+                    <span className="collection-read-ready-dot-wrap">
+                      <span className="collection-read-ready-dot-ping" />
+                      <span className="collection-read-ready-dot-core" />
+                    </span>
+                    Collection read ready
+                    <span className="collection-read-ready-arrow">→</span>
                   </button>
                 </>
               ) : (
@@ -1473,9 +1465,73 @@ export default function CollectionPage({
       {toastMessage ? <Toast message={toastMessage} /> : null}
 
       <style>{`
+        .collection-read-ready-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+          padding: 11px 20px;
+          border-radius: 9999px;
+          font-family: "Söhne Breit", sans-serif;
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: 0.01em;
+          cursor: pointer;
+          white-space: nowrap;
+          border: 0.5px solid rgba(168, 180, 117, 0.35);
+          background: #43432B;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          color: #e8e4db;
+          box-shadow: 0 12px 32px rgba(49, 31, 30, 0.18), inset 0 1px 0 rgba(245, 243, 238, 0.14);
+          transition: background 160ms ease, border-color 160ms ease;
+        }
+
+        .collection-read-ready-pill:hover {
+          background: rgba(67, 67, 43, 0.92);
+          border-color: rgba(168, 180, 117, 0.55);
+        }
+
+        .collection-read-ready-dot-wrap {
+          position: relative;
+          width: 8px;
+          height: 8px;
+          flex-shrink: 0;
+        }
+
+        .collection-read-ready-dot-core {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          background: #A8B475;
+        }
+
+        .collection-read-ready-dot-ping {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          background: #A8B475;
+          animation: collectionReadReadyPing 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        .collection-read-ready-arrow {
+          color: #A8B475;
+          display: inline-block;
+          animation: collectionReadReadyArrowBounce 1.8s ease-in-out infinite;
+        }
+
         @keyframes camelPulse {
           0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(184,135,107,0.55); }
           50%       { opacity: 0.75; box-shadow: 0 0 0 5px rgba(184,135,107,0); }
+        }
+
+        @keyframes collectionReadReadyPing {
+          0% { transform: scale(1); opacity: 1; }
+          75%, 100% { transform: scale(2.4); opacity: 0; }
+        }
+
+        @keyframes collectionReadReadyArrowBounce {
+          0%, 100% { transform: translateX(0); }
+          50% { transform: translateX(4px); }
         }
       `}</style>
     </>

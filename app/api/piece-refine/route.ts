@@ -266,6 +266,7 @@ function buildLockedRoleFallback(
 
 function mapArchetypeCategoryToSpecCategory(category: string) {
   if (category === "jean" || category === "trouser") return "bottoms";
+  if (category === "shorts") return "bottoms";
   if (category === "skirt") return "bottoms";
   if (category === "blazer" || category === "outerwear") return "outerwear";
   if (category === "dress") return "dresses";
@@ -276,6 +277,7 @@ function mapArchetypeCategoryToSpecCategory(category: string) {
 function mapArchetypeToSpecSubcategory(category: string, archetype: string) {
   if (category === "jean") return "trouser";
   if (category === "trouser") return archetype === "wide" ? "wide_leg" : "trouser";
+  if (category === "shorts") return "shorts";
   if (category === "skirt") return "skirt";
   if (category === "blazer") return "blazer";
   if (category === "dress") {

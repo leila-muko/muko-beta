@@ -58,6 +58,15 @@ function buildMaterialAliases(material: MaterialLike): string[] {
   return Array.from(aliases);
 }
 
+export function getMaterialAliases<T extends MaterialLike>(
+  materialId: string,
+  materials: T[],
+): string[] {
+  const material = materials.find((entry) => entry.id === materialId);
+  if (!material) return [];
+  return buildMaterialAliases(material);
+}
+
 function scoreClosestAliasMatch(source: string, alias: string): number {
   const sourceTokens = new Set(source.split(" ").filter(Boolean));
   const aliasTokens = alias.split(" ").filter(Boolean);

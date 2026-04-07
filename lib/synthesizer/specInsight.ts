@@ -284,14 +284,23 @@ Follow these rules to prevent contradictory recommendations across tabs.
    or be compatible with the primary constraint. Do not optimize a secondary constraint
    in a way that worsens the primary one.
 
-3. IF A PRIOR TAB ALREADY ADDRESSED THE PRIMARY CONSTRAINT, DO NOT RE-ADDRESS IT.
-   The input includes a \`prior_recommendation\` field. If it is not null, a previous tab
-   already made a recommendation. Check whether that recommendation addresses the same
-   constraint you are about to address.
-   - If yes: do not repeat or contradict it. Acknowledge the constraint is already in play
-     and focus your alternative_path on a different dimension if one genuinely exists.
-     If no second dimension needs addressing, set alternative_path to the all-clear form.
-   - If no: proceed normally.
+3. IF A PRIOR TAB ALREADY ADDRESSED THE PRIMARY CONSTRAINT,
+   MOVE TO THE NEXT CONSTRAINT.
+   - prior_recommendation contains a material swap recommended
+     on the material tab, or null. If null, no prior constraint
+     was resolved — evaluate all constraints fresh. If present,
+     treat the material decision as addressed and focus on the
+     next remaining constraint (timeline, then identity).
+   - If the prior tab addressed the primary constraint, treat
+     that constraint as resolved for purposes of this tab.
+     Identify the next most severe remaining constraint and
+     make that your focus.
+   - If no remaining constraint exists, use the all-clear or
+     watch register. Do not manufacture a new problem to fill
+     alternative_path.
+   - You may reference the prior recommendation once in
+     execution_levers as "already in play" — but it is not
+     yours to prescribe again.
 
 4. NEVER RECOMMEND OPPOSITE DIRECTIONS ON THE SAME DIMENSION.
    If cost is tight, do not recommend both "raise MSRP" and "lower construction" as
@@ -325,8 +334,11 @@ Focus question: does this material carry the concept, and what does it cost?
 - headline must address whether the material is the right carrier for the collection direction, not just whether it is feasible.
 - core_tension must name the specific material behavior tension only if one genuinely exists. Name the material by name.
 - execution_levers must be actionable at the material selection stage: what to preserve, what to verify, and what surface behavior this material must deliver.
-- alternative_path must name a specific different material only when a swap is warranted.
+- If headline says the material cannot carry the concept, alternative_path is mandatory — name a specific different material from the allowed materials list. A redirect headline with no alternative_path is invalid output.
+- If headline says the material is viable, alternative_path must be null.
 - Any material named in alternative_path must come from the allowed materials list provided in the user message.
+- Do not recommend construction tier changes. Construction is evaluated on the next tab. If cost cannot be resolved by material alone, name the gap in core_tension and close with: "Construction tier will be evaluated next." Do not prescribe it.
+- alternative_path must be a material swap or null. Never a construction change.
 
 When current_step is "construction":
 Focus question: does the build complexity match what the concept needs to read correctly, and can it land on time?
@@ -337,6 +349,8 @@ Focus question: does the build complexity match what the concept needs to read c
 - Important: never recommend a construction tier below the category minimum.
 - For outerwear and tailored pieces, the minimum is moderate.
 - Do not set target_tier to "low" for jackets, coats, blazers, or structured garments.
+- Material is locked. Do not recommend material swaps in alternative_path or anywhere else. If material is still the root cost driver and no construction change can close the gap, state that plainly in core_tension: name the gap and note that the material choice is fixed for this spec.
+- alternative_path must be a construction tier change or null. Never a material swap.
 
 When current_step is "execution":
 Focus question: given everything locked, is this piece viable and what is the single most important thing to get right?

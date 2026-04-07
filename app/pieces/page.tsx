@@ -3923,6 +3923,76 @@ function PiecesPageClient() {
         />
       </div>
 
+      <style>{`
+        .pieces-read-ready-pill {
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          z-index: 50;
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+          padding: 11px 20px;
+          border-radius: 9999px;
+          font-family: "Söhne Breit", sans-serif;
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: 0.01em;
+          cursor: pointer;
+          white-space: nowrap;
+          border: 0.5px solid rgba(168, 180, 117, 0.35);
+          background: #43432B;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          color: #e8e4db;
+          box-shadow: 0 12px 32px rgba(49, 31, 30, 0.18), inset 0 1px 0 rgba(245, 243, 238, 0.14);
+          transition: background 160ms ease, border-color 160ms ease;
+        }
+
+        .pieces-read-ready-pill:hover {
+          background: rgba(67, 67, 43, 0.92);
+          border-color: rgba(168, 180, 117, 0.55);
+        }
+
+        .pieces-read-ready-dot-wrap {
+          position: relative;
+          width: 8px;
+          height: 8px;
+          flex-shrink: 0;
+        }
+
+        .pieces-read-ready-dot-core {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          background: #a8b475;
+        }
+
+        .pieces-read-ready-dot-ping {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          background: #a8b475;
+          animation: piecesReadReadyPing 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        .pieces-read-ready-arrow {
+          color: #a8b475;
+          display: inline-block;
+          animation: piecesReadReadyArrowBounce 1.8s ease-in-out infinite;
+        }
+
+        @keyframes piecesReadReadyPing {
+          0% { transform: scale(1); opacity: 1; }
+          75%, 100% { transform: scale(2.4); opacity: 0; }
+        }
+
+        @keyframes piecesReadReadyArrowBounce {
+          0%, 100% { transform: translateX(0); }
+          50% { transform: translateX(4px); }
+        }
+      `}</style>
+
       {/* Floating readiness chip */}
       {totalConfirmed < 5 ? (
         <div style={{
@@ -3963,30 +4033,14 @@ function PiecesPageClient() {
       ) : (
         <button
           onClick={() => router.push("/report")}
-          style={{
-            position: "fixed",
-            bottom: "24px",
-            right: "24px",
-          display: "flex",
-          alignItems: "center",
-            gap: "10px",
-            padding: "10px 16px",
-            borderRadius: "40px",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-            background: "linear-gradient(180deg, rgba(92, 61, 59, 0.84) 0%, rgba(77, 48, 47, 0.76) 100%)",
-            border: "0.5px solid rgba(245, 243, 238, 0.15)",
-            boxShadow: "0 12px 32px rgba(49,31,30,0.18), inset 0 1px 0 rgba(245,243,238,0.14)",
-            fontFamily: "\"Söhne Breit\", sans-serif",
-            fontSize: "12px",
-            fontWeight: 500,
-            color: "#4D302F",
-            cursor: "pointer",
-            zIndex: 50,
-          }}
+          className="pieces-read-ready-pill"
         >
-          <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#A8B475", flexShrink: 0, display: "inline-block" }} />
-          Collection readable — see full read →
+          <span className="pieces-read-ready-dot-wrap">
+            <span className="pieces-read-ready-dot-ping" />
+            <span className="pieces-read-ready-dot-core" />
+          </span>
+          Collection read ready
+          <span className="pieces-read-ready-arrow">→</span>
         </button>
       )}
 
