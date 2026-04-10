@@ -18,6 +18,7 @@ export interface CollectionHealthDetail {
 export interface CollectionRisk {
   title: string;
   detail: string;
+  why_this_matters?: string;
 }
 
 export interface CollectionDistributionItem {
@@ -56,6 +57,12 @@ export interface CollectionReportPieceSummaryItem {
   material: string;
   score: number;
   status?: CollectionPieceStatus;
+  execution_notes?: string | string[] | null;
+  construction?: 'low' | 'moderate' | 'high' | null;
+  margin_passed?: boolean | null;
+  cogs?: number | null;
+  msrp?: number | null;
+  flagged_conflicts?: string[] | null;
 }
 
 export interface CollectionReportPayload {
@@ -87,11 +94,18 @@ export interface CollectionReportPayload {
     watch: string[];
     recommendations: string[];
   };
+  brand?: CollectionReportBrandInput | null;
+  intent?: CollectionReportIntentInput | null;
+  ppw_descriptions?: {
+    protect?: string | null;
+    push?: string | null;
+    watch?: string | null;
+  } | null;
   assortment_intelligence: AssortmentIntelligence;
   collection_health: {
     role_balance: CollectionHealthDetail;
     complexity_load: CollectionHealthDetail;
-    silhouette_diversity: CollectionHealthDetail;
+    silhouette_diversity?: CollectionHealthDetail;
     redundancy_risk?: CollectionHealthDetail;
   };
   piece_summary: CollectionReportPieceSummaryItem[];
@@ -155,7 +169,10 @@ export interface CollectionReportInputPiece {
   msrp?: number | null;
   construction?: 'low' | 'moderate' | 'high' | null;
   flagged_conflicts?: string[] | null;
-  execution_reason?: string | null;
+  execution_notes?: string | string[] | null;
+  saved_piece_expression?: string | null;
+  collection_language?: string[] | null;
+  intent_success_goals?: string[] | null;
 }
 
 export interface CollectionReportInput {
@@ -164,7 +181,6 @@ export interface CollectionReportInput {
   generated_at?: string;
   version_label?: string | null;
   snapshot_id?: string | null;
-  narrative?: string | null;
   pieces: CollectionReportInputPiece[];
   brand?: CollectionReportBrandInput | null;
   intent?: CollectionReportIntentInput | null;

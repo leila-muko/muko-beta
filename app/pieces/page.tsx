@@ -22,6 +22,7 @@ import { buildPiecesReadInput } from "@/lib/pieces/buildPiecesReadInput";
 import { normalizeSpecSubcategoryId } from "@/lib/spec-studio/smart-defaults";
 import {
   hydrateCollectionContextFromAnalysis,
+  mergeCollectionContextRows,
   restoreCollectionContextFromCache,
 } from "@/lib/collections/hydrateCollectionContext";
 import { getLatestCollectionContextRow } from "@/lib/collections/getLatestCollectionContextRow";
@@ -148,9 +149,11 @@ interface BrandProfileRow {
 interface CollectionContextRow {
   collection_aesthetic?: string | null;
   aesthetic_inflection?: string | null;
+  aesthetic_matched_id?: string | null;
   mood_board_images?: string[] | null;
   silhouette?: string | null;
-  agent_versions?: Record<string, string | null> | null;
+  season?: string | null;
+  agent_versions?: Record<string, unknown> | null;
 }
 
 type CategoriesData = { categories: Array<{ id: string; name: string }> };
@@ -2178,6 +2181,7 @@ function PiecesPageClient() {
     conceptPalette,
     moodboardImages,
     strategySummary,
+    collectionContextSnapshots,
     successPriorities,
     sliderTrend,
     sliderCreative,
@@ -2225,6 +2229,10 @@ function PiecesPageClient() {
     const storedSeason =
       typeof window !== "undefined" ? window.localStorage.getItem("muko_seasonLabel")?.trim() || "" : "";
     const resolvedCollectionName = collectionName.trim() || activeCollection?.trim() || storedCollectionName;
+    const cachedContext =
+      resolvedCollectionName
+        ? (collectionContextSnapshots[resolvedCollectionName.trim().toLowerCase()] as CollectionContextRow | undefined) ?? null
+        : null;
 
     if (!resolvedCollectionName) return;
 
@@ -2238,6 +2246,13 @@ function PiecesPageClient() {
 
     if (!season && storedSeason) {
       setSeason(storedSeason);
+    }
+
+    if (cachedContext) {
+      setContextRow((previous) => {
+        const merged = mergeCollectionContextRows(previous, cachedContext) as CollectionContextRow | null;
+        return merged ?? previous;
+      });
     }
 
     restoreCollectionContextFromCache(resolvedCollectionName);
@@ -2256,12 +2271,17 @@ function PiecesPageClient() {
       const data = await getLatestCollectionContextRow(user.id, resolvedCollectionName);
       if (cancelled) return;
 
-      setContextRow((data as CollectionContextRow | null) ?? null);
-      if (!data) return;
+      const mergedContext = mergeCollectionContextRows(
+        data as CollectionContextRow | null,
+        cachedContext
+      ) as CollectionContextRow | null;
 
-      hydrateCollectionContextFromAnalysis(resolvedCollectionName, data);
+      setContextRow(mergedContext);
+      if (!mergedContext) return;
 
-      const nextSeason = data.season?.trim() || storedSeason;
+      hydrateCollectionContextFromAnalysis(resolvedCollectionName, mergedContext);
+
+      const nextSeason = mergedContext.season?.trim() || storedSeason;
       if (nextSeason) {
         setSeason(nextSeason);
       }
@@ -2270,7 +2290,15 @@ function PiecesPageClient() {
     return () => {
       cancelled = true;
     };
-  }, [activeCollection, collectionName, season, setActiveCollection, setCollectionName, setSeason]);
+  }, [
+    activeCollection,
+    collectionContextSnapshots,
+    collectionName,
+    season,
+    setActiveCollection,
+    setCollectionName,
+    setSeason,
+  ]);
 
   useEffect(() => {
     if (!collectionName) return;
@@ -2870,7 +2898,7 @@ function PiecesPageClient() {
           setSynthesizedPiecesRead({
             read_headline: data.read_headline,
             read_body: data.read_body,
-            how_to_lean_in: data.how_to_lean_in,
+            ...(data.how_to_lean_in?.trim() ? { how_to_lean_in: data.how_to_lean_in } : {}),
             start_here_title: data.start_here_title,
             start_here_body: data.start_here_body,
             piece_microcopy: data.piece_microcopy,
@@ -2919,6 +2947,14 @@ function PiecesPageClient() {
   const piecesReadContent = synthesizedPiecesRead ?? piecesReadFallback;
   const rightRailPiecesRead =
     synthesizedPiecesRead ?? (piecesReadStatus === "error" ? piecesReadFallback : null);
+  const collectionReadPillLabel =
+    piecesReadMeta?.source === "fallback" ? "Collection read fallback" : "Collection read ready";
+  const collectionReadPillTitle =
+    piecesReadMeta?.source === "fallback"
+      ? ["Pieces read is using fallback copy", piecesReadMeta.reason, ...(piecesReadMeta.detail ?? [])]
+          .filter(Boolean)
+          .join(" • ")
+      : undefined;
   const askMukoDirectionalGap = Math.max(
     0,
     piecesReadInput.currentCollectionState.roleTargets.directional -
@@ -3560,7 +3596,7 @@ function PiecesPageClient() {
                   lineHeight: 0.98,
                 }}
               >
-                Your vision is set. Let's make it wearable.
+                Your vision is set. Let&apos;s make it wearable.
               </div>
               <button
                 type="button"
@@ -3792,10 +3828,12 @@ function PiecesPageClient() {
                 </div>
                 <div style={{ display: "grid", gap: 16 }}>
                   <div style={{ ...READ_BODY_STYLE, lineHeight: 1.68 }}>{rightRailPiecesRead.read_body}</div>
-                  <div>
-                    <div style={{ ...READ_ZONE_LABEL_STYLE, marginBottom: 8 }}>How to Lean In</div>
-                    <div style={{ ...READ_BODY_STYLE, lineHeight: 1.68 }}>{rightRailPiecesRead.how_to_lean_in}</div>
-                  </div>
+                  {rightRailPiecesRead.how_to_lean_in?.trim() ? (
+                    <div>
+                      <div style={{ ...READ_ZONE_LABEL_STYLE, marginBottom: 8 }}>How to Lean In</div>
+                      <div style={{ ...READ_BODY_STYLE, lineHeight: 1.68 }}>{rightRailPiecesRead.how_to_lean_in}</div>
+                    </div>
+                  ) : null}
                   <div>
                     <div style={{ height: 1, background: "rgba(67,67,43,0.08)", margin: "18px 0 18px" }} />
                     <div
@@ -4034,12 +4072,13 @@ function PiecesPageClient() {
         <button
           onClick={() => router.push("/report")}
           className="pieces-read-ready-pill"
+          title={collectionReadPillTitle}
         >
           <span className="pieces-read-ready-dot-wrap">
             <span className="pieces-read-ready-dot-ping" />
             <span className="pieces-read-ready-dot-core" />
           </span>
-          Collection read ready
+          {collectionReadPillLabel}
           <span className="pieces-read-ready-arrow">→</span>
         </button>
       )}

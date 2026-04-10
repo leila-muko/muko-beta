@@ -3627,7 +3627,7 @@ export default function ConceptStudioPage() {
               </div>
             </div>
 
-            {selectedAesthetic && currentStage !== "direction" && (
+            {selectedAesthetic && (
               <>
                 <div ref={yourConceptRef} />
 
@@ -3892,7 +3892,7 @@ export default function ConceptStudioPage() {
                                 cursor: canAdvanceToStage2 ? "pointer" : "not-allowed",
                               }}
                             >
-                              Translate into Product →
+                              Continue to Language →
                             </button>
                           </div>
                         </>

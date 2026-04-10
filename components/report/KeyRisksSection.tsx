@@ -1,6 +1,9 @@
 import type { CollectionRisk } from '@/lib/collection-report/types';
 import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
 
+const WHY_THIS_MATTERS_FALLBACK =
+  'This could affect clarity, feasibility, or confidence in the line as it moves forward.';
+
 export function KeyRisksSection({ risks }: { risks: CollectionRisk[] }) {
   return (
     <section style={{ ...sectionCard, padding: '28px 30px' }}>
@@ -47,6 +50,19 @@ export function KeyRisksSection({ risks }: { risks: CollectionRisk[] }) {
             >
               {risk.detail}
             </p>
+            {risk.why_this_matters && risk.why_this_matters !== WHY_THIS_MATTERS_FALLBACK ? (
+              <p
+                style={{
+                  margin: '12px 0 0',
+                  fontFamily: fonts.body,
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                  color: reportPalette.faint,
+                }}
+              >
+                Why this matters: {risk.why_this_matters}
+              </p>
+            ) : null}
           </div>
         ))}
       </div>

@@ -9,6 +9,8 @@ function HealthCard({
   detail: CollectionHealthDetail;
 }) {
   const tone = getTone(detail.score);
+  const basis = detail.basis?.trim() ?? '';
+  const shouldRenderBasis = basis.length > 0 && !basis.includes('No intent calibration available');
 
   return (
     <div
@@ -64,7 +66,7 @@ function HealthCard({
         {detail.interpretation}
       </p>
 
-      {detail.basis ? (
+      {shouldRenderBasis ? (
         <p
           style={{
             margin: '10px 0 0',
@@ -74,7 +76,7 @@ function HealthCard({
             color: reportPalette.faint,
           }}
         >
-          {detail.basis}
+          {basis}
         </p>
       ) : null}
     </div>

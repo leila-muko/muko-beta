@@ -4,16 +4,18 @@ import { fonts, getSoftTone, getTone, reportPalette } from '@/components/report/
 export function CollectionScoreCard({
   label,
   detail,
+  compact = false,
 }: {
   label: string;
   detail: CollectionScoreDetail;
+  compact?: boolean;
 }) {
   const tone = getTone(detail.score);
 
   return (
     <div
       style={{
-        padding: '22px 20px',
+        padding: compact ? '18px 18px' : '22px 20px',
         borderRadius: 20,
         border: `1px solid rgba(67,67,43,0.08)`,
         background: `linear-gradient(160deg, ${getSoftTone(detail.score)} 0%, rgba(255,255,255,0.72) 100%)`,
@@ -36,7 +38,7 @@ export function CollectionScoreCard({
         <span
           style={{
             fontFamily: fonts.heading,
-            fontSize: 36,
+            fontSize: compact ? 30 : 36,
             lineHeight: 1,
             letterSpacing: '-0.04em',
             color: tone,
@@ -48,9 +50,9 @@ export function CollectionScoreCard({
 
       <p
         style={{
-          margin: '14px 0 0',
+          margin: compact ? '12px 0 0' : '14px 0 0',
           fontFamily: fonts.body,
-          fontSize: 14,
+          fontSize: compact ? 13 : 14,
           lineHeight: 1.7,
           color: reportPalette.olive,
         }}

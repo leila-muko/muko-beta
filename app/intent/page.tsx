@@ -278,6 +278,7 @@ function IntentSlider({
         }}
       >
         <span
+          className="font-heading"
           style={{
             fontFamily: sohne,
             fontSize: 18,

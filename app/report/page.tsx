@@ -4,11 +4,8 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import materialsData from '@/data/materials.json';
 import { MukoNav } from '@/components/MukoNav';
-import { CollectionContextBar, COLLECTION_CONTEXT_BAR_OFFSET } from '@/components/collection/CollectionContextBar';
 import { CollectionReportView } from '@/components/report/CollectionReportView';
 import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
-import { sanitizeContextBarSummary } from '@/lib/collections/contextBarSummary';
-import { getCollectionLanguageLabels, getExpressionSignalLabels } from '@/lib/collection-signals';
 import { buildCollectionReport } from '@/lib/collection-report/buildCollectionReport';
 import type {
   CollectionComplexity,
@@ -34,6 +31,10 @@ interface AnalysisRow {
   material_id: string | null;
   silhouette: string | null;
   construction_tier: 'low' | 'moderate' | 'high' | null;
+  cogs?: number | null;
+  msrp?: number | null;
+  flagged_conflicts?: string[] | null;
+  execution_notes?: string | null;
   score: number | null;
   dimensions: {
     identity?: number | null;
@@ -44,10 +45,10 @@ interface AnalysisRow {
     cost?: boolean | null;
   } | null;
   piece_name?: string | null;
-  narrative?: string | null;
   mood_board_images?: string[] | null;
   created_at: string;
   agent_versions?: Record<string, string | null> | null;
+  intent_success_goals?: string[] | null;
 }
 
 interface BrandProfileRow {
@@ -110,26 +111,6 @@ function parseStoredStringArray(value: string | null | undefined) {
   }
 }
 
-function parseStoredChipSelection(value: string | null | undefined) {
-  if (!value) return null;
-
-  try {
-    const parsed = JSON.parse(value) as { activatedChips?: Array<{ label?: string | null }> } | null;
-    if (!parsed || typeof parsed !== 'object') return null;
-
-    const activatedChips = Array.isArray(parsed.activatedChips)
-      ? parsed.activatedChips
-          .map((chip) => (typeof chip?.label === 'string' ? chip.label.trim() : ''))
-          .filter(Boolean)
-          .map((label) => ({ label }))
-      : undefined;
-
-    return { activatedChips };
-  } catch {
-    return null;
-  }
-}
-
 function toCollectionInput({
   collectionName,
   season,
@@ -147,18 +128,34 @@ function toCollectionInput({
   brand?: CollectionReportBrandInput | null;
   intent?: CollectionReportIntentInput | null;
 }): CollectionReportInput {
+  const firstPiece = pieces[0];
+  const baseIntent = intent ?? null;
+  const resolvedIntent =
+    baseIntent || firstPiece?.intent_success_goals?.length || firstPiece?.collection_role
+      ? {
+          ...baseIntent,
+          primary_goals:
+            baseIntent?.primary_goals && baseIntent.primary_goals.length > 0
+              ? baseIntent.primary_goals
+              : firstPiece?.intent_success_goals ?? null,
+          tradeoff: baseIntent?.tradeoff?.trim() ? baseIntent.tradeoff : baseIntent?.tradeoff ?? null,
+          collection_role: baseIntent?.collection_role?.trim()
+            ? baseIntent.collection_role
+            : firstPiece?.collection_role ?? null,
+        }
+      : null;
+
   return {
     collection_name: collectionName,
     season,
     version_label: versionLabel ?? null,
     snapshot_id: snapshotId ?? null,
-    narrative: pieces[0]?.narrative ?? null,
     collection_aesthetic: pieces[0]?.collection_aesthetic ?? null,
     aesthetic_inflection: pieces[0]?.aesthetic_inflection ?? null,
     collection_silhouette: pieces[0]?.silhouette ?? null,
     generated_at: new Date().toISOString(),
     brand: brand ?? null,
-    intent: intent ?? null,
+    intent: resolvedIntent,
     pieces: pieces.map((row) => ({
       id: row.id,
       piece_name: getPieceName(row),
@@ -172,7 +169,44 @@ function toCollectionInput({
       status: inferStatus(row.score),
       dimensions: row.dimensions,
       margin_passed: row.gates_passed?.cost ?? null,
+      cogs: row.cogs ?? null,
+      msrp: row.msrp ?? null,
+      construction: row.construction_tier ?? null,
+      flagged_conflicts: row.flagged_conflicts ?? null,
+      execution_notes: row.execution_notes ?? null,
+      saved_piece_expression: row.agent_versions?.saved_piece_expression ?? null,
+      collection_language: row.agent_versions?.collection_language
+        ? parseStoredStringArray(row.agent_versions.collection_language)
+        : null,
+      intent_success_goals: row.intent_success_goals ?? null,
     })),
+  };
+}
+
+function mergeReportWithInput(
+  report: CollectionReportPayload,
+  input: CollectionReportInput
+): CollectionReportPayload {
+  const piecesById = new Map(input.pieces.map((piece) => [piece.id, piece]));
+
+  return {
+    ...report,
+    brand: report.brand ?? input.brand ?? null,
+    intent: report.intent ?? input.intent ?? null,
+    piece_summary: report.piece_summary.map((piece) => {
+      const source = piecesById.get(piece.id);
+      if (!source) return piece;
+
+      return {
+        ...piece,
+        execution_notes: piece.execution_notes ?? source.execution_notes ?? null,
+        construction: piece.construction ?? source.construction ?? null,
+        margin_passed: piece.margin_passed ?? source.margin_passed ?? null,
+        cogs: piece.cogs ?? source.cogs ?? null,
+        msrp: piece.msrp ?? source.msrp ?? null,
+        flagged_conflicts: piece.flagged_conflicts ?? source.flagged_conflicts ?? null,
+      };
+    }),
   };
 }
 
@@ -216,9 +250,9 @@ async function fetchCollectionAnalyses(
 ): Promise<AnalysisRow[]> {
   const supabase = createClient();
   const primarySelect =
-    'id, collection_name, season, category, collection_role, aesthetic_input, collection_aesthetic, aesthetic_inflection, material_id, silhouette, construction_tier, score, dimensions, gates_passed, piece_name, narrative, mood_board_images, created_at, agent_versions';
+    'id, collection_name, season, category, collection_role, aesthetic_input, collection_aesthetic, aesthetic_inflection, material_id, silhouette, construction_tier, cogs, msrp, flagged_conflicts, execution_notes, score, dimensions, gates_passed, piece_name, mood_board_images, created_at, agent_versions, intent_success_goals';
   const fallbackSelect =
-    'id, collection_name, season, category, collection_role, aesthetic_input, collection_aesthetic, aesthetic_inflection, material_id, silhouette, construction_tier, score, dimensions, gates_passed, narrative, mood_board_images, created_at, agent_versions';
+    'id, collection_name, season, category, collection_role, aesthetic_input, collection_aesthetic, aesthetic_inflection, material_id, silhouette, construction_tier, cogs, msrp, flagged_conflicts, execution_notes, score, dimensions, gates_passed, mood_board_images, created_at, agent_versions, intent_success_goals';
 
   const primary = await supabase
     .from('analyses')
@@ -226,6 +260,13 @@ async function fetchCollectionAnalyses(
     .eq('user_id', userId)
     .eq('collection_name', collectionName)
     .order('created_at', { ascending: false });
+
+  console.log('[Report] fetchCollectionAnalyses primary response', {
+    userId,
+    collectionName,
+    data: primary.data,
+    error: primary.error,
+  });
 
   if (!primary.error) {
     return (primary.data as AnalysisRow[] | null) ?? [];
@@ -278,15 +319,6 @@ function ReportPageContent() {
   const category = useSessionStore((state) => state.category);
   const aestheticInput = useSessionStore((state) => state.aestheticInput);
   const aestheticMatchedId = useSessionStore((state) => state.aestheticMatchedId);
-  const collectionAesthetic = useSessionStore((state) => state.collectionAesthetic);
-  const aestheticInflection = useSessionStore((state) => state.aestheticInflection);
-  const directionInterpretationText = useSessionStore((state) => state.directionInterpretationText);
-  const directionInterpretationChips = useSessionStore((state) => state.directionInterpretationChips);
-  const chipSelection = useSessionStore((state) => state.chipSelection);
-  const conceptSilhouette = useSessionStore((state) => state.conceptSilhouette);
-  const conceptPalette = useSessionStore((state) => state.conceptPalette);
-  const moodboardImages = useSessionStore((state) => state.moodboardImages);
-  const strategySummary = useSessionStore((state) => state.strategySummary);
   const materialId = useSessionStore((state) => state.materialId);
   const silhouette = useSessionStore((state) => state.silhouette);
   const constructionTier = useSessionStore((state) => state.constructionTier);
@@ -374,52 +406,12 @@ function ReportPageContent() {
   ]);
 
   const [report, setReport] = useState<CollectionReportPayload | null>(null);
-  const [contextRow, setContextRow] = useState<AnalysisRow | null>(null);
+  const [, setContextRow] = useState<AnalysisRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const collectionAbortRef = useRef<AbortController | null>(null);
   const resolvedCollectionName = collectionFromUrl || activeCollection || collectionName || 'Untitled Collection';
   const resolvedSeason = seasonFromUrl || season || 'Current Season';
-  const storedDirectionChips = useMemo(
-    () => (contextRow ? parseStoredStringArray(contextRow.agent_versions?.direction_interpretation_chips) : []),
-    [contextRow]
-  );
-  const storedChipSelection = useMemo(
-    () => (contextRow ? parseStoredChipSelection(contextRow.agent_versions?.chip_selection) : null),
-    [contextRow]
-  );
-  const barCollectionLanguage = useMemo(
-    () => getCollectionLanguageLabels(directionInterpretationChips, directionInterpretationText).length > 0
-      ? getCollectionLanguageLabels(directionInterpretationChips, directionInterpretationText)
-      : getCollectionLanguageLabels(storedDirectionChips, contextRow?.aesthetic_inflection),
-    [contextRow?.aesthetic_inflection, directionInterpretationChips, directionInterpretationText, storedDirectionChips]
-  );
-  const barExpressionSignals = useMemo(
-    () => getExpressionSignalLabels(chipSelection).length > 0
-      ? getExpressionSignalLabels(chipSelection)
-      : getExpressionSignalLabels(storedChipSelection),
-    [chipSelection, storedChipSelection]
-  );
-  const barSummary = useMemo(
-    () =>
-      sanitizeContextBarSummary(strategySummary) ??
-      sanitizeContextBarSummary(contextRow?.agent_versions?.strategy_summary),
-    [contextRow?.agent_versions?.strategy_summary, strategySummary]
-  );
-  const barDirection =
-    collectionAesthetic ||
-    contextRow?.collection_aesthetic ||
-    aestheticInput ||
-    aestheticMatchedId ||
-    undefined;
-  const barPointOfView =
-    aestheticInflection ||
-    directionInterpretationText ||
-    contextRow?.aesthetic_inflection ||
-    undefined;
-  const barSilhouette = conceptSilhouette || contextRow?.silhouette || silhouette || undefined;
-  const barPalette = conceptPalette || contextRow?.agent_versions?.selected_palette || undefined;
-  const barMoodboardImages = moodboardImages.length > 0 ? moodboardImages : contextRow?.mood_board_images ?? [];
 
   useEffect(() => {
     async function loadReport() {
@@ -490,7 +482,7 @@ function ReportPageContent() {
 
         if (input && input.pieces.length === 0) {
           if (!controller.signal.aborted) {
-            setReport(buildCollectionReport(input).collection_report);
+            setReport(mergeReportWithInput(buildCollectionReport(input).collection_report, input));
             setLoading(false);
           }
           return;
@@ -568,7 +560,7 @@ function ReportPageContent() {
 
                   if (event.type === 'fallback' && event.payload && !controller.signal.aborted) {
                     // Deterministic fields — render immediately
-                    setReport(event.payload);
+                    setReport(mergeReportWithInput(event.payload, input));
                   }
 
                   if (event.type === 'delta' && event.payload && !controller.signal.aborted) {
@@ -598,7 +590,7 @@ function ReportPageContent() {
         }
 
         if (!controller.signal.aborted) {
-          setReport(nextReport);
+          setReport(mergeReportWithInput(nextReport, input));
         }
       } catch (err) {
         if ((err as Error)?.name === 'AbortError') return;
@@ -608,15 +600,26 @@ function ReportPageContent() {
 
         if (!controller.signal.aborted && activeCollectionName) {
           setReport(
-            buildCollectionReport({
-              collection_name: activeCollectionName,
-              season: activeSeason,
-              generated_at: new Date().toISOString(),
-              version_label: 'Fallback Snapshot',
-              snapshot_id: 'error-fallback',
-              intent,
-              pieces: [],
-            }).collection_report
+            mergeReportWithInput(
+              buildCollectionReport({
+                collection_name: activeCollectionName,
+                season: activeSeason,
+                generated_at: new Date().toISOString(),
+                version_label: 'Fallback Snapshot',
+                snapshot_id: 'error-fallback',
+                intent,
+                pieces: [],
+              }).collection_report,
+              {
+                collection_name: activeCollectionName,
+                season: activeSeason,
+                generated_at: new Date().toISOString(),
+                version_label: 'Fallback Snapshot',
+                snapshot_id: 'error-fallback',
+                intent,
+                pieces: [],
+              }
+            )
           );
           setError(null);
         } else if (!controller.signal.aborted) {
@@ -656,32 +659,9 @@ function ReportPageContent() {
 
       <div
         style={{
-          position: 'fixed',
-          top: 72,
-          left: 0,
-          right: 0,
-          zIndex: 100,
-        }}
-      >
-        <CollectionContextBar
-          strategySummary={barSummary}
-          collectionName={resolvedCollectionName}
-          season={resolvedSeason}
-          direction={barDirection}
-          pointOfView={barPointOfView}
-          collectionLanguage={barCollectionLanguage}
-          silhouette={barSilhouette}
-          palette={barPalette}
-          expressionSignals={barExpressionSignals}
-          moodboardImages={barMoodboardImages}
-        />
-      </div>
-
-      <div
-        style={{
           maxWidth: 1240,
           margin: '0 auto',
-          padding: `${72 + COLLECTION_CONTEXT_BAR_OFFSET + 24}px 20px 0`,
+          padding: '96px 20px 0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',

@@ -1124,7 +1124,20 @@ function SpecStudioPageContent() {
   const sliderNovelty = useSessionStore((s) => s.sliderNovelty);
 
   const conceptContext = useMemo<ConceptContextType>(() => {
-    if (!storeAesthetic) return FALLBACK_CONCEPT;
+    const trimmedAestheticName = storeAestheticName.trim();
+    if (!storeAesthetic) {
+      if (trimmedAestheticName) {
+        return {
+          aestheticName: storeAestheticName,
+          aestheticMatchedId: toSlug(trimmedAestheticName),
+          identityScore: 88,
+          resonanceScore: 92,
+          moodboardImages: storeMoodboard || [],
+          recommendedPalette: [],
+        };
+      }
+      return FALLBACK_CONCEPT;
+    }
     const scores = AESTHETIC_CONTENT[storeAesthetic];
     return {
       aestheticName: storeAestheticName,
@@ -3347,6 +3360,20 @@ function SpecStudioPageContent() {
         novelty: useSessionStore.getState().sliderNovelty,
       },
     };
+
+    if (
+      conceptContext.aestheticName === "Quiet Structure" &&
+      storeAestheticName.trim() &&
+      storeAestheticName.trim() !== conceptContext.aestheticName
+    ) {
+      console.warn(
+        "[spec/save] conceptContext fell back to Quiet Structure despite a different raw aesthetic name",
+        {
+          conceptAestheticName: conceptContext.aestheticName,
+          storeAestheticName,
+        },
+      );
+    }
 
     const bb: PipelineBlackboard = {
       input: {

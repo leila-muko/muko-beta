@@ -93,7 +93,7 @@ export type PiecesReadInput = {
 export type PiecesReadOutput = {
   read_headline: string;
   read_body: string;
-  how_to_lean_in: string;
+  how_to_lean_in?: string;
   start_here_title: string;
   start_here_body: string;
   piece_microcopy?: Array<{

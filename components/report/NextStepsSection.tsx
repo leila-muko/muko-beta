@@ -1,13 +1,15 @@
 import type { CollectionReportPayload } from '@/lib/collection-report/types';
 import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
 
+type StepListItem = string | { label?: string; body?: string };
+
 function StepList({
   title,
   items,
   tone,
 }: {
   title: string;
-  items: string[];
+  items: StepListItem[];
   tone: string;
 }) {
   return (
@@ -32,7 +34,7 @@ function StepList({
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
         {items.map((item, index) => (
-          <div key={item} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div key={typeof item === 'string' ? item : `${item.label ?? ''}-${item.body ?? ''}-${index}`} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <span
               style={{
                 minWidth: 24,
@@ -50,17 +52,50 @@ function StepList({
             >
               {index + 1}
             </span>
-            <p
-              style={{
-                margin: 0,
-                fontFamily: fonts.body,
-                fontSize: 14,
-                lineHeight: 1.7,
-                color: reportPalette.olive,
-              }}
-            >
-              {item}
-            </p>
+            {typeof item === 'string' || (!item.label && !item.body) ? (
+              <p
+                style={{
+                  margin: 0,
+                  fontFamily: fonts.body,
+                  fontSize: 14,
+                  lineHeight: 1.7,
+                  color: reportPalette.olive,
+                }}
+              >
+                {typeof item === 'string' ? item : item.body ?? item.label ?? ''}
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {item.label ? (
+                  <span
+                    style={{
+                      display: 'block',
+                      marginBottom: 2,
+                      fontFamily: fonts.body,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: 'var(--color-text-primary)',
+                    }}
+                  >
+                    {item.label}
+                  </span>
+                ) : null}
+                {item.body ? (
+                  <span
+                    style={{
+                      display: 'block',
+                      fontFamily: fonts.body,
+                      fontSize: 13,
+                      fontWeight: 400,
+                      lineHeight: 1.6,
+                      color: 'var(--color-text-secondary)',
+                    }}
+                  >
+                    {item.body}
+                  </span>
+                ) : null}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -85,8 +120,12 @@ export function NextStepsSection({
           marginTop: 18,
         }}
       >
-        <StepList title="Immediate Actions" items={nextSteps.immediate_actions} tone={reportPalette.chartreuse} />
-        <StepList title="Decision Points" items={nextSteps.decision_points} tone={reportPalette.steel} />
+        <StepList title="Immediate Actions" items={nextSteps.immediate_actions as StepListItem[]} tone={reportPalette.chartreuse} />
+        <StepList
+          title="Decision Points"
+          items={nextSteps.decision_points as StepListItem[]}
+          tone={reportPalette.steel}
+        />
       </div>
     </section>
   );

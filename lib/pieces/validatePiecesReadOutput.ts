@@ -17,6 +17,9 @@ export function validatePiecesReadOutput(
   const warnings: string[] = [];
   const candidate = output as Partial<PiecesReadOutput> | null;
   const sanitizedPieceMicrocopy: NonNullable<PiecesReadOutput["piece_microcopy"]> = [];
+  const requiresLeanIn =
+    input.currentCollectionState.collectionPhase === "opening" ||
+    input.currentCollectionState.collectionPhase === "building";
 
   if (!candidate || typeof candidate !== "object") {
     return { valid: false, errors: ["Output is not an object"] };
@@ -24,7 +27,11 @@ export function validatePiecesReadOutput(
 
   validateString(candidate.read_headline, "read_headline", LIMITS.read_headline, errors, warnings, "warn");
   validateString(candidate.read_body, "read_body", LIMITS.read_body, errors, warnings, "warn");
-  validateString(candidate.how_to_lean_in, "how_to_lean_in", LIMITS.how_to_lean_in, errors, warnings, "warn");
+  if (requiresLeanIn) {
+    validateString(candidate.how_to_lean_in, "how_to_lean_in", LIMITS.how_to_lean_in, errors, warnings, "warn");
+  } else if (candidate.how_to_lean_in != null) {
+    validateString(candidate.how_to_lean_in, "how_to_lean_in", LIMITS.how_to_lean_in, errors, warnings, "warn");
+  }
   validateString(candidate.start_here_title, "start_here_title", LIMITS.start_here_title, errors, warnings, "warn");
   validateString(candidate.start_here_body, "start_here_body", LIMITS.start_here_body, errors, warnings, "warn");
 
@@ -98,6 +105,9 @@ export function validatePiecesReadOutput(
     valid: true,
     data: {
       ...candidate,
+      ...(typeof candidate.how_to_lean_in === "string" && candidate.how_to_lean_in.trim()
+        ? { how_to_lean_in: candidate.how_to_lean_in }
+        : {}),
       ...(candidate.piece_microcopy != null ? { piece_microcopy: sanitizedPieceMicrocopy } : {}),
     } as PiecesReadOutput,
     warnings,

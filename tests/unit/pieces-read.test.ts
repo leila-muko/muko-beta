@@ -177,6 +177,31 @@ describe("pieces read helpers", () => {
     }
   });
 
+  it("allows forming-phase output to omit how_to_lean_in", () => {
+    const result = validatePiecesReadOutput(
+      {
+        ...baseInput,
+        currentCollectionState: {
+          ...baseInput.currentCollectionState,
+          confirmedPieceCount: 6,
+          collectionPhase: "forming",
+        },
+      },
+      {
+        read_headline: "Refined Utility is bottom-heavy too early.",
+        read_body: "Refined Utility is forming through bottoms and column silhouettes, so the range still needs tops to keep the structure from narrowing the whole assortment.",
+        start_here_title: "Next move: tops coverage",
+        start_here_body: "Add one top that keeps the column line visible. That corrects the category imbalance and stops bottoms from carrying all the directional pressure.",
+        piece_microcopy: [],
+      }
+    );
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.data.how_to_lean_in).toBeUndefined();
+    }
+  });
+
   it("rejects generic output that ignores the supplied collection state", () => {
     const result = validatePiecesReadOutput(baseInput, {
       read_headline: "Lead with the clearest piece.",

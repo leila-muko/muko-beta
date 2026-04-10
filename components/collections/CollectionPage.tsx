@@ -233,7 +233,6 @@ function toCollectionReportInput({
     season,
     version_label: 'Latest Snapshot',
     snapshot_id: pieces[0]?.created_at ?? null,
-    narrative: pieces[0]?.narrative ?? null,
     collection_aesthetic: pieces[0]?.collection_aesthetic ?? null,
     aesthetic_inflection: pieces[0]?.aesthetic_inflection ?? null,
     generated_at: new Date().toISOString(),

@@ -2,7 +2,6 @@ import type {
   AssortmentIntelligence,
   CollectionComplexity,
   CollectionDistributionItem,
-  CollectionHealthDetail,
   CollectionPieceRole,
   CollectionPieceStatus,
   CollectionReportInput,
@@ -225,6 +224,7 @@ function describeRoleBalance(
 
 function describeComplexityLoad(
   score: number,
+  executionScore: number,
   highCount: number,
   total: number,
   strategy: StrategyProfile,
@@ -233,7 +233,7 @@ function describeComplexityLoad(
   if (score >= 72) {
     return {
       label: 'Controlled',
-      interpretation: 'Development burden is staying inside the collection’s current risk tolerance, leaving room for selective ambition.',
+      interpretation: `Development burden is staying inside the collection's current risk tolerance${executionScore < 65 ? ' — but the uniformity of that load across pieces is compressing execution range. The risk is in the distribution, not the total.' : ', leaving room for selective ambition.'}`,
       basis: `${intentSummary} Complexity tolerance set for a ${strategy.framing}.`,
     };
   }
@@ -411,6 +411,11 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     status: inferStatus(piece),
     dimensions: piece.dimensions ?? null,
     margin_passed: piece.margin_passed ?? null,
+    cogs: piece.cogs ?? null,
+    msrp: piece.msrp ?? null,
+    construction: piece.construction ?? null,
+    flagged_conflicts: piece.flagged_conflicts ?? null,
+    execution_notes: piece.execution_notes ?? null,
   }));
 
   const pieceCount = pieces.length;
@@ -467,23 +472,6 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
     Math.max(0, rawRedundancyRisk - strategy.redundancyTolerance) * 1.7
   );
 
-  const roleBalance = {
-    score: roleBalanceScore,
-    ...describeRoleBalance(roleBalanceScore, roles, strategy, intentSummary),
-  };
-  const complexityLoad = {
-    score: complexityLoadScore,
-    ...describeComplexityLoad(complexityLoadScore, complexityCounts.high ?? 0, total, strategy, intentSummary),
-  };
-  const silhouetteDiversity = {
-    score: silhouetteDiversityScore,
-    ...describeSilhouetteDiversity(silhouetteDiversityScore, uniqueSilhouettes, total, strategy, intentSummary),
-  };
-  const redundancyRisk = {
-    score: redundancyRiskScore,
-    ...describeRedundancyRisk(redundancyRiskScore, dominantCategoryShare, strategy, intentSummary),
-  };
-
   const rawIdentity = average(
     pieces.map((piece) => piece.dimensions?.identity ?? Math.round(piece.score * 0.95))
   );
@@ -502,6 +490,30 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
   const execution = clamp(
     rawExecution + (complexityLoadScore >= 70 ? 4 : 0) - (foundationShare < 40 ? 3 : 0)
   );
+
+  const roleBalance = {
+    score: roleBalanceScore,
+    ...describeRoleBalance(roleBalanceScore, roles, strategy, intentSummary),
+  };
+  const complexityLoad = {
+    score: complexityLoadScore,
+    ...describeComplexityLoad(
+      complexityLoadScore,
+      execution,
+      complexityCounts.high ?? 0,
+      total,
+      strategy,
+      intentSummary
+    ),
+  };
+  const silhouetteDiversity = {
+    score: silhouetteDiversityScore,
+    ...describeSilhouetteDiversity(silhouetteDiversityScore, uniqueSilhouettes, total, strategy, intentSummary),
+  };
+  const redundancyRisk = {
+    score: redundancyRiskScore,
+    ...describeRedundancyRisk(redundancyRiskScore, dominantCategoryShare, strategy, intentSummary),
+  };
 
   const dominantCategory = dominantCategoryToken ? titleCase(dominantCategoryToken) : undefined;
   const topMaterial = Object.entries(materialCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
@@ -582,10 +594,18 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
         ? 'Role Balance'
         : index === 1
           ? 'Complexity Risk'
-          : index === 2
+        : index === 2
             ? 'Coverage Risk'
             : 'Assortment Risk',
     detail,
+    why_this_matters:
+      index === 0
+        ? 'Unclear role separation makes it harder for the line to read as a considered assortment.'
+        : index === 1
+          ? 'Execution concentration can slow sampling and compress margin room across the line.'
+          : index === 2
+            ? 'Coverage gaps reduce how complete the line feels to a merchant or buyer.'
+            : 'Structural ambiguity makes later editing decisions more reactive than intentional.',
   }));
 
   const overallRead = buildOverallRead({
@@ -608,7 +628,6 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
       collection_thesis: buildThesis(input, {
         assortmentIntelligence,
       }),
-      narrative: input.narrative?.trim() || '',
       overview: {
         total_pieces: pieceCount,
         role_distribution: overviewRoleDistribution,
@@ -619,6 +638,8 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
       },
       scores,
       muko_insight: insight,
+      brand: input.brand ?? null,
+      intent: input.intent ?? null,
       assortment_intelligence: assortmentIntelligence,
       collection_health: {
         role_balance: roleBalance,
@@ -638,6 +659,12 @@ export function buildCollectionReport(input: CollectionReportInput): CollectionR
           material: piece.material,
           score: piece.score,
           status: piece.status,
+          execution_notes: piece.execution_notes,
+          construction: piece.construction,
+          margin_passed: piece.margin_passed,
+          cogs: piece.cogs,
+          msrp: piece.msrp,
+          flagged_conflicts: piece.flagged_conflicts,
         })),
       key_risks: keyRisks,
       next_steps: {
