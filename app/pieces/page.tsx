@@ -2808,7 +2808,7 @@ function PiecesPageClient() {
         saturationScore: collectionEntry?.saturation_score ?? null,
         seenIn: collectionEntry?.seen_in ?? [],
         silhouette: [conceptSilhouette],
-        palette: [paletteName],
+        palette: [paletteName as string],
         expression: [...collectionLanguageLabels, ...expressionSignalLabels].slice(0, 6),
         interpretationText: directionInterpretationText || null,
         confirmedPieceCount: totalConfirmed,
@@ -3521,14 +3521,14 @@ function PiecesPageClient() {
         }}
       >
         <CollectionContextBar
-          strategySummary={strategySummary || contextRow?.agent_versions?.strategy_summary || undefined}
+          strategySummary={(strategySummary || contextRow?.agent_versions?.strategy_summary || undefined) as string | undefined}
           collectionName={collectionName}
           season={season}
           direction={directionName}
           pointOfView={aestheticInflection || directionInterpretationText || contextRow?.aesthetic_inflection || undefined}
           collectionLanguage={collectionLanguageLabels}
           silhouette={conceptSilhouette || contextRow?.silhouette || undefined}
-          palette={paletteName || undefined}
+          palette={(paletteName as string) || undefined}
           expressionSignals={expressionSignalLabels}
           moodboardImages={moodboardImages.length > 0 ? moodboardImages : contextRow?.mood_board_images ?? []}
           action={

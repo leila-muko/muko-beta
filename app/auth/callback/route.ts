@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return toErrorPage(error.message)
+    return toErrorPage(error instanceof Error ? error.message : 'An unexpected error occurred.')
   }
 
   return toErrorPage('No authentication code was returned.')
