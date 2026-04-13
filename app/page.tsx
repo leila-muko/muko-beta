@@ -1,5 +1,5 @@
-import DesignSystemTest from '@/components/DesignSystemTest';
+import { redirect } from 'next/navigation';
 
 export default function Home() {
-  return <DesignSystemTest />;
+  redirect('/auth/signin');
 }
