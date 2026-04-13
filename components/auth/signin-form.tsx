@@ -30,7 +30,7 @@ export function SignInForm() {
       setLoading(false)
     } else {
       const next = new URLSearchParams(window.location.search).get('next')
-      const destination = next && next.startsWith('/') ? next : '/dashboard'
+      const destination = next && next.startsWith('/') ? next : '/entry'
       router.push(destination)
       router.refresh()
     }

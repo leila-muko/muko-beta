@@ -14,27 +14,7 @@ export default async function DashboardPage() {
     .from('brand_profiles')
     .select('id')
     .eq('user_id', user!.id)
-    .single()
+    .maybeSingle()
 
-  if (brandProfile) {
-    redirect('/entry')
-  }
-
-  return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-4">Dashboard</h1>
-        <p className="text-gray-600 mb-8">Welcome, {user.email}!</p>
-        
-        <div className="bg-white p-6 rounded-lg border">
-          <p className="text-gray-600">
-            🎉 Auth is working! You&apos;re logged in.
-          </p>
-          <p className="text-sm text-gray-500 mt-4">
-            This is a placeholder. We&apos;ll build the real dashboard later.
-          </p>
-        </div>
-      </div>
-    </div>
-  )
+  redirect(brandProfile ? '/entry' : '/onboarding')
 }

@@ -6,8 +6,31 @@ export async function middleware(request: NextRequest) {
   try {
     const response = await updateSession(request)
     
-    const protectedRoutes = ['/dashboard', '/analysis', '/settings']
+    const protectedRoutes = [
+      '/dashboard',
+      '/analysis',
+      '/settings',
+      '/entry',
+      '/concept',
+      '/spec',
+      '/report',
+      '/pieces',
+      '/collections',
+      '/onboarding',
+    ]
     const authRoutes = ['/auth/signin', '/auth/signup']
+    const onboardingRoute = '/onboarding'
+    const postOnboardingRoutes = [
+      '/entry',
+      '/concept',
+      '/spec',
+      '/report',
+      '/pieces',
+      '/collections',
+      '/analysis',
+      '/settings',
+      '/dashboard',
+    ]
     const pathname = request.nextUrl.pathname
 
     const isProtectedRoute = protectedRoutes.some(route =>
@@ -33,6 +56,11 @@ export async function middleware(request: NextRequest) {
 
     const { data: { user } } = await supabase.auth.getUser()
 
+    const isOnboardingRoute = pathname.startsWith(onboardingRoute)
+    const isPostOnboardingRoute = postOnboardingRoutes.some(route =>
+      pathname.startsWith(route)
+    )
+
     if (isProtectedRoute && !user) {
       const signInUrl = new URL('/auth/signin', request.url)
       const nextPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
@@ -40,16 +68,28 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(signInUrl)
     }
 
-    // Logged-in user hitting auth pages or root — route by brand profile
-    if ((isAuthRoute || isRoot) && user) {
+    if (user) {
       const { data: brandProfile } = await supabase
         .from('brand_profiles')
         .select('id')
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle()
 
-      const destination = brandProfile ? '/entry' : '/onboarding'
-      return NextResponse.redirect(new URL(destination, request.url))
+      const hasCompletedOnboarding = Boolean(brandProfile)
+
+      if (isOnboardingRoute && hasCompletedOnboarding) {
+        return NextResponse.redirect(new URL('/entry', request.url))
+      }
+
+      if (isPostOnboardingRoute && !hasCompletedOnboarding) {
+        return NextResponse.redirect(new URL('/onboarding', request.url))
+      }
+
+      // Logged-in user hitting auth pages or root — route by brand profile
+      if (isAuthRoute || isRoot) {
+        const destination = hasCompletedOnboarding ? '/entry' : '/onboarding'
+        return NextResponse.redirect(new URL(destination, request.url))
+      }
     }
     
     return response

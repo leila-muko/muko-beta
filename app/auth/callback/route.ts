@@ -6,6 +6,22 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const next = searchParams.get('next')
+  const providerError = searchParams.get('error')
+  const providerErrorDescription = searchParams.get('error_description')
+
+  const toErrorPage = (message?: string) => {
+    const errorUrl = new URL('/auth/auth-code-error', origin)
+
+    if (message) {
+      errorUrl.searchParams.set('message', message)
+    }
+
+    return NextResponse.redirect(errorUrl)
+  }
+
+  if (providerError || providerErrorDescription) {
+    return toErrorPage(providerErrorDescription ?? providerError ?? 'Authentication failed.')
+  }
 
   if (code) {
     const supabase = await createClient()
@@ -23,13 +39,15 @@ export async function GET(request: Request) {
           .from('brand_profiles')
           .select('id')
           .eq('user_id', user.id)
-          .single()
+          .maybeSingle()
 
         const destination = brandProfile ? '/entry' : '/onboarding'
         return NextResponse.redirect(`${origin}${destination}`)
       }
     }
+
+    return toErrorPage(error.message)
   }
 
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  return toErrorPage('No authentication code was returned.')
 }

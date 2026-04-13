@@ -3,7 +3,18 @@ import { AuthLayout } from '@/components/auth/auth-layout'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
-export default function AuthCodeErrorPage() {
+type AuthCodeErrorPageProps = {
+  searchParams?: Promise<{
+    message?: string
+  }>
+}
+
+export default async function AuthCodeErrorPage({ searchParams }: AuthCodeErrorPageProps) {
+  const params = await searchParams
+  const message = params?.message
+    ? decodeURIComponent(params.message)
+    : 'There was an error with your authentication. Please try again.'
+
   return (
     <AuthLayout 
       title="Something went wrong" 
@@ -17,7 +28,7 @@ export default function AuthCodeErrorPage() {
         </div>
         
         <p className="text-gray-700 mb-8 leading-relaxed font-body">
-          There was an error with your authentication. Please try again.
+          {message}
         </p>
         
         <Link href="/auth/signin">

@@ -20,7 +20,7 @@ export function SignUpForm() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -32,7 +32,11 @@ export function SignUpForm() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push('/auth/check-email')
+      const hasActiveSession = Boolean(data.session)
+      const needsEmailConfirmation = Boolean(data.user) && !hasActiveSession
+
+      router.push(needsEmailConfirmation ? '/auth/check-email' : '/onboarding')
+      router.refresh()
     }
   }
 

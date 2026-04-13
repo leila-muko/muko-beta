@@ -2,7 +2,6 @@
 import { AuthBackgroundPulse } from '@/components/auth/auth-background-pulse'
 import { SignUpForm } from '@/components/auth/signup-form'
 import { AuthBrand } from '@/components/auth/auth-brand'
-import { GoogleButton } from '@/components/auth/google-button'
 import Link from 'next/link'
 
 export default function SignUpPage() {
@@ -35,31 +34,6 @@ export default function SignUpPage() {
 
         {/* Form card */}
         <div>
-          {/* Google OAuth */}
-          <GoogleButton />
-
-          {/* Divider */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              margin: '16px 0',
-            }}
-          >
-            <div style={{ flex: 1, height: 1, background: 'rgba(73,66,53,0.15)' }} />
-            <span
-              style={{
-                fontFamily: 'var(--font-inter)',
-                fontSize: 11,
-                color: '#756C61',
-              }}
-            >
-              or
-            </span>
-            <div style={{ flex: 1, height: 1, background: 'rgba(73,66,53,0.15)' }} />
-          </div>
-
           {/* Sign up form */}
           <SignUpForm />
 
