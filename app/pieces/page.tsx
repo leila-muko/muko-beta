@@ -316,6 +316,12 @@ function toTitleCase(value: string) {
     .join(" ");
 }
 
+function formatDirectionLabel(value: string | null | undefined) {
+  const normalized = value?.trim();
+  if (!normalized || normalized === "—") return "—";
+  return toTitleCase(normalized.replace(/[-_]+/g, " "));
+}
+
 function getCategoryLabel(categories: Array<{ id: string; name: string }>, categoryId: string) {
   return categories.find((entry) => entry.id === categoryId)?.name ?? toTitleCase(categoryId.replace(/[-_]+/g, " "));
 }
@@ -903,12 +909,21 @@ function PieceFlat({
 function ConfirmedPieceCard({
   piece,
   onClick,
+  onRename,
+  onDelete,
 }: {
   piece: CollectionPiece;
   onClick: () => void;
+  onRename: (nextName: string) => Promise<void>;
+  onDelete: () => Promise<void>;
 }) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   const score = piece.score;
   const scoreDotBg =
@@ -923,14 +938,63 @@ function ConfirmedPieceCard({
     [piece.category, piece.silhouette].filter(Boolean).join(" • "),
   ].filter(Boolean) as string[];
   const expression = getDisplayPieceExpression(piece);
+  const pieceName = getDisplayPieceName(piece);
+
+  const beginRename = () => {
+    setDraftName(pieceName);
+    setIsEditingName(true);
+    setMenuOpen(false);
+    setIsConfirmingDelete(false);
+  };
+
+  const cancelRename = () => {
+    setDraftName(pieceName);
+    setIsEditingName(false);
+    setIsSavingName(false);
+  };
+
+  const confirmRename = async () => {
+    const nextName = draftName.trim();
+    if (!nextName || nextName === pieceName || isSavingName) {
+      if (!nextName) {
+        setDraftName(pieceName);
+      }
+      setIsEditingName(false);
+      return;
+    }
+
+    setIsSavingName(true);
+    try {
+      await onRename(nextName);
+      setIsEditingName(false);
+    } finally {
+      setIsSavingName(false);
+    }
+  };
 
   return (
-    <button
-      onClick={onClick}
+    <div
+      onClick={() => {
+        if (isEditingName) return;
+        onClick();
+      }}
+      onKeyDown={(e) => {
+        if (isEditingName) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={() => {
+        setHovered(false);
+        setMenuOpen(false);
+        setIsConfirmingDelete(false);
+      }}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
+      role="button"
+      tabIndex={0}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -961,12 +1025,12 @@ function ConfirmedPieceCard({
         }}
       >
         <PieceFlat type={null} signal={null} category={piece.category} pieceName={getDisplayPieceName(piece)} size={65} />
-        {/* Score dot */}
+        {/* Score pill */}
         <div
           style={{
             position: "absolute",
             top: 12,
-            right: 12,
+            left: 12,
             width: 26,
             height: 26,
             borderRadius: "50%",
@@ -982,6 +1046,40 @@ function ConfirmedPieceCard({
         >
           {score !== null ? score : "—"}
         </div>
+
+        {(hovered || menuOpen) && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen((prev) => !prev);
+            }}
+            style={{
+              position: "absolute",
+              top: 12,
+              right: 12,
+              width: 26,
+              height: 26,
+              borderRadius: 8,
+              background: "rgba(255,255,255,0.92)",
+              border: "0.5px solid rgba(67,67,43,0.14)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 13,
+              color: "rgba(67,67,43,0.55)",
+              zIndex: 2,
+              letterSpacing: "0.04em",
+              lineHeight: 1,
+              padding: 0,
+            }}
+            title="More options"
+            aria-label="More options"
+          >
+            ···
+          </button>
+        )}
       </div>
 
       {/* Card body */}
@@ -994,18 +1092,96 @@ function ConfirmedPieceCard({
             gap: 8,
           }}
         >
-          <div
-            style={{
-              fontFamily: sohne,
-              fontWeight: 500,
-              fontSize: 15,
-              color: TEXT,
-              lineHeight: 1.24,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {getDisplayPieceName(piece)}
-          </div>
+          {isEditingName ? (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flex: 1,
+                minWidth: 0,
+                padding: "4px 6px",
+                borderRadius: 8,
+                background: "#F7F3EE",
+                border: "1px solid rgba(196,123,107,0.22)",
+                boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.45)",
+              }}
+            >
+              <input
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void confirmRename();
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    cancelRename();
+                  }
+                }}
+                autoFocus
+                aria-label="Rename piece"
+                disabled={isSavingName}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  border: "none",
+                  outline: "none",
+                  background: "transparent",
+                  fontFamily: sohne,
+                  fontWeight: 500,
+                  fontSize: 15,
+                  color: TEXT,
+                  lineHeight: 1.24,
+                  letterSpacing: "-0.02em",
+                }}
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void confirmRename();
+                }}
+                disabled={isSavingName}
+                aria-label="Confirm piece rename"
+                title="Confirm rename"
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 999,
+                  border: "none",
+                  background: isSavingName ? "rgba(168,180,117,0.55)" : CHARTREUSE,
+                  color: "#FFFFFF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: isSavingName ? "default" : "pointer",
+                  flexShrink: 0,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  padding: 0,
+                }}
+              >
+                ✓
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                fontFamily: sohne,
+                fontWeight: 500,
+                fontSize: 15,
+                color: TEXT,
+                lineHeight: 1.24,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {pieceName}
+            </div>
+          )}
           {pieceRole && roleLabel ? (
             <span
               style={{
@@ -1072,7 +1248,155 @@ function ConfirmedPieceCard({
           </div>
         </div>
       </div>
-    </button>
+
+      {menuOpen && (
+        <div
+          style={{
+            position: "absolute",
+            top: 42,
+            right: 12,
+            background: "#FFFFFF",
+            border: "1px solid rgba(67,67,43,0.1)",
+            borderRadius: 8,
+            boxShadow: "0 6px 20px rgba(25,25,25,0.1)",
+            zIndex: 20,
+            overflow: "hidden",
+            minWidth: 140,
+          }}
+        >
+          {isConfirmingDelete ? (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                padding: "10px 12px 12px",
+                display: "grid",
+                gap: 10,
+                minWidth: 188,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: inter,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#6F4A43",
+                  lineHeight: 1.4,
+                }}
+              >
+                Delete this piece?
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsConfirmingDelete(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: "1px solid rgba(67,67,43,0.12)",
+                    background: "#FFFFFF",
+                    color: "#5F5953",
+                    fontFamily: inter,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    await onDelete();
+                    setMenuOpen(false);
+                    setIsConfirmingDelete(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "#C47B6B",
+                    color: "#FFFFFF",
+                    fontFamily: inter,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  beginRename();
+                }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  padding: "10px 14px",
+                  textAlign: "left",
+                  fontFamily: inter,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: "#43432B",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "background 120ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#F7F3EE";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                Rename piece
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsConfirmingDelete(true);
+                }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  padding: "10px 14px",
+                  textAlign: "left",
+                  fontFamily: inter,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: "#C47B6B",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "background 120ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#FAF0EF";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                Delete piece
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1220,6 +1544,28 @@ function InlineLoadingState({ label }: { label: string }) {
       >
         {label}
       </div>
+    </div>
+  );
+}
+
+function Toast({ message }: { message: string }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        right: 36,
+        bottom: 88,
+        background: "#191919",
+        color: "#FFFFFF",
+        borderRadius: 8,
+        padding: "10px 14px",
+        fontFamily: inter,
+        fontSize: 12,
+        zIndex: 60,
+        boxShadow: "0 8px 24px rgba(25,25,25,0.16)",
+      }}
+    >
+      {message}
     </div>
   );
 }
@@ -2222,6 +2568,7 @@ function PiecesPageClient() {
   const [confirmedPieces, setConfirmedPieces] = useState<CollectionPiece[]>([]);
   const [brandProfile, setBrandProfile] = useState<BrandProfileRow | null>(null);
   const [contextRow, setContextRow] = useState<CollectionContextRow | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const storedCollectionName =
@@ -2341,6 +2688,60 @@ function PiecesPageClient() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!toastMessage) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      setToastMessage(null);
+    }, 2200);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [toastMessage]);
+
+  const handleRenameConfirmedPiece = useCallback(async (id: string, nextName: string) => {
+    const cleanedName = nextName.trim();
+    if (!cleanedName) return;
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("analyses")
+      .update({
+        piece_name: cleanedName,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (error) {
+      setToastMessage("Unable to rename piece");
+      throw error;
+    }
+
+    setConfirmedPieces((prev) =>
+      prev.map((piece) =>
+        piece.id === id
+          ? {
+              ...piece,
+              piece_name: cleanedName,
+            }
+          : piece
+      )
+    );
+    setToastMessage("Piece renamed");
+  }, []);
+
+  const handleDeleteConfirmedPiece = useCallback(async (id: string) => {
+    const supabase = createClient();
+    const { error } = await supabase.from("analyses").delete().eq("id", id);
+
+    if (error) {
+      setToastMessage("Unable to delete piece");
+      return;
+    }
+
+    setConfirmedPieces((prev) => prev.filter((piece) => piece.id !== id));
+    setToastMessage("Piece removed from collection");
+  }, []);
+
   // Key pieces from aesthetics data
   const keyPieces = useMemo((): KeyPiece[] => {
     if (!collectionAesthetic) return [];
@@ -2407,16 +2808,17 @@ function PiecesPageClient() {
     () => parseStoredChipSelection((contextRow?.agent_versions?.chip_selection as string | null | undefined) ?? undefined),
     [contextRow]
   );
-  const directionName = collectionAesthetic || contextRow?.collection_aesthetic || "—";
+  const rawDirectionName = collectionAesthetic || contextRow?.collection_aesthetic || "—";
   const collectionEntry = useMemo(
     () =>
       (aestheticsData as unknown as AestheticDataEntry[]).find(
         (entry) =>
-          entry.name === directionName ||
-          entry.id === directionName?.toLowerCase().replace(/\s+/g, "-")
+          entry.name === rawDirectionName ||
+          entry.id === rawDirectionName?.toLowerCase().replace(/\s+/g, "-")
       ) ?? null,
-    [directionName]
+    [rawDirectionName]
   );
+  const directionName = collectionEntry?.name || formatDirectionLabel(rawDirectionName);
   const paletteName = useMemo(
     () =>
       collectionEntry?.palette_options?.find(
@@ -3708,6 +4110,8 @@ function PiecesPageClient() {
                   key={piece.id}
                   piece={piece}
                   onClick={() => router.push("/spec")}
+                  onRename={(nextName) => handleRenameConfirmedPiece(piece.id, nextName)}
+                  onDelete={() => handleDeleteConfirmedPiece(piece.id)}
                 />
               ))}
             </div>
@@ -4474,6 +4878,8 @@ function PiecesPageClient() {
           </div>
         </div>
       ) : null}
+
+      {toastMessage ? <Toast message={toastMessage} /> : null}
     </div>
   );
 }

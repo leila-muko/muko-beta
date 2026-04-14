@@ -1050,6 +1050,7 @@ export default function ConceptStudioPage() {
   const [headerSeasonLabel, setHeaderSeasonLabel] = useState<string>(season || "—");
   const [lockedCollectionAesthetic, setLockedCollectionAesthetic] = useState<string | null>(storeCollectionAesthetic);
   const [isAestheticSelectionUnlocked, setIsAestheticSelectionUnlocked] = useState(false);
+  const [isReviewingDirectionSelection, setIsReviewingDirectionSelection] = useState(false);
   const [showAestheticChangeModal, setShowAestheticChangeModal] = useState(false);
   const [pendingAestheticChange, setPendingAestheticChange] = useState<string | null>(null);
   const [aestheticInflection, setAestheticInflection] = useState(storeDirectionInterpretationText);
@@ -2587,6 +2588,7 @@ export default function ConceptStudioPage() {
     const aestheticSlug = toAestheticSlug(aesthetic);
     setCurrentStageState("direction");
     setStageTransitionDirection(1);
+    setIsReviewingDirectionSelection(false);
     setSelectedElements(new Set());
     setCustomChips({});
     setChipMeta(new Map());
@@ -2647,6 +2649,7 @@ export default function ConceptStudioPage() {
   const handleSelectAesthetic = useCallback((aesthetic: string) => {
     if (isAestheticSelectorLocked) {
       if (aesthetic === selectedAesthetic) {
+        setIsReviewingDirectionSelection(false);
         setCurrentStageState("direction");
         setStageTransitionDirection(-1);
         return;
@@ -2659,6 +2662,7 @@ export default function ConceptStudioPage() {
   }, [applyAestheticSelection, isAestheticSelectorLocked, selectedAesthetic]);
 
   const handleBackToDirection = useCallback(() => {
+    setIsReviewingDirectionSelection(true);
     setStageTransitionDirection(-1);
     setCurrentStageState("direction");
     setTimeout(() => { yourConceptRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 100);
@@ -2875,10 +2879,13 @@ export default function ConceptStudioPage() {
 
   /* ─── Top card chip data ──────────────────────────────────────────────────── */
   const topChips = getAestheticChips(topAesthetic);
-  const topDisplayChips = selectedAesthetic && combinedDirection
-    ? combinedDirection.signals.map((signal) => {
+  const topDisplayChips = useMemo(() => {
+    if (!(selectedAesthetic && combinedDirection)) return [];
+
+    return combinedDirection.signals
+      .map((signal, index) => {
         const matchingChip = topChips.find((chip) => chip.label === signal.label);
-        return matchingChip ?? {
+        const chip = matchingChip ?? {
           label: signal.label,
           type: "mood" as const,
           material: null,
@@ -2886,8 +2893,16 @@ export default function ConceptStudioPage() {
           complexity_mod: 0,
           palette: null,
         };
+        const chipKey = `${topAesthetic}::${chip.label}`;
+        const isActive = selectedElements.has(chipKey);
+        const isAutoSelected = chipMeta.get(chipKey)?.source === "key-piece";
+        const priority = isAutoSelected ? 0 : isActive ? 1 : 2;
+
+        return { chip, index, priority };
       })
-    : [];
+      .sort((a, b) => a.priority - b.priority || a.index - b.index)
+      .map(({ chip }) => chip);
+  }, [chipMeta, combinedDirection, selectedAesthetic, selectedElements, topAesthetic, topChips]);
   const orderedSilhouettes = useMemo(() => {
     const order = combinedDirection?.silhouetteOrder ?? [];
     return CONCEPT_SILHOUETTES.slice().sort((a, b) => {
@@ -3413,6 +3428,7 @@ export default function ConceptStudioPage() {
       const nextIndex = getStageIndex(nextStage);
       const highestIndex = getStageIndex(highestAvailableStage);
       if (nextIndex > highestIndex) return;
+      setIsReviewingDirectionSelection(false);
       setStageTransitionDirection(nextIndex > currentIndex ? 1 : -1);
       setCurrentStageState(nextStage);
     },
@@ -3443,6 +3459,9 @@ export default function ConceptStudioPage() {
   const collectionContextTopOffset = selectedAesthetic
     ? 72 + COLLECTION_CONTEXT_BAR_OFFSET
     : 72 + COLLECTION_READ_BAR_OFFSET;
+  const showDirectionSelection = !selectedAesthetic || isReviewingDirectionSelection;
+  const showPointOfViewStage =
+    Boolean(selectedAesthetic) && currentStage === "direction" && !isReviewingDirectionSelection;
   const handleContinueToSpecs = useCallback(async () => {
     if (!canLockDirection || !selectedAesthetic) return;
     if (!heroAssignedPieceId) {
@@ -3627,7 +3646,7 @@ export default function ConceptStudioPage() {
               </div>
             </div>
 
-            {selectedAesthetic && (
+            {selectedAesthetic && !isReviewingDirectionSelection && (
               <>
                 <div ref={yourConceptRef} />
 
@@ -3688,7 +3707,7 @@ export default function ConceptStudioPage() {
                         padding: "8px 0 28px",
                       }}
                     >
-                      {currentStage === "direction" && (
+                      {showPointOfViewStage && (
                         <>
                           <div style={{ paddingTop: 12, marginBottom: 28 }}>
                             <div style={{ fontFamily: sohne, fontSize: 24, fontWeight: 500, color: OLIVE, marginBottom: 8, letterSpacing: "-0.03em" }}>
@@ -4354,9 +4373,9 @@ export default function ConceptStudioPage() {
               </>
             )}
 
-            {selectedAesthetic && currentStage === "direction" && <div ref={yourConceptRef} />}
+            {selectedAesthetic && showPointOfViewStage && <div ref={yourConceptRef} />}
 
-            {currentStage === "direction" && (
+            {showDirectionSelection && (
               <>
                 {selectedAesthetic && selectedRecommendation && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 30 }}>

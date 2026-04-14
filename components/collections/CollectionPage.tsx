@@ -406,14 +406,20 @@ function PieceCard({
   execution_notes,
   onClick,
   onDelete,
+  onRename,
 }: {
   analysis: AnalysisRow;
   execution_notes?: string | null;
   onClick: () => void;
   onDelete: () => void;
+  onRename: (nextName: string) => Promise<void>;
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   const pieceName = getPieceName(analysis);
   const score = getScore(analysis);
@@ -443,17 +449,71 @@ function PieceCard({
     .map((note) => note.trim())
     .filter(Boolean).length ?? 0;
 
+  const beginRename = () => {
+    setDraftName(pieceName);
+    setIsEditingName(true);
+    setMenuOpen(false);
+    setIsConfirmingDelete(false);
+  };
+
+  const cancelRename = () => {
+    setDraftName(pieceName);
+    setIsEditingName(false);
+    setIsSavingName(false);
+  };
+
+  const beginDeleteConfirm = () => {
+    setIsConfirmingDelete(true);
+  };
+
+  const cancelDeleteConfirm = () => {
+    setIsConfirmingDelete(false);
+  };
+
+  const confirmRename = async () => {
+    const nextName = draftName.trim();
+    if (!nextName || nextName === pieceName || isSavingName) {
+      if (!nextName) {
+        setDraftName(pieceName);
+      }
+      setIsEditingName(false);
+      return;
+    }
+
+    setIsSavingName(true);
+    try {
+      await onRename(nextName);
+      setIsEditingName(false);
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
   return (
     <div
       style={{ position: 'relative' }}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setMenuOpen(false); }}
+      onMouseLeave={() => {
+        setHovered(false);
+        setMenuOpen(false);
+        setIsConfirmingDelete(false);
+      }}
     >
-      <button
-        onClick={onClick}
+      <div
+        onClick={() => {
+          if (isEditingName) return;
+          onClick();
+        }}
+        onKeyDown={(e) => {
+          if (isEditingName) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        role="button"
+        tabIndex={0}
         style={{
-          appearance: 'none',
-          WebkitAppearance: 'none',
           display: 'block',
           width: '100%',
           background: 'transparent',
@@ -523,21 +583,99 @@ function PieceCard({
               display: 'flex',
               alignItems: 'flex-start',
               justifyContent: 'space-between',
-              gap: 8,
-              marginBottom: 8,
+          gap: 8,
+          marginBottom: 8,
             }}
           >
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 500,
-                color: pieceName ? '#191919' : '#A8A09A',
-                fontStyle: pieceName ? 'normal' : 'italic',
-                lineHeight: 1.4,
-              }}
-            >
-              {pieceName || 'Unnamed Piece'}
-            </div>
+            {isEditingName ? (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  flex: 1,
+                  minWidth: 0,
+                  padding: '4px 6px',
+                  borderRadius: 8,
+                  background: '#F7F3EE',
+                  border: '1px solid rgba(196,123,107,0.22)',
+                  boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.45)',
+                }}
+              >
+                <input
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void confirmRename();
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      cancelRename();
+                    }
+                  }}
+                  autoFocus
+                  aria-label="Rename piece"
+                  disabled={isSavingName}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: '#191919',
+                    lineHeight: 1.4,
+                    fontFamily: inter,
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void confirmRename();
+                  }}
+                  disabled={isSavingName}
+                  aria-label="Confirm piece rename"
+                  title="Confirm rename"
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 999,
+                    border: 'none',
+                    background: isSavingName ? 'rgba(168,180,117,0.55)' : '#A8B475',
+                    color: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: isSavingName ? 'default' : 'pointer',
+                    flexShrink: 0,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ✓
+                </button>
+              </div>
+            ) : (
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: pieceName ? '#191919' : '#A8A09A',
+                  fontStyle: pieceName ? 'normal' : 'italic',
+                  lineHeight: 1.4,
+                }}
+              >
+                {pieceName || 'Unnamed Piece'}
+              </div>
+            )}
 
             <span
               style={{
@@ -599,7 +737,7 @@ function PieceCard({
             </div>
           ) : null}
         </div>
-      </button>
+      </div>
 
       {/* Ellipsis button — appears on hover */}
       {(hovered || menuOpen) && (
@@ -647,27 +785,132 @@ function PieceCard({
             minWidth: 140,
           }}
         >
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); setMenuOpen(false); }}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '10px 14px',
-              textAlign: 'left',
-              fontFamily: inter,
-              fontSize: 13,
-              fontWeight: 500,
-              color: '#C47B6B',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'background 120ms ease',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#FAF0EF'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            Delete piece
-          </button>
+          {isConfirmingDelete ? (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                padding: '10px 12px 12px',
+                display: 'grid',
+                gap: 10,
+                minWidth: 188,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: inter,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#6F4A43',
+                  lineHeight: 1.4,
+                }}
+              >
+                Delete this piece?
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    cancelDeleteConfirm();
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(67,67,43,0.12)',
+                    background: '#FFFFFF',
+                    color: '#5F5953',
+                    fontFamily: inter,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                    setMenuOpen(false);
+                    setIsConfirmingDelete(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: '#C47B6B',
+                    color: '#FFFFFF',
+                    fontFamily: inter,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  beginRename();
+                }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: '10px 14px',
+                  textAlign: 'left',
+                  fontFamily: inter,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#43432B',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background 120ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#F7F3EE';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                Rename piece
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  beginDeleteConfirm();
+                }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: '10px 14px',
+                  textAlign: 'left',
+                  fontFamily: inter,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#C47B6B',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background 120ms ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#FAF0EF'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                Delete piece
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -756,10 +999,46 @@ export default function CollectionPage({
 
   const handleDeletePiece = async (id: string) => {
     const supabase = createClient();
-    await supabase.from('analyses').delete().eq('id', id);
+    const { error } = await supabase.from('analyses').delete().eq('id', id);
+    if (error) {
+      setToastMessage('Unable to delete piece');
+      return;
+    }
     setAnalyses((prev) => prev.filter((a) => a.id !== id));
     onPieceDeleted?.();
     setToastMessage('Piece removed from collection');
+  };
+
+  const handleRenamePiece = async (id: string, nextName: string) => {
+    const cleanedName = nextName.trim();
+    if (!cleanedName) return;
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('analyses')
+      .update({
+        piece_name: cleanedName,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (error) {
+      setToastMessage('Unable to rename piece');
+      throw error;
+    }
+
+    setAnalyses((prev) =>
+      prev.map((analysis) =>
+        analysis.id === id
+          ? {
+              ...analysis,
+              piece_name: cleanedName,
+              updated_at: new Date().toISOString(),
+            }
+          : analysis
+      )
+    );
+    setToastMessage('Piece renamed');
   };
 
   const seasonLabel = season ?? analyses[0]?.season ?? '';
@@ -1543,6 +1822,7 @@ export default function CollectionPage({
                       execution_notes={analysis.execution_notes ?? null}
                       onClick={() => handleOpenExistingPiece(analysis)}
                       onDelete={() => handleDeletePiece(analysis.id)}
+                      onRename={(nextName) => handleRenamePiece(analysis.id, nextName)}
                     />
                   ))
                 )}

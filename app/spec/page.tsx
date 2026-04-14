@@ -4060,26 +4060,12 @@ function SpecStudioPageContent() {
                             }}
                           >
                             <div style={{ height: 34, position: "relative", background: MATERIAL_SWATCH_BG[mat.id] || "#D0C8B8" }}>
-                              {isSel && <div style={{ position: "absolute", top: 8, right: 8, width: 7, height: 7, borderRadius: "50%", background: CHARTREUSE }} />}
-                              {isRecommended && (
+                              {isRecommended && isSel && (
                                 <span
-                                  style={{
-                                    position: "absolute",
-                                    top: 8,
-                                    left: 8,
-                                    padding: "2px 7px",
-                                    borderRadius: 999,
-                                    border: "1px solid rgba(168,180,117,0.28)",
-                                    background: "rgba(255,255,255,0.72)",
-                                    color: "#6B7A40",
-                                    fontFamily: inter,
-                                    fontSize: 9,
-                                    fontWeight: 700,
-                                    letterSpacing: "0.06em",
-                                    textTransform: "uppercase",
-                                  }}
+                                  className="specSelectionChip"
+                                  style={{ position: "absolute", top: 8, left: 8 }}
                                 >
-                                  Muko Pick
+                                  Selected
                                 </span>
                               )}
                             </div>
