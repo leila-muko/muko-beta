@@ -81,7 +81,7 @@ export interface BrandProfile {
     updated_at: string;
   }
   
-  export interface SavedCollection {
+export interface SavedCollection {
     id: string;
     user_id: string;
     name: string;
@@ -89,4 +89,13 @@ export interface BrandProfile {
     analysis_ids: string[];
     created_at: string;
     updated_at: string;
+  }
+
+  export interface CollectionSnapshot {
+    id: string;
+    user_id: string;
+    collection_name: string;
+    report_snapshot: Record<string, unknown>;
+    report_saved_at: string;
+    piece_count: number | null;
   }

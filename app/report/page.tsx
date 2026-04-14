@@ -60,6 +60,15 @@ interface BrandProfileRow {
   reference_brands: string[] | null;
 }
 
+interface CollectionSnapshotRow {
+  id: string;
+  user_id: string;
+  collection_name: string;
+  report_snapshot: CollectionReportPayload;
+  report_saved_at: string;
+  piece_count: number | null;
+}
+
 const materialNameById = new Map(
   (materialsData as Array<{ id: string; name: string }>).map((material) => [material.id, material.name])
 );
@@ -310,6 +319,26 @@ async function fetchBrandProfile(userId: string): Promise<CollectionReportBrandI
   };
 }
 
+async function fetchCollectionSnapshot(
+  userId: string,
+  collectionName: string
+): Promise<CollectionSnapshotRow | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('collection_snapshots')
+    .select('id, user_id, collection_name, report_snapshot, report_saved_at, piece_count')
+    .eq('user_id', userId)
+    .eq('collection_name', collectionName)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as CollectionSnapshotRow;
+}
+
+function getReportPieceCount(report: CollectionReportPayload) {
+  return report.header?.piece_count ?? report.overview?.total_pieces ?? null;
+}
+
 function ReportPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -325,14 +354,16 @@ function ReportPageContent() {
   const identityPulse = useSessionStore((state) => state.identityPulse);
   const resonancePulse = useSessionStore((state) => state.resonancePulse);
   const executionPulse = useSessionStore((state) => state.executionPulse);
-  const savedAnalysisId = useSessionStore((state) => state.savedAnalysisId);
-  const setSavedAnalysisId = useSessionStore((state) => state.setSavedAnalysisId);
 
   const collectionFromUrl = searchParams.get('collection');
   const seasonFromUrl = searchParams.get('season');
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSnapshotLoaded, setIsSnapshotLoaded] = useState(false);
+  const [isRefreshingReport, setIsRefreshingReport] = useState(false);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const forceFreshGenerationRef = useRef(false);
 
   // Auto-clear toast after 2400ms
   useEffect(() => {
@@ -423,6 +454,7 @@ function ReportPageContent() {
       const supabase = createClient();
       const activeCollectionName = collectionFromUrl || activeCollection || collectionName;
       const activeSeason = seasonFromUrl || season;
+      const shouldBypassSnapshot = forceFreshGenerationRef.current;
 
       try {
         let input = sessionFallbackInput;
@@ -434,6 +466,18 @@ function ReportPageContent() {
 
         if (user) {
           brand = await fetchBrandProfile(user.id);
+        }
+
+        if (!shouldBypassSnapshot && user && activeCollectionName) {
+          const snapshot = await fetchCollectionSnapshot(user.id, activeCollectionName);
+          if (snapshot && !controller.signal.aborted) {
+            setReport(snapshot.report_snapshot);
+            setContextRow(null);
+            setIsSnapshotLoaded(true);
+            setSaveStatus('saved');
+            setLoading(false);
+            return;
+          }
         }
 
         if (user && activeCollectionName) {
@@ -591,6 +635,8 @@ function ReportPageContent() {
 
         if (!controller.signal.aborted) {
           setReport(mergeReportWithInput(nextReport, input));
+          setIsSnapshotLoaded(false);
+          setSaveStatus('idle');
         }
       } catch (err) {
         if ((err as Error)?.name === 'AbortError') return;
@@ -625,7 +671,9 @@ function ReportPageContent() {
         } else if (!controller.signal.aborted) {
           setError('Unable to build the collection report right now.');
         }
-      } finally {
+        } finally {
+        forceFreshGenerationRef.current = false;
+        setIsRefreshingReport(false);
         if (!controller.signal.aborted) {
           setLoading(false);
         }
@@ -637,7 +685,11 @@ function ReportPageContent() {
     return () => {
       collectionAbortRef.current?.abort();
     };
-  }, [activeCollection, collectionFromUrl, collectionName, season, seasonFromUrl, sessionFallbackInput]);
+  }, [activeCollection, collectionFromUrl, collectionName, refreshNonce, season, seasonFromUrl, sessionFallbackInput]);
+
+  const canSaveReport = Boolean(report) && !isSnapshotLoaded && saveStatus === 'idle';
+  const saveButtonLabel =
+    saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' || isSnapshotLoaded ? 'Saved' : 'Save to Collection';
 
   return (
     <main
@@ -703,78 +755,54 @@ function ReportPageContent() {
 
           {/* Save to Collection — chartreuse primary style */}
           <button
-            disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+            disabled={!canSaveReport}
             onClick={async () => {
-              if (saveStatus !== 'idle') return;
+              if (!report || !canSaveReport) return;
 
-              // If already saved by ScorecardModal, just confirm
-              if (savedAnalysisId) {
-                setSaveStatus('saved');
-                setToastMessage('Analysis saved to your collection');
-                return;
-              }
-
-              // No prior save — attempt upsert with available store data
               setSaveStatus('saving');
               try {
                 const supabase = createClient();
-                const { data: authData } = await supabase.auth.getUser();
-                const userId = authData.user?.id ?? null;
-                if (!userId) {
+                const {
+                  data: { user },
+                } = await supabase.auth.getUser();
+
+                if (!user) {
                   setSaveStatus('error');
-                  setToastMessage('Sign in to save this analysis');
-                  setTimeout(() => setSaveStatus('idle'), 2000);
+                  setToastMessage('Sign in to save this report');
+                  window.setTimeout(() => setSaveStatus('idle'), 2000);
                   return;
                 }
-                const resolvedCollectionName =
-                  collectionFromUrl || activeCollection || collectionName || null;
-                const resolvedSeason = seasonFromUrl || season || null;
-                const avgScore = Math.round(
-                  ((identityPulse?.score ?? 0) +
-                    (resonancePulse?.score ?? 0) +
-                    (executionPulse?.score ?? 0)) /
-                    3
-                );
-                const { data: insertData, error: insertError } = await supabase
-                  .from('analyses')
-                  .insert({
-                    user_id:          userId,
-                    collection_name:  resolvedCollectionName,
-                    season:           resolvedSeason,
-                    category:         category?.toLowerCase()?.trim() || null,
-                    aesthetic_input:  aestheticInput || null,
-                    aesthetic_matched_id: aestheticMatchedId ?? aestheticInput?.toLowerCase()?.replace(/\s+/g, '-') ?? null,
-                    material_id:      materialId || null,
-                    silhouette:       silhouette || null,
-                    construction_tier: constructionTier ?? null,
-                    score:            avgScore,
-                    dimensions: {
-                      identity:  identityPulse?.score ?? null,
-                      resonance: resonancePulse?.score ?? null,
-                      execution: executionPulse?.score ?? null,
-                    },
-                    gates_passed: {
-                      cost: (executionPulse?.score ?? 0) >= 65,
-                    },
-                  })
-                  .select('id')
-                  .single();
 
-                if (insertError) {
-                  console.error('[Report] Save to collection failed:', insertError);
+                const savedAt = new Date().toISOString();
+                const { error: snapshotError } = await supabase
+                  .from('collection_snapshots')
+                  .upsert(
+                    {
+                      user_id: user.id,
+                      collection_name: resolvedCollectionName,
+                      report_snapshot: report,
+                      report_saved_at: savedAt,
+                      piece_count: getReportPieceCount(report),
+                    },
+                    { onConflict: 'user_id,collection_name' }
+                  );
+
+                if (snapshotError) {
+                  console.error('[Report] Snapshot save failed:', snapshotError);
                   setSaveStatus('error');
                   setToastMessage('Save failed — please try again');
-                  setTimeout(() => setSaveStatus('idle'), 2000);
+                  window.setTimeout(() => setSaveStatus('idle'), 2000);
                   return;
                 }
-                if (insertData?.id) setSavedAnalysisId(insertData.id as string);
+
                 setSaveStatus('saved');
-                setToastMessage('Analysis saved to your collection');
+                setToastMessage('Report snapshot saved');
+                return;
               } catch (err) {
-                console.error('[Report] Save to collection threw:', err);
+                console.error('[Report] Snapshot save threw:', err);
                 setSaveStatus('error');
                 setToastMessage('Save failed — please try again');
-                setTimeout(() => setSaveStatus('idle'), 2000);
+                window.setTimeout(() => setSaveStatus('idle'), 2000);
               }
             }}
             style={{
@@ -782,24 +810,33 @@ function ReportPageContent() {
               borderRadius: 999,
               border: 'none',
               background:
-                saveStatus === 'saved'
-                  ? '#6B8F3E'
+                saveStatus === 'saved' || isSnapshotLoaded
+                  ? 'rgba(67,67,43,0.16)'
                   : saveStatus === 'saving'
                   ? 'rgba(168,180,117,0.6)'
                   : '#A8B475',
-              color: '#F8F4EC',
+              color: saveStatus === 'saved' || isSnapshotLoaded ? reportPalette.olive : '#F8F4EC',
               fontFamily: fonts.body,
               fontSize: 13,
-              cursor: saveStatus === 'idle' ? 'pointer' : 'default',
-              opacity: saveStatus === 'saving' ? 0.75 : 1,
+              cursor: canSaveReport ? 'pointer' : 'default',
+              opacity: saveStatus === 'saving' ? 0.75 : canSaveReport ? 1 : 0.8,
               transition: 'background 150ms ease, opacity 150ms ease',
             }}
           >
-            {saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'saving' ? 'Saving…' : 'Save to Collection'}
+            {saveButtonLabel}
           </button>
 
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              forceFreshGenerationRef.current = true;
+              setIsRefreshingReport(true);
+              setSaveStatus('idle');
+              collectionAbortRef.current?.abort();
+              setError(null);
+              setIsSnapshotLoaded(false);
+              setRefreshNonce((value) => value + 1);
+            }}
+            disabled={isRefreshingReport}
             style={{
               padding: '12px 16px',
               borderRadius: 999,
@@ -808,10 +845,11 @@ function ReportPageContent() {
               color: '#F8F4EC',
               fontFamily: fonts.body,
               fontSize: 13,
-              cursor: 'pointer',
+              cursor: isRefreshingReport ? 'default' : 'pointer',
+              opacity: isRefreshingReport ? 0.75 : 1,
             }}
           >
-            Refresh Report
+            {isRefreshingReport ? 'Refreshing…' : 'Refresh Report'}
           </button>
         </div>
 

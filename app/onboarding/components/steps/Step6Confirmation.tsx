@@ -21,17 +21,6 @@ interface StepProps {
   };
 }
 
-const AESTHETIC_LABELS: Record<string, string> = {
-  'terrain-luxe':    'Terrain Luxe',
-  'quiet-structure': 'Quiet Structure',
-  'romantic-analog': 'Romantic Analog',
-  'heritage-hand':   'Heritage Hand',
-  'undone-glam':     'Undone Glam',
-  'haptic-play':     'Haptic Play',
-  'high-voltage':    'High Voltage',
-  'sweet-subversion':'Sweet Subversion',
-};
-
 const PRICE_TIER_LABELS: Record<string, string> = {
   Contemporary: 'Contemporary ($100–300)',
   Bridge:       'Bridge ($300–600)',
@@ -41,7 +30,6 @@ const PRICE_TIER_LABELS: Record<string, string> = {
 export default function Step6Confirmation({ formData }: StepProps) {
   const refBrands = formData.referenceBrands.filter(Boolean);
   const exclBrands = formData.excludedBrands.filter(Boolean);
-  const exclAesthetics = formData.excludedAesthetics;
 
   const fields = [
     {
@@ -80,14 +68,6 @@ export default function Step6Confirmation({ formData }: StepProps) {
       label: 'Never-Be Brands',
       value: exclBrands.length > 0 ? exclBrands.join(', ') : 'None added',
       filled: exclBrands.length > 0,
-    },
-    {
-      label: 'Excluded Aesthetics',
-      value:
-        exclAesthetics.length > 0
-          ? exclAesthetics.map((id) => AESTHETIC_LABELS[id] ?? id).join(', ')
-          : 'None excluded',
-      filled: exclAesthetics.length > 0,
     },
     {
       label: 'Target Margin',

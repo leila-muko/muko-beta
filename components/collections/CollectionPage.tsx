@@ -6,6 +6,8 @@ import materialsData from '@/data/materials.json';
 import { createClient } from '@/lib/supabase/client';
 import { getFlatForPiece } from '@/components/flats';
 import { buildCollectionReport } from '@/lib/collection-report/buildCollectionReport';
+import { CollectionThesis } from '@/components/report/CollectionThesis';
+import { OverallReadCallout } from '@/components/report/OverallReadCallout';
 import type {
   CollectionComplexity,
   CollectionPieceRole,
@@ -18,6 +20,7 @@ import { useSessionStore } from '@/lib/store/sessionStore';
 import { parseSelectedPieceImage, resolvePieceImageType } from '@/lib/piece-image';
 import { buildAssortmentIntelligence } from '@/lib/collection-report/buildAssortmentIntelligence';
 import { hydrateSpecSessionFromAnalysis, type PersistedSpecAnalysisRow } from '@/lib/collections/hydrateSpecSessionFromAnalysis';
+import { formatMonthYear, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
 
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
@@ -48,6 +51,16 @@ interface AnalysisRow {
   dimensions?: { identity?: number | null; resonance?: number | null; execution?: number | null } | null;
   narrative?: string | null;
   execution_notes?: string | null;
+  updated_at?: string | null;
+}
+
+interface CollectionSnapshotRow {
+  id: string;
+  user_id: string;
+  collection_name: string;
+  report_snapshot: CollectionReportPayload;
+  report_saved_at: string;
+  piece_count: number | null;
 }
 
 interface CollectionPageProps {
@@ -213,6 +226,22 @@ async function fetchBrandProfile(userId: string): Promise<CollectionReportBrandI
     tension_context: row.tension_context,
     reference_brands: row.reference_brands,
   };
+}
+
+async function fetchCollectionSnapshot(
+  userId: string,
+  collectionName: string
+): Promise<CollectionSnapshotRow | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('collection_snapshots')
+    .select('id, user_id, collection_name, report_snapshot, report_saved_at, piece_count')
+    .eq('user_id', userId)
+    .eq('collection_name', collectionName)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as CollectionSnapshotRow;
 }
 
 function toCollectionReportInput({
@@ -669,6 +698,8 @@ export default function CollectionPage({
   const [isReadPinnedClosed, setIsReadPinnedClosed] = useState(false);
   const [collectionReadReport, setCollectionReadReport] = useState<CollectionReportPayload | null>(null);
   const [isRefreshingCollectionRead, setIsRefreshingCollectionRead] = useState(false);
+  const [activeTab, setActiveTab] = useState<'pieces' | 'report'>('pieces');
+  const [snapshot, setSnapshot] = useState<CollectionSnapshotRow | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -677,17 +708,21 @@ export default function CollectionPage({
       setLoading(true);
 
       const supabase = createClient();
-      const primary = await supabase
-        .from('analyses')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('collection_name', collectionName)
-        .order('created_at', { ascending: false });
+      const [primary, snapshotRow] = await Promise.all([
+        supabase
+          .from('analyses')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('collection_name', collectionName)
+          .order('created_at', { ascending: false }),
+        fetchCollectionSnapshot(userId, collectionName),
+      ]);
 
       if (cancelled) return;
 
       if (primary.error) {
         setAnalyses([]);
+        setSnapshot(snapshotRow);
         setLoading(false);
         return;
       }
@@ -698,6 +733,7 @@ export default function CollectionPage({
           piece_name: row.piece_name ?? getAgentString(row.agent_versions, 'saved_piece_name') ?? null,
         }))
       );
+      setSnapshot(snapshotRow);
       setLoading(false);
     };
 
@@ -859,6 +895,14 @@ export default function CollectionPage({
     router.push(`/report?${params.toString()}`);
   };
 
+  const handleOpenReport = () => {
+    const params = new URLSearchParams({ collection: collectionName });
+    if (seasonLabel) {
+      params.set('season', seasonLabel);
+    }
+    router.push(`/report?${params.toString()}`);
+  };
+
   const handleRerunCollectionAnalysis = async () => {
     if (!collectionReportInput || isRefreshingCollectionRead) return;
 
@@ -950,6 +994,18 @@ export default function CollectionPage({
     hydrateSpecSessionFromAnalysis(collectionName, analysis as PersistedSpecAnalysisRow);
     router.push(`/spec?analysis=${encodeURIComponent(analysis.id)}`);
   };
+
+  const snapshotSavedAt = snapshot?.report_saved_at ?? null;
+  const isSnapshotOutdated = useMemo(() => {
+    if (!snapshotSavedAt) return false;
+    const snapshotTime = new Date(snapshotSavedAt).getTime();
+    if (Number.isNaN(snapshotTime)) return false;
+
+    return analyses.some((analysis) => {
+      const updatedTime = new Date(analysis.updated_at ?? analysis.created_at).getTime();
+      return !Number.isNaN(updatedTime) && updatedTime > snapshotTime;
+    });
+  }, [analyses, snapshotSavedAt]);
 
   return (
     <>
@@ -1263,40 +1319,62 @@ export default function CollectionPage({
           </div>
         </div>
 
-        {/* ── Pieces section ─────────────────────────────────────────────── */}
         <div style={{ flex: 1, overflowY: 'auto', padding: reportExists ? '2px 32px 24px' : '20px 32px 24px' }}>
           {reportExists ? (
             <div
               style={{
                 borderTop: '1px solid rgba(67,67,43,0.08)',
-                margin: '24px 0',
+                margin: '24px 0 18px',
               }}
             />
           ) : null}
 
-          {/* Section label */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: 16,
-              marginBottom: 16,
+              marginBottom: 18,
               flexWrap: 'wrap',
             }}
           >
-            <span
+            <div
               style={{
-                fontFamily: inter,
-                fontSize: 9,
-                fontWeight: 600,
-                letterSpacing: '0.16em',
-                textTransform: 'uppercase',
-                color: '#888078',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: 4,
+                borderRadius: 999,
+                border: '1px solid rgba(67,67,43,0.08)',
+                background: 'rgba(255,255,255,0.72)',
               }}
             >
-              Pieces{analyses.length > 0 ? ` · ${analyses.length} total` : ''}
-            </span>
+              {(['pieces', 'report'] as const).map((tab) => {
+                const isActive = activeTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    style={{
+                      border: 'none',
+                      borderRadius: 999,
+                      padding: '10px 16px',
+                      background: isActive ? '#43432B' : 'transparent',
+                      color: isActive ? '#F8F4EC' : '#6B6459',
+                      fontFamily: inter,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: '0.12em',
+                      textTransform: 'uppercase',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {tab}
+                  </button>
+                );
+              })}
+            </div>
 
             <div
               style={{
@@ -1308,40 +1386,30 @@ export default function CollectionPage({
                 marginLeft: 'auto',
               }}
             >
-              {reportExists ? (
+              {activeTab === 'pieces' ? (
                 <>
-                  <button
-                    onClick={handleRerunCollectionAnalysis}
-                    disabled={!collectionReportInput || isRefreshingCollectionRead}
-                    style={{
-                      ...headerActionButtonBase,
-                      border: !collectionReportInput || isRefreshingCollectionRead
-                        ? '1px solid rgba(67,67,43,0.08)'
-                        : '1px solid rgba(67,67,43,0.12)',
-                      background: !collectionReportInput || isRefreshingCollectionRead
-                        ? 'rgba(244,240,233,0.95)'
-                        : 'rgba(248,245,239,0.96)',
-                      color: !collectionReportInput || isRefreshingCollectionRead ? '#AAA198' : '#6B6459',
-                      cursor: !collectionReportInput || isRefreshingCollectionRead ? 'not-allowed' : 'pointer',
-                      boxShadow: !collectionReportInput || isRefreshingCollectionRead
-                        ? 'none'
-                        : headerActionButtonBase.boxShadow,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!collectionReportInput || isRefreshingCollectionRead) return;
-                      e.currentTarget.style.borderColor = 'rgba(67,67,43,0.2)';
-                      e.currentTarget.style.background = '#F2EDE4';
-                      e.currentTarget.style.color = '#43432B';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!collectionReportInput || isRefreshingCollectionRead) return;
-                      e.currentTarget.style.borderColor = 'rgba(67,67,43,0.12)';
-                      e.currentTarget.style.background = 'rgba(248,245,239,0.96)';
-                      e.currentTarget.style.color = '#6B6459';
-                    }}
-                  >
-                    {isRefreshingCollectionRead ? 'Refreshing...' : 'Re-run Analysis'}
-                  </button>
+                  {reportExists ? (
+                    <button
+                      onClick={handleRerunCollectionAnalysis}
+                      disabled={!collectionReportInput || isRefreshingCollectionRead}
+                      style={{
+                        ...headerActionButtonBase,
+                        border: !collectionReportInput || isRefreshingCollectionRead
+                          ? '1px solid rgba(67,67,43,0.08)'
+                          : '1px solid rgba(67,67,43,0.12)',
+                        background: !collectionReportInput || isRefreshingCollectionRead
+                          ? 'rgba(244,240,233,0.95)'
+                          : 'rgba(248,245,239,0.96)',
+                        color: !collectionReportInput || isRefreshingCollectionRead ? '#AAA198' : '#6B6459',
+                        cursor: !collectionReportInput || isRefreshingCollectionRead ? 'not-allowed' : 'pointer',
+                        boxShadow: !collectionReportInput || isRefreshingCollectionRead
+                          ? 'none'
+                          : headerActionButtonBase.boxShadow,
+                      }}
+                    >
+                      {isRefreshingCollectionRead ? 'Refreshing...' : 'Re-run Analysis'}
+                    </button>
+                  ) : null}
 
                   <button
                     onClick={onNewPiece}
@@ -1351,54 +1419,59 @@ export default function CollectionPage({
                       background: 'rgba(255,255,255,0.92)',
                       color: '#575143',
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(168,180,117,0.9)';
-                      e.currentTarget.style.color = '#43432B';
-                      e.currentTarget.style.background = '#F8F5EF';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(67,67,43,0.14)';
-                      e.currentTarget.style.color = '#575143';
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.92)';
-                    }}
                   >
                     Add Piece
                   </button>
 
-                  <button
-                    onClick={handleGenerateReport}
-                    className="collection-read-ready-pill"
-                  >
-                    <span className="collection-read-ready-dot-wrap">
-                      <span className="collection-read-ready-dot-ping" />
-                      <span className="collection-read-ready-dot-core" />
-                    </span>
-                    Collection read ready
-                    <span className="collection-read-ready-arrow">→</span>
-                  </button>
+                  {reportExists ? (
+                    <button onClick={handleGenerateReport} className="collection-read-ready-pill">
+                      <span className="collection-read-ready-dot-wrap">
+                        <span className="collection-read-ready-dot-ping" />
+                        <span className="collection-read-ready-dot-core" />
+                      </span>
+                      Collection read ready
+                      <span className="collection-read-ready-arrow">→</span>
+                    </button>
+                  ) : (
+                    <button
+                      disabled
+                      style={{
+                        ...headerActionButtonBase,
+                        border: '1px solid rgba(67,67,43,0.08)',
+                        background: '#E2DDD6',
+                        color: '#888078',
+                        cursor: 'not-allowed',
+                        boxShadow: 'none',
+                      }}
+                    >
+                      Collection read ready →
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
+                  {snapshot && isSnapshotOutdated ? (
+                    <span
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 12,
+                        color: 'rgba(67,67,43,0.56)',
+                      }}
+                    >
+                      Collection updated since last save
+                    </span>
+                  ) : null}
+
                   <button
-                    onClick={onNewPiece}
+                    onClick={handleOpenReport}
                     style={{
                       ...headerActionButtonBase,
-                      border: '1px solid rgba(67,67,43,0.14)',
-                      background: 'rgba(255,255,255,0.92)',
-                      color: '#575143',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(168,180,117,0.9)';
-                      e.currentTarget.style.color = '#43432B';
-                      e.currentTarget.style.background = '#F8F5EF';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(67,67,43,0.14)';
-                      e.currentTarget.style.color = '#575143';
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.92)';
+                      border: '1px solid rgba(67,67,43,0.12)',
+                      background: '#43432B',
+                      color: '#F8F4EC',
                     }}
                   >
-                    Add Piece
+                    Refresh Report
                   </button>
 
                   <button
@@ -1412,52 +1485,146 @@ export default function CollectionPage({
                       boxShadow: 'none',
                     }}
                   >
-                    Generate Report
+                    Save to Collection
                   </button>
                 </>
               )}
             </div>
           </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-              gap: 14,
-              paddingBottom: 100,
-            }}
-          >
-            {loading ? (
-              <div style={{ gridColumn: '1 / -1' }}>
-                <LoadingCards />
-              </div>
-            ) : analyses.length === 0 ? (
+          {activeTab === 'pieces' ? (
+            <>
               <div
                 style={{
-                  gridColumn: '1 / -1',
-                  padding: '40px 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  textAlign: 'center',
+                  fontFamily: inter,
+                  fontSize: 9,
+                  fontWeight: 600,
+                  letterSpacing: '0.16em',
+                  textTransform: 'uppercase',
+                  color: '#888078',
+                  marginBottom: 16,
                 }}
               >
-                <span style={{ fontFamily: inter, fontSize: 13, color: '#888078' }}>
-                  No pieces have been added yet. Add your first piece to get started.
-                </span>
+                Pieces{analyses.length > 0 ? ` · ${analyses.length} total` : ''}
               </div>
-            ) : (
-              analyses.map((analysis) => (
-                <PieceCard
-                  key={analysis.id}
-                  analysis={analysis}
-                  execution_notes={analysis.execution_notes ?? null}
-                  onClick={() => handleOpenExistingPiece(analysis)}
-                  onDelete={() => handleDeletePiece(analysis.id)}
-                />
-              ))
-            )}
-          </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: 14,
+                  paddingBottom: 100,
+                }}
+              >
+                {loading ? (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <LoadingCards />
+                  </div>
+                ) : analyses.length === 0 ? (
+                  <div
+                    style={{
+                      gridColumn: '1 / -1',
+                      padding: '40px 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <span style={{ fontFamily: inter, fontSize: 13, color: '#888078' }}>
+                      No pieces have been added yet. Add your first piece to get started.
+                    </span>
+                  </div>
+                ) : (
+                  analyses.map((analysis) => (
+                    <PieceCard
+                      key={analysis.id}
+                      analysis={analysis}
+                      execution_notes={analysis.execution_notes ?? null}
+                      onClick={() => handleOpenExistingPiece(analysis)}
+                      onDelete={() => handleDeletePiece(analysis.id)}
+                    />
+                  ))
+                )}
+              </div>
+            </>
+          ) : loading ? (
+            <div style={{ paddingBottom: 100 }}>
+              <LoadingCards />
+            </div>
+          ) : snapshot ? (
+            <div style={{ display: 'grid', gap: 18, paddingBottom: 100 }}>
+              <section
+                style={{
+                  ...sectionCard,
+                  padding: '18px 22px',
+                  background: 'rgba(255,255,255,0.76)',
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    fontFamily: inter,
+                    fontSize: 12,
+                    color: reportPalette.muted,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {collectionName} · Saved snapshot · Generated {formatMonthYear(snapshot.report_saved_at)} ·{' '}
+                  {snapshot.piece_count ?? snapshot.report_snapshot.header?.piece_count ?? 0} pieces reviewed
+                </p>
+              </section>
+
+              <OverallReadCallout
+                value={snapshot.report_snapshot.overall_read}
+                detail={snapshot.report_snapshot.overall_read_detail}
+              />
+
+              <CollectionThesis thesis={snapshot.report_snapshot.collection_thesis} tightened />
+
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <button onClick={handleOpenReport} className="collection-read-ready-pill">
+                  View full report
+                  <span className="collection-read-ready-arrow">→</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ paddingBottom: 100 }}>
+              <section style={{ ...sectionCard, padding: '30px' }}>
+                <p style={sectionEyebrow}>Report</p>
+                <h2
+                  style={{
+                    margin: '12px 0 0',
+                    fontFamily: sohne,
+                    fontSize: 30,
+                    letterSpacing: '-0.04em',
+                    color: '#191919',
+                  }}
+                >
+                  No report saved yet
+                </h2>
+                <p
+                  style={{
+                    margin: '14px 0 0',
+                    fontFamily: inter,
+                    fontSize: 15,
+                    lineHeight: 1.7,
+                    color: '#6B6459',
+                    maxWidth: 720,
+                  }}
+                >
+                  Generate a report to capture a snapshot of this collection.
+                </p>
+                <div style={{ marginTop: 20 }}>
+                  <button onClick={handleOpenReport} className="collection-read-ready-pill">
+                    Generate Report
+                    <span className="collection-read-ready-arrow">→</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+          )}
         </div>
       </div>
 
