@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
+import { trackEvent } from "@/lib/analytics";
 import { useSessionStore } from "@/lib/store/sessionStore";
 
 /* ─── Types ─── */
@@ -56,6 +57,9 @@ function AskMukoInner({
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [dynamicSuggestions, setDynamicSuggestions] = useState<string[]>([]);
+  const activeCollection = useSessionStore((state) => state.activeCollection);
+  const collectionName = useSessionStore((state) => state.collectionName);
+  const savedAnalysisId = useSessionStore((state) => state.savedAnalysisId);
   const setAskMukoLastResponse = useSessionStore((state) => state.setAskMukoLastResponse);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,13 +107,23 @@ function AskMukoInner({
     };
   }, [context]);
 
-  const handleSend = useCallback(async (text: string) => {
+  const handleSend = useCallback(async (text: string, options?: { track?: boolean }) => {
     if (!text.trim()) return;
+    const trimmedText = text.trim();
+    const collectionId = activeCollection || collectionName || savedAnalysisId || null;
     const history = messages.slice(-20).map((message) => ({
       role: message.role === "muko" ? "assistant" : "user",
       content: message.content,
     }));
-    setMessages(prev => [...prev, { role: "user", content: text.trim() }]);
+
+    if (options?.track !== false) {
+      trackEvent(null, "ask_muko_submitted", {
+        question_length: trimmedText.length,
+        collection_id: collectionId,
+      });
+    }
+
+    setMessages(prev => [...prev, { role: "user", content: trimmedText }]);
     setInputValue("");
     setIsTyping(true);
     try {
@@ -117,7 +131,7 @@ function AskMukoInner({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: text.trim(),
+          question: trimmedText,
           context,
           history,
         }),
@@ -138,7 +152,7 @@ function AskMukoInner({
     } finally {
       setIsTyping(false);
     }
-  }, [context, messages, setAskMukoLastResponse]);
+  }, [activeCollection, collectionName, context, messages, savedAnalysisId, setAskMukoLastResponse]);
 
   useEffect(() => {
     if (!isExpanded || isTyping) return;
@@ -147,7 +161,7 @@ function AskMukoInner({
     if (lastOpeningMessageVersionRef.current === openingMessageVersion) return;
 
     lastOpeningMessageVersionRef.current = openingMessageVersion;
-    void handleSend(openingMessage);
+    void handleSend(openingMessage, { track: false });
   }, [handleSend, isExpanded, isTyping, openingMessage, openingMessageVersion]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

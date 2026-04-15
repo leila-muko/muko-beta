@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
+import { trackEvent } from "@/lib/analytics";
 
 const CHARTREUSE = "#A8B475";
 const MUTED = "#888078";
@@ -28,6 +29,12 @@ const TABS = [
   { id: "pieces" as const, label: "Pieces" },
   { id: "report" as const, label: "Report" },
 ];
+
+const STEP_INDEX = {
+  setup: 0,
+  pieces: 1,
+  report: 2,
+} as const;
 
 export function MukoNav({
   activeTab,
@@ -117,7 +124,17 @@ export function MukoNav({
             return (
               <div
                 key={tab.id}
-                onClick={() => !active && router.push(tabRoute)}
+                onClick={() => {
+                  if (active) return;
+                  if (STEP_INDEX[tab.id] > STEP_INDEX[activeTab]) {
+                    trackEvent(null, "step_completed", {
+                      from_step: activeTab,
+                      to_step: tab.id,
+                      collection_id: collectionName ?? null,
+                    });
+                  }
+                  router.push(tabRoute);
+                }}
                 style={{
                   display: "flex",
                   alignItems: "center",

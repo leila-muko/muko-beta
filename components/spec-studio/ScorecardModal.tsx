@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/lib/store/sessionStore";
+import { trackEvent } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
 import { getCollectionLanguageLabels, getExpressionSignalLabels } from "@/lib/collection-signals";
@@ -445,6 +446,15 @@ export function ScorecardModal({
         throw new Error("No authenticated user found for collection save.");
       }
 
+      const { count: existingCollectionCount, error: countError } = await supabase
+        .from("analyses")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("collection_name", effectiveCollection);
+
+      if (countError) throw countError;
+      const isFirstPieceInCollection = (existingCollectionCount ?? 0) === 0;
+
       const trimmedPieceName = pieceName.trim();
       const baseInsert = {
         user_id: userId,
@@ -508,7 +518,20 @@ export function ScorecardModal({
 
       if (insertResult.error) throw insertResult.error;
       const { data } = insertResult;
-      if (data?.id) setSavedAnalysisId(data.id as string);
+      const pieceId = typeof data?.id === "string" ? data.id : null;
+      if (pieceId) {
+        setSavedAnalysisId(pieceId);
+        if (isFirstPieceInCollection) {
+          trackEvent(userId, "collection_created" as never, {
+            collection_name: effectiveCollection,
+          });
+        }
+        trackEvent(userId, "piece_added" as never, {
+          collection_id: effectiveCollection,
+          collection_name: effectiveCollection,
+          piece_id: pieceId,
+        });
+      }
     } catch (error) {
       if (error instanceof Error) {
         console.error("[Muko] Failed to save analysis to collection:", {

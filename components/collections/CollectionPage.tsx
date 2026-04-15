@@ -6,6 +6,7 @@ import materialsData from '@/data/materials.json';
 import { createClient } from '@/lib/supabase/client';
 import { getFlatForPiece } from '@/components/flats';
 import { buildCollectionReport } from '@/lib/collection-report/buildCollectionReport';
+import { trackEvent } from '@/lib/analytics';
 import { CollectionThesis } from '@/components/report/CollectionThesis';
 import { OverallReadCallout } from '@/components/report/OverallReadCallout';
 import type {
@@ -1175,6 +1176,13 @@ export default function CollectionPage({
   };
 
   const handleOpenReport = () => {
+    if (snapshot?.id) {
+      trackEvent(userId, 'report_opened', {
+        collection_id: snapshot.id,
+        source: 'hub',
+      });
+    }
+
     const params = new URLSearchParams({ collection: collectionName });
     if (seasonLabel) {
       params.set('season', seasonLabel);

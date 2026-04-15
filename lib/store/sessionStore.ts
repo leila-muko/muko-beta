@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { trackEvent } from '@/lib/analytics';
 import type { SelectedPieceImage } from '@/lib/piece-image';
 import { createClient } from '@/lib/supabase/client';
 import { getSmartDefault } from '@/lib/spec-studio/smart-defaults';
@@ -534,6 +535,13 @@ function initializeSessionStoreAuthListener() {
   const supabase = createClient();
   supabase.auth.onAuthStateChange((event, session) => {
     if (event !== 'SIGNED_IN') return;
+
+    if (window.sessionStorage.getItem('muko_session_tracked') === null) {
+      trackEvent(session?.user?.id ?? null, 'session_start' as never, {
+        user_id: session?.user?.id ?? null,
+      });
+      window.sessionStorage.setItem('muko_session_tracked', 'true');
+    }
 
     const userId = session?.user?.id ?? null;
     if (!userId || userId === lastSignedInUserId) return;

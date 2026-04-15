@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { createClient } from '@/lib/supabase/client';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import CollectionPage from '@/components/collections/CollectionPage';
@@ -18,10 +19,41 @@ const OLIVE = BRAND.oliveInk;
 const FLOW_BG = '#FAF9F6';
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
+const menuItemStyle: React.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  padding: '10px 14px',
+  textAlign: 'left',
+  fontFamily: inter,
+  fontSize: 13,
+  fontWeight: 500,
+  color: OLIVE,
+  background: 'transparent',
+  border: 'none',
+  borderRadius: 6,
+  cursor: 'pointer',
+  outline: 'none',
+};
 
 interface CollectionGroup {
   name: string;
   season: string | null;
+}
+
+function getNextDuplicateName(name: string, existingNames: string[]) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`^${escaped}(?:\\s(\\d+))?$`);
+  let highestSuffix = 1;
+
+  for (const existingName of existingNames) {
+    const match = existingName.match(pattern);
+    if (!match) continue;
+
+    const suffix = match[1] ? parseInt(match[1], 10) : 1;
+    highestSuffix = Math.max(highestSuffix, suffix);
+  }
+
+  return `${name} ${highestSuffix + 1}`;
 }
 
 export default function CollectionsHubPage() {
@@ -32,6 +64,10 @@ export default function CollectionsHubPage() {
   const [loading, setLoading] = useState(true);
   const [hoveredCollection, setHoveredCollection] = useState<string | null>(null);
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
+  const [renamingCollection, setRenamingCollection] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameLoading, setRenameLoading] = useState(false);
+  const [duplicatingCollection, setDuplicatingCollection] = useState<string | null>(null);
 
   const loadCollections = useCallback(async (uid: string) => {
     const supabase = createClient();
@@ -149,6 +185,71 @@ export default function CollectionsHubPage() {
     }
   }, [userId, activeCollection, setActiveCollection]);
 
+  const handleRenameCollection = useCallback(async () => {
+    if (!userId || !renamingCollection || !renameValue.trim()) return;
+
+    setRenameLoading(true);
+    const supabase = createClient();
+
+    await supabase
+      .from('analyses')
+      .update({ collection_name: renameValue.trim(), updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('collection_name', renamingCollection);
+
+    await loadCollections(userId);
+    setRenamingCollection(null);
+    setRenameValue('');
+    setRenameLoading(false);
+  }, [loadCollections, renameValue, renamingCollection, userId]);
+
+  const handleDuplicateCollection = useCallback(async (name: string, season: string | null) => {
+    if (!userId) return;
+
+    const supabase = createClient();
+    const newName = getNextDuplicateName(
+      name,
+      collections.map((collection) => collection.name)
+    );
+
+    const { data: rows, error } = await supabase
+      .from('analyses')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('collection_name', name);
+
+    if (error || !rows?.length) {
+      console.error('Failed to load collection rows for duplication.', error);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const duplicated = rows.map((row) => {
+      const rest = { ...row };
+      delete rest.id;
+      delete rest.created_at;
+      delete rest.updated_at;
+
+      return {
+        ...rest,
+        season: row.season ?? season,
+        collection_name: newName,
+        created_at: now,
+        updated_at: now,
+      };
+    });
+
+    const { error: insertError } = await supabase.from('analyses').insert(duplicated);
+    if (insertError) {
+      console.error('Failed to duplicate collection.', insertError);
+      return;
+    }
+
+    await loadCollections(userId);
+    resetCollectionScopedSession(newName, season);
+    setActiveCollection(newName);
+  }, [collections, loadCollections, setActiveCollection, userId]);
+
   const activeCollectionMeta = collections.find((collection) => collection.name === activeCollection) ?? null;
 
   return (
@@ -202,7 +303,15 @@ export default function CollectionsHubPage() {
 
         <NewCollectionButton onClick={handleStartCollection} />
 
-        <div style={{ marginTop: 8 }}>
+        <div
+          style={{
+            marginTop: 8,
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           <h2
             style={{
               fontSize: 10,
@@ -218,7 +327,17 @@ export default function CollectionsHubPage() {
             Recents
           </h2>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+              overflowY: 'auto',
+              flex: 1,
+              minHeight: 0,
+              paddingRight: 6,
+            }}
+          >
             {loading ? (
               <div
                 style={{
@@ -254,7 +373,10 @@ export default function CollectionsHubPage() {
                     key={collection.name}
                     style={{ position: 'relative' }}
                     onMouseEnter={() => setHoveredCollection(collection.name)}
-                    onMouseLeave={() => { setHoveredCollection(null); if (!isMenuOpen) setMenuOpenFor(null); }}
+                    onMouseLeave={() => {
+                      setHoveredCollection(null);
+                      if (!isMenuOpen) setMenuOpenFor(null);
+                    }}
                   >
                     <button
                       onClick={() => {
@@ -285,73 +407,98 @@ export default function CollectionsHubPage() {
                     </button>
 
                     {(isHovered || isMenuOpen) && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setMenuOpenFor(isMenuOpen ? null : collection.name); }}
-                        style={{
-                          position: 'absolute',
-                          right: 8,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          width: 22,
-                          height: 22,
-                          borderRadius: 5,
-                          background: 'rgba(255,255,255,0.9)',
-                          border: '0.5px solid rgba(67,67,43,0.14)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 12,
-                          color: 'rgba(67,67,43,0.55)',
-                          letterSpacing: '0.04em',
-                          lineHeight: 1,
-                          padding: 0,
-                          zIndex: 2,
+                      <DropdownMenu.Root
+                        open={isMenuOpen}
+                        onOpenChange={(open) => {
+                          setMenuOpenFor(open ? collection.name : null);
                         }}
-                        title="More options"
                       >
-                        ···
-                      </button>
-                    )}
+                        <DropdownMenu.Trigger asChild>
+                          <button
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              position: 'absolute',
+                              right: 8,
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              width: 22,
+                              height: 22,
+                              borderRadius: 5,
+                              background: 'rgba(255,255,255,0.9)',
+                              border: '0.5px solid rgba(67,67,43,0.14)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 12,
+                              color: 'rgba(67,67,43,0.55)',
+                              letterSpacing: '0.04em',
+                              lineHeight: 1,
+                              padding: 0,
+                              zIndex: 2,
+                            }}
+                            title="More options"
+                            aria-label={`More options for ${collection.name}`}
+                          >
+                            ···
+                          </button>
+                        </DropdownMenu.Trigger>
 
-                    {isMenuOpen && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          right: 0,
-                          background: '#FFFFFF',
-                          border: '1px solid rgba(67,67,43,0.1)',
-                          borderRadius: 8,
-                          boxShadow: '0 6px 20px rgba(25,25,25,0.1)',
-                          zIndex: 30,
-                          overflow: 'hidden',
-                          minWidth: 160,
-                          marginTop: 4,
-                        }}
-                      >
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDeleteCollection(collection.name); }}
-                          style={{
-                            display: 'block',
-                            width: '100%',
-                            padding: '10px 14px',
-                            textAlign: 'left',
-                            fontFamily: inter,
-                            fontSize: 13,
-                            fontWeight: 500,
-                            color: '#C47B6B',
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            transition: 'background 120ms ease',
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = '#FAF0EF'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                        >
-                          Delete collection
-                        </button>
-                      </div>
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content
+                            side="bottom"
+                            align="end"
+                            sideOffset={6}
+                            collisionPadding={12}
+                            style={{
+                              background: '#FFFFFF',
+                              border: '1px solid rgba(67,67,43,0.1)',
+                              borderRadius: 8,
+                              boxShadow: '0 6px 20px rgba(25,25,25,0.1)',
+                              zIndex: 80,
+                              overflow: 'hidden',
+                              minWidth: 188,
+                              padding: 4,
+                            }}
+                          >
+                            <DropdownMenu.Item
+                              onSelect={() => {
+                                setMenuOpenFor(null);
+                                setRenameValue(collection.name);
+                                setRenamingCollection(collection.name);
+                              }}
+                              style={menuItemStyle}
+                            >
+                              Rename collection
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item
+                              disabled={duplicatingCollection === collection.name}
+                              onSelect={async () => {
+                                setMenuOpenFor(null);
+                                setDuplicatingCollection(collection.name);
+                                await handleDuplicateCollection(collection.name, collection.season);
+                                setDuplicatingCollection(null);
+                              }}
+                              style={{
+                                ...menuItemStyle,
+                                opacity: duplicatingCollection === collection.name ? 0.5 : 1,
+                                cursor: duplicatingCollection === collection.name ? 'default' : 'pointer',
+                              }}
+                            >
+                              {duplicatingCollection === collection.name ? 'Duplicating…' : 'Duplicate collection'}
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item
+                              onSelect={() => { handleDeleteCollection(collection.name); }}
+                              style={{
+                                ...menuItemStyle,
+                                color: '#C47B6B',
+                              }}
+                            >
+                              Delete collection
+                            </DropdownMenu.Item>
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu.Root>
                     )}
                   </div>
                 );
@@ -382,6 +529,134 @@ export default function CollectionsHubPage() {
           <EmptyState onStart={handleStartCollection} />
         )}
       </main>
+
+      {renamingCollection && (
+        <div
+          onClick={() => {
+            if (renameLoading) return;
+            setRenamingCollection(null);
+            setRenameValue('');
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(25,25,25,0.28)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+            zIndex: 60,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              boxSizing: 'border-box',
+              background: '#FFFFFF',
+              borderRadius: 14,
+              boxShadow: '0 18px 48px rgba(25,25,25,0.16)',
+              border: '1px solid rgba(25,25,25,0.08)',
+              padding: 20,
+            }}
+          >
+            <h2
+              style={{
+                margin: 0,
+                fontFamily: inter,
+                fontSize: 14,
+                fontWeight: 600,
+                color: '#191919',
+              }}
+            >
+              Rename collection
+            </h2>
+
+            <input
+              autoFocus
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void handleRenameCollection();
+                }
+
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  if (renameLoading) return;
+                  setRenamingCollection(null);
+                  setRenameValue('');
+                }
+              }}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                marginTop: 14,
+                borderRadius: 10,
+                border: '1px solid rgba(25,25,25,0.12)',
+                padding: '11px 12px',
+                fontFamily: inter,
+                fontSize: 13,
+                color: '#191919',
+                outline: 'none',
+              }}
+            />
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 10,
+                marginTop: 16,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  if (renameLoading) return;
+                  setRenamingCollection(null);
+                  setRenameValue('');
+                }}
+                style={{
+                  border: '1px solid rgba(25,25,25,0.12)',
+                  background: 'transparent',
+                  color: '#191919',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  fontFamily: inter,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: renameLoading ? 'default' : 'pointer',
+                  opacity: renameLoading ? 0.6 : 1,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={renameLoading}
+                onClick={() => { void handleRenameCollection(); }}
+                style={{
+                  border: 'none',
+                  background: '#191919',
+                  color: '#FFFFFF',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  fontFamily: inter,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: renameLoading ? 'default' : 'pointer',
+                  opacity: renameLoading ? 0.7 : 1,
+                }}
+              >
+                {renameLoading ? 'Renaming…' : 'Rename'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes fadeIn {

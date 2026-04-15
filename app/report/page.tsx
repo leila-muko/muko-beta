@@ -7,6 +7,7 @@ import { MukoNav } from '@/components/MukoNav';
 import { CollectionReportView } from '@/components/report/CollectionReportView';
 import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
 import { buildCollectionReport } from '@/lib/collection-report/buildCollectionReport';
+import { trackEvent } from '@/lib/analytics';
 import type {
   CollectionComplexity,
   CollectionPieceRole,
@@ -339,6 +340,15 @@ function getReportPieceCount(report: CollectionReportPayload) {
   return report.header?.piece_count ?? report.overview?.total_pieces ?? null;
 }
 
+function getReportScoreRange(report: CollectionReportPayload) {
+  const averageScore =
+    (report.scores.identity.score + report.scores.resonance.score + report.scores.execution.score) / 3;
+
+  if (averageScore >= 80) return 'high' as const;
+  if (averageScore >= 62) return 'mid' as const;
+  return 'low' as const;
+}
+
 function ReportPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -362,8 +372,10 @@ function ReportPageContent() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSnapshotLoaded, setIsSnapshotLoaded] = useState(false);
   const [isRefreshingReport, setIsRefreshingReport] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const forceFreshGenerationRef = useRef(false);
+  const reportCaptureRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-clear toast after 2400ms
   useEffect(() => {
@@ -690,6 +702,92 @@ function ReportPageContent() {
   const canSaveReport = Boolean(report) && !isSnapshotLoaded && saveStatus === 'idle';
   const saveButtonLabel =
     saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' || isSnapshotLoaded ? 'Saved' : 'Save to Collection';
+  const downloadButtonLabel = isDownloadingPdf ? 'Preparing PDF…' : 'Download PDF';
+
+  async function handleDownloadPdf() {
+    if (!report || !reportCaptureRef.current || isDownloadingPdf) return;
+
+    trackEvent(null, 'report_downloaded', {
+      collection_name: report.header.collection_name || resolvedCollectionName,
+      piece_count: getReportPieceCount(report),
+      score_range: getReportScoreRange(report),
+    });
+
+    setIsDownloadingPdf(true);
+    let footerElement: HTMLDivElement | null = null;
+
+    try {
+      const captureTarget = reportCaptureRef.current;
+      const exportDate = new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }).format(new Date());
+
+      footerElement = document.createElement('div');
+      footerElement.textContent = `Muko Beta · mukostudio.com · ${exportDate}`;
+      Object.assign(footerElement.style, {
+        width: '100%',
+        padding: '8px 20px 24px',
+        textAlign: 'center',
+        fontFamily: fonts.body,
+        fontSize: '12px',
+        letterSpacing: '0.02em',
+        color: reportPalette.faint,
+        opacity: '0.9',
+      } satisfies Partial<CSSStyleDeclaration>);
+      captureTarget.appendChild(footerElement);
+
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
+
+      const canvas = await html2canvas(captureTarget, {
+        backgroundColor: reportPalette.bg,
+        scale: Math.min(window.devicePixelRatio || 1, 2),
+        useCORS: true,
+        logging: false,
+      });
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imageWidth = pageWidth;
+      const imageHeight = (canvas.height * imageWidth) / canvas.width;
+      const imageData = canvas.toDataURL('image/png');
+      let heightLeft = imageHeight;
+      let imageOffset = 0;
+
+      pdf.addImage(imageData, 'PNG', 0, imageOffset, imageWidth, imageHeight, undefined, 'FAST');
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        imageOffset = heightLeft - imageHeight;
+        pdf.addPage();
+        pdf.addImage(imageData, 'PNG', 0, imageOffset, imageWidth, imageHeight, undefined, 'FAST');
+        heightLeft -= pageHeight;
+      }
+
+      const filenameBase = [resolvedCollectionName, resolvedSeason, 'report']
+        .filter(Boolean)
+        .join('-')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+      pdf.save(`${filenameBase || 'muko-report'}.pdf`);
+      setToastMessage('PDF downloaded');
+    } catch (err) {
+      console.error('[Report] PDF download failed:', err);
+      setToastMessage('PDF download failed — please try again');
+    } finally {
+      footerElement?.remove();
+      setIsDownloadingPdf(false);
+    }
+  }
 
   return (
     <main
@@ -752,6 +850,26 @@ function ReportPageContent() {
             Back to Collections
           </button>
 
+          <button
+            onClick={() => {
+              void handleDownloadPdf();
+            }}
+            disabled={!report || isDownloadingPdf}
+            style={{
+              padding: '12px 16px',
+              borderRadius: 999,
+              border: `1px solid rgba(67,67,43,0.10)`,
+              background: 'rgba(255,255,255,0.6)',
+              color: reportPalette.olive,
+              fontFamily: fonts.body,
+              fontSize: 13,
+              cursor: !report || isDownloadingPdf ? 'default' : 'pointer',
+              opacity: !report || isDownloadingPdf ? 0.75 : 1,
+              transition: 'opacity 150ms ease',
+            }}
+          >
+            {downloadButtonLabel}
+          </button>
 
           {/* Save to Collection — chartreuse primary style */}
           <button
@@ -797,6 +915,10 @@ function ReportPageContent() {
 
                 setSaveStatus('saved');
                 setToastMessage('Report snapshot saved');
+                trackEvent(null, 'report_saved' as never, {
+                  collection_id: resolvedCollectionName,
+                  analysis_id: report.piece_summary[0]?.id ?? null,
+                });
                 return;
               } catch (err) {
                 console.error('[Report] Snapshot save threw:', err);
@@ -877,7 +999,9 @@ function ReportPageContent() {
 
       {loading ? <LoadingState /> : null}
       {!loading && report ? (
-        <CollectionReportView report={report} />
+        <div ref={reportCaptureRef}>
+          <CollectionReportView report={report} />
+        </div>
       ) : null}
       {!loading && !report && error ? <ErrorState message={error} /> : null}
       {!loading && !report && !error ? <EmptyState /> : null}

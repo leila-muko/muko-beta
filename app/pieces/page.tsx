@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import AskMuko from "@/components/AskMuko";
+import { trackEvent } from "@/lib/analytics";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import type { CollectionRoleId, KeyPiece, PieceBuildContext } from "@/lib/store/sessionStore";
 import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
@@ -3416,9 +3417,11 @@ function PiecesPageClient() {
         : `a ${askMukoCoverageGapLabel}`
       : "a coverage gap";
     const openingContext =
-      askMukoDirectionalGap > 0
-        ? `The collection needs ${askMukoDirectionalGap} more directional pieces and has ${coverageGapClause}.`
-        : `The collection is taking shape and still has ${coverageGapClause}.`;
+      totalConfirmed === 0
+        ? `I'm starting to build this collection. The direction is set.`
+        : askMukoDirectionalGap > 0
+        ? `The collection has ${totalConfirmed} piece${totalConfirmed === 1 ? "" : "s"} so far and could use more directional pieces.`
+        : `The collection has ${totalConfirmed} piece${totalConfirmed === 1 ? "" : "s"} taking shape.`;
     const openingMessage = `${openingContext} What specific pieces should I make for ${collectionLabel} in ${movementLabel}?`;
 
     setAskMukoOpeningMessage(openingMessage);
@@ -3431,6 +3434,7 @@ function PiecesPageClient() {
     directionName,
     piecesReadInput.movement.name,
     rightRailPiecesRead?.start_here_title,
+    totalConfirmed,
   ]);
   const inferredDrawerSuggestion = useMemo(() => {
     if (!drawerPiece) return null;
@@ -4474,7 +4478,14 @@ function PiecesPageClient() {
         </div>
       ) : (
         <button
-          onClick={() => router.push("/report")}
+          onClick={() => {
+            trackEvent(null, "step_completed", {
+              from_step: "pieces",
+              to_step: "report",
+              collection_id: activeCollection || collectionName || null,
+            });
+            router.push("/report");
+          }}
           className="pieces-read-ready-pill"
           title={collectionReadPillTitle}
         >

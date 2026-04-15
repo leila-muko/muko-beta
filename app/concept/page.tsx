@@ -18,6 +18,7 @@ import {
   matchAestheticToFolder,
 } from "../../lib/concept-studio/utils";
 import AskMuko from "@/components/AskMuko";
+import { trackEvent } from "@/lib/analytics";
 import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 import aestheticsData from "@/data/aesthetics.json";
 import chipTensionsData from "@/data/chip_tensions.json";
@@ -3509,6 +3510,11 @@ export default function ConceptStudioPage() {
       directionInterpretationText: aestheticInflection.trim(),
       directionInterpretationModifiers: combinedDirection?.modifierLabels ?? [],
       directionInterpretationChips: selectedInterpretationChips,
+    });
+    trackEvent(null, "step_completed", {
+      from_step: "setup",
+      to_step: "pieces",
+      collection_id: useSessionStore.getState().activeCollection || useSessionStore.getState().collectionName || null,
     });
     setCurrentStep(3);
     router.push('/pieces');

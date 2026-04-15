@@ -35,6 +35,7 @@ import subcategoriesData from "@/data/subcategories.json";
 import aestheticsData from "@/data/aesthetics.json";
 import designLanguageData from "@/data/design-language.json";
 import AskMuko from "@/components/AskMuko";
+import { trackEvent } from "@/lib/analytics";
 import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
 import { PulseSection } from "@/components/ui/PulseSection";
@@ -4662,7 +4663,13 @@ function SpecStudioPageContent() {
                           ) : (
                             <>
                               <button
-                                onClick={() => setShowBetterPathConfirm(true)}
+                                onClick={() => {
+                                  trackEvent(null, "redirect_clicked", {
+                                    redirect_type: betterPathDimension ?? getAlternativePathDimension(activeSpecRail) ?? "unknown",
+                                    piece_id: savedAnalysisId ?? null,
+                                  });
+                                  setShowBetterPathConfirm(true);
+                                }}
                                 style={{
                                   marginTop: 12,
                                   padding: "7px 14px",
