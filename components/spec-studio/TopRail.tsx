@@ -25,7 +25,7 @@ export default function TopRail({
   const marginCeiling = Math.round(targetMSRP * (1 - targetMargin));
 
   return (
-    <div className="px-8 py-4 border-b border-[#E8E3D6] flex items-center gap-6 bg-[#F5F2EB]/60">
+    <div className="px-8 py-4 border-b border-[#E8E3D6] flex items-center gap-6 bg-[#FAF9F6]/60">
       {/* Category */}
       <div className="flex items-center gap-2">
         <label className="text-[11px] font-semibold uppercase tracking-wider text-[#43432B]/50">
@@ -34,7 +34,7 @@ export default function TopRail({
         <select
           value={selectedCategoryId}
           onChange={(e) => onCategoryChange(e.target.value)}
-          className="px-4 py-2 rounded-lg border border-[#E8E3D6] bg-[#FAF8F4] 
+          className="px-4 py-2 rounded-lg border border-[#E8E3D6] bg-[#FAF9F6] 
                      font-sans text-[13px] font-medium text-[#43432B] cursor-pointer 
                      outline-none focus:border-[#A8B475] transition-colors"
         >
@@ -59,7 +59,7 @@ export default function TopRail({
             type="number"
             value={targetMSRP}
             onChange={(e) => onMSRPChange(Number(e.target.value))}
-            className="pl-6 pr-4 py-2 rounded-lg border border-[#E8E3D6] bg-[#FAF8F4]
+            className="pl-6 pr-4 py-2 rounded-lg border border-[#E8E3D6] bg-[#FAF9F6]
                        font-sans text-[13px] font-medium text-[#43432B] w-[110px]
                        outline-none focus:border-[#A8B475] transition-colors"
           />

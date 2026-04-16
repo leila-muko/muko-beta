@@ -26,8 +26,8 @@ export default function LiningToggle({ lined, onToggle }: LiningToggleProps) {
               onClick={() => onToggle(opt.value)}
               className={`flex-1 py-3.5 px-3 rounded-[10px] text-center transition-all duration-200
                 ${isSelected
-                  ? 'border-2 border-[#43432B] bg-[#F5F2EB]'
-                  : 'border border-[#E8E3D6] bg-[#FAF8F4] hover:border-[#43432B]/20'
+                  ? 'border-2 border-[#43432B] bg-[#FAF9F6]'
+                  : 'border border-[#E8E3D6] bg-[#FAF9F6] hover:border-[#43432B]/20'
                 }`}
             >
               <div className="text-[13px] font-semibold text-[#43432B]">

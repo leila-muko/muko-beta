@@ -31,18 +31,18 @@ export function PulseMicroInsight({ insight }: PulseMicroInsightProps) {
     <div
       style={{
         display: "grid",
-        gap: 10,
+        gap: 12,
         minWidth: 0,
       }}
     >
       <div
         style={{
           fontFamily: sohne,
-          fontSize: 12.5,
-          lineHeight: 1.4,
-          letterSpacing: "0.01em",
-          color: "rgba(67,67,43,0.58)",
-          maxWidth: 620,
+          fontSize: "clamp(14px, 1.8vw, 18px)",
+          lineHeight: 1.34,
+          letterSpacing: "-0.018em",
+          color: "rgba(67,67,43,0.68)",
+          maxWidth: 640,
         }}
       >
         {insight.headline.map((part, index) => {
@@ -66,32 +66,43 @@ export function PulseMicroInsight({ insight }: PulseMicroInsightProps) {
           display: "flex",
           flexWrap: "wrap",
           alignItems: "center",
-          gap: 0,
-          fontFamily: sohne,
-          fontSize: 10.5,
+          gap: 8,
+          fontFamily: "var(--font-inter), system-ui, sans-serif",
+          fontSize: 10,
           lineHeight: 1.4,
           color: "rgba(67,67,43,0.34)",
         }}
       >
         {insight.cues.map((cue, index) => (
           <React.Fragment key={cue.key}>
-            {index > 0 ? (
-              <span
-                aria-hidden
-                style={{
-                  margin: "0 6px",
-                  color: "rgba(67,67,43,0.14)",
-                }}
-              >
-                ·
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                whiteSpace: "nowrap",
+                padding: "0 0 0 0",
+              }}
+            >
+              {index > 0 ? (
+                <span
+                  aria-hidden
+                  style={{
+                    color: "rgba(67,67,43,0.16)",
+                    marginRight: 4,
+                  }}
+                >
+                  ·
+                </span>
+              ) : null}
+              <span style={{ color: "rgba(67,67,43,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: 9 }}>
+                {cue.label}
               </span>
-            ) : null}
-            <span style={{ whiteSpace: "nowrap" }}>
-              <span style={{ color: "rgba(67,67,43,0.3)" }}>{cue.label} </span>
               <span
                 style={{
                   color: CUE_COLORS[cue.tone],
-                  fontWeight: 400,
+                  fontWeight: 500,
+                  letterSpacing: "0.01em",
                 }}
               >
                 {cue.value}

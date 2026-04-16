@@ -184,7 +184,7 @@ export default function SpecStudio({
                 key={step}
                 className={`px-3.5 py-1 rounded-full text-[11px] tracking-wide
                   ${i === 2
-                    ? 'font-semibold text-[#FAF8F4] bg-[#43432B]'
+                    ? 'font-semibold text-[#FAF9F6] bg-[#43432B]'
                     : i < 2
                       ? 'font-medium text-[#A8B475] bg-[#A8B475]/10'
                       : 'text-[#43432B]/30'
@@ -253,7 +253,7 @@ export default function SpecStudio({
             className={`w-full py-4 rounded-xl font-semibold text-[14px] tracking-wide
               transition-all duration-300
               ${isComplete
-                ? 'bg-[#43432B] text-[#FAF8F4] cursor-pointer hover:bg-[#43432B]/90'
+                ? 'bg-[#43432B] text-[#FAF9F6] cursor-pointer hover:bg-[#43432B]/90'
                 : 'bg-[#E8E3D6] text-[#43432B]/30 cursor-not-allowed'
               }`}
           >
@@ -262,7 +262,7 @@ export default function SpecStudio({
         </div>
 
         {/* RIGHT PANEL — 40% — Intelligence */}
-        <div className="w-[40%] px-6 py-7 bg-[#F5F2EB]/40 overflow-y-auto">
+        <div className="w-[40%] px-6 py-7 bg-[#FAF9F6]/40 overflow-y-auto">
           {/* Pulse Rail */}
           <PulseRail
             executionStatus={executionStatus}

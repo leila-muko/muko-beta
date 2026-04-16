@@ -1,5 +1,12 @@
 import type { CollectionReportPayload } from '@/lib/collection-report/types';
-import { fonts, formatMonthYear, reportPalette, sectionCard } from '@/components/report/reportStyles';
+import {
+  fonts,
+  formatMonthYear,
+  heroSurface,
+  metaChip,
+  quietMeta,
+  reportPalette,
+} from '@/components/report/reportStyles';
 
 export function CollectionReportHeader({
   header,
@@ -9,22 +16,43 @@ export function CollectionReportHeader({
   return (
     <section
       style={{
-        ...sectionCard,
-        padding: '36px 34px 28px',
+        ...heroSurface,
+        padding: '48px 42px 36px',
         background:
-          'linear-gradient(145deg, rgba(255,255,255,0.88) 0%, rgba(248,244,236,0.76) 52%, rgba(232,227,214,0.42) 100%)',
-        position: 'relative',
-        overflow: 'hidden',
+          'radial-gradient(circle at top right, rgba(168,180,117,0.10), transparent 28%), linear-gradient(180deg, rgba(248,245,239,0.98) 0%, rgba(255,255,255,0.92) 100%)',
       }}
     >
       <div
         style={{
           position: 'absolute',
-          inset: 'auto -50px -60px auto',
-          width: 180,
-          height: 180,
+          inset: 22,
+          borderRadius: 24,
+          border: '1px solid rgba(67,67,43,0.06)',
+          pointerEvents: 'none',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: -10,
+          right: 70,
+          width: 220,
+          height: 220,
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(168,180,117,0.18) 0%, rgba(168,180,117,0) 70%)',
+          border: '1px solid rgba(67,67,43,0.06)',
+          pointerEvents: 'none',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 'auto 44px 28px auto',
+          width: 160,
+          height: 48,
+          borderTop: '1px solid rgba(67,67,43,0.08)',
+          borderRight: '1px solid rgba(67,67,43,0.08)',
+          borderTopRightRadius: 32,
+          pointerEvents: 'none',
         }}
       />
 
@@ -44,24 +72,38 @@ export function CollectionReportHeader({
 
       <h1
         style={{
-          margin: '12px 0 8px',
+          margin: '18px 0 0',
           fontFamily: fonts.heading,
-          fontSize: 'clamp(2.25rem, 5vw, 4rem)',
-          lineHeight: 0.94,
+          fontSize: 'clamp(2.8rem, 6vw, 5rem)',
+          fontWeight: 400,
+          lineHeight: 0.92,
           letterSpacing: '-0.04em',
           color: reportPalette.olive,
-          maxWidth: 700,
+          maxWidth: 760,
         }}
       >
         {header.title}
       </h1>
 
+      <p
+        style={{
+          ...quietMeta,
+          margin: '18px 0 0',
+          maxWidth: 580,
+          fontSize: 14,
+          lineHeight: 1.7,
+        }}
+      >
+        A report formatted for creative and merchandising leadership review, focused on line clarity, tension,
+        and development pressure.
+      </p>
+
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-          gap: 14,
-          marginTop: 24,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 10,
+          marginTop: 28,
         }}
       >
         {[
@@ -76,12 +118,10 @@ export function CollectionReportHeader({
             <div
               key={item}
               style={{
-                padding: '12px 14px',
-                borderRadius: 14,
-                border: `1px solid rgba(67,67,43,0.08)`,
-                background: 'rgba(255,255,255,0.58)',
-                fontFamily: fonts.body,
-                fontSize: 12,
+                ...metaChip,
+                textTransform: 'none',
+                letterSpacing: '0.01em',
+                fontWeight: 500,
                 color: reportPalette.muted,
               }}
             >

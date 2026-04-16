@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react';
 import type { CollectionReportPayload } from '@/lib/collection-report/types';
-import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
+import {
+  fonts,
+  reportPalette,
+  sectionEyebrow,
+  sectionHeading,
+  structuredSurface,
+} from '@/components/report/reportStyles';
 
 function Pill({
   children,
@@ -98,7 +104,7 @@ export function PiecesSection({
   pieces: CollectionReportPayload['piece_summary'];
 }) {
   return (
-    <section style={{ ...sectionCard, padding: '28px 30px' }}>
+    <section style={{ ...structuredSurface, padding: '30px 32px' }}>
       <div
         style={{
           display: 'flex',
@@ -108,12 +114,23 @@ export function PiecesSection({
           flexWrap: 'wrap',
         }}
       >
-        <p style={sectionEyebrow}>Pieces</p>
+        <div>
+          <p style={sectionEyebrow}>Pieces</p>
+          <p
+            style={{
+              ...sectionHeading('md'),
+              marginTop: 12,
+              fontSize: 30,
+            }}
+          >
+            Piece-by-piece review
+          </p>
+        </div>
         <div
           style={{
             padding: '10px 14px',
             borderRadius: 999,
-            background: 'rgba(67,67,43,0.04)',
+            background: 'rgba(67,67,43,0.05)',
             fontFamily: fonts.body,
             fontSize: 12,
             color: reportPalette.muted,
@@ -126,10 +143,10 @@ export function PiecesSection({
       <div
         style={{
           marginTop: 18,
-          borderRadius: 20,
-          border: `1px solid rgba(67,67,43,0.08)`,
+          borderRadius: 22,
+          border: `1px solid rgba(67,67,43,0.06)`,
           overflow: 'hidden',
-          background: 'rgba(255,255,255,0.56)',
+          background: 'rgba(255,255,255,0.62)',
         }}
       >
         <div style={{ overflowX: 'auto' }}>
@@ -139,8 +156,8 @@ export function PiecesSection({
                 display: 'grid',
                 gridTemplateColumns: 'minmax(220px, 2.2fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(180px, 1.35fr) minmax(0, 1fr)',
                 gap: 12,
-                padding: '14px 18px',
-                borderBottom: `1px solid rgba(67,67,43,0.08)`,
+                padding: '18px 22px',
+                borderBottom: `1px solid rgba(67,67,43,0.06)`,
                 fontFamily: fonts.body,
                 fontSize: 10,
                 fontWeight: 700,
@@ -154,7 +171,7 @@ export function PiecesSection({
                   position: 'sticky',
                   left: 0,
                   zIndex: 1,
-                  background: 'rgba(255,255,255,0.56)',
+                  background: 'rgba(255,255,255,0.62)',
                 }}
                 >
                   Piece
@@ -177,9 +194,9 @@ export function PiecesSection({
                     display: 'grid',
                     gridTemplateColumns: 'minmax(220px, 2.2fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(180px, 1.35fr) minmax(0, 1fr)',
                     gap: 12,
-                    padding: '16px 18px',
+                    padding: '20px 22px',
                     alignItems: 'center',
-                    borderBottom: `1px solid rgba(67,67,43,0.06)`,
+                    borderBottom: `1px solid rgba(67,67,43,0.05)`,
                   }}
                 >
                   <div
@@ -187,16 +204,17 @@ export function PiecesSection({
                       position: 'sticky',
                       left: 0,
                       zIndex: 1,
-                      background: 'rgba(255,255,255,0.56)',
+                      background: 'rgba(255,255,255,0.62)',
                     }}
                   >
                     <p
                       style={{
                         margin: 0,
                         fontFamily: fonts.heading,
-                        fontSize: 18,
+                        fontSize: 20,
                         lineHeight: 1.1,
                         color: reportPalette.olive,
+                        letterSpacing: '-0.03em',
                       }}
                     >
                       {piece.piece_name}
@@ -205,7 +223,7 @@ export function PiecesSection({
                       style={{
                         margin: '6px 0 0',
                         fontFamily: fonts.body,
-                        fontSize: 12,
+                        fontSize: 13,
                         color: reportPalette.muted,
                       }}
                     >
@@ -224,17 +242,17 @@ export function PiecesSection({
                         style={{
                           flex: 1,
                           minWidth: 48,
-                          height: 4,
-                          background: 'var(--color-background-secondary)',
-                          borderRadius: 2,
+                          height: 5,
+                          background: 'rgba(67,67,43,0.08)',
+                          borderRadius: 999,
                           overflow: 'hidden',
                         }}
                       >
                         <div
                           style={{
                             height: '100%',
-                            borderRadius: 2,
-                            background: '#b8876b',
+                            borderRadius: 999,
+                            background: statusColor,
                             width: `${Math.max(0, Math.min(piece.score, 100))}%`,
                           }}
                         />
@@ -245,7 +263,7 @@ export function PiecesSection({
                           textAlign: 'right',
                           fontFamily: fonts.body,
                           fontSize: 11,
-                          color: 'var(--color-text-secondary)',
+                          color: reportPalette.muted,
                         }}
                       >
                         {piece.score}

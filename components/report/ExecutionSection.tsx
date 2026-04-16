@@ -1,5 +1,12 @@
 import type { CollectionReportPayload } from '@/lib/collection-report/types';
-import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
+import {
+  fonts,
+  reportPalette,
+  sectionEyebrow,
+  sectionHeading,
+  structuredSurface,
+  subCard,
+} from '@/components/report/reportStyles';
 
 function normalizeNotes(value: string | string[] | null | undefined) {
   if (!value) return [];
@@ -278,16 +285,13 @@ export function ExecutionSection({
   const interventionBullets = getInterventionBullets(pieces);
 
   return (
-    <section style={{ ...sectionCard, padding: '28px 30px' }}>
+    <section style={{ ...structuredSurface, padding: '30px 32px' }}>
       <p style={sectionEyebrow}>Execution</p>
       <p
         style={{
-          margin: '16px 0 0',
-          fontFamily: fonts.heading,
-          fontSize: 30,
-          lineHeight: 1.02,
-          letterSpacing: '-0.04em',
-          color: reportPalette.olive,
+          ...sectionHeading('lg'),
+          marginTop: 16,
+          fontSize: 34,
           maxWidth: 820,
         }}
       >
@@ -300,9 +304,10 @@ export function ExecutionSection({
             style={{
               margin: 0,
               fontFamily: fonts.body,
-              fontSize: 13,
-              lineHeight: 1.7,
-              color: 'var(--color-text-primary)',
+              fontSize: 14,
+              lineHeight: 1.75,
+              color: reportPalette.olive,
+              maxWidth: 920,
             }}
           >
             {buildDiagnosticParts(breakdownBullets, driverBullets).map((part, index) => (
@@ -330,7 +335,16 @@ export function ExecutionSection({
           >
             Where to intervene
           </p>
-          <div style={{ display: 'grid', gap: 8 }}>
+          <div
+            style={{
+              display: 'grid',
+              gap: 10,
+              padding: '18px 20px',
+              borderRadius: 20,
+              border: `1px solid rgba(184,135,107,0.10)`,
+              background: 'rgba(248,244,236,0.82)',
+            }}
+          >
             {formatInterventionItems(interventionBullets).map((item, index) => (
               <div key={`${item.title}-${index}`} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <span
@@ -357,10 +371,10 @@ export function ExecutionSection({
                     fontFamily: fonts.body,
                     fontSize: 14,
                     lineHeight: 1.65,
-                    color: 'var(--color-text-primary)',
+                    color: reportPalette.olive,
                   }}
                 >
-                  <span style={{ fontWeight: 500 }}>{item.title}</span>
+                  <span style={{ fontWeight: 600 }}>{item.title}</span>
                   {item.detail ? ` — ${item.detail}` : ''}
                 </p>
               </div>
@@ -371,10 +385,8 @@ export function ExecutionSection({
 
       <div
         style={{
-          padding: '20px',
-          borderRadius: 20,
-          border: `1px solid rgba(67,67,43,0.08)`,
-          background: 'rgba(255,255,255,0.56)',
+          ...subCard,
+          padding: '24px 24px 8px',
           marginTop: 40,
         }}
       >
@@ -415,18 +427,21 @@ export function ExecutionSection({
                         display: 'flex',
                         alignItems: 'flex-start',
                         gap: 12,
-                        padding: '12px 0',
-                        borderBottom: index === flatNotes.length - 1 ? 'none' : '0.5px solid var(--color-border-tertiary)',
+                        padding: '15px 0',
+                        borderBottom: index === flatNotes.length - 1 ? 'none' : '1px solid rgba(67,67,43,0.06)',
                       }}
                     >
                       <div style={{ width: 110, flexShrink: 0 }}>
                         <span
                           style={{
                             display: 'inline-block',
-                            padding: '2px 8px',
-                            borderRadius: 4,
+                            padding: '4px 10px',
+                            borderRadius: 999,
                             fontFamily: fonts.body,
                             fontSize: 10,
+                            fontWeight: 700,
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase',
                             lineHeight: 1.3,
                             background: tagStyles.background,
                             color: tagStyles.color,
@@ -440,11 +455,12 @@ export function ExecutionSection({
                           <span
                             style={{
                               display: 'block',
-                              marginBottom: 3,
-                              fontFamily: fonts.body,
-                              fontSize: 11,
+                              marginBottom: 6,
+                              fontFamily: fonts.heading,
+                              fontSize: 14,
                               fontWeight: 600,
-                              color: 'var(--color-text-secondary)',
+                              letterSpacing: '-0.02em',
+                              color: reportPalette.olive,
                             }}
                           >
                             {item.pieceNames}
@@ -454,9 +470,9 @@ export function ExecutionSection({
                           style={{
                             margin: 0,
                             fontFamily: fonts.body,
-                            fontSize: 12,
-                            lineHeight: 1.55,
-                            color: 'var(--color-text-primary)',
+                            fontSize: 13,
+                            lineHeight: 1.65,
+                            color: reportPalette.muted,
                           }}
                         >
                           {item.noteText}

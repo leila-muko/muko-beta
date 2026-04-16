@@ -10,7 +10,7 @@ interface MukoInsightPanelProps {
 export default function MukoInsightPanel({ insight }: MukoInsightPanelProps) {
   if (!insight) {
     return (
-      <div className="p-5 rounded-xl bg-[#F5F2EB] border border-[#E8E3D6] min-h-[100px]">
+      <div className="p-5 rounded-xl bg-[#FAF9F6] border border-[#E8E3D6] min-h-[100px]">
         <div className="flex items-center gap-1.5 mb-2">
           <MukoStar color="#43432B" opacity={0.3} />
           <span className="text-[10px] font-semibold uppercase tracking-[1.5px] text-[#43432B]/40">
@@ -37,7 +37,7 @@ export default function MukoInsightPanel({ insight }: MukoInsightPanelProps) {
 
   return (
     <div
-      className="p-5 rounded-xl bg-[#F5F2EB] transition-all duration-400"
+      className="p-5 rounded-xl bg-[#FAF9F6] transition-all duration-400"
       style={{ borderLeft: `3px solid ${borderColor}` }}
     >
       {/* Header */}
@@ -99,7 +99,7 @@ export default function MukoInsightPanel({ insight }: MukoInsightPanelProps) {
 
       {/* Alternative Material Suggestion */}
       {insight.alternative && (
-        <div className="mt-3.5 p-3 rounded-lg bg-[#A8B475]/8 border border-[#A8B475]/20 
+        <div className="mt-3.5 p-3 rounded-[12px] bg-[#A8B475]/8 border border-[#A8B475]/20 
                         flex items-center justify-between">
           <div>
             <div className="flex items-center gap-1.5">

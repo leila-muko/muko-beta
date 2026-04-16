@@ -12,7 +12,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const baseStyle: React.CSSProperties = {
       width: '100%',
       height: 48,
-      borderRadius: 100,
+      borderRadius: 999,
       fontFamily: 'var(--font-inter)',
       fontSize: 13,
       fontWeight: 600,

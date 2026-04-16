@@ -43,7 +43,6 @@ export default function EntryScreen() {
   });
   const [touchedName, setTouchedName] = useState(false);
   const [touchedSeason, setTouchedSeason] = useState(false);
-  const [inputFocused, setInputFocused] = useState(false);
   const [savedCollections, setSavedCollections] = useState<RecentCollectionItem[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [hoveredCollection, setHoveredCollection] = useState<string | null>(null);
@@ -296,7 +295,7 @@ export default function EntryScreen() {
                         cursor: 'pointer',
                         fontFamily: inter,
                         fontWeight: 500,
-                        borderRadius: 8,
+                        borderRadius: 999,
                         transition: 'all 160ms ease',
                         width: '100%',
                         overflow: 'hidden',
@@ -318,7 +317,7 @@ export default function EntryScreen() {
                           transform: 'translateY(-50%)',
                           width: 22,
                           height: 22,
-                          borderRadius: 5,
+                          borderRadius: 999,
                           background: 'rgba(255,255,255,0.9)',
                           border: '0.5px solid rgba(67,67,43,0.14)',
                           cursor: 'pointer',
@@ -396,6 +395,7 @@ export default function EntryScreen() {
             )}
           </div>
         </div>
+
       </aside>
 
       {/* ── Main ─────────────────────────────────────────────────────────── */}
@@ -412,263 +412,368 @@ export default function EntryScreen() {
         }}
       >
         <div
+          className="entry-main-grid"
           style={{
             width: '100%',
-            maxWidth: 720,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 48,
+            maxWidth: 1240,
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1.15fr) minmax(320px, 0.85fr)',
+            alignItems: 'center',
+            gap: 'clamp(40px, 6vw, 84px)',
           }}
         >
-          {/* Hero */}
-          <div style={{ animation: 'fadeIn 450ms ease both' }}>
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 720,
+            }}
+          >
+            <div style={{ animation: 'fadeIn 450ms ease both' }}>
+              <h1
+                className="headline-blur-in"
+                style={{
+                  fontSize: 'clamp(48px, 6vw, 72px)',
+                  fontWeight: 300,
+                  color: '#4D302F',
+                  lineHeight: 0.98,
+                  letterSpacing: '-0.04em',
+                  fontFamily: '"Söhne Breit", var(--font-sohne-breit), Georgia, serif',
+                  margin: 0,
+                  maxWidth: 720,
+                }}
+              >
+                Define your next collection.
+              </h1>
+              <p
+                style={{
+                  margin: '16px 0 0 0',
+                  maxWidth: 540,
+                  color: '#8C7B6B',
+                  fontSize: 16,
+                  lineHeight: 1.6,
+                  fontFamily: inter,
+                }}
+              >
+                Try it on before you commit.
+              </p>
+            </div>
+
+            {/* Form */}
             <div
               style={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: 16,
-                marginBottom: 12,
+                flexDirection: 'column',
+                gap: 36,
+                marginTop: 40,
+              }}
+            >
+              <div className="entry-input-fade">
+                <div style={{ maxWidth: '560px' }}>
+                  <input
+                    type="text"
+                    value={collectionName}
+                    onChange={(e) => setCollectionName(e.target.value)}
+                    onBlur={() => setTouchedName(true)}
+                    placeholder="e.g. Spring Requiem"
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box' as const,
+                      padding: '0 0 14px 0',
+                      fontSize: 'clamp(34px, 4vw, 48px)',
+                      fontWeight: 500,
+                      color: '#4D302F',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid rgba(77,48,47,0.15)',
+                      borderRadius: 0,
+                      outline: 'none',
+                      boxShadow: 'none',
+                      WebkitAppearance: 'none' as const,
+                      appearance: 'none' as const,
+                      fontFamily: sohne,
+                      letterSpacing: '-0.04em',
+                      transition: 'border-color 200ms ease',
+                      caretColor: '#4D302F',
+                    }}
+                  />
+                </div>
+
+                {nameError && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: BRAND.rose,
+                      fontFamily: inter,
+                    }}
+                  >
+                    {nameError}
+                  </div>
+                )}
+              </div>
+
+              <div className="entry-bottom-fade" style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+                {/* Season Selection */}
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: 'rgba(67,67,43,0.38)',
+                      marginBottom: 14,
+                      letterSpacing: '0.12em',
+                      textTransform: 'uppercase',
+                      fontFamily: inter,
+                    }}
+                  >
+                    Select a season
+                  </label>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                    }}
+                  >
+                    {allSeasons.map((season) => {
+                      const active = selectedSeason === season.id;
+                      return (
+                        <SeasonChip
+                          key={season.id}
+                          label={season.label}
+                          active={active}
+                          onClick={() => {
+                            setSelectedSeason(season.id);
+                            setTouchedSeason(true);
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <span
+                    style={{
+                      display: seasonError ? 'block' : 'none',
+                      marginTop: 10,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: BRAND.rose,
+                      fontFamily: inter,
+                    }}
+                  >
+                    {seasonError}
+                  </span>
+                </div>
+
+                {/* CTA */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 16,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <button
+                    onClick={handleContinue}
+                    disabled={!canContinue}
+                    style={{
+                      padding: '12px 28px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: canContinue ? STEEL : 'rgba(67,67,43,0.30)',
+                      background: canContinue ? 'rgba(125,150,172,0.07)' : 'rgba(255,255,255,0.46)',
+                      border: canContinue
+                        ? `1.5px solid ${STEEL}`
+                        : '1.5px solid rgba(67,67,43,0.10)',
+                      borderRadius: 999,
+                      cursor: canContinue ? 'pointer' : 'not-allowed',
+                      fontFamily: sohne,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      transition: 'all 280ms ease',
+                      opacity: canContinue ? 1 : 0.65,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!canContinue) return;
+                      e.currentTarget.style.background = 'rgba(125,150,172,0.14)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!canContinue) return;
+                      e.currentTarget.style.background = 'rgba(125,150,172,0.07)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <span>Continue</span>
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      style={{ opacity: canContinue ? 1 : 0.4 }}
+                    >
+                      <path
+                        d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: 'rgba(67,67,43,0.45)',
+                      fontFamily: inter,
+                    }}
+                  >
+                    Press{' '}
+                    <span
+                      style={{
+                        fontFamily: sohne,
+                        color: 'rgba(67,67,43,0.70)',
+                      }}
+                    >
+                      Enter
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="entry-decorative-column"
+            aria-hidden="true"
+            style={{
+              position: 'relative',
+              minHeight: 620,
+              overflow: 'hidden',
+              borderRadius: 32,
+            }}
+          >
+            <svg
+              viewBox="0 0 420 420"
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                inset: '6% 0 0 3%',
+                width: 420,
+                height: 420,
+                overflow: 'visible',
+                transform: 'rotate(-11deg)',
+                animation: 'blobFloatOne 18s ease-in-out infinite',
+              }}
+            >
+              <path
+                d="M349 113C384 155 396 221 385 278C374 334 340 381 285 396C230 411 154 393 103 351C52 309 27 242 37 181C47 120 93 64 152 44C211 24 314 71 349 113Z"
+                fill="none"
+                stroke="rgba(125,150,172,0.07)"
+                strokeWidth="1.2"
+              />
+            </svg>
+            <svg
+              viewBox="0 0 250 250"
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                bottom: '-7%',
+                left: '10%',
+                width: 250,
+                height: 250,
+                overflow: 'visible',
+                transform: 'rotate(-18deg)',
+                animation: 'blobFloatThree 16s ease-in-out infinite',
+              }}
+            >
+              <path
+                d="M190 55C218 82 228 123 216 161C204 199 170 230 130 236C90 241 46 221 21 188C-4 155 -8 110 9 73C26 36 64 8 106 8C148 8 163 28 190 55Z"
+                fill="none"
+                stroke="rgba(125,150,172,0.06)"
+                strokeWidth="1.2"
+              />
+            </svg>
+            <img
+              src="/Line 1.svg"
+              alt=""
+              style={{
+                position: 'absolute',
+                top: '-12%',
+                right: '-26%',
+                width: '145%',
+                maxWidth: 'none',
+                opacity: 0.12,
+                pointerEvents: 'none',
+              }}
+            />
+            <img
+              src="/Line 2.svg"
+              alt=""
+              style={{
+                position: 'absolute',
+                top: '30%',
+                right: '-22%',
+                width: '210%',
+                maxWidth: 'none',
+                opacity: 0.1,
+                pointerEvents: 'none',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                right: '10%',
+                bottom: '14%',
+                maxWidth: 250,
+                padding: '22px 24px',
+                borderRadius: 24,
+                background: 'rgba(255,255,255,0.22)',
+                backdropFilter: 'blur(10px)',
+                boxShadow: '0 20px 44px rgba(77,48,47,0.06)',
               }}
             >
               <img
                 src="/mlogo.svg"
                 alt="Muko logo"
                 style={{
-                  width: 48,
-                  height: 48,
-                  flexShrink: 0,
+                  width: 44,
+                  height: 44,
+                  marginBottom: 18,
                 }}
               />
-              <h1
+              <div
                 style={{
-                  fontSize: 'clamp(32px, 4vw, 44px)',
-                  fontWeight: 500,
+                  fontFamily: sohne,
+                  fontSize: 22,
+                  lineHeight: 1.12,
+                  letterSpacing: '-0.03em',
                   color: '#4D302F',
-                  lineHeight: 1.1,
-                  letterSpacing: '-0.015em',
-                  fontFamily: '"Söhne Breit", var(--font-sohne-breit), system-ui, sans-serif',
-                  margin: 0,
-                  overflow: 'hidden',
-                  whiteSpace: 'nowrap',
-                  display: 'inline-block',
-                  width: '26ch',
-                  maxWidth: '100%',
-                  borderRight: '1.5px solid rgba(67,67,43,0.55)',
-                  animation: 'typeLoop 5.2s steps(26, end) infinite, caretBlink 850ms step-end infinite',
                 }}
               >
-                Let&apos;s shape your next drop.
-              </h1>
-            </div>
-          </div>
-
-          {/* Form */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 36,
-              animation: 'fadeIn 500ms ease 120ms both',
-            }}
-          >
-            {/* Collection Name */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: 'rgba(67,67,43,0.38)',
-                  marginBottom: 12,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  fontFamily: inter,
-                }}
-              >
-                Collection name
-              </label>
-
-              <input
-                type="text"
-                value={collectionName}
-                onChange={(e) => setCollectionName(e.target.value)}
-                onBlur={() => setTouchedName(true)}
-                onFocus={() => setInputFocused(true)}
-                onBlurCapture={() => setInputFocused(false)}
-                placeholder="e.g. Spring Requiem"
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '18px 22px',
-                  fontSize: 'clamp(20px, 2.5vw, 26px)',
-                  fontWeight: 500,
-                  color: OLIVE,
-                  backgroundColor: 'rgba(255,255,255,0.75)',
-                  border: inputFocused
-                    ? `1.5px solid ${STEEL}`
-                    : '1.5px solid rgba(67,67,43,0.10)',
-                  borderRadius: 999,
-                  outline: 'none',
-                  fontFamily: sohne,
-                  letterSpacing: '-0.01em',
-                  transition: 'all 200ms ease',
-                  boxShadow: inputFocused
-                    ? '0 4px 20px rgba(125,150,172,0.10)'
-                    : '0 2px 8px rgba(0,0,0,0.04)',
-                }}
-              />
-
-              {nameError && (
-                <div
-                  style={{
-                    marginTop: 10,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: BRAND.rose,
-                    fontFamily: inter,
-                  }}
-                >
-                  {nameError}
-                </div>
-              )}
-            </div>
-
-            {/* Season Selection */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: 'rgba(67,67,43,0.38)',
-                  marginBottom: 14,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  fontFamily: inter,
-                }}
-              >
-                Select a season
-              </label>
-
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 10,
-                }}
-              >
-                {allSeasons.map((season) => {
-                  const active = selectedSeason === season.id;
-                  return (
-                    <SeasonChip
-                      key={season.id}
-                      label={season.label}
-                      active={active}
-                      onClick={() => {
-                        setSelectedSeason(season.id);
-                        setTouchedSeason(true);
-                      }}
-                    />
-                  );
-                })}
+                Direction starts here.
               </div>
-
-              {seasonError && (
-                <div
-                  style={{
-                    marginTop: 10,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: BRAND.rose,
-                    fontFamily: inter,
-                  }}
-                >
-                  {seasonError}
-                </div>
-              )}
-            </div>
-
-            {/* CTA */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 16,
-                animation: 'fadeIn 500ms ease 220ms both',
-              }}
-            >
-              <button
-                onClick={handleContinue}
-                disabled={!canContinue}
+              <p
                 style={{
-                  padding: '14px 40px',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: canContinue ? STEEL : 'rgba(67,67,43,0.30)',
-                  background: canContinue ? 'rgba(125,150,172,0.07)' : 'rgba(255,255,255,0.46)',
-                  border: canContinue
-                    ? `1.5px solid ${STEEL}`
-                    : '1.5px solid rgba(67,67,43,0.10)',
-                  borderRadius: 10,
-                  cursor: canContinue ? 'pointer' : 'not-allowed',
-                  fontFamily: sohne,
-                  letterSpacing: '0.02em',
-                  transition: 'all 280ms ease',
-                  opacity: canContinue ? 1 : 0.65,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                }}
-                onMouseEnter={(e) => {
-                  if (!canContinue) return;
-                  e.currentTarget.style.background = 'rgba(125,150,172,0.14)';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  if (!canContinue) return;
-                  e.currentTarget.style.background = 'rgba(125,150,172,0.07)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
-              >
-                <span>Continue</span>
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  style={{ opacity: canContinue ? 1 : 0.4 }}
-                >
-                  <path
-                    d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-
-              <div
-                style={{
-                  fontSize: 12,
-                  color: 'rgba(67,67,43,0.45)',
+                  margin: '10px 0 0 0',
                   fontFamily: inter,
+                  fontSize: 13,
+                  lineHeight: 1.65,
+                  color: '#8C7B6B',
                 }}
               >
-                Press{' '}
-                <span
-                  style={{
-                    fontFamily: sohne,
-                    color: 'rgba(67,67,43,0.70)',
-                  }}
-                >
-                  Enter
-                </span>
-              </div>
+                Frame the collection clearly, then move into concept and specification with a steadier point of view.
+              </p>
             </div>
           </div>
         </div>
-      </main>
 
       <style>{`
         @keyframes fadeIn {
@@ -676,19 +781,34 @@ export default function EntryScreen() {
           to   { opacity: 1; transform: translateY(0); }
         }
 
-        @keyframes typeLoop {
-          0%,
-          12% { width: 0; }
-          52%,
-          82% { width: 26ch; }
-          100% { width: 0; }
+        @keyframes blobFloatOne {
+          0%, 100% { transform: rotate(-11deg) translate3d(0, 0, 0); }
+          50% { transform: rotate(-8deg) translate3d(10px, -8px, 0); }
         }
 
-        @keyframes caretBlink {
-          0%, 100% { border-right-color: rgba(67,67,43,0.55); }
-          50% { border-right-color: transparent; }
+        @keyframes blobFloatThree {
+          0%, 100% { transform: rotate(-18deg) translate3d(0, 0, 0); }
+          50% { transform: rotate(-14deg) translate3d(8px, -10px, 0); }
+        }
+
+        @media (max-width: 1024px) {
+          .entry-main-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+            gap: 36px !important;
+          }
+
+          .entry-decorative-column {
+            min-height: 360px !important;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .entry-decorative-column {
+            display: none !important;
+          }
         }
       `}</style>
+      </main>
     </div>
   );
 }

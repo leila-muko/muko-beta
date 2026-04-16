@@ -104,7 +104,7 @@ export default function Step6Confirmation({ formData }: StepProps) {
 
       <div
         style={{
-          borderRadius: 10,
+          borderRadius: 12,
           border: '1px solid rgba(67,67,43,0.09)',
           background: 'rgba(255,255,255,0.75)',
           boxShadow: '0 2px 8px rgba(0,0,0,0.04)',

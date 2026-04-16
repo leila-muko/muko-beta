@@ -21,6 +21,7 @@ import { CollectionContextBar, COLLECTION_CONTEXT_BAR_OFFSET } from "@/component
 import { buildPiecesReadFallback } from "@/lib/pieces/buildPiecesReadFallback";
 import { buildPiecesReadInput } from "@/lib/pieces/buildPiecesReadInput";
 import { normalizeSpecSubcategoryId } from "@/lib/spec-studio/smart-defaults";
+import { hydrateSpecSessionFromAnalysis, type PersistedSpecAnalysisRow } from "@/lib/collections/hydrateSpecSessionFromAnalysis";
 import {
   hydrateCollectionContextFromAnalysis,
   mergeCollectionContextRows,
@@ -45,7 +46,7 @@ type PiecesReadResponseMeta = {
 
 // ── Design tokens ──────────────────────────────────────────────
 const BG = "#FAF9F6";
-const BG2 = "#F2EFE9";
+const BG2 = "#FAF9F6";
 const TEXT = "#191919";
 const MUTED = "#888078";
 const BORDER = "#E2DDD6";
@@ -111,19 +112,29 @@ const READ_HEADLINE_STYLE = {
 // ── Types ──────────────────────────────────────────────────────
 interface CollectionPiece {
   id: string;
+  collection_name?: string | null;
+  brand_profile_id?: string | null;
   piece_name: string | null;
   score: number | null;
   dimensions: Record<string, number> | null;
   collection_role: string | null;
   category: string | null;
   material_id?: string | null;
+  previous_material_id?: string | null;
   silhouette: string | null;
   aesthetic_matched_id: string | null;
+  aesthetic_input?: string | null;
+  season?: string | null;
   aesthetic_inflection: string | null;
   construction_tier: string | null;
+  construction_tier_override?: boolean | null;
+  target_msrp?: number | null;
+  execution_notes?: string | null;
   agent_versions?: {
     saved_piece_name?: string | null;
     saved_piece_expression?: string | null;
+    selected_piece_image?: string | null;
+    [key: string]: unknown;
   } | null;
 }
 
@@ -2280,7 +2291,7 @@ function ConfirmDrawer({
                         <div
                           style={{
                             fontSize: 14,
-                            fontWeight: 500,
+                            fontWeight: 600,
                             color: "rgba(67,67,43,0.9)",
                             marginBottom: 2,
                           }}
@@ -2395,7 +2406,7 @@ function ConfirmDrawer({
                 <input
                   type="number"
                   min="1"
-                  placeholder="e.g. 285"
+                  placeholder="Ex. 285"
                   value={pieceTargetMsrp ?? ""}
                   onChange={(event) => {
                     const nextValue = Number(event.target.value);
@@ -2421,7 +2432,7 @@ function ConfirmDrawer({
 
               <div
                 style={{
-                  marginTop: 8,
+                  marginTop: 4,
                   fontFamily: inter,
                   fontSize: 11,
                   color: MUTED,
@@ -2742,6 +2753,25 @@ function PiecesPageClient() {
     setConfirmedPieces((prev) => prev.filter((piece) => piece.id !== id));
     setToastMessage("Piece removed from collection");
   }, []);
+
+  const handleOpenConfirmedPiece = useCallback((piece: CollectionPiece) => {
+    const resolvedCollectionName =
+      piece.collection_name?.trim() ||
+      collectionName.trim() ||
+      activeCollection?.trim() ||
+      "";
+
+    if (!resolvedCollectionName) {
+      router.push(`/spec?analysis=${encodeURIComponent(piece.id)}`);
+      return;
+    }
+
+    hydrateSpecSessionFromAnalysis(
+      resolvedCollectionName,
+      piece as PersistedSpecAnalysisRow
+    );
+    router.push(`/spec?analysis=${encodeURIComponent(piece.id)}`);
+  }, [activeCollection, collectionName, router]);
 
   // Key pieces from aesthetics data
   const keyPieces = useMemo((): KeyPiece[] => {
@@ -3350,8 +3380,6 @@ function PiecesPageClient() {
   const piecesReadContent = synthesizedPiecesRead ?? piecesReadFallback;
   const rightRailPiecesRead =
     synthesizedPiecesRead ?? (piecesReadStatus === "error" ? piecesReadFallback : null);
-  const collectionReadPillLabel =
-    piecesReadMeta?.source === "fallback" ? "Collection read fallback" : "Collection read ready";
   const collectionReadPillTitle =
     piecesReadMeta?.source === "fallback"
       ? ["Pieces read is using fallback copy", piecesReadMeta.reason, ...(piecesReadMeta.detail ?? [])]
@@ -4113,7 +4141,7 @@ function PiecesPageClient() {
                 <ConfirmedPieceCard
                   key={piece.id}
                   piece={piece}
-                  onClick={() => router.push("/spec")}
+                  onClick={() => handleOpenConfirmedPiece(piece)}
                   onRename={(nextName) => handleRenameConfirmedPiece(piece.id, nextName)}
                   onDelete={() => handleDeleteConfirmedPiece(piece.id)}
                 />
@@ -4377,106 +4405,40 @@ function PiecesPageClient() {
           z-index: 50;
           display: inline-flex;
           align-items: center;
-          gap: 9px;
-          padding: 11px 20px;
-          border-radius: 9999px;
+          gap: 8px;
+          padding: 8px 14px;
+          border-radius: 100px;
           font-family: "Söhne Breit", sans-serif;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 500;
           letter-spacing: 0.01em;
           cursor: pointer;
           white-space: nowrap;
-          border: 0.5px solid rgba(168, 180, 117, 0.35);
-          background: #43432B;
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          color: #e8e4db;
-          box-shadow: 0 12px 32px rgba(49, 31, 30, 0.18), inset 0 1px 0 rgba(245, 243, 238, 0.14);
+          border: none;
+          background: #c8cc9e;
+          color: #3a3d20;
+          box-shadow: 0 10px 30px rgba(67,67,43,0.12);
           transition: background 160ms ease, border-color 160ms ease;
         }
 
         .pieces-read-ready-pill:hover {
-          background: rgba(67, 67, 43, 0.92);
-          border-color: rgba(168, 180, 117, 0.55);
+          background: #c8cc9e;
         }
 
-        .pieces-read-ready-dot-wrap {
-          position: relative;
-          width: 8px;
-          height: 8px;
-          flex-shrink: 0;
-        }
-
-        .pieces-read-ready-dot-core {
-          position: absolute;
-          inset: 0;
-          border-radius: 50%;
-          background: #a8b475;
-        }
-
-        .pieces-read-ready-dot-ping {
-          position: absolute;
-          inset: 0;
-          border-radius: 50%;
-          background: #a8b475;
-          animation: piecesReadReadyPing 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-        }
-
-        .pieces-read-ready-arrow {
-          color: #a8b475;
-          display: inline-block;
-          animation: piecesReadReadyArrowBounce 1.8s ease-in-out infinite;
-        }
-
-        @keyframes piecesReadReadyPing {
-          0% { transform: scale(1); opacity: 1; }
-          75%, 100% { transform: scale(2.4); opacity: 0; }
-        }
-
-        @keyframes piecesReadReadyArrowBounce {
-          0%, 100% { transform: translateX(0); }
-          50% { transform: translateX(4px); }
+        .pieces-read-ready-count {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1px 7px;
+          border-radius: 100px;
+          background: rgba(0,0,0,0.08);
+          font-size: 11px;
+          line-height: 1.2;
         }
       `}</style>
 
       {/* Floating readiness chip */}
-      {totalConfirmed < 5 ? (
-        <div style={{
-          position: "fixed",
-          bottom: "24px",
-          right: "24px",
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          padding: "10px 16px",
-          borderRadius: "40px",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          background: "linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(245, 243, 238, 0.58) 100%)",
-          border: "0.5px solid var(--color-border-secondary)",
-          boxShadow: "0 10px 30px rgba(67,67,43,0.08), inset 0 1px 0 rgba(255,255,255,0.45)",
-          fontFamily: "\"Söhne Breit\", sans-serif",
-          fontSize: "12px",
-          fontWeight: 500,
-          color: "#4D302F",
-          zIndex: 50,
-        }}>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <circle cx="9" cy="9" r="7.5" stroke="var(--color-border-tertiary)" strokeWidth="1.5"/>
-            <path
-              d={`M 9 1.5 A 7.5 7.5 0 ${totalConfirmed / 5 > 0.5 ? 1 : 0} 1 ${
-                9 + 7.5 * Math.sin((2 * Math.PI * totalConfirmed) / 5)
-              } ${
-                9 - 7.5 * Math.cos((2 * Math.PI * totalConfirmed) / 5)
-              }`}
-              stroke="#A8B475"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
-          {totalConfirmed} of 5 pieces for full read
-        </div>
-      ) : (
+      {totalConfirmed >= 5 ? (
         <button
           onClick={() => {
             trackEvent(null, "step_completed", {
@@ -4489,14 +4451,10 @@ function PiecesPageClient() {
           className="pieces-read-ready-pill"
           title={collectionReadPillTitle}
         >
-          <span className="pieces-read-ready-dot-wrap">
-            <span className="pieces-read-ready-dot-ping" />
-            <span className="pieces-read-ready-dot-core" />
-          </span>
-          {collectionReadPillLabel}
-          <span className="pieces-read-ready-arrow">→</span>
+          <span className="pieces-read-ready-count">{totalConfirmed}</span>
+          <span>{`${totalConfirmed} pieces · Generate report →`}</span>
         </button>
-      )}
+      ) : null}
 
       {/* ── Confirm Drawer ─────────────────────────────────── */}
       {drawerPiece && (
@@ -4789,7 +4747,7 @@ function PiecesPageClient() {
                 <input
                   type="number"
                   min="1"
-                  placeholder="e.g. 285"
+                  placeholder="Ex. 285"
                   value={suggestedMsrp ?? ""}
                   onChange={(event) => {
                     const nextValue = Number(event.target.value);
@@ -4817,7 +4775,7 @@ function PiecesPageClient() {
 
               <div
                 style={{
-                  marginTop: 8,
+                  marginTop: 4,
                   fontFamily: inter,
                   fontSize: 11,
                   color: MUTED,

@@ -11,7 +11,7 @@ export default function PaletteReference({ aestheticName, palette }: PaletteRefe
   if (palette.length === 0) return null;
 
   return (
-    <div className="p-4 rounded-[10px] bg-[#FAF8F4] border border-[#E8E3D6]">
+    <div className="p-4 rounded-[12px] bg-[#FAF9F6] border border-[#E8E3D6]">
       <label className="text-[10px] font-semibold uppercase tracking-[1.5px] text-[#43432B]/35 block mb-2.5">
         Aesthetic Palette · {aestheticName}
       </label>

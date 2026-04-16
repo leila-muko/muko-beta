@@ -362,7 +362,7 @@ function ConflictModal({ conflict, onClose, onConfirm }: ConflictModalProps) {
         onClick={(e) => e.stopPropagation()}
         style={{
           backgroundColor: 'rgba(255,255,255,0.98)',
-          borderRadius: 10,
+          borderRadius: 12,
           padding: '32px 36px',
           maxWidth: 480,
           width: '100%',

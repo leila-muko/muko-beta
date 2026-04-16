@@ -22,9 +22,32 @@ import { parseSelectedPieceImage, resolvePieceImageType } from '@/lib/piece-imag
 import { buildAssortmentIntelligence } from '@/lib/collection-report/buildAssortmentIntelligence';
 import { hydrateSpecSessionFromAnalysis, type PersistedSpecAnalysisRow } from '@/lib/collections/hydrateSpecSessionFromAnalysis';
 import { formatMonthYear, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
+import { BRAND } from '@/lib/concept-studio/constants';
+import { IconIdentity, IconResonance } from '../concept-studio/Icons';
 
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
+
+function CollectionExecutionIcon({ size = 13, color = BRAND.oliveInk }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 type PieceRole = 'hero' | 'core' | 'support';
 type AssignedRole = 'hero' | 'volume-driver' | 'core-evolution' | 'directional' | 'core' | 'support';
@@ -98,6 +121,18 @@ const headerActionButtonBase: React.CSSProperties = {
   transition: 'background 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease',
   boxShadow: '0 12px 30px rgba(67,67,43,0.08)',
   whiteSpace: 'nowrap',
+};
+
+const headerTextLinkBase: React.CSSProperties = {
+  fontFamily: inter,
+  fontSize: 12,
+  fontWeight: 500,
+  color: 'rgba(67,67,43,0.45)',
+  background: 'transparent',
+  border: 'none',
+  padding: 0,
+  lineHeight: 1.2,
+  flexShrink: 0,
 };
 
 function normalizeToken(value: string | null | undefined) {
@@ -369,9 +404,9 @@ function LoadingCards() {
           key={index}
           className="animate-pulse"
           style={{
-            background: '#F9F7F4',
+            background: '#FAF9F6',
             border: '1px solid #E8E3D6',
-            borderRadius: 10,
+            borderRadius: 12,
             height: 260,
           }}
         />
@@ -416,6 +451,7 @@ function PieceCard({
   onRename: (nextName: string) => Promise<void>;
 }) {
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -445,10 +481,12 @@ function PieceCard({
   const role = getAssignedRole(analysis) ?? getPieceRole(analysis);
   const roleLabel = getRoleLabel(role);
   const scoreColor = score >= 80 ? '#A8B475' : '#B8876B';
+  const scoreDotBg = score >= 80 ? '#EDF5EE' : '#FBF3EA';
   const executionNoteCount = execution_notes
     ?.split('\n')
     .map((note) => note.trim())
     .filter(Boolean).length ?? 0;
+  const isExpanded = hovered || focused;
 
   const beginRename = () => {
     setDraftName(pieceName);
@@ -499,6 +537,8 @@ function PieceCard({
         setMenuOpen(false);
         setIsConfirmingDelete(false);
       }}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
     >
       <div
         onClick={() => {
@@ -515,18 +555,20 @@ function PieceCard({
         role="button"
         tabIndex={0}
         style={{
-          display: 'block',
+          display: 'flex',
+          flexDirection: 'column',
           width: '100%',
-          background: 'transparent',
-          border: '1px solid #E8E3D6',
-          borderRadius: 10,
+          background: '#FFFFFF',
+          border: hovered ? '1px solid #C4BDB5' : '1px solid #E8E3D6',
+          borderRadius: 14,
           overflow: 'hidden',
           cursor: 'pointer',
-          boxShadow: hovered ? '0 4px 16px rgba(25,25,25,0.07)' : 'none',
+          boxShadow: hovered ? '0 6px 20px rgba(0,0,0,0.07)' : 'none',
+          transform: hovered ? 'translateY(-1px)' : 'none',
           padding: 0,
           textAlign: 'left',
           fontFamily: inter,
-          transition: 'box-shadow 180ms ease',
+          transition: 'border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease',
         }}
       >
         {/* Visual zone */}
@@ -534,13 +576,13 @@ function PieceCard({
           style={{
             width: '100%',
             height: 120,
-            background: '#F9F7F4',
-            borderTopLeftRadius: 9,
-            borderTopRightRadius: 9,
+            background: '#FAF9F6',
+            borderBottom: '1px solid #E8E3D6',
             position: 'relative',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            overflow: 'hidden',
           }}
         >
           {flat ? (
@@ -554,16 +596,20 @@ function PieceCard({
           <span
             style={{
               position: 'absolute',
-              top: 8,
-              left: 8,
-              background: '#FFFFFF',
-              border: '0.5px solid #E8E3D6',
-              borderRadius: 20,
-              padding: '3px 10px',
-              fontSize: 12,
-              fontWeight: 500,
+              top: 12,
+              left: 12,
+              width: 26,
+              height: 26,
+              borderRadius: '50%',
+              background: scoreDotBg,
               color: scoreColor,
+              fontSize: 10,
+              fontWeight: 700,
               lineHeight: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: inter,
             }}
           >
             {score}
@@ -573,10 +619,8 @@ function PieceCard({
         {/* Body zone */}
         <div
           style={{
-            padding: '10px 12px 14px',
+            padding: '14px 18px 16px',
             background: '#FFFFFF',
-            borderBottomLeftRadius: 9,
-            borderBottomRightRadius: 9,
           }}
         >
           <div
@@ -667,11 +711,13 @@ function PieceCard({
             ) : (
               <div
                 style={{
-                  fontSize: 13,
+                  fontFamily: sohne,
+                  fontSize: 15,
                   fontWeight: 500,
                   color: pieceName ? '#191919' : '#A8A09A',
                   fontStyle: pieceName ? 'normal' : 'italic',
-                  lineHeight: 1.4,
+                  lineHeight: 1.24,
+                  letterSpacing: '-0.02em',
                 }}
               >
                 {pieceName || 'Unnamed Piece'}
@@ -696,47 +742,60 @@ function PieceCard({
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {[materialLabel, complexityLabel].map((tag) => (
-              <span
-                key={tag}
-                style={{
-                  fontSize: 10,
-                  fontWeight: 400,
-                  border: '0.5px solid #E8E3D6',
-                  color: '#C8BFB8',
-                  borderRadius: 20,
-                  padding: '2px 7px',
-                  lineHeight: 1.5,
-                }}
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateRows: isExpanded ? '1fr' : '0fr',
+              opacity: isExpanded ? 1 : 0,
+              marginTop: isExpanded ? 10 : 0,
+              transition: 'grid-template-rows 160ms ease, opacity 140ms ease, margin-top 160ms ease',
+            }}
+          >
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {[materialLabel, complexityLabel].map((tag) => (
+                  <span
+                    key={tag}
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 10,
+                      fontWeight: 400,
+                      border: '0.5px solid #E8E3D6',
+                      color: '#8B837B',
+                      borderRadius: 20,
+                      padding: '2px 7px',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
 
-          {executionNoteCount > 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 7 }}>
-              <span
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: '50%',
-                  background: '#A8B475',
-                  flexShrink: 0,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: 10,
-                  color: 'rgba(67,67,43,0.36)',
-                  fontFamily: inter,
-                }}
-              >
-                {executionNoteCount} execution notes
-              </span>
+              {executionNoteCount > 0 ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 10 }}>
+                  <span
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: '50%',
+                      background: '#A8B475',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: 10,
+                      color: 'rgba(67,67,43,0.36)',
+                      fontFamily: inter,
+                    }}
+                  >
+                    {executionNoteCount} execution notes
+                  </span>
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          </div>
         </div>
       </div>
 
@@ -750,7 +809,7 @@ function PieceCard({
             right: 8,
             width: 24,
             height: 24,
-            borderRadius: 6,
+            borderRadius: 999,
             background: 'rgba(255,255,255,0.92)',
             border: '0.5px solid rgba(67,67,43,0.14)',
             cursor: 'pointer',
@@ -779,7 +838,7 @@ function PieceCard({
             right: 8,
             background: '#FFFFFF',
             border: '1px solid rgba(67,67,43,0.1)',
-            borderRadius: 8,
+            borderRadius: 12,
             boxShadow: '0 6px 20px rgba(25,25,25,0.1)',
             zIndex: 20,
             overflow: 'hidden',
@@ -817,7 +876,7 @@ function PieceCard({
                   style={{
                     flex: 1,
                     padding: '8px 10px',
-                    borderRadius: 8,
+                    borderRadius: 999,
                     border: '1px solid rgba(67,67,43,0.12)',
                     background: '#FFFFFF',
                     color: '#5F5953',
@@ -840,7 +899,7 @@ function PieceCard({
                   style={{
                     flex: 1,
                     padding: '8px 10px',
-                    borderRadius: 8,
+                    borderRadius: 999,
                     border: 'none',
                     background: '#C47B6B',
                     color: '#FFFFFF',
@@ -1302,7 +1361,7 @@ export default function CollectionPage({
           display: 'flex',
           flexDirection: 'column',
           boxSizing: 'border-box',
-          background: '#F9F7F4',
+          background: '#FAF9F6',
         }}
       >
         {/* ── Collection header ──────────────────────────────────────────── */}
@@ -1310,14 +1369,18 @@ export default function CollectionPage({
           style={{
             padding: 0,
             flexShrink: 0,
-            background: '#F9F7F4',
+            background: '#FAF9F6',
+            width: '100%',
+            overflow: 'hidden',
           }}
         >
           <div
             style={{
               width: '100%',
               minWidth: 0,
-              padding: '20px 32px 18px',
+              padding: '24px 28px 16px',
+              overflow: 'hidden',
+              boxSizing: 'border-box',
               background:
                 'linear-gradient(180deg, rgba(252,251,247,0.82) 0%, rgba(250,249,246,0.72) 58%, rgba(246,243,236,0.62) 100%)',
               backdropFilter: 'blur(18px) saturate(140%)',
@@ -1326,300 +1389,263 @@ export default function CollectionPage({
               borderBottom: '1px solid rgba(255,255,255,0.36)',
               boxShadow: '0 18px 48px rgba(67,67,43,0.06), inset 0 1px 0 rgba(255,255,255,0.34)',
               display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
             }}
           >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 24,
-                }}
-              >
-                <div style={{ minWidth: 0, flex: '1 1 620px' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'baseline',
-                      gap: 10,
-                      flexWrap: 'wrap',
-                      marginBottom: 8,
-                    }}
-                  >
-                    <h1
-                      style={{
-                        margin: 0,
-                        fontFamily: sohne,
-                        fontSize: 24,
-                        fontWeight: 600,
-                        letterSpacing: '-0.02em',
-                        color: '#191919',
-                        lineHeight: 1.04,
-                        textTransform: 'lowercase',
-                      }}
-                    >
-                      {collectionName}
-                    </h1>
-                    {seasonLabel ? (
-                      <span
-                        style={{
-                          fontFamily: inter,
-                          fontSize: 10,
-                          fontWeight: 600,
-                          letterSpacing: '0.14em',
-                          textTransform: 'uppercase',
-                          color: '#888078',
-                        }}
-                      >
-                        {seasonLabel}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  {editorialDirection ? (
-                    <div
-                      style={{
-                        fontFamily: inter,
-                        fontSize: 9.5,
-                        fontWeight: 700,
-                        letterSpacing: '0.15em',
-                        textTransform: 'uppercase',
-                        color: '#5F5953',
-                        marginBottom: editorialChips.length > 0 ? 6 : 0,
-                      }}
-                    >
-                      {editorialDirection}
-                    </div>
-                  ) : null}
-
-                  {editorialChips.length > 0 && (
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
-                      <span
-                        style={{
-                          fontFamily: inter,
-                          fontSize: 11,
-                          color: '#888078',
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        {editorialChips.join(' · ')}
-                      </span>
-                    </div>
-                  )}
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: 8,
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      marginTop: editorialDirection || editorialChips.length > 0 ? 8 : 2,
-                    }}
-                  >
-                    <button
-                      onClick={() => router.push('/intent')}
-                      style={{
-                        fontFamily: inter,
-                        fontSize: 10.5,
-                        color: '#888078',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 0,
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = '#191919'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = '#888078'; }}
-                    >
-                      Edit Setup →
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-
-            {reportExists ? (
-              <div
-                style={{
-                  marginTop: 14,
-                  paddingTop: 12,
-                  borderTop: '1px solid rgba(67,67,43,0.08)',
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(0, 1fr)',
-                  gap: 4,
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={() => setIsReadHovering(true)}
-                onMouseLeave={() => setIsReadHovering(false)}
-                onClick={handleReadToggle}
-              >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 24,
+                flex: '1 1 auto',
+                minWidth: 0,
+              }}
+            >
+              <div style={{ minWidth: 0, flex: '1 1 auto' }}>
                 <div
                   style={{
-                    fontFamily: inter,
-                    fontSize: 9,
-                    fontWeight: 600,
-                    letterSpacing: '0.16em',
-                    textTransform: 'uppercase',
-                    color: '#888078',
-                    marginBottom: 6,
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    gap: 6,
+                    flexWrap: 'wrap',
                   }}
                 >
-                  Collection Read
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'flex-end', marginBottom: 14 }}>
-                  <div
+                  <h1
                     style={{
-                      fontFamily: inter,
-                      fontSize: isReadExpanded ? 32 : 38,
-                      fontWeight: 500,
-                      color: '#191919',
-                      letterSpacing: '-0.04em',
-                      lineHeight: 1,
-                    }}
-                  >
-                    {collectionScore}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: inter,
-                      fontSize: 10,
+                      margin: 0,
+                      fontFamily: sohne,
+                      fontSize: 15,
                       fontWeight: 700,
-                      letterSpacing: '0.12em',
-                      textTransform: 'uppercase',
-                      color: 'rgba(67,67,43,0.38)',
-                      marginLeft: 12,
-                      alignSelf: 'flex-end',
-                      background: 'rgba(67,67,43,0.04)',
-                      border: '1px solid rgba(67,67,43,0.08)',
-                      borderRadius: 999,
-                      padding: '6px 10px',
-                      lineHeight: 1,
+                      letterSpacing: '-0.02em',
+                      color: '#191919',
+                      lineHeight: 1.04,
+                      textTransform: 'lowercase',
                     }}
                   >
-                    {displayedCollectionRead.collection_state}
-                  </div>
-                </div>
-
-                {isReadExpanded ? (
-                  <>
-                    <div
-                      style={{
-                        fontFamily: sohne,
-                        fontSize: 17,
-                        fontWeight: 400,
-                        color: '#191919',
-                        lineHeight: 1.38,
-                        letterSpacing: '-0.025em',
-                        marginBottom: 14,
-                      }}
-                    >
-                      {displayedCollectionRead.supporting_line}
-                    </div>
-
-                    <div
-                      style={{
-                        fontFamily: inter,
-                        fontSize: 12.5,
-                        color: 'rgba(67,67,43,0.6)',
-                        lineHeight: 1.65,
-                        marginBottom: displayedCollectionRead.next_action ? 18 : 16,
-                      }}
-                    >
-                      {displayedCollectionRead.muko_insight}
-                    </div>
-
-                    {displayedCollectionRead.next_action ? (
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          gap: 14,
-                          alignItems: 'flex-start',
-                          padding: '11px 14px',
-                          background: 'rgba(67,67,43,0.04)',
-                          borderRadius: 6,
-                          marginBottom: 18,
-                          maxWidth: 'min(100%, 820px)',
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontFamily: inter,
-                            fontSize: 9,
-                            fontWeight: 700,
-                            letterSpacing: '0.13em',
-                            textTransform: 'uppercase',
-                            color: 'rgba(67,67,43,0.32)',
-                            paddingTop: 2,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Next
-                        </div>
-                        <div
-                          style={{
-                            fontFamily: inter,
-                            fontSize: 12,
-                            color: 'rgba(67,67,43,0.72)',
-                            lineHeight: 1.58,
-                          }}
-                        >
-                          {displayedCollectionRead.next_action}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <div
+                    {collectionName}
+                  </h1>
+                  {seasonLabel ? (
+                    <span
                       style={{
                         fontFamily: inter,
                         fontSize: 11,
-                        lineHeight: 1.4,
-                        color: 'rgba(67,67,43,0.38)',
-                        display: 'flex',
-                        gap: 20,
-                        flexWrap: 'wrap',
+                        fontWeight: 400,
+                        color: '#888078',
                       }}
                     >
-                      <div>
-                        Identity
-                        <span style={{ fontWeight: 700, color: getMetricScoreColor(avgIdentity), marginLeft: 4 }}>
-                          {avgIdentity || '—'}
-                        </span>
-                      </div>
-                      <div>
-                        Resonance
-                        <span style={{ fontWeight: 700, color: getMetricScoreColor(avgResonance), marginLeft: 4 }}>
-                          {avgResonance || '—'}
-                        </span>
-                      </div>
-                      <div>
-                        Execution
-                        <span style={{ fontWeight: 700, color: getMetricScoreColor(avgExecution), marginLeft: 4 }}>
-                          {avgExecution || '—'}
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                ) : null}
+                      · {seasonLabel}
+                    </span>
+                  ) : null}
+                  {reportExists ? (
+                    <>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          width: 1,
+                          height: 14,
+                          background: 'rgba(67,67,43,0.12)',
+                          margin: '0 10px',
+                          verticalAlign: 'middle',
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontFamily: inter,
+                          fontSize: 20,
+                          fontWeight: 700,
+                          color: '#191919',
+                          letterSpacing: '-0.03em',
+                        }}
+                      >
+                        {collectionScore}
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: inter,
+                          fontSize: 9,
+                          fontWeight: 700,
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          color: 'rgba(67,67,43,0.38)',
+                          marginLeft: 6,
+                        }}
+                      >
+                        {displayedCollectionRead.collection_state}
+                      </span>
+                    </>
+                  ) : null}
+                </div>
               </div>
-            ) : null}
-          </div>
-        </div>
+            </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: reportExists ? '2px 32px 24px' : '20px 32px 24px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                flexShrink: 0,
+              }}
+            >
+              {reportExists ? (
+                <button
+                  onClick={handleRerunCollectionAnalysis}
+                  disabled={!collectionReportInput || isRefreshingCollectionRead}
+                  style={{
+                    ...headerTextLinkBase,
+                    cursor: !collectionReportInput || isRefreshingCollectionRead ? 'not-allowed' : 'pointer',
+                    opacity: !collectionReportInput || isRefreshingCollectionRead ? 0.6 : 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!collectionReportInput || isRefreshingCollectionRead) return;
+                    e.currentTarget.style.color = '#191919';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!collectionReportInput || isRefreshingCollectionRead) return;
+                    e.currentTarget.style.color = '#888078';
+                  }}
+                >
+                  {isRefreshingCollectionRead ? 'Refreshing...' : '↻ Re-run'}
+                </button>
+              ) : null}
+
+              <button
+                onClick={() => router.push('/intent')}
+                style={{
+                  ...headerTextLinkBase,
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#191919'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = '#888078'; }}
+              >
+                Edit Setup →
+              </button>
+            </div>
+          </div>
+
           {reportExists ? (
             <div
               style={{
-                borderTop: '1px solid rgba(67,67,43,0.08)',
-                margin: '24px 0 18px',
+                marginTop: 12,
+                padding: '12px 28px 0',
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1fr)',
+                gap: 4,
               }}
-            />
-          ) : null}
+            >
+              <div
+                style={{
+                  fontFamily: inter,
+                  fontSize: 12.5,
+                  color: 'rgba(67,67,43,0.6)',
+                  lineHeight: 1.65,
+                  marginBottom: displayedCollectionRead.next_action ? 18 : 16,
+                }}
+              >
+                {displayedCollectionRead.muko_insight}
+              </div>
 
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 22,
+                  alignItems: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <IconIdentity size={13} />
+                  <span
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      letterSpacing: '-0.02em',
+                      color: avgIdentity >= 50 ? '#43432B' : '#C47B6B',
+                      fontFamily: inter,
+                    }}
+                  >
+                    {avgIdentity || '—'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <IconResonance size={13} />
+                  <span
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      letterSpacing: '-0.02em',
+                      color: avgResonance >= 50 ? '#43432B' : '#C47B6B',
+                      fontFamily: inter,
+                    }}
+                  >
+                    {avgResonance || '—'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <CollectionExecutionIcon size={13} color={avgExecution >= 50 ? '#43432B' : '#C47B6B'} />
+                  <span
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      letterSpacing: '-0.02em',
+                      color: avgExecution >= 50 ? '#43432B' : '#C47B6B',
+                      fontFamily: inter,
+                    }}
+                  >
+                    {avgExecution || '—'}
+                  </span>
+                </div>
+              </div>
+
+              {displayedCollectionRead.next_action ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 10,
+                    alignItems: 'center',
+                    padding: '14px 0',
+                    borderTop: '1px solid rgba(67,67,43,0.08)',
+                    borderBottom: '1px solid rgba(67,67,43,0.08)',
+                    marginBottom: 18,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 9,
+                      fontWeight: 700,
+                      letterSpacing: '0.13em',
+                      textTransform: 'uppercase',
+                      color: '#A8B475',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Next
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 12,
+                      color: 'rgba(67,67,43,0.72)',
+                      lineHeight: 1.58,
+                    }}
+                  >
+                    {displayedCollectionRead.next_action}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: reportExists ? '18px 28px 20px' : '20px 28px 24px' }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
+              height: '48px',
               justifyContent: 'space-between',
               gap: 16,
               marginBottom: 18,
@@ -1630,11 +1656,11 @@ export default function CollectionPage({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 8,
-                padding: 4,
-                borderRadius: 999,
-                border: '1px solid rgba(67,67,43,0.08)',
-                background: 'rgba(255,255,255,0.72)',
+                gap: 28,
+                padding: 0,
+                borderRadius: 0,
+                border: 'none',
+                background: 'transparent',
               }}
             >
               {(['pieces', 'report'] as const).map((tab) => {
@@ -1645,10 +1671,11 @@ export default function CollectionPage({
                     onClick={() => setActiveTab(tab)}
                     style={{
                       border: 'none',
-                      borderRadius: 999,
+                      borderBottom: isActive ? '2px solid #43432B' : 'none',
+                      borderRadius: 0,
                       padding: '10px 16px',
-                      background: isActive ? '#43432B' : 'transparent',
-                      color: isActive ? '#F8F4EC' : '#6B6459',
+                      background: 'transparent',
+                      color: isActive ? '#43432B' : 'rgba(67,67,43,0.35)',
                       fontFamily: inter,
                       fontSize: 11,
                       fontWeight: 700,
@@ -1657,7 +1684,35 @@ export default function CollectionPage({
                       cursor: 'pointer',
                     }}
                   >
-                    {tab}
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      <span>{tab}</span>
+                      {tab === 'report' && analyses.length >= 5 ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            borderRadius: 999,
+                            padding: '2px 8px',
+                            background: '#A8B475',
+                            color: '#F8F4EC',
+                            fontFamily: inter,
+                            fontSize: 9,
+                            fontWeight: 700,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          Ready
+                        </span>
+                      ) : null}
+                    </span>
                   </button>
                 );
               })}
@@ -1675,65 +1730,20 @@ export default function CollectionPage({
             >
               {activeTab === 'pieces' ? (
                 <>
-                  {reportExists ? (
-                    <button
-                      onClick={handleRerunCollectionAnalysis}
-                      disabled={!collectionReportInput || isRefreshingCollectionRead}
-                      style={{
-                        ...headerActionButtonBase,
-                        border: !collectionReportInput || isRefreshingCollectionRead
-                          ? '1px solid rgba(67,67,43,0.08)'
-                          : '1px solid rgba(67,67,43,0.12)',
-                        background: !collectionReportInput || isRefreshingCollectionRead
-                          ? 'rgba(244,240,233,0.95)'
-                          : 'rgba(248,245,239,0.96)',
-                        color: !collectionReportInput || isRefreshingCollectionRead ? '#AAA198' : '#6B6459',
-                        cursor: !collectionReportInput || isRefreshingCollectionRead ? 'not-allowed' : 'pointer',
-                        boxShadow: !collectionReportInput || isRefreshingCollectionRead
-                          ? 'none'
-                          : headerActionButtonBase.boxShadow,
-                      }}
-                    >
-                      {isRefreshingCollectionRead ? 'Refreshing...' : 'Re-run Analysis'}
-                    </button>
-                  ) : null}
-
                   <button
                     onClick={onNewPiece}
                     style={{
                       ...headerActionButtonBase,
-                      border: '1px solid rgba(67,67,43,0.14)',
-                      background: 'rgba(255,255,255,0.92)',
-                      color: '#575143',
+                      padding: '7px 16px',
+                      border: '1px solid rgba(67,67,43,0.18)',
+                      background: 'transparent',
+                      color: '#43432B',
+                      fontWeight: 600,
+                      letterSpacing: '0.07em',
                     }}
                   >
                     Add Piece
                   </button>
-
-                  {reportExists ? (
-                    <button onClick={handleGenerateReport} className="collection-read-ready-pill">
-                      <span className="collection-read-ready-dot-wrap">
-                        <span className="collection-read-ready-dot-ping" />
-                        <span className="collection-read-ready-dot-core" />
-                      </span>
-                      Collection read ready
-                      <span className="collection-read-ready-arrow">→</span>
-                    </button>
-                  ) : (
-                    <button
-                      disabled
-                      style={{
-                        ...headerActionButtonBase,
-                        border: '1px solid rgba(67,67,43,0.08)',
-                        background: '#E2DDD6',
-                        color: '#888078',
-                        cursor: 'not-allowed',
-                        boxShadow: 'none',
-                      }}
-                    >
-                      Collection read ready →
-                    </button>
-                  )}
                 </>
               ) : (
                 <>
@@ -1905,9 +1915,9 @@ export default function CollectionPage({
                   Generate a report to capture a snapshot of this collection.
                 </p>
                 <div style={{ marginTop: 20 }}>
-                  <button onClick={handleOpenReport} className="collection-read-ready-pill">
-                    Generate Report
-                    <span className="collection-read-ready-arrow">→</span>
+                  <button onClick={handleOpenReport} className="pieces-read-ready-pill">
+                    {analyses.length > 0 ? <span className="pieces-read-ready-count">{analyses.length}</span> : null}
+                    <span>{`${analyses.length > 0 ? `${analyses.length} pieces · ` : ''}Generate report →`}</span>
                   </button>
                 </div>
               </section>
@@ -1923,26 +1933,24 @@ export default function CollectionPage({
           display: inline-flex;
           align-items: center;
           gap: 9px;
-          padding: 11px 20px;
+          padding: 7px 14px;
           border-radius: 9999px;
-          font-family: "Söhne Breit", sans-serif;
-          font-size: 13px;
-          font-weight: 500;
-          letter-spacing: 0.01em;
+          font-family: Inter, sans-serif;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
           cursor: pointer;
           white-space: nowrap;
-          border: 0.5px solid rgba(168, 180, 117, 0.35);
-          background: #43432B;
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          color: #e8e4db;
-          box-shadow: 0 12px 32px rgba(49, 31, 30, 0.18), inset 0 1px 0 rgba(245, 243, 238, 0.14);
+          border: 1px solid rgba(184,135,107,0.35);
+          background: rgba(184,135,107,0.10);
+          color: #7A4A2A;
           transition: background 160ms ease, border-color 160ms ease;
         }
 
         .collection-read-ready-pill:hover {
-          background: rgba(67, 67, 43, 0.92);
-          border-color: rgba(168, 180, 117, 0.55);
+          background: rgba(184,135,107,0.18);
+          border-color: rgba(184,135,107,0.55);
         }
 
         .collection-read-ready-dot-wrap {
@@ -1968,9 +1976,43 @@ export default function CollectionPage({
         }
 
         .collection-read-ready-arrow {
-          color: #A8B475;
+          color: #7A4A2A;
           display: inline-block;
           animation: collectionReadReadyArrowBounce 1.8s ease-in-out infinite;
+        }
+
+        .pieces-read-ready-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 14px;
+          border-radius: 100px;
+          font-family: "Söhne Breit", sans-serif;
+          font-size: 12px;
+          font-weight: 500;
+          letter-spacing: 0.01em;
+          cursor: pointer;
+          white-space: nowrap;
+          border: none;
+          background: #c8cc9e;
+          color: #3a3d20;
+          box-shadow: 0 10px 30px rgba(67,67,43,0.12);
+          transition: background 160ms ease, border-color 160ms ease;
+        }
+
+        .pieces-read-ready-pill:hover {
+          background: #c8cc9e;
+        }
+
+        .pieces-read-ready-count {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1px 7px;
+          border-radius: 100px;
+          background: rgba(0,0,0,0.08);
+          font-size: 11px;
+          line-height: 1.2;
         }
 
         @keyframes camelPulse {

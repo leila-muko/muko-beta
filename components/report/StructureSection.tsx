@@ -1,5 +1,12 @@
 import type { CollectionReportPayload } from '@/lib/collection-report/types';
-import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
+import {
+  fonts,
+  reportPalette,
+  sectionEyebrow,
+  sectionHeading,
+  structuredSurface,
+  subCard,
+} from '@/components/report/reportStyles';
 
 function DistributionList({
   title,
@@ -11,10 +18,8 @@ function DistributionList({
   return (
     <div
       style={{
-        padding: '16px 18px',
-        borderRadius: 18,
-        border: `1px solid rgba(67,67,43,0.08)`,
-        background: 'rgba(255,255,255,0.52)',
+        ...subCard,
+        padding: '18px 20px',
       }}
     >
       <p style={sectionEyebrow}>{title}</p>
@@ -103,8 +108,18 @@ export function StructureSection({
   const lineReadsWord = getLineReadsWord(lineRead);
 
   return (
-    <section style={{ ...sectionCard, padding: '28px 30px' }}>
+    <section style={{ ...structuredSurface, padding: '30px 32px' }}>
       <p style={sectionEyebrow}>Structure</p>
+      <p
+        style={{
+          ...sectionHeading('md'),
+          marginTop: 12,
+          maxWidth: 620,
+          fontSize: 30,
+        }}
+      >
+        Assortment shape and supporting architecture
+      </p>
 
       <div
         style={{
@@ -118,10 +133,8 @@ export function StructureSection({
         <DistributionList title="Category Distribution" items={overview.category_distribution} />
         <div
           style={{
-            padding: '16px 18px',
-            borderRadius: 18,
-            border: `1px solid rgba(67,67,43,0.08)`,
-            background: 'rgba(255,255,255,0.52)',
+            ...subCard,
+            padding: '18px 20px',
           }}
         >
           <p style={sectionEyebrow}>Top Materials</p>
@@ -162,10 +175,7 @@ export function StructureSection({
       >
         <div
           style={{
-            padding: '18px 20px',
-            borderRadius: 18,
-            background: 'rgba(255,255,255,0.52)',
-            border: `1px solid rgba(67,67,43,0.08)`,
+            ...subCard,
           }}
         >
           <p style={sectionEyebrow}>How The Line Reads</p>
@@ -198,10 +208,7 @@ export function StructureSection({
 
         <div
           style={{
-            padding: '18px 20px',
-            borderRadius: 18,
-            background: 'rgba(255,255,255,0.52)',
-            border: `1px solid rgba(67,67,43,0.08)`,
+            ...subCard,
           }}
         >
           <p style={sectionEyebrow}>Expression Range</p>

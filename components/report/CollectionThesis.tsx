@@ -1,4 +1,4 @@
-import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
+import { reportPalette, narrativeSurface, sectionBody, sectionEyebrow, sectionHeading } from '@/components/report/reportStyles';
 
 export function CollectionThesis({
   thesis,
@@ -8,16 +8,23 @@ export function CollectionThesis({
   tightened?: boolean;
 }) {
   return (
-    <section style={{ ...sectionCard, padding: '28px 30px' }}>
+    <section style={{ ...narrativeSurface, padding: tightened ? '30px 34px' : '34px 36px' }}>
       <p style={sectionEyebrow}>Collection Thesis</p>
       <p
         style={{
-          margin: tightened ? '14px 0 0' : '16px 0 0',
-          fontFamily: fonts.body,
+          ...sectionHeading('md'),
+          marginTop: 14,
+          fontSize: tightened ? 28 : 30,
+        }}
+      >
+        The collection argument
+      </p>
+      <p
+        style={{
+          ...sectionBody(tightened ? 860 : 900),
+          marginTop: 14,
           fontSize: tightened ? 15 : 16,
-          lineHeight: tightened ? 1.75 : 1.8,
           color: reportPalette.olive,
-          maxWidth: tightened ? 860 : 920,
         }}
       >
         {thesis}

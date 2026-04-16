@@ -1,5 +1,5 @@
 import type { CollectionReportPayload } from '@/lib/collection-report/types';
-import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
+import { fonts, reportPalette, sectionEyebrow, sectionHeading, subCard } from '@/components/report/reportStyles';
 
 type StepListItem = string | { label?: string; body?: string };
 
@@ -15,10 +15,7 @@ function StepList({
   return (
     <div
       style={{
-        padding: '20px',
-        borderRadius: 20,
-        border: `1px solid rgba(67,67,43,0.08)`,
-        background: 'rgba(255,255,255,0.58)',
+        ...subCard,
       }}
     >
       <p
@@ -109,8 +106,17 @@ export function NextStepsSection({
   nextSteps: CollectionReportPayload['next_steps'];
 }) {
   return (
-    <section style={{ ...sectionCard, padding: '28px 30px' }}>
+    <section style={{ width: '100%' }}>
       <p style={sectionEyebrow}>Next Steps</p>
+      <p
+        style={{
+          ...sectionHeading('md'),
+          marginTop: 12,
+          fontSize: 30,
+        }}
+      >
+        Recommended next moves
+      </p>
 
       <div
         style={{

@@ -1,5 +1,12 @@
 import type { CollectionReportPayload } from '@/lib/collection-report/types';
-import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
+import {
+  fonts,
+  reportPalette,
+  sectionEyebrow,
+  sectionHeading,
+  structuredSurface,
+  subCard,
+} from '@/components/report/reportStyles';
 
 type SliderKey = 'trend_forward' | 'creative_expression' | 'elevated_design' | 'novelty';
 
@@ -307,18 +314,13 @@ export function CollectionTensionSection({
   const tensionNarrative = buildTensionNarrative(cards, { protect, push, watch }, intent);
 
   return (
-    <section style={{ ...sectionCard, padding: '28px 30px' }}>
+    <section style={{ ...structuredSurface, padding: '30px 32px' }}>
       <p style={sectionEyebrow}>Tension</p>
       <div style={{ marginTop: 10 }}>
         <p
           style={{
-            margin: 0,
-            fontFamily: fonts.heading,
-            fontSize: 28,
-            fontWeight: 400,
-            lineHeight: 1,
-            letterSpacing: '-0.03em',
-            color: reportPalette.olive,
+            ...sectionHeading('md'),
+            fontSize: 30,
           }}
         >
           {buildTensionHeadline(cards)}
@@ -338,15 +340,16 @@ export function CollectionTensionSection({
             }}
           >
             <p
-              style={{
-                margin: 0,
-                fontFamily: fonts.body,
-                fontSize: 13,
-                lineHeight: 1.7,
-                color: 'var(--color-text-primary)',
-              }}
-            >
-              {tensionNarrative}
+            style={{
+              margin: 0,
+              fontFamily: fonts.body,
+              fontSize: 14,
+              lineHeight: 1.75,
+              color: reportPalette.olive,
+              maxWidth: 920,
+            }}
+          >
+            {tensionNarrative}
             </p>
           </div>
         </div>
@@ -385,10 +388,7 @@ export function CollectionTensionSection({
           <div
             key={card.key}
             style={{
-              padding: '18px 20px',
-              borderRadius: 20,
-              border: `1px solid rgba(67,67,43,0.08)`,
-              background: 'rgba(255,255,255,0.56)',
+              ...subCard,
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'start' }}>
@@ -462,10 +462,10 @@ export function CollectionTensionSection({
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-              border: `1px solid rgba(67,67,43,0.08)`,
-              borderRadius: 20,
+              border: `1px solid rgba(67,67,43,0.06)`,
+              borderRadius: 22,
               overflow: 'hidden',
-              background: 'rgba(255,255,255,0.56)',
+              background: 'rgba(248,244,236,0.72)',
             }}
           >
             {[
@@ -501,10 +501,10 @@ export function CollectionTensionSection({
                   style={{
                     margin: '0 0 8px',
                     fontFamily: fonts.heading,
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: 400,
                     letterSpacing: '-0.02em',
-                    color: 'var(--color-text-primary)',
+                    color: reportPalette.olive,
                   }}
                 >
                   {value}
@@ -515,7 +515,7 @@ export function CollectionTensionSection({
                     fontFamily: fonts.body,
                     fontSize: 13,
                     lineHeight: 1.6,
-                    color: 'var(--color-text-secondary)',
+                    color: reportPalette.muted,
                   }}
                 >
                   {getPPWDescription(label.toLowerCase() as 'protect' | 'push' | 'watch', value, cards, ppwDescriptions)}

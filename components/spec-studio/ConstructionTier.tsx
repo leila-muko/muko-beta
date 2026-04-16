@@ -34,8 +34,8 @@ export default function ConstructionTier({
               onClick={() => onSelect(tier)}
               className={`flex-1 py-4 px-3 rounded-[10px] text-center transition-all duration-200
                 ${isSelected
-                  ? 'border-2 border-[#43432B] bg-[#F5F2EB]'
-                  : 'border border-[#E8E3D6] bg-[#FAF8F4] hover:border-[#43432B]/20'
+                  ? 'border-2 border-[#43432B] bg-[#FAF9F6]'
+                  : 'border border-[#E8E3D6] bg-[#FAF9F6] hover:border-[#43432B]/20'
                 }`}
             >
               <div className="text-[13px] font-semibold text-[#43432B]">
@@ -51,7 +51,7 @@ export default function ConstructionTier({
 
       {/* Override Warning */}
       {overrideWarning && (
-        <div className="mt-2.5 px-3.5 py-2.5 rounded-lg bg-[#B8876B]/8 border border-[#B8876B]/20 
+        <div className="mt-2.5 px-3.5 py-2.5 rounded-[12px] bg-[#B8876B]/8 border border-[#B8876B]/20 
                         flex items-center gap-2">
           <span className="text-[12px] text-[#B8876B]">⚠</span>
           <span className="text-[12px] text-[#43432B]/70">

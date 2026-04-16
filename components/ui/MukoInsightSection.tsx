@@ -870,7 +870,7 @@ export function MukoInsightSection({
                   return (
                     <div key={i}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                        <span style={{ padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 500, fontFamily: inter, background: "rgba(125,150,172,0.08)", border: "1px solid rgba(125,150,172,0.55)", color: "#7D96AC", display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
+                        <span style={{ padding: "3px 9px", borderRadius: 999, fontSize: 10, fontWeight: 600, fontFamily: inter, background: "rgba(125,150,172,0.08)", border: "1px solid rgba(125,150,172,0.55)", color: "#7D96AC", display: "inline-flex", alignItems: "center", flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                           {s.chip}
                         </span>
                         <div style={{ flex: 1 }} />

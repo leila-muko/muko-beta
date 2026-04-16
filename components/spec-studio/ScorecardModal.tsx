@@ -569,7 +569,7 @@ export function ScorecardModal({
           maxWidth: "calc(100vw - 32px)",
           maxHeight: "90vh",
           overflowY: "auto",
-          background: "#FAFAF7",
+          background: "#FAF9F6",
           borderRadius: 12,
           border: "1px solid rgba(67,67,43,0.09)",
           boxShadow: "0 8px 40px rgba(67,67,43,0.18)",
@@ -623,13 +623,15 @@ export function ScorecardModal({
             {collectionRole && (
               <div
                 style={{
-                  padding: "4px 10px",
+                  padding: "3px 9px",
                   borderRadius: 999,
                   border: "0.5px solid rgba(168,180,117,0.35)",
                   background: "rgba(168,180,117,0.15)",
                   fontFamily: inter,
-                  fontSize: 11,
-                  fontWeight: 500,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
                   color: "#6b7843",
                   whiteSpace: "nowrap",
                 }}
@@ -673,7 +675,7 @@ export function ScorecardModal({
               gridTemplateColumns: "1fr 1fr 1fr",
               gap: 1,
               background: "rgba(67,67,43,0.10)",
-              borderRadius: 8,
+              borderRadius: 12,
               overflow: "hidden",
             }}
           >
@@ -685,7 +687,7 @@ export function ScorecardModal({
               <div
                 key={label}
                 style={{
-                  background: "#FAFAF7",
+                  background: "#FAF9F6",
                   padding: "14px 10px",
                   textAlign: "center",
                 }}
@@ -912,7 +914,7 @@ export function ScorecardModal({
               padding: "9px 12px",
               borderRadius: 7,
               border: `1.5px solid ${pieceNameFocused ? CHARTREUSE : "rgba(67,67,43,0.14)"}`,
-              background: "#FAFAF7",
+              background: "#FAF9F6",
               fontFamily: inter,
               fontSize: 13,
               color: OLIVE,
@@ -948,7 +950,7 @@ export function ScorecardModal({
                   padding: "16px 32px 20px",
                   display: "flex",
                   gap: 8,
-                  background: "#FAFAF7",
+                  background: "#FAF9F6",
                 }}
               >
                 {/* Revise — primary fill when conflict present, ghost when clean */}

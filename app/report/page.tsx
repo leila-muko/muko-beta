@@ -811,7 +811,7 @@ function ReportPageContent() {
         style={{
           maxWidth: 1240,
           margin: '0 auto',
-          padding: '96px 20px 0',
+          padding: '104px 20px 0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -823,7 +823,19 @@ function ReportPageContent() {
           <p style={sectionEyebrow}>Report</p>
           <p
             style={{
-              margin: '8px 0 0',
+              margin: '10px 0 0',
+              fontFamily: fonts.heading,
+              fontSize: 26,
+              lineHeight: 1.04,
+              letterSpacing: '-0.04em',
+              color: reportPalette.olive,
+            }}
+          >
+            Collection intelligence memo
+          </p>
+          <p
+            style={{
+              margin: '10px 0 0',
               fontFamily: fonts.body,
               fontSize: 13,
               color: reportPalette.muted,
@@ -839,8 +851,8 @@ function ReportPageContent() {
             style={{
               padding: '12px 16px',
               borderRadius: 999,
-              border: `1px solid rgba(67,67,43,0.10)`,
-              background: 'rgba(255,255,255,0.6)',
+              border: `1px solid rgba(67,67,43,0.08)`,
+              background: 'rgba(255,255,255,0.7)',
               color: reportPalette.olive,
               fontFamily: fonts.body,
               fontSize: 13,
@@ -858,8 +870,8 @@ function ReportPageContent() {
             style={{
               padding: '12px 16px',
               borderRadius: 999,
-              border: `1px solid rgba(67,67,43,0.10)`,
-              background: 'rgba(255,255,255,0.6)',
+              border: `1px solid rgba(67,67,43,0.08)`,
+              background: 'rgba(255,255,255,0.7)',
               color: reportPalette.olive,
               fontFamily: fonts.body,
               fontSize: 13,

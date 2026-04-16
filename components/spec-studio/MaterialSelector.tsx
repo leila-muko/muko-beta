@@ -65,8 +65,8 @@ export default function MaterialSelector({
               onClick={() => onSelect(mat.id)}
               className={`p-3.5 rounded-[10px] text-left transition-all duration-200 
                 ${isSelected
-                  ? 'border-2 border-[#43432B] bg-[#F5F2EB]'
-                  : 'border border-[#E8E3D6] bg-[#FAF8F4] hover:border-[#43432B]/20'
+                  ? 'border-2 border-[#43432B] bg-[#FAF9F6]'
+                  : 'border border-[#E8E3D6] bg-[#FAF9F6] hover:border-[#43432B]/20'
                 }`}
             >
               <div className="text-[15px] mb-1">
@@ -85,7 +85,7 @@ export default function MaterialSelector({
 
       {/* Muko Suggests — Alternative Material Nudge */}
       {selectedMaterial && alternativeMaterial && (
-        <div className="mt-2.5 px-3.5 py-2.5 rounded-lg bg-[#A8B475]/5 border border-dashed border-[#A8B475]/25 
+        <div className="mt-2.5 px-3.5 py-2.5 rounded-[12px] bg-[#A8B475]/5 border border-dashed border-[#A8B475]/25 
                         flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-[12px]">💡</span>

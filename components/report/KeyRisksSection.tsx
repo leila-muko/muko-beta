@@ -1,13 +1,22 @@
 import type { CollectionRisk } from '@/lib/collection-report/types';
-import { fonts, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
+import { fonts, reportPalette, sectionEyebrow, sectionHeading } from '@/components/report/reportStyles';
 
 const WHY_THIS_MATTERS_FALLBACK =
   'This could affect clarity, feasibility, or confidence in the line as it moves forward.';
 
 export function KeyRisksSection({ risks }: { risks: CollectionRisk[] }) {
   return (
-    <section style={{ ...sectionCard, padding: '28px 30px' }}>
+    <section style={{ width: '100%' }}>
       <p style={sectionEyebrow}>Key Risks</p>
+      <p
+        style={{
+          ...sectionHeading('md'),
+          marginTop: 12,
+          fontSize: 30,
+        }}
+      >
+        Friction points that could weaken the line
+      </p>
 
       <div
         style={{
@@ -21,10 +30,9 @@ export function KeyRisksSection({ risks }: { risks: CollectionRisk[] }) {
           <div
             key={risk.title}
             style={{
-              padding: '20px',
+              padding: '22px',
               borderRadius: 20,
-              border: `1px solid rgba(169,123,143,0.10)`,
-              background: 'linear-gradient(160deg, rgba(169,123,143,0.10) 0%, rgba(255,255,255,0.64) 100%)',
+              background: 'linear-gradient(180deg, rgba(169,123,143,0.06) 0%, rgba(255,255,255,0.48) 100%)',
             }}
           >
             <p

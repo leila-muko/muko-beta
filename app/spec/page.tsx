@@ -127,7 +127,7 @@ const BRAND = {
   camel: "#B8876B",
   oliveInk: "#43432B",
   cream: "#E8E3D6",
-  warmWhite: "#F5F2EB",
+  warmWhite: "#FAF9F6",
   parchment: "#FAF9F6",
 };
 
@@ -4495,7 +4495,7 @@ function SpecStudioPageContent() {
                           onClick={() => setTargetMsrp(viabilityState.suggestedMsrp)}
                           style={{
                             background: "#4D302F",
-                            color: "#F9F7F4",
+                            color: "#FAF9F6",
                             border: "none",
                             borderRadius: 8,
                             padding: "10px 14px",
@@ -4546,7 +4546,7 @@ function SpecStudioPageContent() {
                           This piece cannot be made viable within your current collection constraints. Muko has assessed all available levers below.
                         </div>
                       </div>
-                      <div style={{ border: "0.5px solid #E0DAD4", borderRadius: 12, background: "#F9F7F4", marginBottom: 14 }}>
+                      <div style={{ border: "0.5px solid #E0DAD4", borderRadius: 12, background: "#FAF9F6", marginBottom: 14 }}>
                         {viabilityState.levers.map((lever, index) => {
                           const statusStyle =
                             lever.status === "exhausted"
@@ -4590,7 +4590,7 @@ function SpecStudioPageContent() {
                         <button
                           style={{
                             background: "#4D302F",
-                            color: "#F9F7F4",
+                            color: "#FAF9F6",
                             border: "none",
                             borderRadius: 8,
                             padding: "10px 14px",
@@ -4963,7 +4963,7 @@ function SpecStudioPageContent() {
           border-right: 1px solid rgba(67,67,43,0.07);
         }
         .specStudioRight {
-          background: #F5F2EB;
+          background: #FAF9F6;
           position: relative;
         }
         .specStudioSticky {

@@ -13,7 +13,7 @@ export default function ConceptContext({ concept }: ConceptContextProps) {
   return (
     <div
       onClick={() => setExpanded(!expanded)}
-      className="mb-6 px-4 py-3 rounded-[10px] bg-[#F5F2EB] border border-[#E8E3D6] 
+      className="mb-6 px-4 py-3 rounded-[12px] bg-[#FAF9F6] border border-[#E8E3D6] 
                  cursor-pointer transition-all duration-300 hover:border-[#43432B]/15"
     >
       {/* Collapsed Header */}

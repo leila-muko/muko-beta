@@ -3956,7 +3956,7 @@ export default function ConceptStudioPage() {
                                         key={sil.id}
                                         style={{
                                           textAlign: "left",
-                                          borderRadius: 18,
+                                          borderRadius: 999,
                                           padding: "18px 18px 16px",
                                           background: isSel ? "linear-gradient(180deg, rgba(248,245,238,0.96) 0%, rgba(255,255,255,0.94) 100%)" : "rgba(255,255,255,0.58)",
                                           border: isSel ? "1px solid rgba(168,180,117,0.48)" : isAffinity ? "1px solid rgba(168,180,117,0.18)" : "1px solid rgba(67,67,43,0.08)",
@@ -4006,7 +4006,7 @@ export default function ConceptStudioPage() {
                                             alignItems: "center",
                                             gap: 14,
                                             padding: "14px 16px",
-                                            borderRadius: 16,
+                                            borderRadius: 999,
                                             background: isSel ? "rgba(248,245,238,0.92)" : "rgba(255,255,255,0.52)",
                                             border: isSel ? "1px solid rgba(168,180,117,0.42)" : isAffinity ? "1px solid rgba(168,180,117,0.16)" : "1px solid rgba(67,67,43,0.07)",
                                             cursor: "default",
@@ -4127,14 +4127,16 @@ export default function ConceptStudioPage() {
                                 <button
                                   onClick={() => setCurrentStageState("product")}
                                   style={{
-                                    padding: "12px 18px",
+                                    padding: "12px 28px",
                                     borderRadius: 999,
                                     border: "1.5px solid #7D96AC",
                                     background: "rgba(125,150,172,0.08)",
                                     color: "#7D96AC",
                                     fontFamily: sohne,
                                     fontSize: 12,
-                                    fontWeight: 600,
+                                    fontWeight: 700,
+                                    letterSpacing: "0.08em",
+                                    textTransform: "uppercase",
                                     cursor: "pointer",
                                   }}
                                 >
@@ -4354,7 +4356,7 @@ export default function ConceptStudioPage() {
                                   disabled={!canAdvanceToStage3}
                                   style={{
                                     padding: "11px 24px",
-                                    borderRadius: 100,
+                                    borderRadius: 999,
                                     border: "none",
                                     background: canAdvanceToStage3 ? "#191919" : "rgba(67,67,43,0.10)",
                                     color: canAdvanceToStage3 ? "#FFFFFF" : "rgba(67,67,43,0.30)",
@@ -4394,7 +4396,7 @@ export default function ConceptStudioPage() {
                       </div>
                     </div>
 
-                    <motion.div layout transition={{ duration: 0.22, ease: "easeInOut" }} style={{ borderRadius: 18 }}>
+                    <motion.div layout transition={{ duration: 0.22, ease: "easeInOut" }} style={{ borderRadius: 20 }}>
                       <DirectionCard
                         aesthetic={selectedAesthetic}
                         isHovered={hoveredCard === selectedAesthetic}
@@ -4428,7 +4430,7 @@ export default function ConceptStudioPage() {
                     const cardImages = loadMoodboardImages(aesthetic);
 
                     return (
-                      <motion.div key={aesthetic} layout transition={{ duration: 0.22, ease: "easeInOut" }} style={{ borderRadius: 18 }}>
+                      <motion.div key={aesthetic} layout transition={{ duration: 0.22, ease: "easeInOut" }} style={{ borderRadius: 20 }}>
                         <DirectionCard
                           aesthetic={aesthetic}
                           isHovered={isHovered}
@@ -4487,7 +4489,7 @@ export default function ConceptStudioPage() {
                     const cardImages = loadMoodboardImages(aesthetic);
 
                     return (
-                      <motion.div key={aesthetic} layout transition={{ duration: 0.22, ease: "easeInOut" }} style={{ borderRadius: 18 }}>
+                      <motion.div key={aesthetic} layout transition={{ duration: 0.22, ease: "easeInOut" }} style={{ borderRadius: 20 }}>
                         <DirectionCard
                           aesthetic={aesthetic}
                           isHovered={isHovered}
@@ -4632,7 +4634,7 @@ export default function ConceptStudioPage() {
 
       {showAestheticChangeModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(23,23,18,0.34)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, padding: 16 }}>
-          <div style={{ width: "min(520px, calc(100vw - 32px))", borderRadius: 24, border: "1px solid rgba(67,67,43,0.10)", background: "linear-gradient(180deg, rgba(248,245,239,0.98) 0%, rgba(255,255,255,0.96) 100%)", boxShadow: "0 28px 80px rgba(17,17,12,0.18)", padding: "24px 24px 20px" }}>
+          <div style={{ width: "min(520px, calc(100vw - 32px))", borderRadius: 20, border: "1px solid rgba(67,67,43,0.10)", background: "linear-gradient(180deg, rgba(248,245,239,0.98) 0%, rgba(255,255,255,0.96) 100%)", boxShadow: "0 28px 80px rgba(17,17,12,0.18)", padding: "24px 24px 20px" }}>
             <div style={{ display: "inline-flex", alignItems: "center", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(168,180,117,0.28)", background: "rgba(168,180,117,0.10)", color: "#6F7C46", fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 14 }}>
               Direction Change
             </div>
@@ -4644,7 +4646,7 @@ export default function ConceptStudioPage() {
                 ? `You’re about to switch from ${selectedAesthetic ?? "your current direction"} to ${pendingAestheticChange}.`
                 : "You’re about to switch away from the current locked direction."}
             </p>
-            <div style={{ marginBottom: 18, padding: "14px 16px", borderRadius: 18, border: "1px solid rgba(77,48,47,0.10)", background: "rgba(255,255,255,0.58)" }}>
+            <div style={{ marginBottom: 18, padding: "14px 16px", borderRadius: 20, border: "1px solid rgba(77,48,47,0.10)", background: "rgba(255,255,255,0.58)" }}>
               <div style={{ fontFamily: inter, fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(77,48,47,0.52)", marginBottom: 8 }}>
                 What Changes
               </div>
@@ -4741,13 +4743,13 @@ function DirectionCard({
     : Array.from({ length: 4 }, (_, index) => `placeholder-${index}`);
   const expandedImages = moodboardImages.length > 0
     ? moodboardImages
-    : Array.from({ length: 8 }, (_, index) => `placeholder-${index}`);
+    : Array.from({ length: 9 }, (_, index) => `placeholder-${index}`);
 
   return (
     <div
       style={{
         position: "relative",
-        borderRadius: 18,
+        borderRadius: 20,
         background: "rgba(255,255,255,0.88)",
         border: isHovered ? "1px solid rgba(67,67,43,0.16)" : "1px solid rgba(67,67,43,0.08)",
         boxShadow: isHovered ? "0 18px 38px rgba(17,17,12,0.08)" : "0 10px 26px rgba(67,67,43,0.04)",
@@ -4840,7 +4842,7 @@ function DirectionCard({
                 key={`mb-${aesthetic}-default-${i}`}
                 style={{
                   aspectRatio: "1",
-                  borderRadius: 10,
+                  borderRadius: 12,
                   overflow: "hidden",
                   background: "linear-gradient(135deg, rgba(67,67,43,0.05), rgba(67,67,43,0.02))",
                   boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
@@ -4871,7 +4873,7 @@ function DirectionCard({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
               gap: 8,
               paddingTop: 2,
               animation: "fadeIn 180ms ease",

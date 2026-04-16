@@ -26,7 +26,7 @@ function PulseIndicator({ label, status, locked, detail }: PulseIndicatorProps) 
 
   return (
     <div
-      className="px-4 py-3.5 rounded-[10px] transition-all duration-400"
+      className="px-4 py-3.5 rounded-[12px] transition-all duration-400"
       style={{
         backgroundColor: config.bg,
         opacity: locked ? 0.6 : 1,

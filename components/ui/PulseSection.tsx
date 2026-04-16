@@ -9,6 +9,7 @@ const inter = "var(--font-inter), system-ui, sans-serif";
 const RADAR_GREEN = "#A8B475";
 const RADAR_ROSE = "#A97B8F";
 const RADAR_NEUTRAL = "rgba(67,67,43,0.28)";
+const SURFACE_RULE = "rgba(226,221,214,0.82)";
 
 export type PulseSectionItem = Omit<PulseScoreRowProps, "isExpanded" | "onToggleExpand" | "variant" | "rowOpacity" | "isChanged">;
 
@@ -78,8 +79,8 @@ export function PulseSection({
   return (
     <section
       style={{
-        paddingTop: 16,
-        borderTop: "1px solid rgba(226,221,214,0.72)",
+        paddingTop: 18,
+        borderTop: `1px solid ${SURFACE_RULE}`,
       }}
     >
       <button
@@ -101,26 +102,64 @@ export function PulseSection({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 10,
+            justifyContent: "space-between",
+            gap: 12,
             fontFamily: inter,
             fontSize: 9,
             fontWeight: 600,
-            letterSpacing: "0.16em",
+            letterSpacing: "0.18em",
             textTransform: "uppercase",
             color: "rgba(67,67,43,0.34)",
-            marginBottom: 5,
+            marginBottom: 8,
             position: "relative",
             zIndex: 1,
           }}
         >
-          <span>{summaryPrefix}</span>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <span>{summaryPrefix}</span>
+            <span
+              aria-hidden
+              style={{
+                position: "relative",
+                display: "inline-flex",
+                alignItems: "center",
+                width: 26,
+                height: 8,
+                opacity: 0.5,
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  inset: "50% 0 auto 0",
+                  height: 1,
+                  background: "linear-gradient(90deg, rgba(67,67,43,0.08) 0%, rgba(67,67,43,0.2) 50%, rgba(67,67,43,0.08) 100%)",
+                }}
+              />
+              <span
+                style={{
+                  position: "absolute",
+                  left: "34%",
+                  top: "50%",
+                  width: 5,
+                  height: 5,
+                  marginTop: -2,
+                  borderRadius: "50%",
+                  background: radarTone,
+                  boxShadow: `0 0 0 1px ${radarGlow}`,
+                  animation: "pulseRadarDot 2.2s ease-out infinite",
+                }}
+              />
+            </span>
+          </div>
           <svg
             width="12"
             height="12"
             viewBox="0 0 12 12"
             fill="none"
             style={{
-              opacity: 0.45,
+              opacity: 0.4,
+              flexShrink: 0,
               transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
               transition: "transform 200ms ease",
             }}
@@ -133,7 +172,7 @@ export function PulseSection({
           style={{
             display: "flex",
             alignItems: "flex-start",
-            gap: 10,
+            gap: 12,
             position: "relative",
             zIndex: 1,
           }}
@@ -142,13 +181,13 @@ export function PulseSection({
             aria-hidden
             style={{
               position: "relative",
-              width: 6,
-              height: 6,
+              width: 5,
+              height: 5,
               borderRadius: "50%",
               flexShrink: 0,
               background: radarTone,
               boxShadow: `0 0 0 1px ${radarGlow}`,
-              marginTop: 7,
+              marginTop: 8,
               animation: "pulseRadarDot 2.2s ease-out infinite",
             }}
           >
@@ -181,11 +220,12 @@ export function PulseSection({
       {helperText && (
         <div
           style={{
-            marginTop: 6,
+            marginTop: 8,
             fontFamily: inter,
             fontSize: 10.5,
             lineHeight: 1.55,
             color: "rgba(67,67,43,0.38)",
+            maxWidth: 620,
           }}
         >
           {helperText}
@@ -195,7 +235,7 @@ export function PulseSection({
       {isExpanded && (
         <div
           style={{
-            marginTop: 18,
+            marginTop: 20,
             animation: "pulseExpandedFade 220ms ease-out",
           }}
         >

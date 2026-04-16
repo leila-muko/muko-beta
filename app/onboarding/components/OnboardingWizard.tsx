@@ -399,12 +399,13 @@ export default function OnboardingWizard() {
               onClick={handleNext}
               disabled={loading}
               style={{
-                padding: '12px 32px',
-                borderRadius: 10,
+                padding: '12px 28px',
+                borderRadius: 999,
                 fontSize: 12,
                 fontWeight: 700,
                 fontFamily: sohne,
-                letterSpacing: '0.02em',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
                 color: STEEL,
                 background: 'rgba(125,150,172,0.07)',
                 border: `1.5px solid ${STEEL}`,
