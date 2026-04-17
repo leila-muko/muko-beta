@@ -478,7 +478,7 @@ export default function EntryScreen() {
               <h1
                 className="entry-headline-blur-line"
                 style={{
-                  fontSize: 'clamp(48px, 6vw, 72px)',
+                  fontSize: 'clamp(40px, 5vw, 60px)',
                   fontWeight: 300,
                   color: '#4D302F',
                   lineHeight: 0.98,
