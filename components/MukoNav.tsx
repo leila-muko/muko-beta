@@ -85,6 +85,9 @@ export function MukoNav({
           onClick={() => router.push("/entry")}
           aria-label="Go to entry page"
           style={{
+            display: "inline-flex",
+            alignItems: "flex-start",
+            gap: 6,
             fontFamily: sohne,
             fontWeight: 700,
             fontSize: 18,
@@ -96,7 +99,29 @@ export function MukoNav({
             cursor: "pointer",
           }}
         >
-          muko
+          <span>muko</span>
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 16,
+              padding: "1px 6px",
+              borderRadius: 999,
+              background: "rgba(60, 60, 60, 0.08)",
+              border: "1px solid rgba(60, 60, 60, 0.14)",
+              color: "rgba(67,67,43,0.62)",
+              fontFamily: inter,
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              lineHeight: 1,
+              textTransform: "uppercase",
+              flexShrink: 0,
+            }}
+          >
+            beta
+          </span>
         </button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
