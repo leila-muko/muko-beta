@@ -1,6 +1,18 @@
-import { fonts, heroSurface, reportPalette, sectionEyebrow, softPanel } from '@/components/report/reportStyles';
+import { fonts, heroSurface, reportPalette, sectionEyebrow } from '@/components/report/reportStyles';
 
-export function OverallReadCallout({ value, detail }: { value: string; detail?: string }) {
+export function OverallReadCallout({
+  topMeta,
+  topRightMeta,
+  value,
+  thesis,
+  detail,
+}: {
+  topMeta?: string;
+  topRightMeta?: string;
+  value: string;
+  thesis?: string;
+  detail?: string;
+}) {
   return (
     <section
       style={{
@@ -13,17 +25,69 @@ export function OverallReadCallout({ value, detail }: { value: string; detail?: 
       <div
         style={{
           display: 'grid',
-          gap: 22,
+          gap: 16,
           alignItems: 'start',
         }}
       >
         <div>
-          <p style={sectionEyebrow}>Overall Muko Read</p>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 16,
+            }}
+          >
+            <div>
+              {topMeta ? (
+                <p
+                  style={{
+                    margin: 0,
+                    fontFamily: fonts.body,
+                    fontSize: 12,
+                    lineHeight: 1.6,
+                    color: reportPalette.muted,
+                  }}
+                >
+                  {topMeta}
+                </p>
+              ) : null}
+
+              <p style={sectionEyebrow}>Overall Muko Read</p>
+            </div>
+
+            {topRightMeta ? (
+              <div
+                style={{
+                  display: 'grid',
+                  justifyItems: 'end',
+                  flexShrink: 0,
+                }}
+              >
+                {topRightMeta ? (
+                  <p
+                    style={{
+                      margin: 0,
+                      fontFamily: fonts.body,
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                      color: 'rgba(67,67,43,0.36)',
+                      textAlign: 'right',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {topRightMeta}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
           <p
             style={{
-              margin: '16px 0 0',
+              margin: '12px 0 0',
               fontFamily: fonts.heading,
-              fontSize: 'clamp(2rem, 3.2vw, 3rem)',
+              fontSize: 'clamp(1.5rem, 2.35vw, 2.2rem)',
               lineHeight: 0.98,
               letterSpacing: '-0.05em',
               color: reportPalette.olive,
@@ -34,10 +98,34 @@ export function OverallReadCallout({ value, detail }: { value: string; detail?: 
           </p>
         </div>
 
-        {detail ? (
-          <aside
+        {thesis ? (
+          <p
             style={{
-              ...softPanel,
+              margin: '0 0 20px',
+              fontFamily: fonts.body,
+              fontSize: 14,
+              lineHeight: 1.75,
+              color: reportPalette.olive,
+              maxWidth: 760,
+            }}
+          >
+            {thesis}
+          </p>
+        ) : null}
+
+        {thesis && detail ? (
+          <div
+            aria-hidden="true"
+            style={{
+              borderTop: '0.5px solid rgba(77,48,47,0.10)',
+              marginBottom: 14,
+            }}
+          />
+        ) : null}
+
+        {detail ? (
+          <div
+            style={{
               maxWidth: 760,
             }}
           >
@@ -51,7 +139,7 @@ export function OverallReadCallout({ value, detail }: { value: string; detail?: 
             </p>
             <p
               style={{
-                margin: '10px 0 0',
+                margin: '8px 0 0',
                 fontFamily: fonts.body,
                 fontSize: 14,
                 lineHeight: 1.72,
@@ -60,7 +148,7 @@ export function OverallReadCallout({ value, detail }: { value: string; detail?: 
             >
               {detail}
             </p>
-          </aside>
+          </div>
         ) : null}
       </div>
     </section>

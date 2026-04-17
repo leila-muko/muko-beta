@@ -1,5 +1,5 @@
 import type { CollectionScoreDetail } from '@/lib/collection-report/types';
-import { fonts, getTone, getToneSurface, reportPalette, sectionEyebrow } from '@/components/report/reportStyles';
+import { fonts, reportPalette } from '@/components/report/reportStyles';
 
 export function CollectionScoreCard({
   label,
@@ -10,67 +10,99 @@ export function CollectionScoreCard({
   detail: CollectionScoreDetail;
   compact?: boolean;
 }) {
-  const tone = getTone(detail.score);
-  const surface = getToneSurface(detail.score);
+  void compact;
 
   return (
-    <div
-      style={{
-        padding: compact ? '18px 18px 20px' : '24px 22px',
-        borderRadius: 20,
-        border: `1px solid ${surface.border}`,
-        background: surface.background,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch' }}>
+      <div style={{ flex: 1, paddingRight: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+          {label === 'Identity' && (
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path
+                d="M6.5 1l1.4 3h3.1l-2.5 1.9 1 3L6.5 7 4 8.9l1-3L2.5 4H5.6z"
+                stroke="rgba(77,48,47,0.4)"
+                strokeWidth="1.1"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+          {label === 'Resonance' && (
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <circle cx="5" cy="4.5" r="1.8" stroke="rgba(77,48,47,0.4)" strokeWidth="1.1" />
+              <circle cx="9" cy="4.5" r="1.4" stroke="rgba(77,48,47,0.4)" strokeWidth="1.1" />
+              <path
+                d="M1 11c0-2 1.8-3.5 4-3.5s4 1.5 4 3.5"
+                stroke="rgba(77,48,47,0.4)"
+                strokeWidth="1.1"
+                strokeLinecap="round"
+              />
+              <path
+                d="M9 7.5c1.5.3 2.5 1.5 2.5 3"
+                stroke="rgba(77,48,47,0.4)"
+                strokeWidth="1.1"
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
+          {label === 'Execution' && (
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path
+                d="M6.5 1.083a5.417 5.417 0 1 0 5.417 5.417"
+                stroke="rgba(77,48,47,0.4)"
+                strokeWidth="1.1"
+                strokeLinecap="round"
+              />
+              <path
+                d="M6.5 3.25v3.25l2.167 1.083"
+                stroke="rgba(77,48,47,0.4)"
+                strokeWidth="1.1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+
+          <p
+            style={{
+              fontSize: 10,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: 'rgba(77,48,47,0.35)',
+              margin: 0,
+              fontFamily: 'Inter, sans-serif',
+            }}
+          >
+            {label}
+          </p>
+        </div>
+
         <p
           style={{
-            ...sectionEyebrow,
-            fontSize: 9,
+            fontSize: 13,
+            color: '#000000',
+            lineHeight: 1.6,
+            margin: 0,
+            fontFamily: 'Inter, sans-serif',
           }}
         >
-          {label}
+          {detail.explanation}
         </p>
-        <div style={{ textAlign: 'right' }}>
-          <span
-            style={{
-              display: 'block',
-              fontFamily: fonts.heading,
-              fontSize: compact ? 34 : 40,
-              lineHeight: 0.92,
-              letterSpacing: '-0.05em',
-              color: reportPalette.olive,
-            }}
-          >
-            {detail.score}
-          </span>
-          <span
-            style={{
-              display: 'block',
-              marginTop: 4,
-              fontFamily: fonts.body,
-              fontSize: 11,
-              fontWeight: 600,
-              color: tone,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-            }}
-          >
-            Score
-          </span>
-        </div>
       </div>
 
       <p
         style={{
-          margin: compact ? '14px 0 0' : '16px 0 0',
-          fontFamily: fonts.body,
-          fontSize: compact ? 13 : 14,
-          lineHeight: 1.72,
-          color: reportPalette.olive,
+          fontFamily: fonts.heading,
+          fontSize: 40,
+          fontWeight: 700,
+          color: label === 'Execution' && detail.score < 60 ? '#CDAAB3' : reportPalette.olive,
+          margin: 0,
+          lineHeight: 1,
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
         }}
       >
-        {detail.explanation}
+        {detail.score}
       </p>
     </div>
   );

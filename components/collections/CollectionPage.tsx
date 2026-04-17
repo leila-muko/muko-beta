@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/client';
 import { getFlatForPiece } from '@/components/flats';
 import { buildCollectionReport } from '@/lib/collection-report/buildCollectionReport';
 import { trackEvent } from '@/lib/analytics';
-import { CollectionThesis } from '@/components/report/CollectionThesis';
 import { OverallReadCallout } from '@/components/report/OverallReadCallout';
 import type {
   CollectionComplexity,
@@ -21,7 +20,7 @@ import { useSessionStore } from '@/lib/store/sessionStore';
 import { parseSelectedPieceImage, resolvePieceImageType } from '@/lib/piece-image';
 import { buildAssortmentIntelligence } from '@/lib/collection-report/buildAssortmentIntelligence';
 import { hydrateSpecSessionFromAnalysis, type PersistedSpecAnalysisRow } from '@/lib/collections/hydrateSpecSessionFromAnalysis';
-import { formatMonthYear, reportPalette, sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
+import { sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
 import { BRAND } from '@/lib/concept-studio/constants';
 import { IconIdentity, IconResonance } from '../concept-studio/Icons';
 
@@ -159,6 +158,18 @@ function getScore(row: AnalysisRow) {
 function titleCase(value: string | null | undefined) {
   if (!value) return '';
   return value.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatSavedDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
 }
 
 function getAssignedRole(analysis: AnalysisRow): AssignedRole | null {
@@ -1852,36 +1863,15 @@ export default function CollectionPage({
             </div>
           ) : snapshot ? (
             <div style={{ display: 'grid', gap: 18, paddingBottom: 100 }}>
-              <section
-                style={{
-                  ...sectionCard,
-                  padding: '18px 22px',
-                  background: 'rgba(255,255,255,0.76)',
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontFamily: inter,
-                    fontSize: 12,
-                    color: reportPalette.muted,
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {collectionName} · Saved snapshot · Generated {formatMonthYear(snapshot.report_saved_at)} ·{' '}
-                  {snapshot.piece_count ?? snapshot.report_snapshot.header?.piece_count ?? 0} pieces reviewed
-                </p>
-              </section>
-
               <OverallReadCallout
+                topRightMeta={`Saved ${formatSavedDateTime(snapshot.report_saved_at)}`}
                 value={snapshot.report_snapshot.overall_read}
+                thesis={snapshot.report_snapshot.collection_thesis}
                 detail={snapshot.report_snapshot.overall_read_detail}
               />
 
-              <CollectionThesis thesis={snapshot.report_snapshot.collection_thesis} tightened />
-
               <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                <button onClick={handleOpenReport} className="collection-read-ready-pill">
+                <button onClick={handleOpenReport} className="pieces-read-ready-pill">
                   View full report
                   <span className="collection-read-ready-arrow">→</span>
                 </button>

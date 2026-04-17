@@ -442,7 +442,7 @@ export default function EntryScreen() {
                   maxWidth: 720,
                 }}
               >
-                Define your next collection.
+                Shape your next drop.
               </h1>
               <p
                 style={{
@@ -454,7 +454,7 @@ export default function EntryScreen() {
                   fontFamily: inter,
                 }}
               >
-                Try it on before you commit.
+                Direction before fabric. Brief before sketch.
               </p>
             </div>
 
@@ -758,7 +758,7 @@ export default function EntryScreen() {
                   color: '#4D302F',
                 }}
               >
-                Direction starts here.
+                The best sample is the one you never made.
               </div>
               <p
                 style={{
@@ -769,7 +769,7 @@ export default function EntryScreen() {
                   color: '#8C7B6B',
                 }}
               >
-                Frame the collection clearly, then move into concept and specification with a steadier point of view.
+                The fitting room for your concepts. Try it on before you commit.
               </p>
             </div>
           </div>

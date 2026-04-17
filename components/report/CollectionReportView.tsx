@@ -139,7 +139,13 @@ export function CollectionReportView({
         }}
       >
         <section id="overview" style={{ display: 'grid', gap: 24, scrollMarginTop: 128 }}>
-          <CollectionReportHeader header={report.header} />
+          <CollectionReportHeader
+            header={report.header}
+            categoryCount={report.overview?.category_distribution?.length ?? 0}
+            assortmentSignal={report.overview?.category_distribution?.[0]?.label ?? undefined}
+            executionSignal={report.assortment_intelligence?.diagnostics?.viabilitySignal ?? undefined}
+            topMaterials={report.overview?.top_materials ?? []}
+          />
 
           <div
             style={{
@@ -149,19 +155,27 @@ export function CollectionReportView({
               alignItems: 'stretch',
             }}
           >
-            <OverallReadCallout value={report.overall_read} detail={report.overall_read_detail} />
+            <OverallReadCallout
+              value={report.overall_read}
+              thesis={report.collection_thesis}
+              detail={report.overall_read_detail}
+            />
 
             <section style={{ ...structuredSurface, padding: '26px 26px' }}>
               <p style={sectionEyebrow}>Collection Scores</p>
-              <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
-                <CollectionScoreCard label="Identity" detail={report.scores.identity} compact />
-                <CollectionScoreCard label="Resonance" detail={report.scores.resonance} compact />
-                <CollectionScoreCard label="Execution" detail={report.scores.execution} compact />
+              <div style={{ marginTop: 16 }}>
+                <CollectionScoreCard label="Identity" detail={report.scores.identity} />
+
+                <div style={{ borderTop: '0.5px solid rgba(77,48,47,0.08)', margin: '20px 0' }} />
+
+                <CollectionScoreCard label="Resonance" detail={report.scores.resonance} />
+
+                <div style={{ borderTop: '0.5px solid rgba(77,48,47,0.08)', margin: '20px 0' }} />
+
+                <CollectionScoreCard label="Execution" detail={report.scores.execution} />
               </div>
             </section>
           </div>
-
-          <CollectionThesis thesis={report.collection_thesis} tightened />
         </section>
 
         <section id="tension" style={{ scrollMarginTop: 128 }}>

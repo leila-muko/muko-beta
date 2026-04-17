@@ -211,10 +211,11 @@ export function PiecesSection({
                       style={{
                         margin: 0,
                         fontFamily: fonts.heading,
-                        fontSize: 20,
-                        lineHeight: 1.1,
+                        fontSize: 14,
+                        fontWeight: 600,
+                        lineHeight: 1.2,
                         color: reportPalette.olive,
-                        letterSpacing: '-0.03em',
+                        letterSpacing: '-0.02em',
                       }}
                     >
                       {piece.piece_name}
