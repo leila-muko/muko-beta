@@ -1123,6 +1123,7 @@ function ConfirmedPieceCard({
               <input
                 value={draftName}
                 onChange={(e) => setDraftName(e.target.value)}
+                onBlur={() => setTimeout(() => cancelRename(), 150)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
