@@ -6,6 +6,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { createClient } from '@/lib/supabase/client';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import CollectionPage from '@/components/collections/CollectionPage';
+import { MukoWordmark } from '@/components/MukoWordmark';
 import { BRAND } from '@/lib/concept-studio/constants';
 import {
   hydrateCollectionContextFromAnalysis,
@@ -279,27 +280,12 @@ export default function CollectionsHubPage() {
         }}
       >
         {/* Logo */}
-        <button
-          type="button"
+        <MukoWordmark
           onClick={() => router.push('/entry')}
-          aria-label="Go to entry page"
-          style={{
-            fontSize: 18,
-            fontWeight: 700,
-            color: '#4D302F',
-            marginBottom: 44,
-            fontFamily: sohne,
-            letterSpacing: '-0.02em',
-            margin: '0 0 44px 0',
-            padding: 0,
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            width: 'fit-content',
-          }}
-        >
-          muko
-        </button>
+          color="#4D302F"
+          marginBottom={44}
+          style={{ margin: '0 0 44px 0' }}
+        />
 
         <NewCollectionButton onClick={handleStartCollection} />
 

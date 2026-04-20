@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
+import { MukoWordmark } from "@/components/MukoWordmark";
 
 const CHARTREUSE = "#A8B475";
 const MUTED = "#888078";
@@ -12,8 +13,6 @@ const OLIVE = "#43432B";
 const FLOW_BG = "#FAF9F6";
 
 const sohne = "var(--font-sohne-breit), -ui-sans-serif, sans-serif";
-const inter = "var(--font-inter), -ui-sans-serif, sans-serif";
-
 export interface MukoNavProps {
   activeTab: "setup" | "pieces" | "report";
   setupComplete?: boolean;
@@ -80,49 +79,7 @@ export function MukoNav({
     >
       {/* Left: logo + tabs */}
       <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-        <button
-          type="button"
-          onClick={() => router.push("/entry")}
-          aria-label="Go to entry page"
-          style={{
-            display: "inline-flex",
-            alignItems: "flex-start",
-            gap: 6,
-            fontFamily: sohne,
-            fontWeight: 700,
-            fontSize: 18,
-            letterSpacing: "-0.02em",
-            color: OLIVE,
-            padding: 0,
-            border: "none",
-            background: "transparent",
-            cursor: "pointer",
-          }}
-        >
-          <span>muko</span>
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              minHeight: 16,
-              padding: "1px 6px",
-              borderRadius: 999,
-              background: "rgba(60, 60, 60, 0.08)",
-              border: "1px solid rgba(60, 60, 60, 0.14)",
-              color: "rgba(67,67,43,0.62)",
-              fontFamily: inter,
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: "0.12em",
-              lineHeight: 1,
-              textTransform: "uppercase",
-              flexShrink: 0,
-            }}
-          >
-            beta
-          </span>
-        </button>
+        <MukoWordmark onClick={() => router.push("/entry")} color={OLIVE} />
 
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           {TABS.map((tab) => {

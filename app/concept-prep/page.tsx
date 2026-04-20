@@ -8,10 +8,10 @@ import { useSessionStore } from "@/lib/store/sessionStore";
 import { preloadCriticScores } from "@/lib/concept-studio/preloadCriticScores";
 
 const TEXT = "#191919";
+const SOFT_TEXT = "#2E2C25";
 const MUTED = "#888078";
 const CHARTREUSE = "#A8B475";
 const STEEL = "#7D96AC";
-const CAMEL = "#B8876B";
 
 const inter = "var(--font-inter), -ui-sans-serif, sans-serif";
 const sohne = "var(--font-sohne-breit), -ui-sans-serif, sans-serif";
@@ -82,7 +82,7 @@ export default function ConceptPrepPage() {
       style={{
         minHeight: "100vh",
         background:
-          "radial-gradient(circle at 16% 18%, rgba(168,180,117,0.18), transparent 0 28%), radial-gradient(circle at 82% 16%, rgba(125,150,172,0.16), transparent 0 30%), linear-gradient(180deg, #FCFAF6 0%, #F2ECE2 100%)",
+          "radial-gradient(circle at 84% 18%, rgba(205,170,179,0.22), transparent 0 30%), radial-gradient(circle at 18% 14%, rgba(168,180,117,0.12), transparent 0 28%), linear-gradient(180deg, #FCFAF6 0%, #F4EEE5 100%)",
         position: "relative",
         overflow: "hidden",
       }}
@@ -90,7 +90,7 @@ export default function ConceptPrepPage() {
       <style>{`
         @keyframes prepFloat {
           0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-          50% { transform: translate3d(0, -10px, 0) scale(1.02); }
+          50% { transform: translate3d(0, -8px, 0) scale(1.015); }
         }
 
         @keyframes prepPulse {
@@ -104,26 +104,50 @@ export default function ConceptPrepPage() {
           100% { transform: translateX(138%); opacity: 0; }
         }
 
-        @keyframes prepShimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
+        @keyframes prepDrift {
+          0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+          50% { transform: translate3d(8px, -6px, 0) rotate(6deg); }
+        }
+
+        @keyframes prepOrbit {
+          0% { transform: rotate(0deg) scale(1); opacity: 0.3; }
+          50% { opacity: 0.5; }
+          100% { transform: rotate(360deg) scale(1); opacity: 0.3; }
+        }
+
+        @keyframes prepDotPulse {
+          0%, 100% { transform: scale(1); opacity: 0.9; box-shadow: 0 0 0 0 rgba(168,180,117,0.24); }
+          60% { transform: scale(1.14); opacity: 1; box-shadow: 0 0 0 8px rgba(168,180,117,0); }
         }
 
         .prep-card {
           border-radius: 34px;
         }
 
+        .prep-orb-wrap {
+          position: relative;
+          width: 230px;
+          height: 230px;
+          display: grid;
+          place-items: center;
+          animation: prepFloat 7.2s ease-in-out infinite;
+        }
+
         .prep-orb {
-          animation: prepFloat 4.8s ease-in-out infinite;
+          position: relative;
+          width: 172px;
+          height: 172px;
+          border-radius: 999px;
+          animation: prepDrift 8s ease-in-out infinite;
         }
 
         .prep-orb::before {
           content: "";
           position: absolute;
-          inset: 18%;
+          inset: 16%;
           border-radius: 999px;
-          background: radial-gradient(circle, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.12) 72%, transparent 100%);
-          filter: blur(6px);
+          background: radial-gradient(circle, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.18) 72%, transparent 100%);
+          filter: blur(8px);
         }
 
         .prep-orb::after {
@@ -132,7 +156,49 @@ export default function ConceptPrepPage() {
           inset: -14%;
           border-radius: 999px;
           border: 1px solid rgba(255,255,255,0.42);
-          animation: prepPulse 2.8s ease-in-out infinite;
+          animation: prepPulse 3.2s ease-in-out infinite;
+        }
+
+        .prep-orbit,
+        .prep-orbit-two {
+          position: absolute;
+          border-radius: 999px;
+          border: 1px solid rgba(67,67,43,0.1);
+          opacity: 0.55;
+          animation: prepOrbit 18s linear infinite;
+        }
+
+        .prep-orbit {
+          width: 214px;
+          height: 214px;
+        }
+
+        .prep-orbit-two {
+          width: 246px;
+          height: 170px;
+          animation-duration: 24s;
+          animation-direction: reverse;
+        }
+
+        .prep-orbit::before,
+        .prep-orbit-two::before {
+          content: "";
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: rgba(184,135,107,0.28);
+          top: -4px;
+          left: calc(50% - 4px);
+          box-shadow: 0 0 18px rgba(184,135,107,0.26);
+        }
+
+        .prep-contour {
+          position: absolute;
+          inset: 26px;
+          border-radius: 999px;
+          border: 1px dashed rgba(125,150,172,0.14);
+          transform: rotate(-14deg);
         }
 
         .prep-progress-fill {
@@ -148,18 +214,67 @@ export default function ConceptPrepPage() {
           animation: prepSweep 1.9s linear infinite;
         }
 
-        .prep-active-line {
-          background: linear-gradient(90deg, rgba(25,25,25,0.95), rgba(25,25,25,0.58), rgba(25,25,25,0.95));
-          background-size: 220% 100%;
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-          animation: prepShimmer 3s linear infinite;
+        .prep-in-progress-dot {
+          animation: prepDotPulse 1.9s ease-out infinite;
         }
 
         @media (max-width: 860px) {
           .prep-card {
             border-radius: 28px;
+          }
+
+          .prep-hero {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+
+          .prep-visual {
+            order: -1;
+            justify-content: flex-start;
+          }
+
+          .prep-orb-wrap {
+            width: 154px;
+            height: 154px;
+          }
+
+          .prep-orb {
+            width: 112px;
+            height: 112px;
+          }
+
+          .prep-orbit {
+            width: 138px;
+            height: 138px;
+          }
+
+          .prep-orbit-two {
+            width: 156px;
+            height: 110px;
+          }
+
+          .prep-contour {
+            inset: 18px;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .prep-orb-wrap {
+            width: 118px;
+            height: 118px;
+          }
+
+          .prep-steps-row {
+            grid-template-columns: 20px minmax(0, 1fr);
+            gap: 12px;
+          }
+
+          .prep-step-head {
+            grid-template-columns: minmax(0, 1fr) !important;
+            gap: 4px !important;
+          }
+
+          .prep-step-status {
+            justify-self: start !important;
           }
         }
       `}</style>
@@ -170,7 +285,7 @@ export default function ConceptPrepPage() {
           position: "absolute",
           inset: 0,
           backgroundImage:
-            "linear-gradient(rgba(67,67,43,0.028) 1px, transparent 1px), linear-gradient(90deg, rgba(67,67,43,0.028) 1px, transparent 1px)",
+            "linear-gradient(rgba(67,67,43,0.024) 1px, transparent 1px), linear-gradient(90deg, rgba(67,67,43,0.024) 1px, transparent 1px)",
           backgroundSize: "84px 84px",
           maskImage: "linear-gradient(180deg, rgba(0,0,0,0.18), transparent 82%)",
           pointerEvents: "none",
@@ -181,13 +296,13 @@ export default function ConceptPrepPage() {
         aria-hidden
         style={{
           position: "absolute",
-          top: "14%",
-          left: "-10vw",
-          width: "36vw",
-          height: "36vw",
+          top: "8%",
+          right: "-12vw",
+          width: "42vw",
+          height: "42vw",
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(184,135,107,0.16), transparent 64%)",
-          filter: "blur(22px)",
+          background: "radial-gradient(circle, rgba(205,170,179,0.22), transparent 64%)",
+          filter: "blur(28px)",
           pointerEvents: "none",
         }}
       />
@@ -229,11 +344,11 @@ export default function ConceptPrepPage() {
           className="prep-card"
           style={{
             width: "min(760px, 100%)",
-            padding: "34px 28px 28px",
+            padding: "34px 30px 24px",
             border: "1px solid rgba(67,67,43,0.08)",
-            background: "rgba(255,255,255,0.58)",
+            background: "linear-gradient(180deg, rgba(255,252,248,0.84) 0%, rgba(251,244,239,0.72) 100%)",
             backdropFilter: "blur(24px) saturate(120%)",
-            boxShadow: "0 30px 100px rgba(67,67,43,0.08), inset 0 1px 0 rgba(255,255,255,0.55)",
+            boxShadow: "0 30px 100px rgba(67,67,43,0.08), inset 0 1px 0 rgba(255,255,255,0.68)",
           }}
         >
           <div
@@ -250,9 +365,9 @@ export default function ConceptPrepPage() {
               style={{
                 fontFamily: inter,
                 fontSize: 11,
-                letterSpacing: "0.16em",
+                letterSpacing: "0.18em",
                 textTransform: "uppercase",
-                color: CHARTREUSE,
+                color: "rgba(67,67,43,0.56)",
               }}
             >
               Editorial AI Ordering
@@ -261,13 +376,13 @@ export default function ConceptPrepPage() {
               style={{
                 padding: "9px 14px",
                 borderRadius: 999,
-                background: "rgba(255,255,255,0.54)",
-                border: "1px solid rgba(67,67,43,0.07)",
+                background: "rgba(255,255,255,0.46)",
+                border: "1px solid rgba(67,67,43,0.08)",
                 fontFamily: inter,
                 fontSize: 10,
-                letterSpacing: "0.13em",
+                letterSpacing: "0.15em",
                 textTransform: "uppercase",
-                color: "rgba(67,67,43,0.54)",
+                color: "rgba(67,67,43,0.58)",
               }}
             >
               {season || "Season pending"}
@@ -275,23 +390,24 @@ export default function ConceptPrepPage() {
           </div>
 
           <div
+            className="prep-hero"
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) 220px",
-              gap: 28,
+              gridTemplateColumns: "minmax(0, 1fr) 240px",
+              gap: 30,
               alignItems: "center",
             }}
           >
             <div>
               <h1
                 style={{
-                  margin: "0 0 14px",
+                  margin: "0 0 16px",
                   fontFamily: sohne,
-                  fontSize: "clamp(24px, 3vw, 34px)",
-                  lineHeight: 1,
+                  fontSize: "clamp(30px, 4vw, 44px)",
+                  lineHeight: 0.98,
                   letterSpacing: "-0.04em",
-                  color: TEXT,
-                  maxWidth: 380,
+                  color: SOFT_TEXT,
+                  maxWidth: 470,
                   fontWeight: 500,
                 }}
               >
@@ -302,12 +418,13 @@ export default function ConceptPrepPage() {
                   margin: "0 0 24px",
                   fontFamily: inter,
                   fontSize: 15,
-                  lineHeight: 1.72,
+                  lineHeight: 1.76,
                   color: MUTED,
-                  maxWidth: 500,
+                  maxWidth: 530,
                 }}
               >
-                Muko is ordering the strongest directions for <span style={{ color: TEXT }}>{resolvedCollectionName}</span>,
+                Muko is ordering the strongest directions for{" "}
+                <span style={{ color: SOFT_TEXT, fontStyle: "italic" }}>{resolvedCollectionName}</span>{" "}
                 balancing authorship, whitespace, and commercial pressure.
               </p>
 
@@ -324,19 +441,19 @@ export default function ConceptPrepPage() {
                   style={{
                     fontFamily: inter,
                     fontSize: 10,
-                    letterSpacing: "0.14em",
+                    letterSpacing: "0.18em",
                     textTransform: "uppercase",
                     color: "rgba(67,67,43,0.46)",
                   }}
                 >
-                  Recommendation Pass
+                  Progress
                 </div>
                 <div
                   style={{
-                    fontFamily: sohne,
-                    fontSize: 19,
-                    color: TEXT,
-                    letterSpacing: "-0.03em",
+                    fontFamily: inter,
+                    fontSize: 13,
+                    color: "rgba(46,44,37,0.68)",
+                    letterSpacing: "0.02em",
                   }}
                 >
                   {Math.round(progress)}%
@@ -345,10 +462,9 @@ export default function ConceptPrepPage() {
 
               <div
                 style={{
-                  height: 10,
+                  height: 4,
                   borderRadius: 999,
-                  background: "rgba(67,67,43,0.08)",
-                  padding: 2,
+                  background: "rgba(67,67,43,0.1)",
                 }}
               >
                 <div
@@ -357,58 +473,64 @@ export default function ConceptPrepPage() {
                     width: `${progress}%`,
                     height: "100%",
                     borderRadius: 999,
-                    background: `linear-gradient(90deg, ${CHARTREUSE} 0%, ${STEEL} 64%, ${CAMEL} 100%)`,
-                    boxShadow: "0 0 24px rgba(125,150,172,0.24)",
-                    transition: "width 260ms ease",
+                    background: `linear-gradient(90deg, ${CHARTREUSE} 0%, rgba(205,170,179,0.92) 58%, rgba(207,188,163,0.95) 100%)`,
+                    boxShadow: "0 0 20px rgba(184,135,107,0.18)",
+                    transition: "width 320ms cubic-bezier(0.22, 1, 0.36, 1)",
                   }}
                 />
               </div>
             </div>
 
             <div
+              className="prep-visual"
               style={{
                 display: "grid",
                 placeItems: "center",
+                justifyContent: "end",
               }}
             >
-              <div
-                className="prep-orb"
-                style={{
-                  width: 182,
-                  height: 182,
-                  borderRadius: "50%",
-                  position: "relative",
-                  background:
-                    "radial-gradient(circle at 34% 28%, rgba(255,255,255,0.95), rgba(255,255,255,0.45) 18%, rgba(168,180,117,0.24) 42%, rgba(125,150,172,0.3) 68%, rgba(184,135,107,0.22) 100%)",
-                  boxShadow:
-                    "inset 0 1px 1px rgba(255,255,255,0.84), 0 20px 42px rgba(67,67,43,0.12), 0 0 42px rgba(168,180,117,0.16)",
-                }}
-              />
+              <div className="prep-orb-wrap">
+                <div className="prep-orbit" />
+                <div className="prep-orbit-two" />
+                <div className="prep-contour" />
+                <div
+                  className="prep-orb"
+                  style={{
+                    background:
+                      "radial-gradient(circle at 36% 30%, rgba(255,255,255,0.98), rgba(255,255,255,0.52) 18%, rgba(168,180,117,0.22) 40%, rgba(205,170,179,0.22) 62%, rgba(184,135,107,0.28) 100%)",
+                    boxShadow:
+                      "inset 0 1px 1px rgba(255,255,255,0.84), 0 18px 42px rgba(67,67,43,0.08), 0 0 44px rgba(205,170,179,0.14)",
+                  }}
+                />
+              </div>
             </div>
           </div>
 
           <div
             style={{
-              marginTop: 28,
-              paddingTop: 20,
-              borderTop: "1px solid rgba(67,67,43,0.08)",
+              marginTop: 30,
+              paddingTop: 22,
+              borderTop: "1px solid rgba(67,67,43,0.07)",
               display: "grid",
-              gap: 14,
+              gap: 10,
             }}
           >
             {STATUS_LINES.map((line, index) => {
               const isComplete = index < activeLine;
               const isActive = index === activeLine;
+              const statusLabel = isComplete ? "Complete" : isActive ? "In progress" : "Pending";
 
               return (
                 <div
+                  className="prep-steps-row"
                   key={line}
                   style={{
                     display: "grid",
                     gridTemplateColumns: "24px minmax(0, 1fr)",
-                    gap: 14,
+                    gap: 16,
                     alignItems: "start",
-                    padding: "6px 0",
+                    padding: "12px 0",
+                    borderTop: index === 0 ? "none" : "1px solid rgba(67,67,43,0.05)",
                   }}
                 >
                   <div
@@ -418,48 +540,93 @@ export default function ConceptPrepPage() {
                       borderRadius: "50%",
                       display: "grid",
                       placeItems: "center",
+                      marginTop: 2,
                       background: isActive
-                        ? "linear-gradient(135deg, rgba(168,180,117,0.2), rgba(125,150,172,0.18))"
+                        ? "linear-gradient(135deg, rgba(168,180,117,0.18), rgba(205,170,179,0.14))"
                         : isComplete
-                          ? "rgba(255,255,255,0.72)"
+                          ? "rgba(255,255,255,0.76)"
                           : "rgba(255,255,255,0.34)",
                       border: `1px solid ${
                         isActive || isComplete ? "rgba(67,67,43,0.12)" : "rgba(67,67,43,0.06)"
                       }`,
                     }}
                   >
-                    <div
-                      style={{
-                        width: 7,
-                        height: 7,
-                        borderRadius: "50%",
-                        background: isActive ? CHARTREUSE : isComplete ? STEEL : "rgba(136,128,120,0.28)",
-                        boxShadow: isActive ? "0 0 0 6px rgba(168,180,117,0.1)" : "none",
-                        transition: "all 180ms ease",
-                      }}
-                    />
+                    {isComplete ? (
+                      <div
+                        style={{
+                          fontFamily: inter,
+                          fontSize: 12,
+                          lineHeight: 1,
+                          color: STEEL,
+                          fontWeight: 600,
+                        }}
+                      >
+                        ✓
+                      </div>
+                    ) : (
+                      <div
+                        className={isActive ? "prep-in-progress-dot" : undefined}
+                        style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: "50%",
+                          background: isActive ? CHARTREUSE : "rgba(136,128,120,0.28)",
+                          boxShadow: isActive ? "0 0 0 6px rgba(168,180,117,0.08)" : "none",
+                          transition: "all 180ms ease",
+                        }}
+                      />
+                    )}
                   </div>
 
                   <div>
                     <div
-                      className={isActive ? "prep-active-line" : undefined}
+                      className="prep-step-head"
                       style={{
-                        fontFamily: sohne,
-                        fontSize: 22,
-                        lineHeight: 1.08,
-                        letterSpacing: "-0.035em",
-                        color: !isActive ? (isComplete ? TEXT : "rgba(67,67,43,0.48)") : undefined,
+                        display: "grid",
+                        gridTemplateColumns: "minmax(0, 1fr) auto",
+                        gap: 12,
+                        alignItems: "baseline",
                         marginBottom: 4,
                       }}
                     >
-                      {line}
+                      <div
+                        style={{
+                          fontFamily: sohne,
+                          fontSize: 20,
+                          lineHeight: 1.08,
+                          letterSpacing: "-0.03em",
+                          color: isActive ? SOFT_TEXT : isComplete ? TEXT : "rgba(67,67,43,0.42)",
+                          transition: "color 180ms ease, opacity 180ms ease",
+                        }}
+                      >
+                        {line}
+                      </div>
+                      <div
+                        className="prep-step-status"
+                        style={{
+                          justifySelf: "end",
+                          fontFamily: inter,
+                          fontSize: 11,
+                          letterSpacing: "0.12em",
+                          textTransform: "uppercase",
+                          color: isActive
+                            ? "rgba(67,67,43,0.72)"
+                            : isComplete
+                              ? "rgba(125,150,172,0.92)"
+                              : "rgba(67,67,43,0.28)",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {statusLabel}
+                      </div>
                     </div>
                     <div
                       style={{
                         fontFamily: inter,
                         fontSize: 12.5,
                         lineHeight: 1.65,
-                        color: "rgba(67,67,43,0.56)",
+                        color: isActive ? "rgba(67,67,43,0.58)" : "rgba(67,67,43,0.48)",
+                        maxWidth: 460,
                       }}
                     >
                       {STATUS_NOTES[index]}
@@ -468,6 +635,40 @@ export default function ConceptPrepPage() {
                 </div>
               );
             })}
+          </div>
+
+          <div
+            style={{
+              marginTop: 18,
+              paddingTop: 16,
+              borderTop: "1px solid rgba(67,67,43,0.06)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: inter,
+                fontSize: 12,
+                lineHeight: 1.6,
+                color: "rgba(67,67,43,0.44)",
+              }}
+            >
+              This may take a few moments. Curating clarity.
+            </div>
+            <div
+              style={{
+                fontFamily: inter,
+                fontSize: 12,
+                lineHeight: 1.6,
+                color: "rgba(67,67,43,0.38)",
+              }}
+            >
+              A collection is a system of decisions.
+            </div>
           </div>
         </section>
       </main>

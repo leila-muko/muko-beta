@@ -2923,19 +2923,9 @@ export default function ConceptStudioPage() {
   }, [combinedDirection, selectedAestheticData?.palette_options]);
   const [showAllInterpretationSuggestions, setShowAllInterpretationSuggestions] = useState(false);
   const [showAllExpressionSignals, setShowAllExpressionSignals] = useState(false);
-  const [currentStageState, setCurrentStageState] = useState<ConceptStageId>(
-    () => (Object.keys(pieceRolesById).length > 0 ? "language" : "direction")
-  );
+  const [currentStageState, setCurrentStageState] = useState<ConceptStageId>("direction");
   const [stageTransitionDirection, setStageTransitionDirection] = useState<1 | -1>(1);
   const isSubsequentPiece = collectionPieces.length > 0 || Object.keys(pieceRolesById).length > 0;
-  const hasAutoAdvancedRef = useRef(false);
-  useEffect(() => {
-    if (hasAutoAdvancedRef.current) return;
-    if (isSubsequentPiece) {
-      hasAutoAdvancedRef.current = true;
-      setCurrentStageState("language");
-    }
-  }, [isSubsequentPiece]);
   const visibleInterpretationSuggestions = showAllInterpretationSuggestions ? interpretationSuggestions : interpretationSuggestions.slice(0, 4);
   const hiddenInterpretationSuggestionCount = Math.max(interpretationSuggestions.length - visibleInterpretationSuggestions.length, 0);
   useEffect(() => {

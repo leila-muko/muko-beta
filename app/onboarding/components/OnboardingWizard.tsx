@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { BRAND } from '@/lib/concept-studio/constants';
+import { MukoWordmark } from '@/components/MukoWordmark';
 import ProgressIndicator from './ProgressIndicator';
 import Step1BrandName from './steps/Step1BrandName';
 import Step2Keywords from './steps/Step2Keywords';
@@ -243,24 +244,7 @@ export default function OnboardingWizard() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-          <button
-            type="button"
-            onClick={() => router.push('/entry')}
-            aria-label="Go to entry page"
-            style={{
-              fontFamily: sohne,
-              fontWeight: 700,
-              fontSize: 18,
-              letterSpacing: '-0.02em',
-              color: OLIVE,
-              padding: 0,
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-            }}
-          >
-            muko
-          </button>
+          <MukoWordmark onClick={() => router.push('/entry')} color={OLIVE} />
 
           <div style={{ width: 1, height: 24, background: 'rgba(67,67,43,0.10)' }} />
 

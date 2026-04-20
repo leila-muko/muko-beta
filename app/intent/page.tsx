@@ -559,6 +559,13 @@ export default function IntentCalibrationPage() {
       directionInterpretationText: "",
       directionInterpretationModifiers: [],
       directionInterpretationChips: [],
+      collectionRole: null,
+      selectedKeyPiece: null,
+      selectedPieceImage: null,
+      decisionGuidanceState: { is_confirmed: false, selected_anchor_piece: null },
+      activeProductPieceId: null,
+      pieceRolesById: {},
+      pieceBuildContext: null,
       isProxyMatch: false,
     });
     router.push("/concept-prep");

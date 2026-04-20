@@ -1,20 +1,21 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { createClient } from '@/lib/supabase/client';
 import { BRAND } from '@/lib/concept-studio/constants';
 import { resetCollectionScopedSession } from '@/lib/collections/resetCollectionScopedSession';
+import { MukoWordmark } from '@/components/MukoWordmark';
 
 /* ─── Design tokens — match Intent / Concept / Spec / Report ─────────────── */
-const OLIVE = BRAND.oliveInk; // #43432B
-const CHARTREUSE = '#A8B475';
-const STEEL = BRAND.steelBlue; // #7D96AC
-const FLOW_BG = '#FAF9F6';
+const FLOW_BG = '#F8F3EE';
+const ESPRESSO = '#4E2F2E';
+const BORDER = 'rgba(78,47,46,0.12)';
+const BORDER_STRONG = 'rgba(78,47,46,0.22)';
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
-
 interface RecentCollectionItem {
   id: string;
   name: string;
@@ -214,9 +215,9 @@ export default function EntryScreen() {
         style={{
           width: 272,
           minWidth: 272,
-          background: FLOW_BG,
-          borderRight: '1px solid rgba(67,67,43,0.09)',
-          padding: '40px 28px',
+          background: 'rgba(248,243,238,0.82)',
+          borderRight: `1px solid ${BORDER}`,
+          padding: '38px 28px 32px',
           boxSizing: 'border-box',
           display: 'flex',
           flexDirection: 'column',
@@ -225,55 +226,16 @@ export default function EntryScreen() {
           height: '100%',
           overflow: 'hidden',
           animation: 'fadeIn 400ms ease both',
+          backdropFilter: 'blur(14px)',
         }}
       >
         {/* Logo */}
-        <button
-          type="button"
+        <MukoWordmark
           onClick={() => router.push('/entry')}
-          aria-label="Go to entry page"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'flex-start',
-            gap: 6,
-            fontSize: 18,
-            fontWeight: 700,
-            color: '#4D302F',
-            marginBottom: 44,
-            fontFamily: sohne,
-            letterSpacing: '-0.02em',
-            margin: '0 0 44px 0',
-            padding: 0,
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            width: 'fit-content',
-          }}
-        >
-          <span>muko</span>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minHeight: 16,
-              padding: '1px 6px',
-              borderRadius: 999,
-              background: 'rgba(60, 60, 60, 0.08)',
-              border: '1px solid rgba(60, 60, 60, 0.14)',
-              color: 'rgba(67,67,43,0.62)',
-              fontFamily: inter,
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              lineHeight: 1,
-              textTransform: 'uppercase',
-              flexShrink: 0,
-            }}
-          >
-            beta
-          </span>
-        </button>
+          color="#4D302F"
+          marginBottom={44}
+          style={{ margin: '0 0 44px 0' }}
+        />
 
         {/* New Collection button */}
         <NewCollectionButton onClick={resetForNewCollection} />
@@ -284,9 +246,9 @@ export default function EntryScreen() {
             style={{
               fontSize: 10,
               fontWeight: 700,
-              color: 'rgba(67,67,43,0.38)',
-              marginBottom: 16,
-              letterSpacing: '0.12em',
+              color: 'rgba(78,47,46,0.42)',
+              marginBottom: 18,
+              letterSpacing: '0.16em',
               textTransform: 'uppercase',
               fontFamily: inter,
               margin: '0 0 16px 0',
@@ -313,15 +275,15 @@ export default function EntryScreen() {
                       style={{
                         textAlign: 'left',
                         fontSize: 13,
-                        color: isHovered ? OLIVE : 'rgba(67,67,43,0.58)',
-                        backgroundColor: isHovered ? 'rgba(67,67,43,0.04)' : 'transparent',
+                        color: isHovered ? ESPRESSO : 'rgba(78,47,46,0.58)',
+                        backgroundColor: isHovered ? 'rgba(255,255,255,0.46)' : 'transparent',
                         border: 'none',
-                        padding: '9px 12px',
+                        padding: '10px 12px',
                         paddingRight: 36,
                         cursor: 'pointer',
                         fontFamily: inter,
                         fontWeight: 500,
-                        borderRadius: 999,
+                        borderRadius: 16,
                         transition: 'all 160ms ease',
                         width: '100%',
                         overflow: 'hidden',
@@ -344,14 +306,14 @@ export default function EntryScreen() {
                           width: 22,
                           height: 22,
                           borderRadius: 999,
-                          background: 'rgba(255,255,255,0.9)',
-                          border: '0.5px solid rgba(67,67,43,0.14)',
+                          background: 'rgba(255,255,255,0.78)',
+                          border: `0.5px solid ${BORDER}`,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontSize: 12,
-                          color: 'rgba(67,67,43,0.55)',
+                          color: 'rgba(78,47,46,0.52)',
                           letterSpacing: '0.04em',
                           lineHeight: 1,
                           padding: 0,
@@ -371,9 +333,9 @@ export default function EntryScreen() {
                           top: '100%',
                           right: 0,
                           background: '#FFFFFF',
-                          border: '1px solid rgba(67,67,43,0.1)',
-                          borderRadius: 8,
-                          boxShadow: '0 6px 20px rgba(25,25,25,0.1)',
+                          border: `1px solid ${BORDER}`,
+                          borderRadius: 12,
+                          boxShadow: '0 10px 28px rgba(78,47,46,0.08)',
                           zIndex: 30,
                           overflow: 'hidden',
                           minWidth: 160,
@@ -411,7 +373,7 @@ export default function EntryScreen() {
                 style={{
                   textAlign: 'left',
                   fontSize: 13,
-                  color: 'rgba(67,67,43,0.40)',
+                  color: 'rgba(78,47,46,0.42)',
                   padding: '9px 12px',
                   fontFamily: inter,
                 }}
@@ -426,12 +388,13 @@ export default function EntryScreen() {
 
       {/* ── Main ─────────────────────────────────────────────────────────── */}
       <main
+        className="entry-main"
         style={{
           flex: 1,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'flex-start',
-          padding: '80px clamp(40px, 6vw, 100px)',
+          padding: '72px clamp(36px, 7vw, 112px)',
           boxSizing: 'border-box',
           height: '100%',
           position: 'relative',
@@ -441,24 +404,19 @@ export default function EntryScreen() {
       >
         <div
           aria-hidden="true"
-          className="entry-radar"
+          className="entry-atmosphere"
           style={{
             position: 'absolute',
-            right: 'clamp(48px, 10vw, 160px)',
-            top: '47%',
-            width: 'min(42vw, 560px)',
-            aspectRatio: '1 / 1',
-            transform: 'translateY(-50%)',
+            right: '-6%',
+            top: '10%',
+            width: 'min(54vw, 820px)',
+            height: 'min(70vh, 760px)',
             pointerEvents: 'none',
-            opacity: 0.96,
+            opacity: 1,
           }}
-        >
-          <div className="entry-radar-ring entry-radar-ring-one" />
-          <div className="entry-radar-ring entry-radar-ring-two" />
-          <div className="entry-radar-ring entry-radar-ring-three" />
-          <div className="entry-radar-core" />
-        </div>
+        />
         <div
+          className="entry-shell"
           style={{
             width: '100%',
             maxWidth: 1240,
@@ -466,39 +424,43 @@ export default function EntryScreen() {
             justifyContent: 'flex-start',
             position: 'relative',
             zIndex: 1,
+            minHeight: '100%',
+            alignItems: 'center',
           }}
         >
           <div
+            className="entry-content"
             style={{
               width: '100%',
-              maxWidth: 720,
+              maxWidth: 760,
+              position: 'relative',
             }}
           >
             <div style={{ animation: 'fadeIn 450ms ease both' }}>
               <h1
                 className="entry-headline-blur-line"
                 style={{
-                  fontSize: 'clamp(40px, 5vw, 60px)',
+                  fontSize: 'clamp(2.9rem, 5.2vw, 5rem)',
                   fontWeight: 300,
-                  color: '#4D302F',
-                  lineHeight: 0.98,
+                  color: ESPRESSO,
+                  lineHeight: 0.94,
                   letterSpacing: '-0.04em',
                   fontFamily: '"Söhne Breit", var(--font-sohne-breit), Georgia, serif',
                   margin: 0,
-                  maxWidth: 'none',
-                  whiteSpace: 'nowrap',
-                  display: 'inline-block',
+                  maxWidth: '10.5ch',
+                  whiteSpace: 'normal',
                 }}
               >
-                Shape your next drop.
+                shape what comes next.
               </h1>
               <p
                 style={{
-                  margin: '16px 0 0 0',
-                  maxWidth: 540,
-                  color: 'rgba(77,48,47,0.58)',
-                  fontSize: 16,
-                  lineHeight: 1.6,
+                  margin: '22px 0 0 0',
+                  maxWidth: 460,
+                  color: 'rgba(78,47,46,0.56)',
+                  fontSize: 15,
+                  lineHeight: 1.72,
+                  letterSpacing: '0.01em',
                   fontFamily: inter,
                 }}
               >
@@ -508,30 +470,48 @@ export default function EntryScreen() {
 
             {/* Form */}
             <div
+              className="entry-form-stack"
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 36,
-                marginTop: 40,
+                gap: 42,
+                marginTop: 54,
               }}
             >
               <div className="entry-input-fade">
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: 18,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.22em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(117,94,89,0.68)',
+                    fontFamily: inter,
+                  }}
+                >
+                  What are you building?
+                </label>
                 <div
+                  className="entry-name-row"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 18,
+                    gap: 20,
                     width: '100%',
                     maxWidth: '680px',
                   }}
                 >
-                  <img
+                  <Image
                     src="/mlogo.svg"
                     alt="Muko logo"
+                    width={46}
+                    height={46}
                     style={{
-                      width: 54,
-                      height: 54,
-                      opacity: 0.18,
+                      width: 46,
+                      height: 46,
+                      opacity: 0.14,
                       flexShrink: 0,
                       pointerEvents: 'none',
                     }}
@@ -540,19 +520,18 @@ export default function EntryScreen() {
                     type="text"
                     value={collectionName}
                     onChange={(e) => setCollectionName(e.target.value)}
-                    onBlur={() => setTouchedName(true)}
                     placeholder="e.g. Spring Requiem"
                     style={{
                       flex: 1,
                       minWidth: 0,
                       boxSizing: 'border-box' as const,
-                      padding: '0 0 14px 0',
-                      fontSize: 'clamp(34px, 4vw, 48px)',
+                      padding: '0 0 16px 0',
+                      fontSize: 'clamp(2.1rem, 4.2vw, 3.4rem)',
                       fontWeight: 500,
-                      color: '#4D302F',
+                      color: ESPRESSO,
                       backgroundColor: 'transparent',
                       border: 'none',
-                      borderBottom: '1px solid rgba(77,48,47,0.15)',
+                      borderBottom: `1px solid ${BORDER}`,
                       borderRadius: 0,
                       outline: 'none',
                       boxShadow: 'none',
@@ -561,7 +540,14 @@ export default function EntryScreen() {
                       fontFamily: sohne,
                       letterSpacing: '-0.04em',
                       transition: 'border-color 200ms ease',
-                      caretColor: '#4D302F',
+                      caretColor: ESPRESSO,
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderBottom = `1px solid ${BORDER_STRONG}`;
+                    }}
+                    onBlur={(e) => {
+                      setTouchedName(true);
+                      e.currentTarget.style.borderBottom = `1px solid ${BORDER}`;
                     }}
                   />
                 </div>
@@ -589,9 +575,9 @@ export default function EntryScreen() {
                       display: 'block',
                       fontSize: 10,
                       fontWeight: 700,
-                      color: 'rgba(67,67,43,0.38)',
-                      marginBottom: 14,
-                      letterSpacing: '0.12em',
+                      color: 'rgba(117,94,89,0.68)',
+                      marginBottom: 18,
+                      letterSpacing: '0.22em',
                       textTransform: 'uppercase',
                       fontFamily: inter,
                     }}
@@ -600,10 +586,11 @@ export default function EntryScreen() {
                   </label>
 
                   <div
+                    className="entry-season-row"
                     style={{
                       display: 'flex',
                       flexWrap: 'wrap',
-                      gap: 10,
+                      gap: 28,
                     }}
                   >
                     {allSeasons.map((season) => {
@@ -637,10 +624,11 @@ export default function EntryScreen() {
 
                 {/* CTA */}
                 <div
+                  className="entry-cta-row"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 16,
+                    gap: 18,
                     flexWrap: 'wrap',
                   }}
                 >
@@ -648,37 +636,41 @@ export default function EntryScreen() {
                     onClick={handleContinue}
                     disabled={!canContinue}
                     style={{
-                      padding: '12px 28px',
+                      padding: '13px 24px 13px 26px',
                       fontSize: 12,
                       fontWeight: 700,
-                      color: canContinue ? STEEL : 'rgba(67,67,43,0.30)',
-                      background: canContinue ? 'rgba(125,150,172,0.07)' : 'rgba(255,255,255,0.46)',
+                      color: canContinue ? ESPRESSO : 'rgba(78,47,46,0.34)',
+                      background: canContinue ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.34)',
                       border: canContinue
-                        ? `1.5px solid ${STEEL}`
-                        : '1.5px solid rgba(67,67,43,0.10)',
+                        ? `1px solid ${BORDER_STRONG}`
+                        : `1px solid ${BORDER}`,
                       borderRadius: 999,
                       cursor: canContinue ? 'pointer' : 'not-allowed',
-                      fontFamily: sohne,
-                      letterSpacing: '0.08em',
+                      fontFamily: inter,
+                      letterSpacing: '0.16em',
                       textTransform: 'uppercase',
-                      transition: 'all 280ms ease',
+                      transition: 'all 220ms ease',
                       opacity: canContinue ? 1 : 0.65,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 10,
+                      gap: 12,
+                      boxShadow: canContinue ? '0 10px 24px rgba(111,76,73,0.05)' : 'none',
+                      backdropFilter: 'blur(10px)',
                     }}
                     onMouseEnter={(e) => {
                       if (!canContinue) return;
-                      e.currentTarget.style.background = 'rgba(125,150,172,0.14)';
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.66)';
+                      e.currentTarget.style.borderColor = 'rgba(78,47,46,0.30)';
                       e.currentTarget.style.transform = 'translateY(-1px)';
                     }}
                     onMouseLeave={(e) => {
                       if (!canContinue) return;
-                      e.currentTarget.style.background = 'rgba(125,150,172,0.07)';
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.52)';
+                      e.currentTarget.style.borderColor = BORDER_STRONG;
                       e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
-                    <span>Continue</span>
+                    <span>Enter Studio</span>
                     <svg
                       width="15"
                       height="15"
@@ -698,16 +690,17 @@ export default function EntryScreen() {
 
                   <div
                     style={{
-                      fontSize: 12,
-                      color: 'rgba(67,67,43,0.45)',
+                      fontSize: 11,
+                      color: 'rgba(117,94,89,0.50)',
                       fontFamily: inter,
+                      letterSpacing: '0.02em',
                     }}
                   >
                     Press{' '}
                     <span
                       style={{
                         fontFamily: sohne,
-                        color: 'rgba(67,67,43,0.70)',
+                        color: 'rgba(78,47,46,0.62)',
                       }}
                     >
                       Enter
@@ -715,6 +708,21 @@ export default function EntryScreen() {
                   </div>
                 </div>
               </div>
+            </div>
+            <div
+              className="entry-microcopy"
+              style={{
+                position: 'absolute',
+                right: 'clamp(-440px, -26vw, -280px)',
+                bottom: 'clamp(4px, 1.4vh, 16px)',
+                fontFamily: inter,
+                fontSize: 12,
+                letterSpacing: '0.06em',
+                color: 'rgba(94,64,58,0.4)',
+                pointerEvents: 'none',
+              }}
+            >
+              A collection is a system of decisions.
             </div>
           </div>
 
@@ -745,105 +753,167 @@ export default function EntryScreen() {
           animation: entryHeadlineBlurLine 900ms cubic-bezier(0.22, 1, 0.36, 1) 0.08s forwards;
         }
 
-        @keyframes entryRadarPulse {
-          0% { transform: translate(-50%, -50%) scale(0.72); opacity: 0; }
-          18% { opacity: 0.32; }
-          100% { transform: translate(-50%, -50%) scale(1.9); opacity: 0; }
+        @keyframes entryAtmosphereDrift {
+          0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+          50% { transform: translate3d(-1.5%, 1.2%, 0) scale(1.02); }
         }
 
-        @keyframes entryRadarCoreBreath {
-          0%, 100% { transform: translate(-50%, -50%) scale(0.96); opacity: 0.44; }
-          50% { transform: translate(-50%, -50%) scale(1.08); opacity: 0.76; }
-        }
-
-        .entry-radar::before {
+        .entry-atmosphere::before,
+        .entry-atmosphere::after {
           content: '';
           position: absolute;
-          inset: -30%;
+          inset: 0;
           border-radius: 999px;
-          background:
-            radial-gradient(circle at center, rgba(246, 205, 201, 0.42) 0%, rgba(246, 205, 201, 0.24) 16%, rgba(246, 205, 201, 0.12) 32%, rgba(246, 205, 201, 0.05) 52%, rgba(246, 205, 201, 0) 84%);
-          filter: blur(26px);
+          animation: entryAtmosphereDrift 16s ease-in-out infinite;
         }
 
-        .entry-radar::after {
+        .entry-atmosphere::before {
+          background:
+            radial-gradient(42% 42% at 62% 34%, rgba(236, 201, 207, 0.54) 0%, rgba(236, 201, 207, 0.24) 38%, rgba(236, 201, 207, 0.08) 58%, rgba(236, 201, 207, 0) 82%),
+            radial-gradient(38% 38% at 74% 62%, rgba(226, 181, 188, 0.26) 0%, rgba(226, 181, 188, 0.09) 46%, rgba(226, 181, 188, 0) 78%);
+          filter: blur(28px);
+          opacity: 0.92;
+        }
+
+        .entry-atmosphere::after {
+          inset: 8% 0 -2% 18%;
+          background:
+            radial-gradient(48% 44% at 56% 42%, rgba(244, 223, 226, 0.52) 0%, rgba(244, 223, 226, 0.24) 34%, rgba(244, 223, 226, 0.08) 58%, rgba(244, 223, 226, 0) 82%);
+          filter: blur(52px);
+          opacity: 0.78;
+          animation-duration: 20s;
+        }
+
+        .entry-shell::before {
           content: '';
           position: absolute;
-          inset: -18%;
-          border-radius: 999px;
-          background-image:
-            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 0.09'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
-          background-size: 180px 180px;
-          opacity: 0.24;
-          mix-blend-mode: multiply;
+          inset: 7% auto 6% 0;
+          width: min(62vw, 760px);
+          background: linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0.08));
+          border-radius: 36px;
+          opacity: 0.42;
+          pointer-events: none;
         }
 
-        .entry-radar-ring,
-        .entry-radar-core {
+        .entry-name-row input::placeholder {
+          color: rgba(117,94,89,0.34);
+        }
+
+        .entry-season-tab {
+          position: relative;
+        }
+
+        .entry-season-tab::after {
+          content: '';
           position: absolute;
-          top: 50%;
-          left: 50%;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          height: 1px;
           border-radius: 999px;
+          background: rgba(78,47,46,0.12);
+          transform-origin: center;
         }
 
-        .entry-radar-ring {
-          transform: translate(-50%, -50%);
-          background:
-            radial-gradient(circle at center, rgba(246, 205, 201, 0.22) 0%, rgba(246, 205, 201, 0.14) 18%, rgba(246, 205, 201, 0.07) 34%, rgba(246, 205, 201, 0.025) 52%, rgba(246, 205, 201, 0) 74%);
-          box-shadow:
-            0 0 44px rgba(246, 205, 201, 0.14),
-            0 0 90px rgba(246, 205, 201, 0.08);
-          filter: blur(12px) saturate(108%);
-          mix-blend-mode: screen;
-        }
+        @media (max-width: 1180px) {
+          .entry-main {
+            padding: 56px clamp(28px, 5vw, 72px) !important;
+          }
 
-        .entry-radar-ring-one {
-          width: 74%;
-          height: 74%;
-          border-radius: 58% 42% 55% 45% / 46% 54% 44% 56%;
-          rotate: -10deg;
-          animation: entryRadarPulse 5.8s ease-out infinite;
-        }
-
-        .entry-radar-ring-two {
-          width: 72%;
-          height: 72%;
-          border-radius: 46% 54% 43% 57% / 58% 42% 56% 44%;
-          rotate: 14deg;
-          animation: entryRadarPulse 5.8s ease-out 1.9s infinite;
-        }
-
-        .entry-radar-ring-three {
-          width: 76%;
-          height: 76%;
-          border-radius: 55% 45% 52% 48% / 43% 57% 47% 53%;
-          rotate: -22deg;
-          animation: entryRadarPulse 5.8s ease-out 3.8s infinite;
-        }
-
-        .entry-radar-core {
-          width: 10%;
-          height: 10%;
-          transform: translate(-50%, -50%);
-          background: radial-gradient(circle at center, rgba(246, 205, 201, 0.78) 0%, rgba(246, 205, 201, 0.34) 40%, rgba(246, 205, 201, 0.12) 62%, rgba(246, 205, 201, 0) 100%);
-          box-shadow:
-            0 0 36px rgba(246, 205, 201, 0.28),
-            0 0 72px rgba(246, 205, 201, 0.14);
-          filter: blur(4px);
-          animation: entryRadarCoreBreath 4.8s ease-in-out infinite;
+          .entry-atmosphere {
+            right: -12% !important;
+            width: min(58vw, 680px) !important;
+            height: min(60vh, 620px) !important;
+            opacity: 0.88 !important;
+          }
         }
 
         @media (max-width: 1100px) {
-          .entry-radar {
-            right: 20px !important;
-            width: min(40vw, 380px) !important;
-            opacity: 0.68 !important;
+          .entry-shell::before {
+            width: min(72vw, 640px);
+            inset: 6% auto 10% 0;
+          }
+        }
+
+        @media (max-width: 900px) {
+          .entry-main {
+            padding: 44px 26px !important;
+          }
+
+          .entry-shell {
+            align-items: flex-start !important;
+          }
+
+          .entry-content {
+            padding-top: 36px;
+          }
+
+          .entry-form-stack {
+            gap: 34px !important;
+            margin-top: 42px !important;
+          }
+
+          .entry-season-row {
+            gap: 22px !important;
           }
         }
 
         @media (max-width: 820px) {
-          .entry-radar {
+          .entry-atmosphere {
             display: none !important;
+          }
+
+          .entry-shell::before {
+            display: none;
+          }
+        }
+
+        @media (max-width: 760px) {
+          aside {
+            width: 224px !important;
+            min-width: 224px !important;
+            padding: 28px 18px 22px !important;
+          }
+
+          .entry-name-row {
+            gap: 14px !important;
+          }
+
+          .entry-name-row img {
+            width: 38px !important;
+            height: 38px !important;
+          }
+
+          .entry-cta-row {
+            gap: 12px !important;
+          }
+
+          .entry-microcopy {
+            display: none !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          aside {
+            display: none !important;
+          }
+
+          .entry-main {
+            padding: 36px 22px !important;
+          }
+
+          .entry-content {
+            max-width: 100% !important;
+            padding-top: 18px;
+          }
+
+          .entry-form-stack {
+            gap: 28px !important;
+            margin-top: 34px !important;
+          }
+
+          .entry-season-row {
+            gap: 18px !important;
           }
         }
       `}</style>
@@ -866,9 +936,9 @@ function NewCollectionButton({ onClick }: { onClick: () => void }) {
         alignItems: 'center',
         gap: 8,
         fontSize: 12,
-        color: hovered ? OLIVE : 'rgba(67,67,43,0.62)',
-        backgroundColor: hovered ? 'rgba(67,67,43,0.04)' : 'transparent',
-        border: '1px solid rgba(67,67,43,0.14)',
+        color: hovered ? ESPRESSO : 'rgba(78,47,46,0.62)',
+        backgroundColor: hovered ? 'rgba(255,255,255,0.54)' : 'transparent',
+        border: `1px solid ${BORDER}`,
         padding: '9px 16px',
         borderRadius: 999,
         marginBottom: 28,
@@ -907,35 +977,28 @@ function SeasonChip({
 
   return (
     <button
+      className="entry-season-tab"
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        padding: '11px 20px',
-        fontSize: 13,
+        padding: '0 0 10px 0',
+        fontSize: 14,
         fontWeight: 600,
-        color: active ? OLIVE : hovered ? 'rgba(67,67,43,0.72)' : 'rgba(67,67,43,0.55)',
-        backgroundColor: active
-          ? 'rgba(168,180,117,0.12)'
-          : hovered
-          ? 'rgba(255,255,255,0.90)'
-          : 'rgba(255,255,255,0.75)',
-        border: active
-          ? `1.5px solid ${CHARTREUSE}`
-          : hovered
-          ? '1.5px solid rgba(67,67,43,0.18)'
-          : '1.5px solid rgba(67,67,43,0.10)',
-        borderRadius: 999,
+        color: active ? ESPRESSO : hovered ? 'rgba(78,47,46,0.74)' : 'rgba(117,94,89,0.72)',
+        backgroundColor: 'transparent',
+        border: 'none',
+        borderRadius: 0,
         cursor: 'pointer',
         fontFamily: sohne,
         letterSpacing: '0.01em',
-        transition: 'all 200ms ease',
-        boxShadow: active
-          ? '0 2px 8px rgba(168,180,117,0.12)'
-          : '0 2px 8px rgba(0,0,0,0.04)',
-        transform: active ? 'translateY(-1px)' : 'translateY(0)',
+        transition: 'color 180ms ease, opacity 180ms ease',
+        boxShadow: 'none',
+        transform: 'translateY(0)',
         whiteSpace: 'nowrap',
         outline: 'none',
+        opacity: active ? 1 : hovered ? 0.9 : 0.78,
+        borderBottom: active ? `1px solid ${ESPRESSO}` : '1px solid transparent',
       }}
     >
       {label}

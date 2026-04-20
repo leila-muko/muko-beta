@@ -20,6 +20,7 @@ import LiningToggle from './LiningToggle';
 import PulseRail from './PulseRail';
 import MukoInsightPanel from './MukoInsightPanel';
 import PaletteReference from './PaletteReference';
+import { MukoWordmark } from '@/components/MukoWordmark';
 
 // Import data
 import categoriesData from '@/data/categories.json';
@@ -175,9 +176,7 @@ export default function SpecStudio({
       {/* Step Progress Header */}
       <div className="border-b border-[#E8E3D6] px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <span className="text-lg font-bold text-[#43432B] tracking-tight">
-            muko
-          </span>
+          <MukoWordmark color="#43432B" />
           <div className="flex gap-1">
             {['Entry', 'Concept', 'Spec', 'Report'].map((step, i) => (
               <div
