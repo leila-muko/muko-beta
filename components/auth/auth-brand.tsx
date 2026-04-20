@@ -17,7 +17,7 @@ export function AuthBrand() {
     if (!isDeleting && displayedText === currentWord) {
       const timeoutId = window.setTimeout(() => {
         setIsDeleting(true)
-      }, 1100)
+      }, 1700)
 
       return () => window.clearTimeout(timeoutId)
     }
@@ -36,7 +36,7 @@ export function AuthBrand() {
           isDeleting ? current.slice(0, -1) : currentWord.slice(0, current.length + 1)
         )
       },
-      isDeleting ? 42 : 72
+      isDeleting ? 68 : 118
     )
 
     return () => window.clearTimeout(timeoutId)

@@ -625,14 +625,6 @@ const COLLECTION_ROLE_OPTIONS = [
   { id: "volume-driver", name: "Volume Driver", description: "The stabilizer that keeps the assortment commercially grounded." },
 ] as const;
 
-type ProductStructureSummary = {
-  counts: Record<CollectionRoleId, number>;
-  assignedCount: number;
-  notes: string[];
-  categoryBreakdown: Array<{ category: string; count: number }>;
-  complexityBreakdown: Array<{ tier: string; count: number }>;
-};
-
 type CollectionBalanceContext = {
   totalPieceCount: number;
   assignedRoleCount: number;
@@ -851,69 +843,6 @@ function buildStrategicImplication(
   return {
     summary,
     suggestedRoles,
-  };
-}
-
-function buildCollectionStructureSummary(
-  persistedPieces: Array<{
-    piece_name: string | null;
-    collection_role: string | null;
-    category: string | null;
-    construction_tier: string | null;
-  }> = []
-): ProductStructureSummary {
-  const counts: Record<CollectionRoleId, number> = {
-    hero: 0,
-    directional: 0,
-    "core-evolution": 0,
-    "volume-driver": 0,
-  };
-
-  // Counts reflect only fully built pieces (saved analyses in Supabase).
-  persistedPieces.forEach((p) => {
-    const role = p.collection_role as CollectionRoleId | null;
-    if (role && role in counts) counts[role] += 1;
-  });
-
-  const assignedCount = persistedPieces.length;
-  const notes: string[] = [];
-
-  if (persistedPieces.length === 0 || persistedPieces.some((p) => !p.collection_role)) {
-    notes.push("Assign roles piece by piece to start revealing the collection structure.");
-  } else {
-    if (counts.hero === 0) notes.push("A Hero has not yet been assigned.");
-    if (counts["volume-driver"] === 0 && assignedCount >= 2) notes.push("The assortment is currently anchored in directional and core pieces with no volume driver yet.");
-    if (counts["core-evolution"] === 0 && assignedCount >= 2) notes.push("The mix still needs a grounded core evolution layer.");
-    if (counts.directional >= 2 && counts["core-evolution"] === 0) notes.push("You have directional energy, but the assortment needs more stabilizing clarity.");
-    if (notes.length === 0) notes.push("The role mix is reading balanced, with a clear structure emerging.");
-  }
-
-  // Category breakdown from persisted pieces.
-  const categoryMap = new Map<string, number>();
-  persistedPieces.forEach((p) => {
-    const cat = p.category ?? "unspecified";
-    categoryMap.set(cat, (categoryMap.get(cat) ?? 0) + 1);
-  });
-  const categoryBreakdown = Array.from(categoryMap.entries())
-    .map(([category, count]) => ({ category, count }))
-    .sort((a, b) => b.count - a.count);
-
-  // Complexity breakdown from persisted pieces.
-  const complexityMap = new Map<string, number>();
-  persistedPieces.forEach((p) => {
-    const tier = p.construction_tier ?? "unspecified";
-    complexityMap.set(tier, (complexityMap.get(tier) ?? 0) + 1);
-  });
-  const complexityBreakdown = Array.from(complexityMap.entries())
-    .map(([tier, count]) => ({ tier, count }))
-    .sort((a, b) => b.count - a.count);
-
-  return {
-    counts,
-    assignedCount,
-    notes: notes.slice(0, 2),
-    categoryBreakdown,
-    complexityBreakdown,
   };
 }
 
@@ -3139,25 +3068,31 @@ export default function ConceptStudioPage() {
     language: canAdvanceToStage3,
     product: canLockDirection,
   };
-  const collectionStructureSummary = useMemo(
-    () => buildCollectionStructureSummary(collectionPieces),
-    [collectionPieces]
-  );
   const collectionBalanceContext: CollectionBalanceContext = useMemo(() => {
     const roleCounts: Record<string, number> = {};
+    const categoryMap = new Map<string, number>();
+    const complexityMap = new Map<string, number>();
     // Balance context reflects only fully built pieces (Supabase) — not session-only selections.
     collectionPieces.forEach((p) => {
       if (p.collection_role) roleCounts[p.collection_role] = (roleCounts[p.collection_role] ?? 0) + 1;
+      const category = p.category ?? "unspecified";
+      const tier = p.construction_tier ?? "unspecified";
+      categoryMap.set(category, (categoryMap.get(category) ?? 0) + 1);
+      complexityMap.set(tier, (complexityMap.get(tier) ?? 0) + 1);
     });
     return {
       totalPieceCount: collectionPieces.length,
       assignedRoleCount: collectionPieces.filter((p) => p.collection_role).length,
       heroAssigned: collectionPieces.some((p) => p.collection_role === "hero"),
       roleCounts,
-      categoryBreakdown: collectionStructureSummary.categoryBreakdown ?? [],
-      complexityBreakdown: collectionStructureSummary.complexityBreakdown ?? [],
+      categoryBreakdown: Array.from(categoryMap.entries())
+        .map(([category, count]) => ({ category, count }))
+        .sort((a, b) => b.count - a.count),
+      complexityBreakdown: Array.from(complexityMap.entries())
+        .map(([tier, count]) => ({ tier, count }))
+        .sort((a, b) => b.count - a.count),
     };
-  }, [collectionPieces, collectionStructureSummary]);
+  }, [collectionPieces]);
   const activePieceSuggestion = useMemo(
     () =>
       activeProductPieceEntry
@@ -3559,7 +3494,7 @@ export default function ConceptStudioPage() {
         collectionName={headerCollectionName}
         seasonLabel={headerSeasonLabel}
         onBack={() => window.history.back()}
-        onSaveClose={() => {}}
+        onSaveClose={() => router.push("/pieces")}
       />
 
       {selectedAesthetic ? (
@@ -4334,13 +4269,27 @@ export default function ConceptStudioPage() {
                                 </div>
                               )}
 
-                              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                              <div style={{ display: "flex", justifyContent: "flex-start", marginTop: 8 }}>
                                 <button
                                   onClick={() => navigateStage("direction")}
                                   style={{ padding: "12px 18px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", color: "rgba(67,67,43,0.62)", fontFamily: sohne, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
                                 >
                                   Return to Point of View
                                 </button>
+                              </div>
+                              <div
+                                style={{
+                                  position: "sticky",
+                                  bottom: 0,
+                                  backgroundColor: "#FAF9F6",
+                                  borderTop: "0.5px solid rgba(0,0,0,0.08)",
+                                  padding: "12px 0 20px",
+                                  display: "flex",
+                                  justifyContent: "flex-end",
+                                  zIndex: 10,
+                                  marginTop: 20,
+                                }}
+                              >
                                 <button
                                   onClick={handleLockAndStartPieces}
                                   disabled={!canAdvanceToStage3}

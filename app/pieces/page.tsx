@@ -1427,6 +1427,7 @@ function SuggestedPieceCard({
 
   return (
     <div
+      onClick={onBuild}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -3942,6 +3943,7 @@ function PiecesPageClient() {
         collectionName={collectionName || undefined}
         seasonLabel={season || undefined}
         onBack={() => router.push("/concept")}
+        onSaveClose={() => router.push("/collections")}
       />
 
       {/* ── Collection context strip ─────────────────────────── */}

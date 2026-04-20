@@ -1072,7 +1072,10 @@ function SpecStudioPageContent() {
   const [selectedLevers, setSelectedLevers] = useState<Set<string>>(new Set());
   const [leverNotesSaved, setLeverNotesSaved] = useState(false);
   const [showBetterPathConfirm, setShowBetterPathConfirm] = useState(false);
+  const [betterPathResolved, setBetterPathResolved] = useState(false);
   const [betterPathApplyMessage, setBetterPathApplyMessage] = useState<string | null>(null);
+  const [priceUpdatedMessage, setPriceUpdatedMessage] = useState(false);
+  const [confirmedPriceUpdate, setConfirmedPriceUpdate] = useState<number | null>(null);
   const [dismissedRepriceKey, setDismissedRepriceKey] = useState<string | null>(null);
   const [materialSelectionDelta, setMaterialSelectionDelta] = useState<{
     cogs: number;
@@ -1870,7 +1873,7 @@ function SpecStudioPageContent() {
   }, [materialId, materials, constructionTier, baselineComplexity, conceptYardage, targetMSRP, brandTargetMargin]);
 
   const baselineMaterial = useMemo(() => {
-    const id = recommendedMaterialId || materialId || "";
+    const id = materialId || recommendedMaterialId || "";
     return materials.find((m) => m.id === id) || null;
   }, [materials, recommendedMaterialId, materialId]);
   const selectedMaterialIsRecommended = materialId === recommendedMaterialId;
@@ -2197,6 +2200,7 @@ function SpecStudioPageContent() {
   const reportAbortRef = useRef<AbortController | null>(null);
   const specRawJsonRef = useRef<string>('');
   const leverNotesSavedTimeoutRef = useRef<number | null>(null);
+  const priceUpdatedTimeoutRef = useRef<number | null>(null);
   const [specSynthInsightData, setSpecSynthInsightData] = useState<InsightData | null>(null);
   const [specRailInsight, setSpecRailInsight] = useState<SpecRailInsight | null>(null);
   const [priorTabRecommendation, setPriorTabRecommendation] = useState<{
@@ -3048,6 +3052,7 @@ function SpecStudioPageContent() {
     const nextLevers = activeSpecRail?.execution_levers ?? [];
     setSelectedLevers(new Set(nextLevers.map((lever) => lever.text)));
     setShowBetterPathConfirm(false);
+    setBetterPathResolved(false);
     setBetterPathApplyMessage(null);
   }, [activeSpecRail]);
 
@@ -3055,6 +3060,22 @@ function SpecStudioPageContent() {
     if (leverNotesSavedTimeoutRef.current) {
       window.clearTimeout(leverNotesSavedTimeoutRef.current);
     }
+    if (priceUpdatedTimeoutRef.current) {
+      window.clearTimeout(priceUpdatedTimeoutRef.current);
+    }
+  }, []);
+
+  const showPriceUpdatedConfirmation = useCallback((nextPrice: number) => {
+    setConfirmedPriceUpdate(nextPrice);
+    setPriceUpdatedMessage(true);
+    if (priceUpdatedTimeoutRef.current) {
+      window.clearTimeout(priceUpdatedTimeoutRef.current);
+    }
+    priceUpdatedTimeoutRef.current = window.setTimeout(() => {
+      setPriceUpdatedMessage(false);
+      setConfirmedPriceUpdate(null);
+      priceUpdatedTimeoutRef.current = null;
+    }, 2500);
   }, []);
 
   useEffect(() => {
@@ -3257,6 +3278,7 @@ function SpecStudioPageContent() {
     setExecutionNotes(nextNotes);
     await persistExecutionNotes(nextNotes);
     showLeverNotesSavedConfirmation();
+    setSelectedLevers(new Set());
   }, [activeSpecRail?.execution_levers, executionNotes, persistExecutionNotes, selectedLevers, showLeverNotesSavedConfirmation]);
 
   const handleConfirmBetterPath = useCallback(async () => {
@@ -3314,6 +3336,7 @@ function SpecStudioPageContent() {
     }
 
     setShowBetterPathConfirm(false);
+    setBetterPathResolved(true);
   }, [
     activeSpecRail,
     betterPathMaterial,
@@ -3324,7 +3347,7 @@ function SpecStudioPageContent() {
     materials,
   ]);
 
-  const persistCurrentPiece = useCallback(async () => {
+  const persistCurrentPiece = useCallback(async (overrideTargetMsrp?: number | null) => {
     const supabase = createClient();
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError) throw authError;
@@ -3350,6 +3373,8 @@ function SpecStudioPageContent() {
     if (!resolvedCollectionName) {
       throw new Error("No collection name available for piece save.");
     }
+
+    const effectiveTargetMsrp = overrideTargetMsrp ?? targetMSRP;
 
     const intentPayload = {
       primary_goals: intentGoals,
@@ -3383,7 +3408,7 @@ function SpecStudioPageContent() {
         silhouette: conceptSilhouette || "",
         construction_tier: constructionTier ?? "moderate",
         category: categoryId || "",
-        target_msrp: targetMSRP,
+        target_msrp: effectiveTargetMsrp,
         season: resolvedSeason,
         collection_name: resolvedCollectionName,
         timeline_weeks: timelineWeeks,
@@ -3403,7 +3428,7 @@ function SpecStudioPageContent() {
         selectedAesthetic: conceptContext.aestheticMatchedId || null,
         selectedElements: [],
         category: categoryId || null,
-        targetMSRP: targetMSRP,
+        targetMSRP: effectiveTargetMsrp,
         materialId: materialId || null,
         previousMaterialId: previousMaterialId ?? null,
         silhouette: conceptSilhouette || null,
@@ -3600,7 +3625,10 @@ function SpecStudioPageContent() {
         collectionName={headerCollectionName}
         seasonLabel={headerSeasonLabel}
         onBack={() => router.push("/pieces")}
-        onSaveClose={() => {}}
+        onSaveClose={async () => {
+          await persistCurrentPiece()
+          router.push("/pieces")
+        }}
       />
 
       <div
@@ -3915,7 +3943,7 @@ function SpecStudioPageContent() {
             {/* ── Section E: Build Numbers ───────────────────────────────── */}
             {displayMaterial && constructionConfirmed && constructionTier && insight && (
               <div style={{ animation: "fadeIn 220ms ease both" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: resolvedTargetMsrp > 0 ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr", gap: 8 }}>
                   <div>
                     <div style={{ fontFamily: inter, fontSize: 8, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.36)", marginBottom: 3 }}>
                       COGS
@@ -3940,6 +3968,16 @@ function SpecStudioPageContent() {
                       {marginBuffer == null ? "—" : marginBuffer >= 0 ? `$${marginBuffer}` : `-$${Math.abs(marginBuffer)}`}
                     </div>
                   </div>
+                  {resolvedTargetMsrp > 0 ? (
+                    <div>
+                      <div style={{ fontFamily: inter, fontSize: 8, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const, color: "rgba(67,67,43,0.36)", marginBottom: 3 }}>
+                        TARGET
+                      </div>
+                      <div style={{ fontFamily: sohne, fontSize: 15, color: OLIVE }}>
+                        ${resolvedTargetMsrp}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )}
@@ -3953,7 +3991,10 @@ function SpecStudioPageContent() {
           topOffset={0}
           constrainToViewport={false}
           leftContent={
-            <main className="specStudioColumn specStudioCenter">
+            <main
+              className="specStudioColumn specStudioCenter"
+              style={{ height: `calc(100vh - 72px - ${contextBarHeight}px)` }}
+            >
           <div style={{ padding: "36px 32px 56px" }}>
             <div style={{ maxWidth: 920, margin: "0 auto" }}>
               {/* ── Progress stepper ──────────────────────────────────────── */}
@@ -4081,7 +4122,18 @@ function SpecStudioPageContent() {
                         );
                       })}
                   </div>
-                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+                  <div
+                    style={{
+                      position: "sticky",
+                      bottom: 0,
+                      backgroundColor: "#FAF9F6",
+                      borderTop: "0.5px solid rgba(0,0,0,0.08)",
+                      padding: "12px 0 20px",
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      zIndex: 10,
+                    }}
+                  >
                     <button
                       onClick={() => {
                         if (!selectedMaterial) return;
@@ -4205,7 +4257,7 @@ function SpecStudioPageContent() {
                       })}
                     </div>
                     {overrideWarning && <div style={{ marginTop: 12, fontSize: 12, color: "rgba(67,67,43,0.56)", fontFamily: inter }}>{overrideWarning}</div>}
-                    {executionNotes.length > 0 && (
+                    {(executionNotes.length > 0 || selectedLevers.size > 0) && (
                       <div
                         style={{
                           marginTop: 18,
@@ -4228,40 +4280,75 @@ function SpecStudioPageContent() {
                         >
                           Applied notes
                         </div>
-                        <div style={{ display: "grid", gap: 10 }}>
-                          {executionNotes.map((note) => (
-                            <div
-                              key={note}
-                              style={{
-                                display: "flex",
-                                alignItems: "flex-start",
-                                gap: 10,
-                              }}
-                            >
-                              <span
-                                aria-hidden
-                                style={{
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: "50%",
-                                  marginTop: 7,
-                                  flexShrink: 0,
-                                  background: "rgba(168,180,117,0.9)",
-                                }}
-                              />
+                        {executionNotes.length === 0 ? (
+                          <p style={{ fontSize: 13, color: "var(--color-text-tertiary)", margin: 0 }}>
+                            Selected notes will appear here
+                          </p>
+                        ) : (
+                          <div style={{ display: "grid", gap: 10 }}>
+                            {executionNotes.map((note) => (
                               <div
+                                key={note}
                                 style={{
-                                  fontFamily: inter,
-                                  fontSize: 12,
-                                  lineHeight: 1.58,
-                                  color: "rgba(25,25,25,0.82)",
+                                  display: "flex",
+                                  alignItems: "flex-start",
+                                  justifyContent: "space-between",
+                                  gap: 10,
                                 }}
                               >
-                                {note}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "flex-start",
+                                    gap: 10,
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  <span
+                                    aria-hidden
+                                    style={{
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: "50%",
+                                      marginTop: 7,
+                                      flexShrink: 0,
+                                      background: "rgba(168,180,117,0.9)",
+                                    }}
+                                  />
+                                  <div
+                                    style={{
+                                      fontFamily: inter,
+                                      fontSize: 12,
+                                      lineHeight: 1.58,
+                                      color: "rgba(25,25,25,0.82)",
+                                    }}
+                                  >
+                                    {note}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    const updated = executionNotes.filter((n) => n !== note);
+                                    setExecutionNotes(updated);
+                                    void persistExecutionNotes(updated);
+                                  }}
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    color: "var(--color-text-tertiary)",
+                                    fontSize: 12,
+                                    padding: "0 0 0 8px",
+                                    flexShrink: 0,
+                                  }}
+                                  aria-label="Remove note"
+                                >
+                                  ✕
+                                </button>
                               </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </section>
@@ -4456,7 +4543,7 @@ function SpecStudioPageContent() {
               </section>
             )}
 
-            {((showBetterPath && activeSpecRail) || showRepriceRecommendation || viabilityState?.state === "not_viable") && (
+            {((showBetterPath && activeSpecRail && !betterPathResolved) || showRepriceRecommendation || viabilityState?.state === "not_viable") && (
               <>
                 <div style={{ height: 1, background: "#E2DDD6", margin: "0 0 24px" }} />
                 <section style={{ marginBottom: 24 }}>
@@ -4466,6 +4553,11 @@ function SpecStudioPageContent() {
                       <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 500, color: "#4D302F", lineHeight: 1.35, marginBottom: 12 }}>
                         Material is right. The margin gap is a pricing problem, not a construction problem.
                       </div>
+                      {priceUpdatedMessage && confirmedPriceUpdate != null ? (
+                        <p style={{ fontSize: 13, color: "var(--color-text-success, #3B6D11)", margin: "4px 0 12px" }}>
+                          Price updated to ${confirmedPriceUpdate}
+                        </p>
+                      ) : null}
                       <div style={{ background: "#F5F2EC", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
                         <div style={{ fontFamily: inter, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9A9187", fontWeight: 500, marginBottom: 8 }}>Target MSRP</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -4492,7 +4584,14 @@ function SpecStudioPageContent() {
                       </div>
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                         <button
-                          onClick={() => setTargetMsrp(viabilityState.suggestedMsrp)}
+                          onClick={() => {
+                            const nextPrice = viabilityState.suggestedMsrp;
+                            setTargetMsrp(nextPrice);
+                            showPriceUpdatedConfirmation(nextPrice);
+                            void persistCurrentPiece(nextPrice).catch((error) => {
+                              console.error("[Spec] Failed to persist updated MSRP:", serializePersistError(error));
+                            });
+                          }}
                           style={{
                             background: "#4D302F",
                             color: "#FAF9F6",
@@ -4956,6 +5055,9 @@ function SpecStudioPageContent() {
         .specStudioColumn {
           overflow-y: auto;
           min-height: 0;
+        }
+        .specStudioCenter {
+          overflow-y: auto;
         }
         .specStudioLeft {
           width: 320px;

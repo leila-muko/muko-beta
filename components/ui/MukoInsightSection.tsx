@@ -86,11 +86,6 @@ export interface MukoInsightSectionProps {
     summary: string;
     suggestedRoles: CollectionRoleId[];
   } | null;
-  productStructure?: {
-    counts: Record<CollectionRoleId, number>;
-    assignedCount: number;
-    notes: string[];
-  } | null;
   hasSelectedProductPiece?: boolean;
   /** Show "Shaped by your brand context" label near narrative output */
   showBrandContextLabel?: boolean;
@@ -136,7 +131,6 @@ function roleToDisplayName(role: string): string {
 function ProductDecisionRail({
   productPieceRead,
   productStrategicImplication,
-  productStructure,
   hasSelectedProductPiece = false,
   pieceStreamingTitle = '',
   pieceStreamingBody = '',
@@ -146,11 +140,6 @@ function ProductDecisionRail({
   productStrategicImplication?: {
     summary: string;
     suggestedRoles: CollectionRoleId[];
-  } | null;
-  productStructure?: {
-    counts: Record<CollectionRoleId, number>;
-    assignedCount: number;
-    notes: string[];
   } | null;
   hasSelectedProductPiece?: boolean;
   pieceStreamingTitle?: string;
@@ -192,51 +181,6 @@ function ProductDecisionRail({
           <p style={bodyText}>
             Review the assortment from the piece that most clearly holds the collection DNA, then assign roles as the structure starts to emerge.
           </p>
-          {productStructure && (
-            <>
-              <div style={hairline} />
-              <div>
-                <div style={{ ...zoneLabel, marginBottom: 14 }}>COLLECTION STRUCTURE</div>
-                <div style={{ display: "grid", gap: 12, marginBottom: (productStructure.notes ?? []).length ? 18 : 0 }}>
-                  {(["hero", "directional", "core-evolution", "volume-driver"] as CollectionRoleId[]).map((role) => {
-                    const count = productStructure.counts[role] ?? 0;
-                    return (
-                      <div key={role} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "center" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{ display: "flex", gap: 4 }}>
-                            {Array.from({ length: 4 }).map((_, index) => (
-                              <span
-                                key={index}
-                                style={{
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: "50%",
-                                  background: index < count ? "#A8B475" : "rgba(67,67,43,0.12)",
-                                }}
-                              />
-                            ))}
-                          </div>
-                          <div style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.58)" }}>
-                            {roleToDisplayName(role)}
-                          </div>
-                        </div>
-                        <div style={{ fontFamily: sohne, fontSize: 16, color: "#43432B" }}>{count}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {(productStructure.notes ?? []).length > 0 && (
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {(productStructure.notes ?? []).map((note) => (
-                      <p key={note} style={{ ...bodyText, color: "rgba(67,67,43,0.54)" }}>
-                        {note}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
         </div>
       ) : isPieceStreaming ? (
         <div style={{ marginBottom: 28 }}>
@@ -280,53 +224,6 @@ function ProductDecisionRail({
               </div>
             </>
           )}
-
-          {hasSelectedProductPiece && (
-            <>
-              <div style={hairline} />
-
-              <div style={{ marginBottom: 26 }}>
-                <div style={{ ...zoneLabel, marginBottom: 14 }}>COLLECTION STRUCTURE</div>
-                <div style={{ display: "grid", gap: 12, marginBottom: productStructure?.notes?.length ? 18 : 0 }}>
-                  {(["hero", "directional", "core-evolution", "volume-driver"] as CollectionRoleId[]).map((role) => {
-                    const count = productStructure?.counts[role] ?? 0;
-                    return (
-                      <div key={role} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "center" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{ display: "flex", gap: 4 }}>
-                            {Array.from({ length: 4 }).map((_, index) => (
-                              <span
-                                key={index}
-                                style={{
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: "50%",
-                                  background: index < count ? "#A8B475" : "rgba(67,67,43,0.12)",
-                                }}
-                              />
-                            ))}
-                          </div>
-                          <div style={{ fontFamily: inter, fontSize: 11.5, color: "rgba(67,67,43,0.58)" }}>
-                            {roleToDisplayName(role)}
-                          </div>
-                        </div>
-                        <div style={{ fontFamily: sohne, fontSize: 16, color: "#43432B" }}>{count}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {(productStructure?.notes ?? []).length > 0 && (
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {(productStructure?.notes ?? []).map((note) => (
-                      <p key={note} style={{ ...bodyText, color: "rgba(67,67,43,0.54)" }}>
-                        {note}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
         </>
       )}
     </div>
@@ -363,7 +260,6 @@ function ConceptDecisionRail({
   languageRead,
   productPieceRead,
   productStrategicImplication,
-  productStructure,
   hasSelectedProductPiece,
   showBrandContextLabel,
 }: {
@@ -401,11 +297,6 @@ function ConceptDecisionRail({
   productStrategicImplication?: {
     summary: string;
     suggestedRoles: CollectionRoleId[];
-  } | null;
-  productStructure?: {
-    counts: Record<CollectionRoleId, number>;
-    assignedCount: number;
-    notes: string[];
   } | null;
   hasSelectedProductPiece?: boolean;
   showBrandContextLabel?: boolean;
@@ -459,7 +350,6 @@ function ConceptDecisionRail({
       <ProductDecisionRail
         productPieceRead={productPieceRead}
         productStrategicImplication={productStrategicImplication}
-        productStructure={productStructure}
         hasSelectedProductPiece={hasSelectedProductPiece}
         pieceStreamingTitle={pieceStreamingTitle}
         pieceStreamingBody={pieceStreamingBody}
@@ -688,7 +578,6 @@ export function MukoInsightSection({
   languageRead,
   productPieceRead,
   productStrategicImplication,
-  productStructure,
   hasSelectedProductPiece,
   showBrandContextLabel,
 }: MukoInsightSectionProps) {
@@ -746,7 +635,6 @@ export function MukoInsightSection({
         languageRead={languageRead}
         productPieceRead={productPieceRead}
         productStrategicImplication={productStrategicImplication}
-        productStructure={productStructure}
         hasSelectedProductPiece={hasSelectedProductPiece}
         showBrandContextLabel={showBrandContextLabel}
       />

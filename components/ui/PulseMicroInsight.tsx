@@ -64,13 +64,14 @@ export function PulseMicroInsight({ insight }: PulseMicroInsightProps) {
       <div
         style={{
           display: "flex",
-          flexWrap: "wrap",
+          flexWrap: "nowrap",
           alignItems: "center",
-          gap: 8,
+          gap: 6,
           fontFamily: "var(--font-inter), system-ui, sans-serif",
-          fontSize: 10,
+          fontSize: 9,
           lineHeight: 1.4,
           color: "rgba(67,67,43,0.34)",
+          whiteSpace: "nowrap",
         }}
       >
         {insight.cues.map((cue, index) => (
@@ -79,7 +80,7 @@ export function PulseMicroInsight({ insight }: PulseMicroInsightProps) {
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 4,
+                gap: 3,
                 whiteSpace: "nowrap",
                 padding: "0 0 0 0",
               }}
@@ -89,13 +90,13 @@ export function PulseMicroInsight({ insight }: PulseMicroInsightProps) {
                   aria-hidden
                   style={{
                     color: "rgba(67,67,43,0.16)",
-                    marginRight: 4,
+                    marginRight: 3,
                   }}
                 >
                   ·
                 </span>
               ) : null}
-              <span style={{ color: "rgba(67,67,43,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", fontSize: 9 }}>
+              <span style={{ color: "rgba(67,67,43,0.3)", letterSpacing: "0.07em", textTransform: "uppercase", fontSize: 8.5 }}>
                 {cue.label}
               </span>
               <span

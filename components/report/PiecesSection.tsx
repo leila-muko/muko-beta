@@ -154,7 +154,7 @@ export function PiecesSection({
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'minmax(220px, 2.2fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(180px, 1.35fr) minmax(0, 1fr)',
+                gridTemplateColumns: 'minmax(220px, 2.2fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(180px, 1.35fr) minmax(0, 1fr)',
                 gap: 12,
                 padding: '18px 22px',
                 borderBottom: `1px solid rgba(67,67,43,0.06)`,
@@ -179,6 +179,7 @@ export function PiecesSection({
                 <span>Role</span>
                 <span>Complexity</span>
                 <span>Material</span>
+                <span>MSRP</span>
                 <span>Execution Signal</span>
                 <span>Status</span>
               </div>
@@ -192,7 +193,7 @@ export function PiecesSection({
                   key={piece.id}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'minmax(220px, 2.2fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(180px, 1.35fr) minmax(0, 1fr)',
+                    gridTemplateColumns: 'minmax(220px, 2.2fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(180px, 1.35fr) minmax(0, 1fr)',
                     gap: 12,
                     padding: '20px 22px',
                     alignItems: 'center',
@@ -234,6 +235,9 @@ export function PiecesSection({
                   <span style={{ fontFamily: fonts.body, fontSize: 13, color: reportPalette.olive }}>{formatToken(piece.role)}</span>
                   <span style={{ fontFamily: fonts.body, fontSize: 13, color: reportPalette.olive }}>{piece.complexity}</span>
                   <span style={{ fontFamily: fonts.body, fontSize: 13, color: reportPalette.olive }}>{piece.material}</span>
+                  <span style={{ fontFamily: fonts.body, fontSize: 13, color: reportPalette.olive }}>
+                    {typeof piece.msrp === 'number' ? `$${Math.round(piece.msrp)}` : '—'}
+                  </span>
                   <Pill background={executionSignal.background} color={executionSignal.color}>
                     {executionSignal.label}
                   </Pill>

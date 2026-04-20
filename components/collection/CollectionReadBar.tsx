@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { sanitizeContextBarSummary } from "@/lib/collections/contextBarSummary";
 
@@ -29,8 +29,19 @@ export function CollectionReadBar({
   const [isHovering, setIsHovering] = useState(false);
   const [isPinnedOpen, setIsPinnedOpen] = useState(false);
   const [isPinnedClosed, setIsPinnedClosed] = useState(false);
+  const barRef = useRef<HTMLDivElement>(null);
   const hasExpandableContent = Boolean(resolvedSummary);
   const isExpanded = hasExpandableContent ? isPinnedOpen || (isHovering && !isPinnedClosed) : true;
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (barRef.current && !barRef.current.contains(e.target as Node)) {
+        setIsPinnedOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
 
   function handleToggle() {
     if (!hasExpandableContent) return;
@@ -45,6 +56,7 @@ export function CollectionReadBar({
 
   return (
     <div
+      ref={barRef}
       style={{
         position: isSticky ? "fixed" : "relative",
         top: isSticky ? (stickyTop ?? 0) : undefined,
