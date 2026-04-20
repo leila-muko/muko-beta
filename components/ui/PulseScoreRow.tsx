@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
@@ -26,6 +27,7 @@ export interface PulseScoreRowProps {
   dimensionKey: string;
   label: string;
   icon: React.ReactNode;
+  infoCopy?: string;
   displayScore: string;
   numericPercent: number;
   scoreColor: string;
@@ -45,6 +47,7 @@ export interface PulseScoreRowProps {
 export function PulseScoreRow({
   label,
   icon,
+  infoCopy,
   displayScore,
   numericPercent,
   scoreColor,
@@ -156,6 +159,7 @@ export function PulseScoreRow({
             >
               {label}
             </span>
+            {infoCopy ? <InfoTooltip copy={infoCopy} /> : null}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {pill && stripPillStyle && (
@@ -261,6 +265,12 @@ export function PulseScoreRow({
 
   /* ── Default variant ───────────────────────────────────────────────────── */
   const canExpand = Boolean(onToggleExpand);
+  const handleHeaderKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!canExpand) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onToggleExpand?.();
+  };
 
   return (
     <div
@@ -275,8 +285,12 @@ export function PulseScoreRow({
       }}
     >
       {/* Top row: icon + label, rail, value + chevron */}
-      <button
-        onClick={onToggleExpand}
+      <div
+        role={canExpand ? "button" : undefined}
+        tabIndex={canExpand ? 0 : undefined}
+        aria-expanded={canExpand ? isExpanded : undefined}
+        onClick={canExpand ? onToggleExpand : undefined}
+        onKeyDown={handleHeaderKeyDown}
         style={{
           display: "flex",
           flexWrap: "wrap",
@@ -305,6 +319,7 @@ export function PulseScoreRow({
           >
             {label}
           </span>
+          {infoCopy ? <InfoTooltip copy={infoCopy} /> : null}
         </div>
         <div
           aria-hidden
@@ -400,7 +415,7 @@ export function PulseScoreRow({
             </svg>
           )}
         </div>
-      </button>
+      </div>
 
       {/* Sub label */}
       {subLabel && (

@@ -11,7 +11,10 @@ const RADAR_ROSE = "#A97B8F";
 const RADAR_NEUTRAL = "rgba(67,67,43,0.28)";
 const SURFACE_RULE = "rgba(226,221,214,0.82)";
 
-export type PulseSectionItem = Omit<PulseScoreRowProps, "isExpanded" | "onToggleExpand" | "variant" | "rowOpacity" | "isChanged">;
+export interface PulseSectionItem
+  extends Omit<PulseScoreRowProps, "isExpanded" | "onToggleExpand" | "variant" | "rowOpacity" | "isChanged"> {
+  infoCopy?: string;
+}
 
 interface PulseSectionProps {
   items: PulseSectionItem[];

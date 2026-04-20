@@ -2077,11 +2077,27 @@ function SpecStudioPageContent() {
     selectedKeyPiece,
   ]);
 
+  const aestheticEntry = (aestheticsData as Array<{ id: string; name: string; trend_velocity: string; saturation_score: number }>)
+    .find((a) => a.id === conceptContext.aestheticMatchedId || a.name === conceptContext.aestheticName);
+
   const commercialPotentialScore = useMemo(() => {
-    if (!selectedMaterial) return conceptContext.resonanceScore;
+    const satScore = aestheticEntry?.saturation_score ?? 0;
+    const velocity = aestheticEntry?.trend_velocity ?? 'emerging';
+
+    const velocityPenalty: Record<string, number> = {
+      emerging: 0,
+      growing: 0,
+      peak: 8,
+      declining: 15,
+    };
+
+    const saturationPenalty = Math.max(0, satScore - 65) * 0.6;
+    const totalPenalty = saturationPenalty + (velocityPenalty[velocity] ?? 0);
+
+    if (!selectedMaterial) return clamp(conceptContext.resonanceScore - totalPenalty, 0, 100);
 
     const baseScore = conceptContext.resonanceScore;
-    const materialDelta = selectedMaterial ? scoreMaterialDeltas(selectedMaterial).commercialPotential : 0;
+    const materialDelta = scoreMaterialDeltas(selectedMaterial).commercialPotential;
     const complexityDelta = constructionTier ? scoreComplexityDeltas(constructionTier).commercialPotential : 0;
     // Key piece signal reflects market momentum for this piece type
     const keyPieceDelta = selectedKeyPiece && !selectedKeyPiece.custom
@@ -2092,7 +2108,7 @@ function SpecStudioPageContent() {
       : 0;
 
     return clamp(
-      baseScore + materialDelta + complexityDelta + keyPieceDelta,
+      baseScore + materialDelta + complexityDelta + keyPieceDelta - totalPenalty,
       0,
       100
     );
@@ -2107,6 +2123,8 @@ function SpecStudioPageContent() {
     materials,
     aestheticKws,
     selectedKeyPiece,
+    aestheticEntry?.saturation_score,
+    aestheticEntry?.trend_velocity,
   ]);
 
   const identityColor =
@@ -2130,9 +2148,6 @@ function SpecStudioPageContent() {
       : dynamicIdentityScore >= 60
         ? { variant: "amber", status: "Adjacent", consequence: "Not core territory" }
         : { variant: "red", status: "Misaligned", consequence: "Review brand fit" };
-
-  const aestheticEntry = (aestheticsData as Array<{ id: string; name: string; trend_velocity: string; saturation_score: number }>)
-    .find((a) => a.id === conceptContext.aestheticMatchedId || a.name === conceptContext.aestheticName);
 
   const marketSaturationSignal = useMemo(() => getSpecMarketSaturationSignal({
     trendVelocity: aestheticEntry?.trend_velocity,
@@ -3130,6 +3145,7 @@ function SpecStudioPageContent() {
       key: "identity",
       label: "Identity",
       icon: <IconIdentity color={identityColor} />,
+      infoCopy: "How well this direction aligns with your brand's established aesthetic and values. Measured against your Brand DNA — the keywords, price positioning, and creative tensions you set in onboarding. A high score means the direction feels like you. A low score means there's drift worth examining before you commit.",
       displayScore: String(dynamicIdentityScore),
       numericPercent: dynamicIdentityScore,
       scoreColor: identityColor,
@@ -3143,11 +3159,12 @@ function SpecStudioPageContent() {
       key: "commercial-potential",
       label: "Commercial Potential",
       icon: <IconResonance color={commercialPotentialColor} />,
+      infoCopy: "How much runway this direction has in the current market. Measured against trend saturation, category momentum, and how legible this concept is to your customer right now. High upside means the market has room for this. Crowding means you're entering a saturated conversation.",
       displayScore: String(commercialPotentialScore),
       numericPercent: commercialPotentialScore,
       scoreColor: commercialPotentialColor,
       pill: { variant: commercialPotentialChipData.variant, label: commercialPotentialChipData.status },
-      subLabel: `${specPulseTelemetry.commercial_potential.label} · ${specPulseTelemetry.saturation.label}`,
+      subLabel: `${specPulseTelemetry.saturation.label === 'crowding' && commercialPotentialScore >= 75 ? 'strong demand' : specPulseTelemetry.commercial_potential.label} · ${specPulseTelemetry.saturation.label}`,
       whatItMeans: "Commercial telemetry shows likely pull once the concept becomes product, with market saturation held as supporting evidence.",
       howCalculated: "Built from concept resonance, product relevance, piece signal, and market state telemetry.",
       isPending: false,
@@ -3156,6 +3173,7 @@ function SpecStudioPageContent() {
       key: "execution",
       label: "Execution",
       icon: <IconExecution color={executionScoreColor} />,
+      infoCopy: "Whether this collection can actually be delivered as designed. Measured against construction complexity, material lead times, and your available production window. A tight score means something needs to give — timeline, complexity, or both.",
       displayScore: String(executionScore),
       numericPercent: executionScore,
       scoreColor: executionScoreColor,
@@ -5016,6 +5034,7 @@ function SpecStudioPageContent() {
                 dimensionKey: row.key,
                 label: row.label,
                 icon: row.icon,
+                infoCopy: row.infoCopy,
                 displayScore: row.displayScore,
                 numericPercent: row.numericPercent,
                 scoreColor: row.scoreColor,

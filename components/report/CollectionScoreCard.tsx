@@ -1,13 +1,16 @@
 import type { CollectionScoreDetail } from '@/lib/collection-report/types';
 import { fonts, reportPalette } from '@/components/report/reportStyles';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
 export function CollectionScoreCard({
   label,
   detail,
+  infoCopy,
   compact = false,
 }: {
   label: string;
   detail: CollectionScoreDetail;
+  infoCopy?: string;
   compact?: boolean;
 }) {
   void compact;
@@ -74,6 +77,7 @@ export function CollectionScoreCard({
           >
             {label}
           </p>
+          {infoCopy ? <InfoTooltip copy={infoCopy} /> : null}
         </div>
 
         <p

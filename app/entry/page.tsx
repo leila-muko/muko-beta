@@ -451,21 +451,8 @@ export default function EntryScreen() {
                   whiteSpace: 'normal',
                 }}
               >
-                shape what comes next.
+                the intentional collection.
               </h1>
-              <p
-                style={{
-                  margin: '22px 0 0 0',
-                  maxWidth: 460,
-                  color: 'rgba(78,47,46,0.56)',
-                  fontSize: 15,
-                  lineHeight: 1.72,
-                  letterSpacing: '0.01em',
-                  fontFamily: inter,
-                }}
-              >
-                Direction before fabric. Brief before sketch.
-              </p>
             </div>
 
             {/* Form */}
@@ -720,9 +707,13 @@ export default function EntryScreen() {
                 letterSpacing: '0.06em',
                 color: 'rgba(94,64,58,0.4)',
                 pointerEvents: 'none',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
               }}
             >
               A collection is a system of decisions.
+              <span>Nothing is neutral. Everything is intentional.</span>
             </div>
           </div>
 

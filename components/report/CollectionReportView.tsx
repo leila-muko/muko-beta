@@ -164,15 +164,27 @@ export function CollectionReportView({
             <section style={{ ...structuredSurface, padding: '26px 26px' }}>
               <p style={sectionEyebrow}>Collection Scores</p>
               <div style={{ marginTop: 16 }}>
-                <CollectionScoreCard label="Identity" detail={report.scores.identity} />
+                <CollectionScoreCard
+                  label="Identity"
+                  detail={report.scores.identity}
+                  infoCopy="Measures how cohesively this collection expresses your brand's point of view. Looks at aesthetic alignment across pieces, role balance, and silhouette consistency — not just whether individual pieces feel on-brand, but whether the collection reads as a system. Strong Identity means a customer can feel who it's for."
+                />
 
                 <div style={{ borderTop: '0.5px solid rgba(77,48,47,0.08)', margin: '20px 0' }} />
 
-                <CollectionScoreCard label="Resonance" detail={report.scores.resonance} />
+                <CollectionScoreCard
+                  label="Resonance"
+                  detail={report.scores.resonance}
+                  infoCopy="Measures commercial legibility and market timing across the collection. Looks at trend saturation, category clarity, and whether the assortment is differentiated enough to stand out without being so niche it loses reach. High Resonance means the market has space for this collection right now."
+                />
 
                 <div style={{ borderTop: '0.5px solid rgba(77,48,47,0.08)', margin: '20px 0' }} />
 
-                <CollectionScoreCard label="Execution" detail={report.scores.execution} />
+                <CollectionScoreCard
+                  label="Execution"
+                  detail={report.scores.execution}
+                  infoCopy="Measures whether this collection can be produced as planned. Looks at complexity concentration, material lead times, and how the production load distributes across pieces relative to your delivery window. A strong score means the collection is buildable. Pressure points flag where the plan needs adjustment before you commit."
+                />
               </div>
             </section>
           </div>
