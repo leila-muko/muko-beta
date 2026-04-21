@@ -710,6 +710,13 @@ export function shouldShowBetterPath(rail: SpecRailInsight): boolean {
   }
 
   if (
+    rail.alternative_path.dimension === 'construction' &&
+    !rail.alternative_path.target_tier
+  ) {
+    return false;
+  }
+
+  if (
     rail.alternative_path.dimension === 'construction' ||
     rail.alternative_path.dimension === 'material'
   ) {

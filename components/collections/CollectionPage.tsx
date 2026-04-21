@@ -1002,6 +1002,7 @@ export default function CollectionPage({
   const storeCollectionName = useSessionStore((state) => state.collectionName);
   const collectionAesthetic = useSessionStore((state) => state.collectionAesthetic);
   const aestheticInflection = useSessionStore((state) => state.aestheticInflection);
+  const conceptSilhouette = useSessionStore((state) => state.conceptSilhouette);
   const directionInterpretationText = useSessionStore((state) => state.directionInterpretationText);
   const directionInterpretationChips = useSessionStore((state) => state.directionInterpretationChips);
   const [analyses, setAnalyses] = useState<AnalysisRow[]>([]);
@@ -1210,6 +1211,33 @@ export default function CollectionPage({
     aestheticInflection,
     analyses,
     collectionAesthetic,
+    directionInterpretationText,
+    storeMatchesCollection,
+  ]);
+
+  const conceptCompleteForCollection = useMemo(() => {
+    if (
+      storeMatchesCollection &&
+      conceptSilhouette.trim() &&
+      (collectionAesthetic?.trim() || aestheticInflection?.trim() || directionInterpretationText?.trim())
+    ) {
+      return true;
+    }
+
+    return analyses.some((analysis) => {
+      const hasDirection = Boolean(
+        analysis.collection_aesthetic?.trim() ||
+        analysis.aesthetic_inflection?.trim() ||
+        analysis.aesthetic_matched_id?.trim()
+      );
+
+      return hasDirection && Boolean(analysis.silhouette?.trim());
+    });
+  }, [
+    aestheticInflection,
+    analyses,
+    collectionAesthetic,
+    conceptSilhouette,
     directionInterpretationText,
     storeMatchesCollection,
   ]);
@@ -1796,7 +1824,7 @@ export default function CollectionPage({
               {activeTab === 'pieces' ? (
                 <>
                   <button
-                    onClick={collectionAesthetic ? onNewPiece : undefined}
+                    onClick={conceptCompleteForCollection ? onNewPiece : undefined}
                     style={{
                       ...headerActionButtonBase,
                       padding: '7px 16px',
@@ -1805,8 +1833,8 @@ export default function CollectionPage({
                       color: '#43432B',
                       fontWeight: 600,
                       letterSpacing: '0.07em',
-                      opacity: collectionAesthetic ? 1 : 0.35,
-                      cursor: collectionAesthetic ? 'pointer' : 'not-allowed',
+                      opacity: conceptCompleteForCollection ? 1 : 0.35,
+                      cursor: conceptCompleteForCollection ? 'pointer' : 'not-allowed',
                     }}
                   >
                     Add Piece

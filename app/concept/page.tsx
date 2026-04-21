@@ -359,6 +359,17 @@ function getResonanceStatus(pulse: { status: string; score: number; message: str
   return { label, color, sublabel };
 }
 
+function getResonanceScoreColor(
+  pulse: { status: string; score: number; message: string } | null,
+  score: number | null | undefined
+): string {
+  if (pulse?.status === "green") return PULSE_GREEN;
+  if (pulse?.status === "yellow") return PULSE_YELLOW;
+  if (pulse?.status === "red") return PULSE_RED;
+  if (typeof score === "number") return score >= 80 ? CHARTREUSE : score >= 65 ? BRAND.camel : BRAND.rose;
+  return "rgba(67,67,43,0.35)";
+}
+
 /* ─── Direction insight ───────────────────────────────────────────────────── */
 function getDirectionInsight(
   aesthetic: string,
@@ -2511,7 +2522,7 @@ export default function ConceptStudioPage() {
     sublabel: identityPulse?.message ?? "Select a direction to score",
   };
   const resStatus = getResonanceStatus(resonancePulse, resonanceSaturationScore ?? undefined, resonanceCollectionsCount ?? undefined);
-  const scoreColor = (score: number) => score >= 80 ? CHARTREUSE : score >= 65 ? BRAND.camel : BRAND.rose;
+  const resonanceDisplayColor = getResonanceScoreColor(resonancePulse, resonanceScore);
 
   /* ─── Select handler ──────────────────────────────────────────────────────── */
   const applyAestheticSelection = useCallback((aesthetic: string) => {
@@ -2775,7 +2786,7 @@ export default function ConceptStudioPage() {
   /* ─── Pulse rows ──────────────────────────────────────────────────────────── */
   const pulseRows = [
     { key: "identity", label: "Identity", icon: (c: string) => <IconIdentity size={14} color={c} />, infoCopy: "How well this direction aligns with your brand's established aesthetic and values. Measured against your Brand DNA — the keywords, price positioning, and creative tensions you set in onboarding. A high score means the direction feels like you. A low score means there's drift worth examining before you commit.", score: identityScore != null ? `${identityScore}` : "—", scoreNum: identityScore ?? 0, color: idStatus.color, chip: identityScore != null ? { variant: idStatus.color === PULSE_GREEN ? "green" as const : idStatus.color === PULSE_YELLOW ? "amber" as const : idStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: idStatus.label } : null, subLabel: noBrandProfile ? "Complete Brand DNA setup to see identity scores" : idStatus.sublabel, what: `Identity measures how well this direction aligns with your brand DNA — keywords, aesthetic positioning, and customer profile. A high score means this direction reinforces who you already are. A low score signals tension that requires intentional navigation.`, how: `Keyword overlap between your brand profile and this direction's signals, weighted by conflict detection. Intentional tensions acknowledged in onboarding are factored in.`, pending: false },
-    { key: "resonance", label: "Resonance", icon: (c: string) => <IconResonance size={14} color={c} />, infoCopy: "How much runway this direction has in the current market. Measured against trend saturation, category momentum, and how legible this concept is to your customer right now. High upside means the market has room for this. Crowding means you're entering a saturated conversation.", score: resonanceLoading ? "—" : resonanceScore != null ? `${resonanceScore}` : "—", scoreNum: resonanceLoading ? 0 : resonanceScore ?? 0, color: resonanceLoading ? "rgba(67,67,43,0.35)" : resonanceScore != null ? scoreColor(resonanceScore) : "rgba(67,67,43,0.35)", chip: resonanceLoading ? { variant: "gray" as const, status: "Matching direction..." } : resonanceScore != null ? { variant: resStatus.color === PULSE_GREEN ? "green" as const : resStatus.color === PULSE_YELLOW ? "amber" as const : resStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: resStatus.label } : null, subLabel: resonanceLoading ? "\u00A0" : resStatus.sublabel || "\u00A0", what: `Resonance measures market timing — the base market lane plus any lift coming from the piece signal you have chosen. High resonance means the window is open or still building. Peak saturation means the lane is crowded or late.`, how: `Base market state comes from a shared saturation model across concept and spec. Resonance score = 100 − saturation, with a 15-point penalty for declining velocity and a small piece-signal uplift when a key piece strengthens the commercial read.`, pending: false },
+    { key: "resonance", label: "Resonance", icon: (c: string) => <IconResonance size={14} color={c} />, infoCopy: "How much runway this direction has in the current market. Measured against trend saturation, category momentum, and how legible this concept is to your customer right now. High upside means the market has room for this. Crowding means you're entering a saturated conversation.", score: resonanceLoading ? "—" : resonanceScore != null ? `${resonanceScore}` : "—", scoreNum: resonanceLoading ? 0 : resonanceScore ?? 0, color: resonanceLoading ? "rgba(67,67,43,0.35)" : resonanceDisplayColor, chip: resonanceLoading ? { variant: "gray" as const, status: "Matching direction..." } : resonanceScore != null ? { variant: resStatus.color === PULSE_GREEN ? "green" as const : resStatus.color === PULSE_YELLOW ? "amber" as const : resStatus.color === PULSE_RED ? "red" as const : "amber" as const, status: resStatus.label } : null, subLabel: resonanceLoading ? "\u00A0" : resStatus.sublabel || "\u00A0", what: `Resonance measures market timing — the base market lane plus any lift coming from the piece signal you have chosen. High resonance means the window is open or still building. Peak saturation means the lane is crowded or late.`, how: `Base market state comes from a shared saturation model across concept and spec. Resonance score = 100 − saturation, with a 15-point penalty for declining velocity and a small piece-signal uplift when a key piece strengthens the commercial read.`, pending: false },
     { key: "execution", label: "Execution", icon: (c: string) => <IconExecution size={14} color={c} />, infoCopy: "Whether this collection can actually be delivered as designed. Measured against construction complexity, material lead times, and your available production window. A tight score means something needs to give — timeline, complexity, or both.", score: "—", scoreNum: 0, color: "rgba(67,67,43,0.35)", chip: null, subLabel: "Unlocks in Spec Studio", what: `Execution measures whether the physical product you're building is feasible given your timeline, materials, and construction complexity. It unlocks in Spec Studio once you define your product inputs.`, how: `Timeline buffer score based on material lead times and construction complexity relative to your season deadline. Negative buffer scores red. Margin gate applied as a 30% score penalty if COGS exceeds target.`, pending: true },
   ];
   const collapsedPulseInsight = useMemo(() => buildPulseMicroInsight({
@@ -4276,14 +4287,6 @@ export default function ConceptStudioPage() {
                                 </div>
                               )}
 
-                              <div style={{ display: "flex", justifyContent: "flex-start", marginTop: 8 }}>
-                                <button
-                                  onClick={() => navigateStage("direction")}
-                                  style={{ padding: "12px 18px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", color: "rgba(67,67,43,0.62)", fontFamily: sohne, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-                                >
-                                  Return to Point of View
-                                </button>
-                              </div>
                               <div
                                 style={{
                                   position: "sticky",
@@ -4292,11 +4295,20 @@ export default function ConceptStudioPage() {
                                   borderTop: "0.5px solid rgba(0,0,0,0.08)",
                                   padding: "12px 0 20px",
                                   display: "flex",
-                                  justifyContent: "flex-end",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  gap: 12,
+                                  flexWrap: "wrap",
                                   zIndex: 10,
                                   marginTop: 20,
                                 }}
                               >
+                                <button
+                                  onClick={() => navigateStage("direction")}
+                                  style={{ padding: "12px 18px", borderRadius: 999, border: "1px solid rgba(67,67,43,0.14)", background: "transparent", color: "rgba(67,67,43,0.62)", fontFamily: sohne, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                                >
+                                  Return to Point of View
+                                </button>
                                 <button
                                   onClick={handleLockAndStartPieces}
                                   disabled={!canAdvanceToStage3}

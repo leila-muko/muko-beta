@@ -40,6 +40,7 @@ import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
 import { PulseSection } from "@/components/ui/PulseSection";
 import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
+import { MukoTypedLoadingState } from "@/components/ui/MukoTypedLoadingState";
 import type { PulseChipProps } from "@/components/ui/PulseChip";
 import type { InsightData, SpecInsightMode } from "@/lib/types/insight";
 import { buildReportBlackboard, buildSpecBlackboard } from "@/lib/synthesizer/assemble";
@@ -141,6 +142,8 @@ const PULSE_YELLOW = "#B8876B";
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
 const GENERIC_STRATEGY_SUMMARY = "Define your collection stance";
+const SPEC_READ_LOADING_HEADLINE = "Testing whether this product direction holds once it becomes a build.";
+const SPEC_READ_LOADING_BODY = "Muko is weighing material, margin, and construction pressure to surface the clearest spec read.";
 
 /* ─── Icons ─── */
 function IconExecution({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
@@ -1003,7 +1006,7 @@ function SpecStudioPageContent() {
   const searchParams = useSearchParams();
   const previousMaterialIdRef = useRef<string | null>(null);
   const materialDeltaTimeoutRef = useRef<number | null>(null);
-  const { setCategory, setSubcategory: setStoreSubcategory, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setSelectedKeyPiece, setActiveProductPieceId, setPieceBuildContext, setCollectionName, setSeason, setActiveCollection, setTargetMsrp } = useSessionStore();
+  const { setCategory, setSubcategory: setStoreSubcategory, setMaterial, setSilhouette, setConstructionTier: setStoreTier, setColorPalette, setCurrentStep, setChipSelection, updateExecutionPulse, intentGoals, intentTradeoff, collectionRole: storeCollectionRole, savedAnalysisId, setSavedAnalysisId, setSelectedKeyPiece, setActiveProductPieceId, setPieceBuildContext, setCollectionName, setSeason, setActiveCollection, setTargetMsrp, identityPulse } = useSessionStore();
   const storedTimelineWeeks = useSessionStore((s) => s.timelineWeeks);
   const storedTimelineWeeksOverride = useSessionStore((s) => s.timelineWeeksOverride);
   const previousMaterialId = useSessionStore((s) => s.previousMaterialId);
@@ -2049,33 +2052,8 @@ function SpecStudioPageContent() {
   }
 
   const dynamicIdentityScore = useMemo(() => {
-    if (!selectedMaterial) return conceptContext.identityScore;
-
-    const baseScore = conceptContext.identityScore;
-    const materialDelta = selectedMaterial ? scoreMaterialDeltas(selectedMaterial).identity : 0;
-    const complexityDelta = constructionTier ? scoreComplexityDeltas(constructionTier).identity : 0;
-    // Key piece: building the exact category the direction calls for reinforces identity
-    const keyPieceDelta = (selectedKeyPiece && !selectedKeyPiece.custom && selectedKeyPiece.category && categoryId &&
-      (selectedKeyPiece.category === categoryId || selectedKeyPiece.category.toLowerCase() === categoryId.toLowerCase()))
-      ? 3 : 0;
-
-    return clamp(
-      baseScore + materialDelta + complexityDelta + keyPieceDelta,
-      0,
-      100
-    );
-  }, [
-    selectedMaterial,
-    constructionTier,
-    conceptContext.identityScore,
-    baselineMaterial,
-    baselineComplexity,
-    recommendedMaterialId,
-    categoryId,
-    materials,
-    aestheticKws,
-    selectedKeyPiece,
-  ]);
+    return identityPulse?.score ?? conceptContext.identityScore ?? 88;
+  }, [identityPulse, conceptContext.identityScore]);
 
   const aestheticEntry = (aestheticsData as Array<{ id: string; name: string; trend_velocity: string; saturation_score: number }>)
     .find((a) => a.id === conceptContext.aestheticMatchedId || a.name === conceptContext.aestheticName);
@@ -3152,7 +3130,7 @@ function SpecStudioPageContent() {
       pill: { variant: identityChipData.variant, label: identityChipData.status },
       subLabel: `Signal ${specPulseTelemetry.identity.label}`,
       whatItMeans: "Identity telemetry tracks how clearly the piece still carries the collection's intended point of view.",
-      howCalculated: "Built from concept alignment, anchor-piece context, and continuity between the selected spec and the locked direction.",
+      howCalculated: "Set at concept lock. Reflects how cohesively your aesthetic direction expresses your brand's point of view — stable across spec choices.",
       isPending: false,
     },
     {
@@ -3204,6 +3182,7 @@ function SpecStudioPageContent() {
   const overallScore = Math.round((dynamicIdentityScore + commercialPotentialScore + executionScore) / 3);
   const specInsightNarrative = specInsightData.statements.join(" ");
   const executionLevers = activeSpecRail?.execution_levers ?? [];
+  const appliedExecutionNotes = new Set(executionNotes);
   const prioritizedExecutionLever = executionLevers.find((lever) => lever.priority === true) ?? null;
   const standardExecutionLevers = prioritizedExecutionLever
     ? executionLevers.filter((lever) => lever.text !== prioritizedExecutionLever.text)
@@ -4412,7 +4391,7 @@ function SpecStudioPageContent() {
                               border: "none",
                               background: (selectedMaterial && constructionConfirmed) ? "#191919" : "#E2DDD6",
                               color: (selectedMaterial && constructionConfirmed) ? "#FFFFFF" : "#888078",
-                              fontFamily: inter,
+                              fontFamily: sohne,
                               fontSize: 13,
                               fontWeight: 500,
                               letterSpacing: "0.02em",
@@ -4449,10 +4428,13 @@ function SpecStudioPageContent() {
             <section style={{ marginBottom: 30 }}>
               <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 20 }}>Muko&apos;s Read</div>
               {shouldShowSpecRailLoading ? (
-                <div style={{ display: "grid", gap: 12 }}>
-                  <div style={{ height: 54, borderRadius: 18, background: "linear-gradient(90deg, rgba(226,221,214,0.56) 0%, rgba(250,249,246,0.95) 50%, rgba(226,221,214,0.56) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
-                  <div style={{ height: 34, width: "88%", borderRadius: 14, background: "linear-gradient(90deg, rgba(226,221,214,0.48) 0%, rgba(250,249,246,0.92) 50%, rgba(226,221,214,0.48) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
-                </div>
+                <MukoTypedLoadingState
+                  headline={SPEC_READ_LOADING_HEADLINE}
+                  body={SPEC_READ_LOADING_BODY}
+                  headlineStyle={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em" }}
+                  bodyContainerStyle={{ marginTop: 12 }}
+                  bodyStyle={{ fontFamily: inter, fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.66)" }}
+                />
               ) : (
                 <>
                   <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em" }}>
@@ -4885,6 +4867,7 @@ function SpecStudioPageContent() {
                             {(() => {
                               const leverText = prioritizedExecutionLever.text;
                               const isChecked = selectedLevers.has(leverText);
+                              const isApplied = appliedExecutionNotes.has(leverText);
 
                               return (
                                 <div key={leverText} style={{ display: "flex", gap: 10, alignItems: "start" }}>
@@ -4893,7 +4876,9 @@ function SpecStudioPageContent() {
                                       type="button"
                                       aria-label={`Toggle priority lever: ${leverText}`}
                                       aria-pressed={isChecked}
+                                      disabled={isApplied}
                                       onClick={() => {
+                                        if (isApplied) return;
                                         setSelectedLevers((prev) => {
                                           const next = new Set(prev);
                                           if (next.has(leverText)) {
@@ -4908,14 +4893,15 @@ function SpecStudioPageContent() {
                                         width: 14,
                                         height: 14,
                                         borderRadius: 4,
-                                        border: `1px solid ${BRAND.camel}`,
-                                        background: isChecked ? BRAND.camel : "transparent",
+                                        border: `1px solid ${isApplied ? "rgba(184,135,107,0.35)" : BRAND.camel}`,
+                                        background: isApplied ? "rgba(184,135,107,0.14)" : isChecked ? BRAND.camel : "transparent",
                                         display: "inline-flex",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                        cursor: "pointer",
+                                        cursor: isApplied ? "not-allowed" : "pointer",
                                         padding: 0,
                                         position: "relative",
+                                        opacity: isApplied ? 0.55 : 1,
                                       }}
                                     >
                                       {isChecked ? (
@@ -4934,12 +4920,14 @@ function SpecStudioPageContent() {
                                     style={{
                                       fontFamily: inter,
                                       fontSize: 12,
-                                      color: BRAND.camel,
+                                      color: isApplied ? "rgba(184,135,107,0.48)" : BRAND.camel,
                                       fontWeight: 500,
                                       lineHeight: 1.58,
-                                      cursor: "pointer",
+                                      cursor: isApplied ? "not-allowed" : "pointer",
+                                      opacity: isApplied ? 0.7 : 1,
                                     }}
                                     onClick={() => {
+                                      if (isApplied) return;
                                       setSelectedLevers((prev) => {
                                         const next = new Set(prev);
                                         if (next.has(leverText)) {
@@ -4964,13 +4952,16 @@ function SpecStudioPageContent() {
                         {standardExecutionLevers.map((item) => {
                           const leverText = item.text;
                           const isChecked = selectedLevers.has(leverText);
+                          const isApplied = appliedExecutionNotes.has(leverText);
 
                           return (
                             <div key={leverText} style={{ display: "flex", gap: 10, alignItems: "start" }}>
                               <input
                                 type="checkbox"
                                 checked={isChecked}
+                                disabled={isApplied}
                                 onChange={() => {
+                                  if (isApplied) return;
                                   setSelectedLevers((prev) => {
                                     const next = new Set(prev);
                                     if (next.has(leverText)) {
@@ -4981,15 +4972,29 @@ function SpecStudioPageContent() {
                                     return next;
                                   });
                                 }}
-                                style={{ accentColor: "#43432B", width: 13, height: 13, marginTop: 3, cursor: "pointer", flexShrink: 0 }}
+                                style={{
+                                  accentColor: "#43432B",
+                                  width: 13,
+                                  height: 13,
+                                  marginTop: 3,
+                                  cursor: isApplied ? "not-allowed" : "pointer",
+                                  flexShrink: 0,
+                                  opacity: isApplied ? 0.45 : 1,
+                                }}
                               />
                               <label
                                 style={{
                                   fontFamily: inter,
                                   fontSize: 12,
-                                  color: "#191919",
+                                  color: isApplied ? "rgba(25,25,25,0.38)" : "#191919",
                                   lineHeight: 1.58,
-                                  cursor: "pointer",
+                                  cursor: isApplied ? "not-allowed" : "pointer",
+                                  opacity: isApplied ? 0.72 : 1,
+                                }}
+                                onClick={(event) => {
+                                  if (isApplied) {
+                                    event.preventDefault();
+                                  }
                                 }}
                               >
                                 {leverText}

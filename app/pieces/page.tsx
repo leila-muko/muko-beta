@@ -18,6 +18,7 @@ import categoriesData from "@/data/categories.json";
 import materialsData from "@/data/materials.json";
 import subcategoriesData from "@/data/subcategories.json";
 import { CollectionContextBar, COLLECTION_CONTEXT_BAR_OFFSET } from "@/components/collection/CollectionContextBar";
+import { MukoTypedLoadingState } from "@/components/ui/MukoTypedLoadingState";
 import { buildPiecesReadFallback } from "@/lib/pieces/buildPiecesReadFallback";
 import { buildPiecesReadInput } from "@/lib/pieces/buildPiecesReadInput";
 import { normalizeSpecSubcategoryId } from "@/lib/spec-studio/smart-defaults";
@@ -108,6 +109,8 @@ const READ_HEADLINE_STYLE = {
   letterSpacing: "-0.01em",
   width: "100%",
 };
+const PIECES_READ_LOADING_HEADLINE = "Mapping the strongest starting point for this collection.";
+const PIECES_READ_LOADING_BODY = "Muko is reading the collection direction, assortment gaps, and signal balance to identify where the line should begin.";
 
 // ── Types ──────────────────────────────────────────────────────
 interface CollectionPiece {
@@ -2482,7 +2485,7 @@ function ConfirmDrawer({
               padding: "12px 24px",
               fontSize: 14,
               fontWeight: 500,
-              fontFamily: inter,
+              fontFamily: sohne,
               border: "none",
               cursor: canPressStart ? "pointer" : "not-allowed",
               whiteSpace: "nowrap" as const,
@@ -4353,39 +4356,40 @@ function PiecesPageClient() {
                 </div>
               </>
             ) : (
-              <div style={{ display: "grid", gap: 14 }}>
-                <div
-                  style={{
-                    height: 42,
-                    borderRadius: 12,
-                    background: "rgba(67,67,43,0.08)",
-                    animation: "skeleton-loading 1.4s ease-in-out infinite",
+              <div style={{ display: "grid", gap: 22 }}>
+                <MukoTypedLoadingState
+                  headline={PIECES_READ_LOADING_HEADLINE}
+                  body={PIECES_READ_LOADING_BODY}
+                  headlineStyle={{
+                    ...READ_HEADLINE_STYLE,
+                    marginBottom: 0,
+                    fontSize: 18,
+                    lineHeight: 1.22,
+                  }}
+                  bodyContainerStyle={{ marginTop: 12 }}
+                  bodyStyle={{
+                    ...READ_BODY_STYLE,
+                    lineHeight: 1.68,
                   }}
                 />
-                <div
-                  style={{
-                    height: 104,
-                    borderRadius: 16,
-                    background: "rgba(67,67,43,0.06)",
-                    animation: "skeleton-loading 1.4s ease-in-out infinite",
-                  }}
-                />
-                <div
-                  style={{
-                    height: 86,
-                    borderRadius: 16,
-                    background: "rgba(67,67,43,0.06)",
-                    animation: "skeleton-loading 1.4s ease-in-out infinite",
-                  }}
-                />
-                <div
-                  style={{
-                    height: 132,
-                    borderRadius: 16,
-                    background: "rgba(67,67,43,0.06)",
-                    animation: "skeleton-loading 1.4s ease-in-out infinite",
-                  }}
-                />
+                <div style={{ display: "grid", gap: 14 }}>
+                  <div
+                    style={{
+                      height: 84,
+                      borderRadius: 16,
+                      background: "rgba(67,67,43,0.06)",
+                      animation: "skeleton-loading 1.4s ease-in-out infinite",
+                    }}
+                  />
+                  <div
+                    style={{
+                      height: 126,
+                      borderRadius: 16,
+                      background: "rgba(67,67,43,0.06)",
+                      animation: "skeleton-loading 1.4s ease-in-out infinite",
+                    }}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -4811,7 +4815,7 @@ function PiecesPageClient() {
                 padding: "12px 24px",
                 background: "#191919",
                 color: "#FFFFFF",
-                fontFamily: inter,
+                fontFamily: sohne,
                 fontSize: 14,
                 fontWeight: 500,
                 cursor: suggestedMsrp != null && suggestedMsrp > 0 ? "pointer" : "not-allowed",

@@ -1086,7 +1086,7 @@ export default function IntentCalibrationPage() {
                 border: "none",
                 background: canContinue ? TEXT : BORDER,
                 color: canContinue ? "white" : MUTED,
-                fontFamily: inter,
+                fontFamily: sohne,
                 fontSize: 13,
                 fontWeight: 500,
                 cursor: canContinue ? "pointer" : "not-allowed",
