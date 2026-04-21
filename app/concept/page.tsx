@@ -1392,24 +1392,19 @@ export default function ConceptStudioPage() {
     const slug = toAestheticSlug(selectedAesthetic);
     const tensionToNum = (v: string) => v === 'left' ? 75 : v === 'right' ? 25 : 50;
     let intentPayload: import('@/lib/synthesizer/blackboard').IntentCalibration | undefined;
-    try {
-      const raw = window.localStorage.getItem('muko_intent');
-      if (raw) {
-        const parsed = JSON.parse(raw) as { tensions?: Record<string, string> };
-        const t = parsed.tensions ?? {};
-        intentPayload = {
-          primary_goals: intentGoals,
-          tradeoff: intentTradeoff,
-          piece_role: storeCollectionRole ?? '',
-          tension_sliders: {
-            trend_forward: tensionToNum(t.trendForward_vs_timeless ?? 'center'),
-            creative_expression: tensionToNum(t.creative_vs_commercial ?? 'center'),
-            elevated_design: tensionToNum(t.elevated_vs_accessible ?? 'center'),
-            novelty: tensionToNum(t.novelty_vs_continuity ?? 'center'),
-          },
-        };
-      }
-    } catch { /* no intent stored — omit from payload */ }
+    if (intentGoals || intentTradeoff || storeCollectionRole) {
+      intentPayload = {
+        primary_goals: intentGoals,
+        tradeoff: intentTradeoff,
+        piece_role: storeCollectionRole ?? '',
+        tension_sliders: {
+          trend_forward: sliderTrend ?? 50,
+          creative_expression: sliderCreative ?? 50,
+          elevated_design: sliderElevated ?? 50,
+          novelty: sliderNovelty ?? 50,
+        },
+      };
+    }
 
     const blackboard = buildConceptBlackboard({
       aestheticInput: aestheticInput || selectedAesthetic,
@@ -2627,6 +2622,20 @@ export default function ConceptStudioPage() {
   }, [selectedAesthetic, selectedIsAlternative, recommendedAesthetic]);
 
   const curatedRecommendations = useMemo(() => {
+    const intentPayload = {
+      tension_sliders: {
+        trend_forward: sliderTrend,
+        creative_expression: sliderCreative,
+        elevated_design: sliderElevated,
+        novelty: sliderNovelty,
+      },
+    };
+    // Read intent sliders — default to 50 (neutral) if intentPayload is absent
+    const ts = intentPayload?.tension_sliders;
+    const trendForward = ts?.trend_forward ?? 50; // 75=trend, 25=timeless
+    const creativeExpress = ts?.creative_expression ?? 50; // 75=creative, 25=commercial
+    const novelty = ts?.novelty ?? 50; // 75=novelty, 25=continuity
+
     const candidates = [...AESTHETICS].map((aesthetic) => {
       const content = AESTHETIC_CONTENT[aesthetic];
       const entry = (aestheticsData as unknown as AestheticDataEntry[]).find((item) => item.name === aesthetic);
@@ -2642,20 +2651,55 @@ export default function ConceptStudioPage() {
 
     const primary = candidates.find((candidate) => candidate.aesthetic === recommendedAesthetic) ?? candidates[0];
     const remaining = candidates.filter((candidate) => candidate.aesthetic !== primary?.aesthetic);
+    // Commercial Anchor: favor identity alignment; boost further when intent leans commercial
+    // commercial lean = creativeExpression < 50; timeless lean = trendForward < 50
+    const commercialLean = (50 - creativeExpress) / 50; // -1..1, positive = commercial
+    const timelessLean = (50 - trendForward) / 50; // -1..1, positive = timeless
     const anchor =
       remaining
         .slice()
-        .sort((a, b) => (b.identityScore + b.resonanceScore * 0.35) - (a.identityScore + a.resonanceScore * 0.35))[0] ??
+        .sort((a, b) => {
+          const velocityPenaltyA = timelessLean > 0
+            ? timelessLean * (a.velocity === "emerging" || a.velocity === "ascending" ? 8 : 0)
+            : 0;
+          const velocityPenaltyB = timelessLean > 0
+            ? timelessLean * (b.velocity === "emerging" || b.velocity === "ascending" ? 8 : 0)
+            : 0;
+          const anchorScoreA = a.identityScore + a.resonanceScore * 0.35
+            + commercialLean * 6
+            - velocityPenaltyA;
+          const anchorScoreB = b.identityScore + b.resonanceScore * 0.35
+            + commercialLean * 6
+            - velocityPenaltyB;
+          return anchorScoreB - anchorScoreA;
+        })[0] ??
       remaining[0];
     const stretchPool = remaining.filter((candidate) => candidate.aesthetic !== anchor?.aesthetic);
+    // Stretch Path: favor resonance + novelty; amplify when intent leans trend-forward or novel
+    const noveltyLean = (novelty - 50) / 50; // -1..1, positive = novelty
+    const trendLean = (trendForward - 50) / 50; // -1..1, positive = trend
     const stretch =
       stretchPool
         .slice()
-        .sort(
-          (a, b) =>
-            (b.resonanceScore + (b.saturationScore <= 55 ? 10 : 0) - b.identityScore * 0.15) -
-            (a.resonanceScore + (a.saturationScore <= 55 ? 10 : 0) - a.identityScore * 0.15)
-        )[0] ?? stretchPool[0];
+        .sort((a, b) => {
+          const lowSatBonusA = a.saturationScore <= 55 ? 10 : 0;
+          const lowSatBonusB = b.saturationScore <= 55 ? 10 : 0;
+          const velocityBonusA = trendLean > 0
+            ? trendLean * (a.velocity === "emerging" ? 10 : a.velocity === "ascending" ? 5 : 0)
+            : 0;
+          const velocityBonusB = trendLean > 0
+            ? trendLean * (b.velocity === "emerging" ? 10 : b.velocity === "ascending" ? 5 : 0)
+            : 0;
+          const stretchScoreA = a.resonanceScore
+            + lowSatBonusA * (1 + noveltyLean * 0.5)
+            + velocityBonusA
+            - a.identityScore * 0.15;
+          const stretchScoreB = b.resonanceScore
+            + lowSatBonusB * (1 + noveltyLean * 0.5)
+            + velocityBonusB
+            - b.identityScore * 0.15;
+          return stretchScoreB - stretchScoreA;
+        })[0] ?? stretchPool[0];
 
     return [primary, anchor, stretch]
       .filter(Boolean)
@@ -2676,7 +2720,7 @@ export default function ConceptStudioPage() {
         }),
       }))
       .filter((item, index, array) => array.findIndex((entry) => entry.aesthetic === item.aesthetic) === index) as DirectionRecommendation[];
-  }, [recommendedAesthetic]);
+  }, [recommendedAesthetic, sliderTrend, sliderCreative, sliderElevated, sliderNovelty]);
   const exploreDirections = useMemo(
     () => orderedDirections.filter((aesthetic) => !curatedRecommendations.some((recommendation) => recommendation.aesthetic === aesthetic)),
     [curatedRecommendations, orderedDirections]
@@ -3508,7 +3552,7 @@ export default function ConceptStudioPage() {
         onSaveClose={() => {
           const activeCollection = useSessionStore.getState().activeCollection;
           if (activeCollection) {
-            router.push(`/collection/${encodeURIComponent(activeCollection)}`);
+            router.push(`/collections?collection=${encodeURIComponent(activeCollection)}`);
           } else {
             router.push('/collections');
           }
