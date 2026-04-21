@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import materialsData from '@/data/materials.json';
 import { createClient } from '@/lib/supabase/client';
@@ -26,6 +26,98 @@ import { IconIdentity, IconResonance } from '../concept-studio/Icons';
 
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
+const MIN_REPORT_PIECES = 5;
+
+function HoverHint({
+  copy,
+  children,
+}: {
+  copy: string;
+  children: React.ReactNode;
+}) {
+  const triggerRef = useRef<HTMLSpanElement | null>(null);
+  const panelId = useId();
+  const [isOpen, setIsOpen] = useState(false);
+  const [panelStyle, setPanelStyle] = useState<{
+    bottom: number;
+    left?: number;
+    right?: number;
+    width: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const updatePosition = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const viewportWidth = window.innerWidth;
+      const maxWidth = Math.min(320, viewportWidth - 32);
+      const preferredLeft = rect.left;
+      const overflowRight = preferredLeft + maxWidth > viewportWidth - 16;
+
+      setPanelStyle({
+        bottom: Math.max(window.innerHeight - rect.top + 10, 16),
+        width: maxWidth,
+        ...(overflowRight
+          ? { right: Math.max(16, viewportWidth - rect.right), left: undefined }
+          : { left: Math.max(16, preferredLeft), right: undefined }),
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [isOpen]);
+
+  return (
+    <span
+      ref={triggerRef}
+      aria-describedby={isOpen ? panelId : undefined}
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+      onFocus={() => setIsOpen(true)}
+      onBlur={() => setIsOpen(false)}
+      style={{ position: 'relative', display: 'inline-flex' }}
+    >
+      {children}
+      {isOpen && panelStyle ? (
+        <span
+          id={panelId}
+          role="note"
+          style={{
+            position: 'fixed',
+            bottom: panelStyle.bottom,
+            left: panelStyle.left,
+            right: panelStyle.right,
+            zIndex: 9999,
+            width: panelStyle.width,
+            maxWidth: 'calc(100vw - 32px)',
+            padding: '12px 14px',
+            borderRadius: 14,
+            border: '1px solid rgba(67,67,43,0.08)',
+            background: '#FFFFFF',
+            color: '#43432B',
+            fontFamily: inter,
+            fontSize: 11.5,
+            lineHeight: 1.55,
+            boxShadow: '0 12px 28px rgba(67,67,43,0.08)',
+            whiteSpace: 'normal',
+            pointerEvents: 'none',
+          }}
+        >
+          {copy}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 function CollectionExecutionIcon({ size = 13, color = BRAND.oliveInk }: { size?: number; color?: string }) {
   return (
@@ -1114,7 +1206,10 @@ export default function CollectionPage({
   };
 
   const seasonLabel = season ?? analyses[0]?.season ?? '';
-  const canGenerateReport = analyses.length >= 2;
+  const pieceCount = analyses.length;
+  const canGenerateReport = pieceCount >= MIN_REPORT_PIECES;
+  const piecesNeededForReport = Math.max(0, MIN_REPORT_PIECES - pieceCount);
+  const reportLockedHoverCopy = `Report is enabled after ${MIN_REPORT_PIECES} pieces are added`;
 
   // Aggregate scores for score banner
   const scoredAnalyses = useMemo(() => analyses.filter(a => (a.score ?? 0) > 0), [analyses]);
@@ -1274,6 +1369,8 @@ export default function CollectionPage({
   };
 
   const handleOpenReport = () => {
+    if (!canGenerateReport) return;
+
     if (snapshot?.id) {
       trackEvent(userId, 'report_opened', {
         collection_id: snapshot.id,
@@ -1758,23 +1855,30 @@ export default function CollectionPage({
             >
               {(['pieces', 'report'] as const).map((tab) => {
                 const isActive = activeTab === tab;
-                return (
+                const isReportTab = tab === 'report';
+                const isLocked = isReportTab && !canGenerateReport;
+                const tabButton = (
                   <button
                     key={tab}
-                    onClick={() => setActiveTab(tab)}
+                    onClick={() => {
+                      if (isLocked) return;
+                      setActiveTab(tab);
+                    }}
+                    aria-disabled={isLocked}
                     style={{
                       border: 'none',
                       borderBottom: isActive ? '2px solid #43432B' : 'none',
                       borderRadius: 0,
                       padding: '10px 16px',
                       background: 'transparent',
-                      color: isActive ? '#43432B' : 'rgba(67,67,43,0.35)',
+                      color: isLocked ? 'rgba(67,67,43,0.2)' : isActive ? '#43432B' : 'rgba(67,67,43,0.35)',
                       fontFamily: inter,
                       fontSize: 11,
                       fontWeight: 700,
                       letterSpacing: '0.12em',
                       textTransform: 'uppercase',
-                      cursor: 'pointer',
+                      cursor: isLocked ? 'not-allowed' : 'pointer',
+                      opacity: isLocked ? 0.7 : 1,
                     }}
                   >
                     <span
@@ -1785,7 +1889,7 @@ export default function CollectionPage({
                       }}
                     >
                       <span>{tab}</span>
-                      {tab === 'report' && analyses.length >= 5 ? (
+                      {isReportTab && canGenerateReport ? (
                         <span
                           style={{
                             display: 'inline-flex',
@@ -1805,8 +1909,36 @@ export default function CollectionPage({
                           Ready
                         </span>
                       ) : null}
+                      {isReportTab && !canGenerateReport ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            borderRadius: 999,
+                            padding: '2px 8px',
+                            background: 'rgba(67,67,43,0.08)',
+                            color: 'rgba(67,67,43,0.5)',
+                            fontFamily: inter,
+                            fontSize: 9,
+                            fontWeight: 700,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          {`${pieceCount}/${MIN_REPORT_PIECES}`}
+                        </span>
+                      ) : null}
                     </span>
                   </button>
+                );
+
+                return isLocked ? (
+                  <HoverHint key={tab} copy={reportLockedHoverCopy}>
+                    {tabButton}
+                  </HoverHint>
+                ) : (
+                  tabButton
                 );
               })}
             </div>
@@ -1854,17 +1986,41 @@ export default function CollectionPage({
                     </span>
                   ) : null}
 
-                  <button
-                    onClick={handleOpenReport}
-                    style={{
-                      ...headerActionButtonBase,
-                      border: '1px solid rgba(67,67,43,0.12)',
-                      background: '#43432B',
-                      color: '#F8F4EC',
-                    }}
-                  >
-                    Refresh Report
-                  </button>
+                  {canGenerateReport ? (
+                    <button
+                      onClick={handleOpenReport}
+                      aria-disabled={false}
+                      style={{
+                        ...headerActionButtonBase,
+                        border: '1px solid rgba(67,67,43,0.12)',
+                        background: '#43432B',
+                        color: '#F8F4EC',
+                        cursor: 'pointer',
+                        boxShadow: headerActionButtonBase.boxShadow,
+                        opacity: 1,
+                      }}
+                    >
+                      Refresh Report
+                    </button>
+                  ) : (
+                    <HoverHint copy={reportLockedHoverCopy}>
+                      <button
+                        onClick={handleOpenReport}
+                        aria-disabled
+                        style={{
+                          ...headerActionButtonBase,
+                          border: '1px solid rgba(67,67,43,0.12)',
+                          background: '#E2DDD6',
+                          color: '#888078',
+                          cursor: 'not-allowed',
+                          boxShadow: 'none',
+                          opacity: 0.8,
+                        }}
+                      >
+                        {`Add ${piecesNeededForReport} More Piece${piecesNeededForReport === 1 ? '' : 's'}`}
+                      </button>
+                    </HoverHint>
+                  )}
 
                   <button
                     disabled
@@ -1955,10 +2111,26 @@ export default function CollectionPage({
               />
 
               <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                <button onClick={handleOpenReport} className="pieces-read-ready-pill">
-                  View full report
-                  <span className="collection-read-ready-arrow">→</span>
-                </button>
+                {canGenerateReport ? (
+                  <button
+                    onClick={handleOpenReport}
+                    className="pieces-read-ready-pill"
+                  >
+                    View full report
+                    <span className="collection-read-ready-arrow">→</span>
+                  </button>
+                ) : (
+                  <HoverHint copy={reportLockedHoverCopy}>
+                    <button
+                      onClick={handleOpenReport}
+                      aria-disabled
+                      className="pieces-read-ready-pill"
+                    >
+                      {`${pieceCount}/${MIN_REPORT_PIECES} pieces required`}
+                      <span className="collection-read-ready-arrow">→</span>
+                    </button>
+                  </HoverHint>
+                )}
               </div>
             </div>
           ) : (
@@ -1986,13 +2158,31 @@ export default function CollectionPage({
                     maxWidth: 720,
                   }}
                 >
-                  Generate a report to capture a snapshot of this collection.
+                  {canGenerateReport
+                    ? 'Generate a report to capture a snapshot of this collection.'
+                    : `Add ${piecesNeededForReport} more piece${piecesNeededForReport === 1 ? '' : 's'} to unlock collection reporting.`}
                 </p>
                 <div style={{ marginTop: 20 }}>
-                  <button onClick={handleOpenReport} className="pieces-read-ready-pill">
-                    {analyses.length > 0 ? <span className="pieces-read-ready-count">{analyses.length}</span> : null}
-                    <span>{`${analyses.length > 0 ? `${analyses.length} pieces · ` : ''}Generate report →`}</span>
-                  </button>
+                  {canGenerateReport ? (
+                    <button
+                      onClick={handleOpenReport}
+                      className="pieces-read-ready-pill"
+                    >
+                      {pieceCount > 0 ? <span className="pieces-read-ready-count">{pieceCount}</span> : null}
+                      <span>{`${pieceCount > 0 ? `${pieceCount} pieces · ` : ''}Generate report →`}</span>
+                    </button>
+                  ) : (
+                    <HoverHint copy={reportLockedHoverCopy}>
+                      <button
+                        onClick={handleOpenReport}
+                        aria-disabled
+                        className="pieces-read-ready-pill"
+                      >
+                        {pieceCount > 0 ? <span className="pieces-read-ready-count">{pieceCount}</span> : null}
+                        <span>{`${pieceCount}/${MIN_REPORT_PIECES} pieces required`}</span>
+                      </button>
+                    </HoverHint>
+                  )}
                 </div>
               </section>
             </div>
@@ -2022,9 +2212,23 @@ export default function CollectionPage({
           transition: background 160ms ease, border-color 160ms ease;
         }
 
+        .collection-read-ready-pill:disabled,
+        .collection-read-ready-pill[aria-disabled='true'] {
+          cursor: not-allowed;
+          background: rgba(67,67,43,0.06);
+          border-color: rgba(67,67,43,0.14);
+          color: rgba(67,67,43,0.45);
+        }
+
         .collection-read-ready-pill:hover {
           background: rgba(184,135,107,0.18);
           border-color: rgba(184,135,107,0.55);
+        }
+
+        .collection-read-ready-pill:disabled:hover,
+        .collection-read-ready-pill[aria-disabled='true']:hover {
+          background: rgba(67,67,43,0.06);
+          border-color: rgba(67,67,43,0.14);
         }
 
         .collection-read-ready-dot-wrap {

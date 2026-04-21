@@ -2861,6 +2861,56 @@ export default function ConceptStudioPage() {
     resonancePulse,
     resonanceScore,
   ]);
+  const conceptCollapsedBadges = useMemo(() => {
+    const getBadgeConfig = (score?: number | null) => {
+      if (typeof score !== "number") {
+        return {
+          value: "Locked",
+          background: "rgba(67,67,43,0.06)",
+          color: "rgba(67,67,43,0.4)",
+        };
+      }
+
+      if (score >= 70) {
+        return {
+          value: "Strong",
+          background: "#eef1e3",
+          color: "#43432B",
+        };
+      }
+
+      if (score >= 50) {
+        return {
+          value: "Mixed",
+          background: "#f5ede6",
+          color: "#8B5E3C",
+        };
+      }
+
+      return {
+        value: "Weak",
+        background: "#f5ede6",
+        color: "#8B5E3C",
+      };
+    };
+
+    return [
+      {
+        label: "Identity",
+        ...getBadgeConfig(identityPulse?.score),
+      },
+      {
+        label: "Resonance",
+        ...getBadgeConfig(resonanceLoading ? null : resonanceScore),
+      },
+      {
+        label: "Execution",
+        value: "Locked",
+        background: "rgba(67,67,43,0.06)",
+        color: "rgba(67,67,43,0.4)",
+      },
+    ];
+  }, [identityPulse?.score, resonanceLoading, resonanceScore]);
 
   /* ─── Top card chip data ──────────────────────────────────────────────────── */
   const topChips = getAestheticChips(topAesthetic);
@@ -3627,7 +3677,7 @@ export default function ConceptStudioPage() {
           <div style={{ padding: "0 44px 48px" }}>
             <div style={{ padding: "2px 0 20px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
               <div>
-                <div style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(67,67,43,0.40)", marginBottom: 10 }}>
+                <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#888078", marginBottom: 10 }}>
                   Concept Studio
                 </div>
                 <h1 style={{ margin: 0, fontFamily: sohne, fontWeight: 500, fontSize: 32, color: OLIVE, letterSpacing: "-0.04em", lineHeight: 0.98, maxWidth: 720 }}>
@@ -3723,7 +3773,7 @@ export default function ConceptStudioPage() {
                               }}
                             >
                               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, marginBottom: 6 }}>
-                                <span style={{ fontFamily: inter, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(67,67,43,0.34)" }}>
+                                <span style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#888078" }}>
                                   Point of View
                                 </span>
                                 <motion.span
@@ -3784,7 +3834,7 @@ export default function ConceptStudioPage() {
                               </div>
                             </div>
                             <div style={{ marginTop: 14 }}>
-                              <div style={{ fontFamily: inter, fontSize: 12, fontWeight: 600, color: "rgba(67,67,43,0.56)", letterSpacing: "0.01em", marginBottom: 10 }}>
+                              <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 700, color: "#888078", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>
                                 Try a direction
                               </div>
                               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -3904,7 +3954,7 @@ export default function ConceptStudioPage() {
                                 cursor: canAdvanceToStage2 ? "pointer" : "not-allowed",
                               }}
                             >
-                              Continue to Language →
+                              Continue to Product →
                             </button>
                           </div>
                         </>
@@ -4606,8 +4656,22 @@ export default function ConceptStudioPage() {
               )
             )}
 
+            <div style={{
+              padding: '8px 0 18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              gap: '7px',
+            }}>
+              <span style={{ fontSize: '20px', color: 'rgba(77,48,47,0.52)', lineHeight: '1', marginTop: '-2px' }}>✳</span>
+              <p style={{ margin: 0, fontSize: '11px', color: 'rgba(77,48,47,0.52)', lineHeight: '1.4', fontFamily: inter }}>
+                Muko uses AI — always apply your own judgment.
+              </p>
+            </div>
+
             <PulseSection
               collapsedInsight={collapsedPulseInsight}
+              collapsedBadges={conceptCollapsedBadges}
               items={pulseRows.map((row) => ({
                 dimensionKey: row.key,
                 label: row.label,
@@ -4626,11 +4690,11 @@ export default function ConceptStudioPage() {
             />
 
           </div>
-            <AskMuko
-              step="concept"
-              context={askMukoContext}
-            />
-          </div>
+	            <AskMuko
+	              step="concept"
+	              context={askMukoContext}
+	            />
+	          </div>
         }
       />
 

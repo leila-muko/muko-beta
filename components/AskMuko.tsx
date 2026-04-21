@@ -239,6 +239,7 @@ function AskMukoInner({
         width: 280,
         flexShrink: 0,
         height: "100%",
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
         background: "rgba(250,249,246,0.97)",
@@ -282,16 +283,15 @@ function AskMukoInner({
           >&times;</button>
         </div>
 
-        {/* Scrollable content */}
+        {/* Content */}
         <div style={{
           flex: 1,
-          overflowY: "auto",
+          minHeight: 0,
+          overflow: "hidden",
           padding: "14px 16px",
           display: "flex",
           flexDirection: "column",
           gap: 0,
-          scrollbarWidth: "thin" as const,
-          scrollbarColor: "rgba(67,67,43,0.08) transparent",
         }}>
           {/* Suggested questions */}
           {showSuggestions && (
@@ -362,6 +362,21 @@ function AskMukoInner({
           </div>
         </div>
 
+        <div style={{
+          padding: '8px 14px',
+          borderTop: '0.5px solid rgba(0,0,0,0.1)',
+          background: 'var(--color-background-secondary)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '7px',
+          flexShrink: 0
+        }}>
+          <span style={{ fontSize: '20px', color: '#888888', lineHeight: '1', marginTop: '-2px' }}>✳</span>
+          <p style={{ margin: 0, fontSize: '11px', color: '#888888', lineHeight: '1.4', fontFamily: inter }}>
+            Muko uses AI — always apply your own judgment.
+          </p>
+        </div>
         {/* Input row */}
         <div style={{ padding: "12px 16px", borderTop: "1px solid rgba(67,67,43,0.07)", flexShrink: 0 }}>
           <div style={{ position: "relative" as const }}>

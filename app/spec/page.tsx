@@ -39,7 +39,6 @@ import { trackEvent } from "@/lib/analytics";
 import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
 import { PulseSection } from "@/components/ui/PulseSection";
-import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
 import { MukoTypedLoadingState } from "@/components/ui/MukoTypedLoadingState";
 import type { PulseChipProps } from "@/components/ui/PulseChip";
 import type { InsightData, SpecInsightMode } from "@/lib/types/insight";
@@ -142,8 +141,6 @@ const PULSE_YELLOW = "#B8876B";
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
 const GENERIC_STRATEGY_SUMMARY = "Define your collection stance";
-const SPEC_READ_LOADING_HEADLINE = "Testing whether this product direction holds once it becomes a build.";
-const SPEC_READ_LOADING_BODY = "Muko is weighing material, margin, and construction pressure to surface the clearest spec read.";
 
 /* ─── Icons ─── */
 function IconExecution({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
@@ -3177,6 +3174,78 @@ function SpecStudioPageContent() {
     marketSaturationSignal,
     selectedMaterial,
   ]);
+  const specCollapsedBadges = useMemo(() => {
+    const getScoreBadgeConfig = (score?: number | null) => {
+      if (typeof score !== "number") {
+        return {
+          value: "Locked",
+          background: "rgba(67,67,43,0.06)",
+          color: "rgba(67,67,43,0.4)",
+        };
+      }
+
+      if (score >= 70) {
+        return {
+          value: "Strong",
+          background: "#eef1e3",
+          color: "#43432B",
+        };
+      }
+
+      if (score >= 50) {
+        return {
+          value: "Mixed",
+          background: "#f5ede6",
+          color: "#8B5E3C",
+        };
+      }
+
+      return {
+        value: "Weak",
+        background: "#f5ede6",
+        color: "#8B5E3C",
+      };
+    };
+
+    const executionBadge = !selectedMaterial
+      ? {
+          value: "Locked",
+          background: "rgba(67,67,43,0.06)",
+          color: "rgba(67,67,43,0.4)",
+        }
+      : executionScore >= 70
+        ? {
+            value: executionChipData?.status ?? "Strong",
+            background: "#eef1e3",
+            color: "#43432B",
+          }
+        : executionScore >= 50
+          ? {
+              value: executionChipData?.status ?? "Mixed",
+              background: "#f5ede6",
+              color: "#8B5E3C",
+            }
+          : {
+              value: executionChipData?.status ?? "Weak",
+              background: "#f5ede6",
+              color: "#8B5E3C",
+            };
+
+    return [
+      {
+        label: "Identity",
+        ...getScoreBadgeConfig(dynamicIdentityScore),
+      },
+      {
+        label: "Resonance",
+        ...getScoreBadgeConfig(commercialPotentialScore),
+      },
+      {
+        label: "Execution",
+        ...executionBadge,
+      },
+    ];
+  }, [commercialPotentialScore, dynamicIdentityScore, executionChipData?.status, executionScore, selectedMaterial]);
 
   /* ─── RENDER ───────────────────────────────────────────────────────────── */
   const overallScore = Math.round((dynamicIdentityScore + commercialPotentialScore + executionScore) / 3);
@@ -4428,24 +4497,37 @@ function SpecStudioPageContent() {
             <section style={{ marginBottom: 30 }}>
               <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 20 }}>Muko&apos;s Read</div>
               {shouldShowSpecRailLoading ? (
+                <div style={{ display: "grid", gap: 12 }}>
+                  <div
+                    style={{
+                      height: 24,
+                      width: "84%",
+                      borderRadius: 8,
+                      background: "linear-gradient(90deg, rgba(226,221,214,0.5) 0%, rgba(250,249,246,0.94) 50%, rgba(226,221,214,0.5) 100%)",
+                      backgroundSize: "200% 100%",
+                      animation: "shimmer 1.4s ease-in-out infinite",
+                    }}
+                  />
+                  <div
+                    style={{
+                      height: 52,
+                      borderRadius: 16,
+                      background: "linear-gradient(90deg, rgba(226,221,214,0.5) 0%, rgba(250,249,246,0.94) 50%, rgba(226,221,214,0.5) 100%)",
+                      backgroundSize: "200% 100%",
+                      animation: "shimmer 1.4s ease-in-out infinite",
+                    }}
+                  />
+                </div>
+              ) : (
                 <MukoTypedLoadingState
-                  headline={SPEC_READ_LOADING_HEADLINE}
-                  body={SPEC_READ_LOADING_BODY}
+                  key={`spec-read-${activeSpecRail?.headline ?? "empty"}-${activeSpecRail?.decision.reason ?? ""}`}
+                  headline={activeSpecRail?.headline ?? "Select a material and build path to activate the spec read."}
+                  body={activeSpecRail?.decision.reason}
+                  showFooter={false}
                   headlineStyle={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em" }}
-                  bodyContainerStyle={{ marginTop: 12 }}
+                  bodyContainerStyle={activeSpecRail ? { marginTop: 12 } : undefined}
                   bodyStyle={{ fontFamily: inter, fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.66)" }}
                 />
-              ) : (
-                <>
-                  <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em" }}>
-                    {activeSpecRail?.headline ?? "Select a material and build path to activate the spec read."}
-                  </div>
-                  {activeSpecRail && (
-                    <div style={{ marginTop: 12, fontFamily: inter, fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.66)" }}>
-                      {activeSpecRail.decision.reason}
-                    </div>
-                  )}
-                </>
               )}
             </section>
 
@@ -5033,8 +5115,22 @@ function SpecStudioPageContent() {
               </>
             )}
 
+            <div style={{
+              padding: '8px 0 18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              gap: '7px',
+            }}>
+              <span style={{ fontSize: '20px', color: 'rgba(77,48,47,0.52)', lineHeight: '1', marginTop: '-2px' }}>✳</span>
+              <p style={{ margin: 0, fontSize: '11px', color: 'rgba(77,48,47,0.52)', lineHeight: '1.4', fontFamily: inter }}>
+                Muko uses AI — always apply your own judgment.
+              </p>
+            </div>
+
             <PulseSection
               collapsedInsight={collapsedPulseInsight}
+              collapsedBadges={specCollapsedBadges}
               items={pulseRows.map((row) => ({
                 dimensionKey: row.key,
                 label: row.label,
@@ -5054,10 +5150,10 @@ function SpecStudioPageContent() {
 
           </div>
             </aside>
-            <AskMuko
-              step="spec"
-              context={askMukoContext}
-            />
+	            <AskMuko
+	              step="spec"
+	              context={askMukoContext}
+	            />
             </div>
           }
         />

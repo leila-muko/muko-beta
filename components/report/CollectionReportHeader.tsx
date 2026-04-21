@@ -293,6 +293,40 @@ export function CollectionReportHeader({
           )}
         </div>
       )}
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          gap: 7,
+          marginTop: 28,
+          paddingTop: 18,
+          borderTop: '0.5px solid rgba(0,0,0,0.1)',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 20,
+            color: '#888888',
+            lineHeight: '1',
+            marginTop: '-2px',
+          }}
+        >
+          ✳
+        </span>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 11,
+            color: '#888888',
+            lineHeight: '1.4',
+            fontFamily: 'Inter, sans-serif',
+          }}
+        >
+          Muko uses AI — always apply your own judgment.
+        </p>
+      </div>
     </section>
   );
 }

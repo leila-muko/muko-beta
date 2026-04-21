@@ -11,6 +11,7 @@ interface MukoTypedLoadingStateProps {
   containerStyle?: React.CSSProperties;
   bodyContainerStyle?: React.CSSProperties;
   wordDelayMs?: number;
+  showFooter?: boolean;
 }
 
 function revealWords(text: string, count: number) {
@@ -26,16 +27,12 @@ export function MukoTypedLoadingState({
   containerStyle,
   bodyContainerStyle,
   wordDelayMs = 90,
+  showFooter = true,
 }: MukoTypedLoadingStateProps) {
   const headlineWords = useMemo(() => headline.trim().split(/\s+/).filter(Boolean), [headline]);
   const bodyWords = useMemo(() => (body ? body.trim().split(/\s+/).filter(Boolean) : []), [body]);
   const [headlineCount, setHeadlineCount] = useState(0);
   const [bodyCount, setBodyCount] = useState(0);
-
-  useEffect(() => {
-    setHeadlineCount(0);
-    setBodyCount(0);
-  }, [headline, body]);
 
   useEffect(() => {
     if (headlineWords.length === 0 || headlineCount >= headlineWords.length) return;
@@ -83,8 +80,10 @@ export function MukoTypedLoadingState({
       {body ? (
         <div style={bodyContainerStyle}>
           <MukoStreamingParagraph
+            text={body}
             streamingText={visibleBody}
             isStreaming={bodyStreaming}
+            showFooter={showFooter}
             paragraphStyle={bodyStyle}
             paragraphSpacing={12}
           />

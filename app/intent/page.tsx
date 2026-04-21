@@ -118,24 +118,55 @@ function deliveryWeeks(season: string): number | null {
 function BeatHeader({
   title,
   description,
+  optionalLabel,
 }: {
   title: string;
   description?: string;
+  optionalLabel?: string;
 }) {
   return (
     <div>
       <div
         style={{
-          fontFamily: sohne,
-          fontSize: 24,
-          fontWeight: 500,
-          color: TEXT,
-          letterSpacing: "-0.015em",
-          lineHeight: 1.2,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
           marginBottom: 8,
         }}
       >
-        {title}
+        <div
+          style={{
+            fontFamily: sohne,
+            fontSize: 24,
+            fontWeight: 500,
+            color: TEXT,
+            letterSpacing: "-0.015em",
+            lineHeight: 1.2,
+          }}
+        >
+          {title}
+        </div>
+        {optionalLabel ? (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "3px 8px",
+              borderRadius: 999,
+              border: `1px solid ${BORDER}`,
+              fontFamily: inter,
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: MUTED,
+              lineHeight: 1,
+            }}
+          >
+            {optionalLabel}
+          </span>
+        ) : null}
       </div>
       {description && (
         <div
@@ -1045,6 +1076,7 @@ export default function IntentCalibrationPage() {
           <section>
             <BeatHeader
               title="Set the tension."
+              optionalLabel="Optional"
               description="Position the collection across a few core tensions so the direction feels intentional rather than accidental."
             />
 

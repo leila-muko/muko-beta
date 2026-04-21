@@ -7,6 +7,7 @@ interface MukoStreamingParagraphProps {
   text?: string;
   streamingText?: string;
   isStreaming?: boolean;
+  showFooter?: boolean;
   containerStyle?: React.CSSProperties;
   contentStyle?: React.CSSProperties;
   paragraphStyle?: React.CSSProperties;
@@ -54,6 +55,7 @@ export function MukoStreamingParagraph({
   text,
   streamingText = "",
   isStreaming = false,
+  showFooter = true,
   containerStyle,
   contentStyle,
   paragraphStyle,
@@ -180,7 +182,7 @@ export function MukoStreamingParagraph({
             </p>
           ))
         )}
-        <MukoFooter isStreaming={isStreaming} />
+        {showFooter ? <MukoFooter isStreaming={isStreaming} /> : null}
       </div>
     </div>
   );

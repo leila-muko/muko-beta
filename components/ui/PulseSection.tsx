@@ -19,6 +19,12 @@ export interface PulseSectionItem
 interface PulseSectionProps {
   items: PulseSectionItem[];
   collapsedInsight: PulseMicroInsight;
+  collapsedBadges?: Array<{
+    label: string;
+    value: string;
+    background: string;
+    color: string;
+  }>;
   initiallyExpanded?: boolean;
   summaryPrefix?: string;
   helperText?: string | null;
@@ -27,6 +33,7 @@ interface PulseSectionProps {
 export function PulseSection({
   items,
   collapsedInsight,
+  collapsedBadges,
   initiallyExpanded = false,
   summaryPrefix = "Pulse",
   helperText,
@@ -112,7 +119,7 @@ export function PulseSection({
             fontWeight: 600,
             letterSpacing: "0.18em",
             textTransform: "uppercase",
-            color: "rgba(67,67,43,0.34)",
+            color: "#888078",
             marginBottom: 8,
             position: "relative",
             zIndex: 1,
@@ -161,7 +168,8 @@ export function PulseSection({
             viewBox="0 0 12 12"
             fill="none"
             style={{
-              opacity: 0.4,
+              opacity: 1,
+              color: "rgba(67,67,43,0.62)",
               flexShrink: 0,
               transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
               transition: "transform 200ms ease",
@@ -180,42 +188,82 @@ export function PulseSection({
             zIndex: 1,
           }}
         >
-          <span
-            aria-hidden
-            style={{
-              position: "relative",
-              width: 5,
-              height: 5,
-              borderRadius: "50%",
-              flexShrink: 0,
-              background: radarTone,
-              boxShadow: `0 0 0 1px ${radarGlow}`,
-              marginTop: 8,
-              animation: "pulseRadarDot 2.2s ease-out infinite",
-            }}
-          >
-            <span
-              style={{
-                position: "absolute",
-                inset: -4,
-                borderRadius: "50%",
-                border: `1px solid ${radarGlow}`,
-                animation: "pulseRadarRing 2.2s ease-out infinite",
-              }}
-            />
-            <span
-              style={{
-                position: "absolute",
-                inset: -8,
-                borderRadius: "50%",
-                border: `1px solid ${radarGlow}`,
-                opacity: trend === "steady" ? 0.22 : 0.42,
-                animation: "pulseRadarRingOuter 2.2s ease-out infinite",
-              }}
-              />
-            </span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <PulseMicroInsightView insight={collapsedInsight} />
+            {collapsedBadges && collapsedBadges.length > 0 ? (
+              <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                {collapsedBadges.map((badge, index) => (
+                  <React.Fragment key={`${badge.label}:${badge.value}`}>
+                    {index > 0 ? (
+                      <span style={{ fontSize: "10px", color: "rgba(67, 67, 43, 0.25)" }}>·</span>
+                    ) : null}
+                    <span
+                      style={{
+                        fontSize: "10px",
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        color: "rgba(67, 67, 43, 0.45)",
+                        fontFamily: "var(--font-inter, sans-serif)",
+                      }}
+                    >
+                      {badge.label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 500,
+                        padding: "3px 10px",
+                        borderRadius: "20px",
+                        background: badge.background,
+                        color: badge.color,
+                        fontFamily: "var(--font-inter, sans-serif)",
+                      }}
+                    >
+                      {badge.value}
+                    </span>
+                  </React.Fragment>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <span
+                  aria-hidden
+                  style={{
+                    position: "relative",
+                    width: 5,
+                    height: 5,
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    background: radarTone,
+                    boxShadow: `0 0 0 1px ${radarGlow}`,
+                    marginTop: 8,
+                    animation: "pulseRadarDot 2.2s ease-out infinite",
+                  }}
+                >
+                  <span
+                    style={{
+                      position: "absolute",
+                      inset: -4,
+                      borderRadius: "50%",
+                      border: `1px solid ${radarGlow}`,
+                      animation: "pulseRadarRing 2.2s ease-out infinite",
+                    }}
+                  />
+                  <span
+                    style={{
+                      position: "absolute",
+                      inset: -8,
+                      borderRadius: "50%",
+                      border: `1px solid ${radarGlow}`,
+                      opacity: trend === "steady" ? 0.22 : 0.42,
+                      animation: "pulseRadarRingOuter 2.2s ease-out infinite",
+                    }}
+                  />
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <PulseMicroInsightView insight={collapsedInsight} />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </button>

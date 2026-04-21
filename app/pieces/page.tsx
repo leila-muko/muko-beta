@@ -55,6 +55,7 @@ const CHARTREUSE = "#A8B475";
 const GREEN = "#7A9E7E";
 const AMBER = "#C4955A";
 const RED = "#B85C5C";
+const STEEL_BLUE = "#7D96AC";
 
 const sohne = "var(--font-sohne-breit), -ui-sans-serif, sans-serif";
 const inter = "var(--font-inter), -ui-sans-serif, sans-serif";
@@ -109,8 +110,6 @@ const READ_HEADLINE_STYLE = {
   letterSpacing: "-0.01em",
   width: "100%",
 };
-const PIECES_READ_LOADING_HEADLINE = "Mapping the strongest starting point for this collection.";
-const PIECES_READ_LOADING_BODY = "Muko is reading the collection direction, assortment gaps, and signal balance to identify where the line should begin.";
 
 // ── Types ──────────────────────────────────────────────────────
 interface CollectionPiece {
@@ -4015,6 +4014,10 @@ function PiecesPageClient() {
             <div
               style={{
                 ...EYEBROW_STYLE,
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: "0.18em",
+                color: "#888078",
                 marginBottom: 10,
               }}
             >
@@ -4059,15 +4062,15 @@ function PiecesPageClient() {
                   minHeight: 38,
                   padding: "0 16px",
                   borderRadius: 999,
-                  border: "1px solid rgba(168,180,117,0.34)",
-                  background: "linear-gradient(180deg, rgba(168,180,117,0.18) 0%, rgba(168,180,117,0.1) 100%)",
-                  boxShadow: "0 8px 22px rgba(67,67,43,0.08)",
-                  fontFamily: inter,
+                  border: `1px solid ${STEEL_BLUE}`,
+                  background: "transparent",
+                  boxShadow: "none",
+                  fontFamily: sohne,
                   fontSize: 10.5,
-                  fontWeight: 700,
+                  fontWeight: 600,
                   letterSpacing: "0.14em",
                   textTransform: "uppercase",
-                  color: "#4F5B28",
+                  color: STEEL_BLUE,
                   cursor: "pointer",
                   flexShrink: 0,
                   marginLeft: 16,
@@ -4075,17 +4078,15 @@ function PiecesPageClient() {
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = "0 12px 28px rgba(67,67,43,0.12)";
-                  e.currentTarget.style.borderColor = "rgba(168,180,117,0.5)";
-                  e.currentTarget.style.background =
-                    "linear-gradient(180deg, rgba(168,180,117,0.24) 0%, rgba(168,180,117,0.14) 100%)";
+                  e.currentTarget.style.boxShadow = "0 10px 24px rgba(125,150,172,0.14)";
+                  e.currentTarget.style.borderColor = "rgba(125,150,172,0.72)";
+                  e.currentTarget.style.background = "rgba(125,150,172,0.04)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "0 8px 22px rgba(67,67,43,0.08)";
-                  e.currentTarget.style.borderColor = "rgba(168,180,117,0.34)";
-                  e.currentTarget.style.background =
-                    "linear-gradient(180deg, rgba(168,180,117,0.18) 0%, rgba(168,180,117,0.1) 100%)";
+                  e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.borderColor = STEEL_BLUE;
+                  e.currentTarget.style.background = "transparent";
                 }}
               >
                 <span style={{ fontSize: 13, lineHeight: 1 }}>+</span>
@@ -4168,6 +4169,10 @@ function PiecesPageClient() {
             <span
               style={{
                 ...EYEBROW_STYLE,
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: "0.18em",
+                color: "#888078",
                 padding: "0 16px",
                 whiteSpace: "nowrap" as const,
               }}
@@ -4258,24 +4263,49 @@ function PiecesPageClient() {
             </div>
             {rightRailPiecesRead ? (
               <>
-                <div
-                  style={{
+                <MukoTypedLoadingState
+                  key={`pieces-read-${rightRailPiecesRead.read_headline}-${rightRailPiecesRead.read_body}`}
+                  headline={rightRailPiecesRead.read_headline}
+                  body={rightRailPiecesRead.read_body}
+                  showFooter={false}
+                  headlineStyle={{
                     ...READ_HEADLINE_STYLE,
-                    marginBottom: 10,
+                    marginBottom: 0,
                     fontSize: 18,
                     lineHeight: 1.22,
                   }}
-                >
-                  {rightRailPiecesRead.read_headline}
-                </div>
+                  bodyContainerStyle={{ marginTop: 10 }}
+                  bodyStyle={{ ...READ_BODY_STYLE, lineHeight: 1.68 }}
+                />
                 <div style={{ display: "grid", gap: 16 }}>
-                  <div style={{ ...READ_BODY_STYLE, lineHeight: 1.68 }}>{rightRailPiecesRead.read_body}</div>
                   {rightRailPiecesRead.how_to_lean_in?.trim() ? (
                     <div>
                       <div style={{ ...READ_ZONE_LABEL_STYLE, marginBottom: 8 }}>How to Lean In</div>
                       <div style={{ ...READ_BODY_STYLE, lineHeight: 1.68 }}>{rightRailPiecesRead.how_to_lean_in}</div>
                     </div>
                   ) : null}
+                  <div
+                    style={{
+                      padding: "8px 0 0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-start",
+                      gap: "7px",
+                    }}
+                  >
+                    <span style={{ fontSize: "20px", color: "rgba(77,48,47,0.52)", lineHeight: "1", marginTop: "-2px" }}>✳</span>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: "11px",
+                        color: "rgba(77,48,47,0.52)",
+                        lineHeight: "1.4",
+                        fontFamily: inter,
+                      }}
+                    >
+                      Muko uses AI — always apply your own judgment.
+                    </p>
+                  </div>
                   <div>
                     <div style={{ height: 1, background: "rgba(67,67,43,0.08)", margin: "18px 0 18px" }} />
                     <div
@@ -4286,29 +4316,29 @@ function PiecesPageClient() {
                     >
                       Start Here
                     </div>
-                    <div
-                      style={{
+                    <MukoTypedLoadingState
+                      key={`pieces-start-here-${rightRailPiecesRead.start_here_title}-${rightRailPiecesRead.start_here_body}`}
+                      headline={
+                        rightRailPiecesRead.start_here_title?.trim()
+                          ? rightRailPiecesRead.start_here_title
+                          : recommendedStartPiece?.name ?? "Lead with the clearest piece"
+                      }
+                      body={rightRailPiecesRead.start_here_body}
+                      showFooter={false}
+                      headlineStyle={{
                         ...SECTION_TITLE_STYLE,
                         fontSize: 18,
                         color: "#43432B",
                         lineHeight: 1.26,
-                        marginBottom: 8,
+                        marginBottom: 0,
                       }}
-                    >
-                      {rightRailPiecesRead.start_here_title?.trim()
-                        ? rightRailPiecesRead.start_here_title
-                        : recommendedStartPiece?.name ?? "Lead with the clearest piece"}
-                    </div>
-                    <div
-                      style={{
+                      bodyContainerStyle={{ marginTop: 8, marginBottom: 16 }}
+                      bodyStyle={{
                         ...READ_BODY_STYLE,
                         color: TEXT,
-                        marginBottom: 16,
                         lineHeight: 1.68,
                       }}
-                    >
-                      {rightRailPiecesRead.start_here_body}
-                    </div>
+                    />
                     <div style={{ display: "grid", gap: 14, justifyItems: "start" }}>
                       <button
                         type="button"
@@ -4355,27 +4385,21 @@ function PiecesPageClient() {
                   </div>
                 </div>
               </>
-            ) : (
-              <div style={{ display: "grid", gap: 22 }}>
-                <MukoTypedLoadingState
-                  headline={PIECES_READ_LOADING_HEADLINE}
-                  body={PIECES_READ_LOADING_BODY}
-                  headlineStyle={{
-                    ...READ_HEADLINE_STYLE,
-                    marginBottom: 0,
-                    fontSize: 18,
-                    lineHeight: 1.22,
-                  }}
-                  bodyContainerStyle={{ marginTop: 12 }}
-                  bodyStyle={{
-                    ...READ_BODY_STYLE,
-                    lineHeight: 1.68,
-                  }}
-                />
+	            ) : (
+	              <div style={{ display: "grid", gap: 22 }}>
                 <div style={{ display: "grid", gap: 14 }}>
                   <div
                     style={{
-                      height: 84,
+                      height: 24,
+                      width: "78%",
+                      borderRadius: 8,
+                      background: "rgba(67,67,43,0.06)",
+                      animation: "skeleton-loading 1.4s ease-in-out infinite",
+                    }}
+                  />
+                  <div
+                    style={{
+                      height: 96,
                       borderRadius: 16,
                       background: "rgba(67,67,43,0.06)",
                       animation: "skeleton-loading 1.4s ease-in-out infinite",
@@ -4389,12 +4413,12 @@ function PiecesPageClient() {
                       animation: "skeleton-loading 1.4s ease-in-out infinite",
                     }}
                   />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-        <AskMuko
+	                </div>
+	              </div>
+	            )}
+	          </div>
+	        </div>
+	        <AskMuko
           step="pieces"
           context={askMukoContext}
           isOpen={isAskMukoOpen}
