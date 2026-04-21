@@ -134,6 +134,25 @@ export default function CollectionsHubPage() {
     } catch {}
   }, [activeCollection, collections]);
 
+  useEffect(() => {
+    if (loading || collections.length === 0 || activeCollection) return;
+
+    const requestedCollection =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('collection')?.trim()
+        : null;
+    const storedCollection =
+      typeof window !== 'undefined' ? window.localStorage.getItem('muko_collectionName')?.trim() : null;
+    const nextCollectionName = requestedCollection || storedCollection || null;
+    if (!nextCollectionName) return;
+
+    const matchingCollection = collections.find((collection) => collection.name === nextCollectionName);
+    if (!matchingCollection) return;
+
+    resetCollectionScopedSession(matchingCollection.name, matchingCollection.season);
+    setActiveCollection(matchingCollection.name);
+  }, [activeCollection, collections, loading, setActiveCollection]);
+
   const handleStartCollection = useCallback(() => {
     const { assortmentInsightCache } = useSessionStore.getState();
     useSessionStore.getState().resetSession();
@@ -145,7 +164,7 @@ export default function CollectionsHubPage() {
       localStorage.removeItem('muko_aesthetic_inflection');
       localStorage.removeItem('muko_intent');
     } catch {}
-    router.push('/entry');
+    router.push('/entry?fresh=1');
   }, [router]);
 
   const handleNewPiece = useCallback(() => {

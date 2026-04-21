@@ -176,7 +176,7 @@ function EntryScreenContent() {
     try {
       window.localStorage.setItem('muko_collectionName', name);
     } catch {}
-    router.push('/collections');
+    router.push(`/collections?collection=${encodeURIComponent(name)}`);
   };
 
   const handleDeleteCollection = async (name: string) => {
@@ -256,7 +256,12 @@ function EntryScreenContent() {
         />
 
         {/* New Collection button */}
-        <NewCollectionButton onClick={resetForNewCollection} />
+        <NewCollectionButton
+          onClick={() => {
+            resetForNewCollection();
+            router.replace('/entry?fresh=1');
+          }}
+        />
 
         {/* Recents */}
         <div style={{ marginTop: 8 }}>
