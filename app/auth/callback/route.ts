@@ -32,7 +32,8 @@ export async function GET(request: Request) {
 
       if (user) {
         if (next && next.startsWith('/')) {
-          return NextResponse.redirect(`${origin}${next}`)
+          const redirectedNext = next === '/entry' ? '/entry?fresh=1' : next
+          return NextResponse.redirect(`${origin}${redirectedNext}`)
         }
 
         const { data: brandProfile } = await supabase
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
           .eq('user_id', user.id)
           .maybeSingle()
 
-        const destination = brandProfile ? '/entry' : '/onboarding'
+        const destination = brandProfile ? '/entry?fresh=1' : '/onboarding'
         return NextResponse.redirect(`${origin}${destination}`)
       }
     }

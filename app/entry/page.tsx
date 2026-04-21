@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { createClient } from '@/lib/supabase/client';
 import { BRAND } from '@/lib/concept-studio/constants';
@@ -23,7 +23,9 @@ interface RecentCollectionItem {
 
 export default function EntryScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const store = useSessionStore();
+  const isFreshEntry = searchParams.get('fresh') === '1';
 
   const allSeasons = useMemo(
     () => [
@@ -33,7 +35,7 @@ export default function EntryScreen() {
     []
   );
 
-  const [collectionName, setCollectionName] = useState(() => store.collectionName || 'Spring Requiem');
+  const [collectionName, setCollectionName] = useState(() => (isFreshEntry ? '' : store.collectionName || ''));
   const [selectedSeason, setSelectedSeason] = useState<string | null>(() => {
     const storeSeason = store.season;
     if (storeSeason) {
@@ -87,6 +89,12 @@ export default function EntryScreen() {
   };
 
   useEffect(() => {
+    if (isFreshEntry) {
+      resetForNewCollection();
+      router.replace('/entry');
+      return;
+    }
+
     try {
       const savedName = window.localStorage.getItem('muko_collectionName')?.trim();
       const savedSeason = window.localStorage.getItem('muko_seasonLabel')?.trim();
@@ -104,7 +112,17 @@ export default function EntryScreen() {
         }
       }
     } catch {}
-  }, [allSeasons, setActiveCollection, setSeason, setStoreCollectionName]);
+    if (store.collectionName.trim()) {
+      setCollectionName(store.collectionName);
+    }
+
+    if (store.season) {
+      const match = allSeasons.find((season) => season.label === store.season);
+      if (match) {
+        setSelectedSeason(match.id);
+      }
+    }
+  }, [allSeasons, isFreshEntry, router, setSeason, setStoreCollectionName, store.collectionName, store.season]);
 
   useEffect(() => {
     let cancelled = false;

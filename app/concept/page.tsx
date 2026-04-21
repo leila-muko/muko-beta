@@ -3494,7 +3494,14 @@ export default function ConceptStudioPage() {
         collectionName={headerCollectionName}
         seasonLabel={headerSeasonLabel}
         onBack={() => window.history.back()}
-        onSaveClose={() => router.push("/pieces")}
+        onSaveClose={() => {
+          const activeCollection = useSessionStore.getState().activeCollection;
+          if (activeCollection) {
+            router.push(`/collection/${encodeURIComponent(activeCollection)}`);
+          } else {
+            router.push('/collections');
+          }
+        }}
       />
 
       {selectedAesthetic ? (

@@ -1449,6 +1449,60 @@ export default function CollectionPage({
                     >
                       · {seasonLabel}
                     </span>
+                  ) : collectionAesthetic ? (
+                    <div style={{
+                      padding: '14px 20px 16px',
+                      borderBottom: '0.5px solid rgba(67,67,43,0.08)',
+                    }}>
+                      <div style={{
+                        background: 'rgba(168,180,117,0.07)',
+                        border: '0.5px solid rgba(168,180,117,0.28)',
+                        borderRadius: 10,
+                        padding: '11px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 16,
+                      }}>
+                        <div>
+                          <div style={{
+                            fontFamily: inter,
+                            fontSize: 12,
+                            fontWeight: 500,
+                            color: '#191919',
+                            marginBottom: 3,
+                          }}>
+                            Concept in progress
+                          </div>
+                          <div style={{
+                            fontFamily: inter,
+                            fontSize: 11,
+                            color: 'rgba(67,67,43,0.50)',
+                            lineHeight: 1.4,
+                          }}>
+                            Direction set — language and product not yet complete
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => router.push('/concept')}
+                          style={{
+                            fontFamily: inter,
+                            fontSize: 12,
+                            fontWeight: 500,
+                            background: '#191919',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 100,
+                            padding: '7px 14px',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
+                        >
+                          Continue Concept →
+                        </button>
+                      </div>
+                    </div>
                   ) : null}
                   {reportExists ? (
                     <>
@@ -1742,7 +1796,7 @@ export default function CollectionPage({
               {activeTab === 'pieces' ? (
                 <>
                   <button
-                    onClick={onNewPiece}
+                    onClick={collectionAesthetic ? onNewPiece : undefined}
                     style={{
                       ...headerActionButtonBase,
                       padding: '7px 16px',
@@ -1751,6 +1805,8 @@ export default function CollectionPage({
                       color: '#43432B',
                       fontWeight: 600,
                       letterSpacing: '0.07em',
+                      opacity: collectionAesthetic ? 1 : 0.35,
+                      cursor: collectionAesthetic ? 'pointer' : 'not-allowed',
                     }}
                   >
                     Add Piece

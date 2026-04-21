@@ -144,7 +144,6 @@ function BeatHeader({
             fontSize: 13,
             color: MUTED,
             fontStyle: "italic",
-            textTransform: "lowercase",
             lineHeight: 1.6,
             marginBottom: 30,
             maxWidth: 600,
@@ -355,16 +354,6 @@ function IntentSlider({
         >
           {right}
         </span>
-      </div>
-      <div
-        style={{
-          marginTop: 10,
-          fontFamily: inter,
-          fontSize: 11,
-          color: MUTED,
-        }}
-      >
-        Currently: <span style={{ color: TEXT }}>{posLabel}</span>
       </div>
     </div>
   );

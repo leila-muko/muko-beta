@@ -29,17 +29,14 @@ export function SignInForm() {
       setError(error.message)
       setLoading(false)
     } else {
-      const next = new URLSearchParams(window.location.search).get('next')
-      const destination = next && next.startsWith('/') ? next : '/entry'
-      const resolvedDestination = destination === '/entry' ? '/entry?fresh=1' : destination
-      router.push(resolvedDestination)
+      router.push('/dashboard')
       router.refresh()
     }
   }
 
   return (
     <form onSubmit={handleSignIn}>
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: '1.5rem' }}>
         <Input
           id="email"
           type="email"
@@ -51,7 +48,7 @@ export function SignInForm() {
         />
       </div>
 
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: '2rem' }}>
         <Input
           id="password"
           type="password"
@@ -64,36 +61,14 @@ export function SignInForm() {
       </div>
 
       {error && (
-        <div
-          style={{
-            marginBottom: 16,
-            backgroundColor: 'rgba(188,82,74,0.06)',
-            border: '1px solid rgba(188,82,74,0.2)',
-            borderRadius: 8,
-            padding: '10px 14px',
-          }}
-        >
-          <p style={{ fontSize: 13, color: '#9A4039', fontFamily: 'var(--font-inter)' }}>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4" style={{ marginBottom: '2rem' }}>
+          <p className="text-sm text-red-600 font-body">
             {error}
           </p>
         </div>
       )}
 
-      <Button
-        type="submit"
-        disabled={loading}
-        style={{ background: '#4D302F', color: '#F9F7F4' }}
-        onMouseEnter={(e) => {
-          if (!loading) {
-            e.currentTarget.style.background = '#3F2726'
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!loading) {
-            e.currentTarget.style.background = '#4D302F'
-          }
-        }}
-      >
+      <Button type="submit" disabled={loading}>
         {loading ? 'Signing in...' : 'Sign in'}
       </Button>
     </form>
