@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSessionStore } from '@/lib/store/sessionStore';
@@ -21,7 +21,7 @@ interface RecentCollectionItem {
   name: string;
 }
 
-export default function EntryScreen() {
+function EntryScreenContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const store = useSessionStore();
@@ -928,6 +928,14 @@ export default function EntryScreen() {
       `}</style>
       </main>
     </div>
+  );
+}
+
+export default function EntryScreen() {
+  return (
+    <Suspense fallback={null}>
+      <EntryScreenContent />
+    </Suspense>
   );
 }
 
