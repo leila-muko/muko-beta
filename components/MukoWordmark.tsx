@@ -5,6 +5,26 @@ import React from "react";
 const defaultSohne = "var(--font-sohne-breit), -ui-sans-serif, sans-serif";
 const defaultInter = "var(--font-inter), -ui-sans-serif, sans-serif";
 
+function withAlpha(hexColor: string, alpha: number) {
+  if (!hexColor.startsWith("#")) return hexColor;
+
+  let hex = hexColor.slice(1);
+  if (hex.length === 3) {
+    hex = hex
+      .split("")
+      .map((char) => char + char)
+      .join("");
+  }
+
+  if (hex.length !== 6) return hexColor;
+
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 interface MukoWordmarkProps {
   onClick?: () => void;
   ariaLabel?: string;
@@ -59,9 +79,9 @@ export function MukoWordmark({
             minHeight: 16,
             padding: "1px 6px",
             borderRadius: 999,
-            background: "rgba(60, 60, 60, 0.08)",
-            border: "1px solid rgba(60, 60, 60, 0.14)",
-            color: "rgba(67,67,43,0.62)",
+            background: "transparent",
+            border: `1px solid ${withAlpha(color, 0.5)}`,
+            color: withAlpha(color, 0.5),
             fontFamily: defaultInter,
             fontSize: 9,
             fontWeight: 700,

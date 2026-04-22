@@ -2,7 +2,7 @@
 
 import categoriesData from "@/data/categories.json";
 import { getCollectionLanguageLabels, getExpressionSignalLabels } from "@/lib/collection-signals";
-import { parseSelectedPieceImage, resolvePieceImageType } from "@/lib/piece-image";
+import { resolveSelectedPieceImage } from "@/lib/piece-image";
 import { normalizeSpecSubcategoryId } from "@/lib/spec-studio/smart-defaults";
 import { useSessionStore, type ActivatedChip, type ChipSelection, type CollectionRoleId, type KeyPiece, type PieceBuildContext } from "@/lib/store/sessionStore";
 import { hydrateCollectionContextFromAnalysis, type PersistedCollectionContextRow } from "@/lib/collections/hydrateCollectionContext";
@@ -112,16 +112,15 @@ function getAssignedRole(row: PersistedSpecAnalysisRow): CollectionRoleId | null
 
 export function deriveSpecSessionSnapshot(row: PersistedSpecAnalysisRow) {
   const pieceName = getPieceName(row);
-  const storedPieceImage = parseSelectedPieceImage(
-    typeof row.agent_versions?.selected_piece_image === "string" ? row.agent_versions.selected_piece_image : null
-  );
-  const resolvedPieceType =
-    storedPieceImage?.pieceType ??
-    resolvePieceImageType({
-      pieceName,
-      category: row.category,
-      silhouette: row.silhouette,
-    });
+  const selectedPieceImage = resolveSelectedPieceImage({
+    storedImageRaw: typeof row.agent_versions?.selected_piece_image === "string"
+      ? row.agent_versions.selected_piece_image
+      : null,
+    pieceName,
+    category: row.category,
+    silhouette: row.silhouette,
+  });
+  const resolvedPieceType = selectedPieceImage?.pieceType ?? null;
   const categoryId = normalizeToken(row.category);
   const categoryName = (categoryId ? categoryNameById.get(categoryId) : null) ?? titleCase(row.category) ?? "";
   const subcategoryId = normalizeSpecSubcategoryId(resolvedPieceType ?? null) ?? "";
@@ -152,7 +151,7 @@ export function deriveSpecSessionSnapshot(row: PersistedSpecAnalysisRow) {
 
   const selectedKeyPiece: KeyPiece = {
     item: pieceName,
-    signal: storedPieceImage?.signal ?? null,
+    signal: selectedPieceImage?.signal ?? null,
     note: undefined,
     category: categoryId || null,
     type: resolvedPieceType ?? (subcategoryId || null),
@@ -183,7 +182,7 @@ export function deriveSpecSessionSnapshot(row: PersistedSpecAnalysisRow) {
     constructionTierOverride: Boolean(row.construction_tier_override),
     targetMsrp: row.target_msrp ?? null,
     role,
-    selectedPieceImage: storedPieceImage,
+    selectedPieceImage,
     selectedKeyPiece,
     pieceBuildContext,
     chipSelection,

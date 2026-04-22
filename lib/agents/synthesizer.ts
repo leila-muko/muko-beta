@@ -293,7 +293,7 @@ function buildHigh(ctx: NarrativeCtx): [string[], string[], string[]] {
       `${uc(firstSentence(lc(aesthetic.consumer_insight)))} — the consumer case is solid and the score reflects it.`,
     ];
     edit = [
-      `The ${score} is not the problem. If reconsideration is driven by gut tension rather than a commercial concern, the data suggests trusting the brief.`,
+      `The commercial case is solid. If there is tension, it is in execution — not in the direction itself.`,
       adjacent
         ? `${adjacent} is the available redirect if the concern is specifically about market differentiation.`
         : `Avoid a full pivot before isolating the specific lever pulling ${weakest.label} to ${weakest.score}.`,
@@ -445,14 +445,14 @@ function buildLow(ctx: NarrativeCtx): [string[], string[], string[]] {
     adjacent
       ? `${adjacent} keeps ${strongest.label} intact while resolving the ${weakest.label} problem — the consumer case transfers.`
       : `${uc(firstSentence(lc(aesthetic.consumer_insight)))} — the consumer signal is intact, the spec is the barrier.`,
-    `The direction may be more recoverable than the ${score} reads. Isolate the ${weakest.label} decisions before widening the scope of the review.`,
+    `The concept signal is intact. ${weakest.label} is the specific constraint — isolating it keeps the review focused.`,
   ];
 
   const edit: string[] = [
     `${weakest.label} at ${weakest.score} is the constraint. Identify the specific executions pulling it down before rebuilding the direction.`,
     adjacent
       ? `Avoid reconstructing the brief from scratch — ${adjacent} is the redirect that preserves the commercial logic.`
-      : `Avoid treating this as a full creative problem. ${weakest.label} at ${weakest.score} is the specific repair point.`,
+      : `${weakest.label} is the one dimension to address. The brief itself does not need to change.`,
     `The brief needs to address why ${aesthetic.name} is creating ${'AEIOUaeiou'.includes(weakest.label[0]) ? 'an' : 'a'} ${weakest.label} problem for ${brand} specifically. That answer shapes what comes next.`,
   ];
 

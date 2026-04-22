@@ -8,6 +8,14 @@ import type { DecisionGuidance, InsightMode } from "@/lib/types/insight";
 
 const sohne = "var(--font-sohne-breit), system-ui, sans-serif";
 const inter = "var(--font-inter), system-ui, sans-serif";
+const readTitleStyle: React.CSSProperties = {
+  fontFamily: sohne,
+  fontSize: 18,
+  fontWeight: 500,
+  lineHeight: 1.26,
+  color: "#43432B",
+  letterSpacing: "-0.03em",
+};
 
 /* ─── Next Move discriminated union ─────────────────────────────────────── */
 
@@ -50,6 +58,7 @@ export interface ConstructionImplication {
 
 export interface MukoInsightSectionProps {
   headline: string;
+  marketMoment?: string;
   paragraphs: string[];
   bullets: { label: string; items: string[]; subtitle?: string };
   nextMove: NextMoveProps;
@@ -186,7 +195,7 @@ function ProductDecisionRail({
         <div style={{ marginBottom: 28 }}>
           <div style={{ ...zoneLabel, marginBottom: 10 }}>MUKO&apos;S READ</div>
           {pieceStreamingTitle ? (
-            <div style={{ fontFamily: sohne, fontSize: 21, fontWeight: 500, lineHeight: 1.24, color: "#43432B", marginBottom: 12 }}>
+            <div style={{ ...readTitleStyle, marginBottom: 12 }}>
               {pieceStreamingTitle}
               <span style={{ display: "inline-block", width: 2, height: "0.85em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
             </div>
@@ -205,7 +214,7 @@ function ProductDecisionRail({
           <div style={{ marginBottom: 28 }}>
             <div style={{ ...zoneLabel, marginBottom: 10 }}>{hasSelectedProductPiece ? "MUKO'S TAKE" : "MUKO'S READ"}</div>
             {productPieceRead?.title && (
-              <div style={{ fontFamily: sohne, fontSize: 21, fontWeight: 500, lineHeight: 1.24, color: "#43432B", marginBottom: 12 }}>
+              <div style={{ ...readTitleStyle, marginBottom: 12 }}>
                 {productPieceRead.title}
               </div>
             )}
@@ -233,6 +242,7 @@ function ProductDecisionRail({
 
 function ConceptDecisionRail({
   headline,
+  marketMoment,
   paragraphs,
   bullets,
   guidance,
@@ -264,6 +274,7 @@ function ConceptDecisionRail({
   showBrandContextLabel,
 }: {
   headline: string;
+  marketMoment?: string;
   paragraphs: string[];
   bullets: { label: string; items: string[] };
   guidance: DecisionGuidance | null;
@@ -368,6 +379,14 @@ function ConceptDecisionRail({
     const firstSentence = getFirstSentence(text);
     return text.slice(firstSentence.length).trim();
   }
+  function renderBoldSegments(text: string) {
+    return text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((segment, index) => {
+      if (segment.startsWith("**") && segment.endsWith("**")) {
+        return <strong key={`${segment}-${index}`}>{segment.slice(2, -2)}</strong>;
+      }
+      return <React.Fragment key={`${segment}-${index}`}>{segment}</React.Fragment>;
+    });
+  }
 
   const zoneLabel: React.CSSProperties = {
     fontFamily: inter,
@@ -393,6 +412,13 @@ function ConceptDecisionRail({
   const settledParagraphs = shouldPromoteParagraphLead
     ? (leadBody ? [leadBody, ...paragraphs.slice(1)] : paragraphs.slice(1))
     : paragraphs;
+  const directionBriefBodyText = marketMoment ?? streamingParagraph ?? "";
+  const directionBriefParagraphs = directionBriefBodyText
+    .split(/(?=\*\*[^*]+\*\*\s+—)/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  const hasDirectionBriefBody =
+    conceptStage === "direction" && (Boolean(marketMoment) || Boolean(streamingParagraph));
 
   if (conceptStage === "language") {
     const displayHeadline = isLanguageStreaming && languageStreamingText ? languageStreamingText : headline;
@@ -415,9 +441,9 @@ function ConceptDecisionRail({
         {isLanguageStreaming && (
           <style>{`@keyframes mukoCursorBlink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
         )}
-        <div style={{ marginBottom: 34 }}>
+        <div style={{ marginBottom: 10 }}>
           <div style={{ ...zoneLabel, marginBottom: 10 }}>{zoneOneLabel.toUpperCase()}</div>
-          <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em", width: "100%" }}>
+          <div style={{ ...readTitleStyle, width: "100%" }}>
             {displayHeadline}
             {isCursorOnHeadline && (
               <span style={{ display: "inline-block", width: 2, height: "0.85em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
@@ -482,11 +508,11 @@ function ConceptDecisionRail({
       )}
 
       {/* ── Zone 1 — Muko's Read ─────────────────────────────────────────── */}
-      <div style={{ marginBottom: 34 }}>
+      <div style={{ marginBottom: 10 }}>
         <div style={{ ...zoneLabel, marginBottom: 10 }}>{zoneOneLabel.toUpperCase()}</div>
 
         {/* Guidance statement */}
-        <div style={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em", width: "100%", opacity: headlineFadedOut ? 0 : 1, transition: headlineFadedOut ? "opacity 150ms ease-out" : "opacity 250ms ease-in" }}>
+        <div style={{ ...readTitleStyle, width: "100%", opacity: headlineFadedOut ? 0 : 1, transition: headlineFadedOut ? "opacity 150ms ease-out" : "opacity 250ms ease-in" }}>
           {isStreaming && streamingText ? (
             <>
               {streamingText}
@@ -502,9 +528,32 @@ function ConceptDecisionRail({
         </div>
       </div>
 
+      {hasDirectionBriefBody ? (
+        <div style={{ marginTop: 0, marginBottom: 32 }}>
+          {directionBriefParagraphs.map((sentence, index, sentences) => (
+            <p
+              key={`${sentence}-${index}`}
+              style={{
+                margin: 0,
+                marginBottom: index === sentences.length - 1 ? 0 : "0.75rem",
+                fontFamily: inter,
+                fontSize: 12.5,
+                lineHeight: 1.76,
+                color: "rgba(67,67,43,0.66)",
+              }}
+            >
+              {renderBoldSegments(sentence)}
+              {isParagraphStreaming && index === sentences.length - 1 ? (
+                <span style={{ display: "inline-block", width: 2, height: "0.85em", background: "#A8B475", marginLeft: 2, verticalAlign: "text-bottom", animation: "mukoCursorBlink 0.9s step-start infinite" }} />
+              ) : null}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
       {/* ── Zone 2 — Insight Paragraph ───────────────────────────────────── */}
-      {((!isParagraphStreaming && paragraphs.length > 0) || !!streamingParagraph) && (
-        <div style={{ marginTop: -10, marginBottom: 32 }}>
+      {!hasDirectionBriefBody && (((!isParagraphStreaming && paragraphs.length > 0) || !!streamingParagraph)) && (
+        <div style={{ marginTop: 0, marginBottom: 32 }}>
           {pageMode !== "concept" && headline && headline !== leadInsight && (
             <div style={{ marginBottom: 12, fontFamily: inter, fontSize: 11, fontWeight: 500, color: "rgba(67,67,43,0.46)", lineHeight: 1.55 }}>
               {headline}
@@ -556,6 +605,7 @@ function ConceptDecisionRail({
 
 export function MukoInsightSection({
   headline,
+  marketMoment,
   paragraphs,
   bullets,
   nextMove,
@@ -608,6 +658,7 @@ export function MukoInsightSection({
     return (
       <ConceptDecisionRail
         headline={headline}
+        marketMoment={marketMoment}
         paragraphs={paragraphs}
         bullets={bullets}
         guidance={nmProps?.guidance ?? null}

@@ -241,6 +241,10 @@ All-clear:
 - execution_levers are positive specificity notes: what to get right to preserve what is working.
 - alternative_path.title must be "Material selection is working. No swap suggested."
 
+When all-clear applies, your job is affirmation with specificity — not faint praise, not hedged approval. Name exactly what is working and why it is the right call for this direction. A strong all-clear read is as valuable as a redirect. The designer needs to know when to stop second-guessing as much as they need to know when to change course.
+
+When identity and resonance are both strong (identity >= 80, resonance >= 75) and execution is the only constraint, Watch is almost always the correct register — not Redirect. The concept has earned the right to be solved, not reconsidered. Lead with what is working before naming the one thing to address.
+
 Watch:
 - Use when identity/resonance are strong and one execution constraint is manageable.
 - feasibility_stance should usually be "viable_with_constraints".
@@ -554,7 +558,7 @@ export function buildSpecSystemPrompt(bb: SpecBlackboard): string {
 
   const lockedLine =
     `Concept direction is already locked: ${bb.aesthetic_name} for ${bb.brand_name ?? 'the brand'}. ` +
-    `Identity scored ${bb.identity_score}, Resonance scored ${bb.resonance_score}. ` +
+    `Identity scored ${bb.identity_score}, Resonance scored ${bb.resonance_score}, Execution scored ${bb.execution_score}. ` +
     `Collection language: ${(bb.collection_language ?? []).join(', ') || 'none provided'}. ` +
     `Expression signals: ${(bb.expression_signals ?? []).join(', ') || 'none provided'}. ` +
     `The diagnostics layer already contains a deterministic read on carrier, burden, buffer, timeline, and likely failure mode. Use it as grounded signal, then sharpen the decision.`;
@@ -844,6 +848,8 @@ export function buildSpecFallbackRail(bb: SpecBlackboard): SpecRailInsight {
     required_timeline_weeks: bb.required_timeline_weeks,
     timeline_gap_weeks: bb.timeline_gap_weeks,
     brand_name: bb.brand_name,
+    identity_score: bb.identity_score,
+    resonance_score: bb.resonance_score,
     keyPiece: bb.keyPiece,
     diagnostics: bb.diagnostics,
     resolved_redirects: {

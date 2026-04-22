@@ -207,10 +207,10 @@ function computeReportData(bb: ReportBlackboard): ReportComputedData {
     });
   }
 
-  if (considerations.length < 3 && bb.identity_score < 75) {
+  if (considerations.length < 3 && bb.identity_score < 65) {
     considerations.push({
-      title: 'Identity signal needs sharpening',
-      detail: 'Brand alignment is below the target threshold. Tightening the aesthetic direction or adding a differentiating chip would strengthen the identity position.',
+      title: 'Identity alignment worth reviewing',
+      detail: 'Brand alignment has room to sharpen. Tightening the aesthetic angle or adding a differentiating execution lever would strengthen the position before committing.',
       dimension: 'identity',
     });
   }
@@ -242,7 +242,7 @@ function computeReportData(bb: ReportBlackboard): ReportComputedData {
   if (actions.length < 2 && bb.execution_score < 60) {
     actions.push({
       title: 'Simplify before committing',
-      detail: `Execution at ${bb.execution_score} creates production risk. Reduce construction complexity or material lead time before locking the spec.`,
+      detail: 'The current construction approach leaves limited room for delays. Reducing complexity or material lead time before locking the spec protects the delivery window.',
       tags: ['Execution'],
     });
   }

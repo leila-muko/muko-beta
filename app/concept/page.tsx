@@ -45,6 +45,7 @@ import { CollectionReadBar, COLLECTION_READ_BAR_OFFSET } from "@/components/coll
 import { buildProgressiveStrategySummary, buildStrategySummary } from "@/lib/strategy-summary";
 import { CollectionContextBar, ContextBarSignalIcon, COLLECTION_CONTEXT_BAR_OFFSET } from "@/components/collection/CollectionContextBar";
 import { buildPulseMicroInsight } from "@/lib/pulse/microInsight";
+import { generateDirectionBrief } from "@/lib/synthesizer/conceptInsight";
 
 /* ─── Pulse icons ─────────────────────────────────────────────────────────── */
 function IconIdentity({ size = 14, color = "currentColor" }: { size?: number; color?: string }) {
@@ -1282,6 +1283,21 @@ export default function ConceptStudioPage() {
   const [customerProfile, setCustomerProfile] = useState<string | null>(null);
   const [referenceBrands, setReferenceBrands] = useState<string[]>([]);
   const [excludedBrands, setExcludedBrands] = useState<string[]>([]);
+  const [marketMoment, setMarketMoment] = useState<string | null>(null);
+  const [directionBriefHeadline, setDirectionBriefHeadline] = useState<string | null>(null);
+  const [directionBriefLoading, setDirectionBriefLoading] = useState(false);
+  const [directionBriefStreamingHeadline, setDirectionBriefStreamingHeadline] = useState("");
+  const [directionBriefStreamingBody, setDirectionBriefStreamingBody] = useState("");
+  const [directionBriefIsStreaming, setDirectionBriefIsStreaming] = useState(false);
+  const [marketMomentSeed, setMarketMomentSeed] = useState<{
+    brandName: string;
+    brandKeywords: string[];
+    customerProfile: string;
+    priceTier: string;
+  } | null>(null);
+  const marketMomentRequestedRef = useRef(false);
+  const directionBriefAnimationRunRef = useRef(0);
+  const directionBriefTimeoutsRef = useRef<number[]>([]);
 
   // ─── Collection context state for Decision Guidance ──────────────────────
   const [collectionPieces, setCollectionPieces] = useState<Array<{
@@ -1608,6 +1624,13 @@ export default function ConceptStudioPage() {
     const strategy = conceptStrategySummary?.trim();
     return strategy && strategy !== GENERIC_STRATEGY_SUMMARY ? strategy : null;
   }, [conceptStrategySummary]);
+  const hasInterpretationLayer = Boolean(aestheticInflection.trim() || selectedInterpretationChips.length > 0);
+  const hasLanguageChoices = Boolean(conceptSilhouette || conceptPalette || selectedElements.size > 0);
+  const canAdvanceToStage2 = Boolean(selectedAesthetic && hasInterpretationLayer);
+  const canAdvanceToStage3 = Boolean(canAdvanceToStage2 && hasLanguageChoices);
+  const assignedRoleCount = Object.keys(pieceRolesById).length;
+  const heroAssignedPieceId = Object.entries(pieceRolesById).find(([, role]) => role === "hero")?.[0] ?? null;
+  const canLockDirection = Boolean(canAdvanceToStage3 && assignedRoleCount > 0);
   const persistLockedCollectionContext = useCallback(() => {
     const resolvedCollectionName = storeCollectionName.trim() || headerCollectionName.trim();
     if (!resolvedCollectionName || resolvedCollectionName === "Collection") return;
@@ -1622,6 +1645,7 @@ export default function ConceptStudioPage() {
       agent_versions: {
         strategy_summary: effectiveConceptBarSummary,
         selected_palette: conceptPalette?.trim() || null,
+        concept_setup_complete: JSON.stringify(canLockDirection),
         direction_interpretation_chips: JSON.stringify(selectedInterpretationChips),
         collection_language: JSON.stringify(selectedCollectionLanguage),
         expression_signals: JSON.stringify(selectedExpressionSignals),
@@ -1632,6 +1656,7 @@ export default function ConceptStudioPage() {
     aestheticInflection,
     conceptPalette,
     conceptSilhouette,
+    canLockDirection,
     effectiveConceptBarSummary,
     headerCollectionName,
     headerSeasonLabel,
@@ -1894,6 +1919,15 @@ export default function ConceptStudioPage() {
               setNoBrandProfile(false);
             });
 
+            if (data.brand_name) {
+              setMarketMomentSeed({
+                brandName: data.brand_name,
+                brandKeywords: Array.isArray(data.keywords) ? data.keywords : brandKeywordSource,
+                customerProfile: data.customer_profile ?? "",
+                priceTier: data.price_tier ?? "",
+              });
+            }
+
             // Batch-score all aesthetics against the brand profile so Pick selection
             // can use real Critic identity scores instead of static constants.
             const profileId = data.id;
@@ -1943,7 +1977,7 @@ export default function ConceptStudioPage() {
     return () => {
       criticBatchAbortRef.current?.abort();
     };
-  }, [preloadedCriticScores, setPreloadedCriticScores]);
+  }, [brandKeywordSource, preloadedCriticScores, setPreloadedCriticScores]);
 
   useEffect(() => {
     if (Object.keys(preloadedCriticScores).length === 0) return;
@@ -2785,6 +2819,84 @@ export default function ConceptStudioPage() {
       strategySummary: conceptStrategySummary,
     });
   }, [conceptStrategySummary, curatedRecommendations, hoveredCard, hoveredRecommendation]);
+  const clearDirectionBriefAnimation = useCallback(() => {
+    directionBriefAnimationRunRef.current += 1;
+    directionBriefTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    directionBriefTimeoutsRef.current = [];
+  }, []);
+  const runDirectionBriefAnimation = useCallback(async (headlineText: string, bodyText: string) => {
+    clearDirectionBriefAnimation();
+    const runId = directionBriefAnimationRunRef.current;
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        const timeoutId = window.setTimeout(() => resolve(), ms);
+        directionBriefTimeoutsRef.current.push(timeoutId);
+      });
+
+    setDirectionBriefIsStreaming(true);
+    setDirectionBriefStreamingHeadline("");
+    setDirectionBriefStreamingBody("");
+    setDirectionBriefHeadline(null);
+    setMarketMoment(null);
+
+    for (let index = 1; index <= headlineText.length; index += 1) {
+      if (runId !== directionBriefAnimationRunRef.current) return;
+      setDirectionBriefStreamingHeadline(headlineText.slice(0, index));
+      await wait(headlineText[index - 1] === " " ? 10 : 18);
+    }
+
+    await wait(140);
+
+    for (let index = 1; index <= bodyText.length; index += 1) {
+      if (runId !== directionBriefAnimationRunRef.current) return;
+      setDirectionBriefStreamingBody(bodyText.slice(0, index));
+      await wait(bodyText[index - 1] === " " ? 8 : 12);
+    }
+
+    if (runId !== directionBriefAnimationRunRef.current) return;
+
+    setDirectionBriefHeadline(headlineText);
+    setMarketMoment(bodyText);
+    setDirectionBriefStreamingHeadline("");
+    setDirectionBriefStreamingBody("");
+    setDirectionBriefIsStreaming(false);
+  }, [clearDirectionBriefAnimation]);
+  useEffect(() => {
+    if (marketMomentRequestedRef.current || !marketMomentSeed || curatedRecommendations.length === 0) return;
+    const bestFit = curatedRecommendations.find((item) => item.role === "primary")?.aesthetic ?? curatedRecommendations[0]?.aesthetic ?? "";
+    const anchor = curatedRecommendations.find((item) => item.role === "anchor")?.aesthetic ?? curatedRecommendations[1]?.aesthetic ?? bestFit;
+    const stretch = curatedRecommendations.find((item) => item.role === "stretch")?.aesthetic ?? curatedRecommendations[2]?.aesthetic ?? anchor;
+    if (!bestFit) return;
+
+    marketMomentRequestedRef.current = true;
+    setDirectionBriefLoading(true);
+    setDirectionBriefHeadline(null);
+    setMarketMoment(null);
+    setDirectionBriefStreamingHeadline("");
+    setDirectionBriefStreamingBody("");
+    setDirectionBriefIsStreaming(false);
+    generateDirectionBrief({
+      ...marketMomentSeed,
+      intentGoals: intentGoals.join(", "),
+      intentTradeoff,
+      bestFit,
+      anchor,
+      stretch,
+    })
+      .then(async (result) => {
+        setDirectionBriefLoading(false);
+        if (result.headline.trim() && result.body.trim()) {
+          await runDirectionBriefAnimation(result.headline.trim(), result.body.trim());
+        }
+      })
+      .catch((marketMomentError) => {
+        setDirectionBriefLoading(false);
+        console.warn("[Muko] market moment generation failed:", marketMomentError);
+      });
+    return () => {
+      clearDirectionBriefAnimation();
+    };
+  }, [clearDirectionBriefAnimation, curatedRecommendations, intentGoals, intentTradeoff, marketMomentSeed, runDirectionBriefAnimation]);
 
   /* ─── Muko Insight ────────────────────────────────────────────────────────── */
   const insightContent = useMemo(() => {
@@ -2971,13 +3083,6 @@ export default function ConceptStudioPage() {
     const chipKey = `${topAesthetic}::${chip.label}`;
     return selectedElements.has(chipKey) ? count + 1 : count;
   }, 0);
-  const hasInterpretationLayer = Boolean(aestheticInflection.trim() || selectedInterpretationChips.length > 0);
-  const hasLanguageChoices = Boolean(conceptSilhouette || conceptPalette || selectedElements.size > 0);
-  const canAdvanceToStage2 = Boolean(selectedAesthetic && hasInterpretationLayer);
-  const canAdvanceToStage3 = Boolean(canAdvanceToStage2 && hasLanguageChoices);
-  const assignedRoleCount = Object.keys(pieceRolesById).length;
-  const heroAssignedPieceId = Object.entries(pieceRolesById).find(([, role]) => role === "hero")?.[0] ?? null;
-  const canLockDirection = Boolean(canAdvanceToStage3 && assignedRoleCount > 0);
   const highestAvailableStage: ConceptStageId = canAdvanceToStage3 ? "product" : canAdvanceToStage2 ? "language" : "direction";
   const currentStage: ConceptStageId =
     currentStageState === "product" && !canAdvanceToStage3 && !isSubsequentPiece
@@ -3437,7 +3542,7 @@ export default function ConceptStudioPage() {
       : currentStage === "language"
       ? step2ReadData?.headline ?? `Translate ${combinedDirection?.dnaLines[0] ?? selectedAesthetic ?? recommendedAesthetic} into disciplined product language.`
       : !selectedAesthetic
-      ? directionSelectionRead.headline
+      ? directionBriefHeadline ?? directionSelectionRead.headline
       : step1ReadData?.statements[0] ?? insightContent.headline;
   const stageAwareParagraphs =
     currentStage === "product"
@@ -3449,7 +3554,9 @@ export default function ConceptStudioPage() {
       : currentStage === "language"
       ? []
       : !selectedAesthetic
-      ? directionSelectionRead.paragraphs
+      ? marketMoment
+        ? []
+        : directionSelectionRead.paragraphs
       : step1ReadData
       ? [step1ReadData.statements[1] ?? "", step1ReadData.statements[2] ?? ""].filter(Boolean)
       : [insightContent.p1, insightContent.p2, insightContent.p3];
@@ -3490,6 +3597,7 @@ export default function ConceptStudioPage() {
   const collectionContextTopOffset = selectedAesthetic
     ? 72 + COLLECTION_CONTEXT_BAR_OFFSET
     : 72 + COLLECTION_READ_BAR_OFFSET;
+  const preClickMarketMoment = !selectedAesthetic ? (marketMoment ?? undefined) : undefined;
   const showDirectionSelection = !selectedAesthetic || isReviewingDirectionSelection;
   const showPointOfViewStage =
     Boolean(selectedAesthetic) && currentStage === "direction" && !isReviewingDirectionSelection;
@@ -3563,6 +3671,64 @@ export default function ConceptStudioPage() {
     topMoodboardImages,
   ]);
 
+  const handleSaveAndClose = useCallback(async () => {
+    const resolvedCollectionName = storeCollectionName.trim() || headerCollectionName.trim();
+    const resolvedSeasonLabel = season?.trim() || headerSeasonLabel.trim();
+
+    if (selectedAesthetic) {
+      await handleConfirmDirection();
+      persistLockedCollectionContext();
+      useSessionStore.setState({
+        activeCollection: resolvedCollectionName || useSessionStore.getState().activeCollection,
+        collectionName: resolvedCollectionName || useSessionStore.getState().collectionName,
+        season: resolvedSeasonLabel || useSessionStore.getState().season,
+        aestheticMatchedId: selectedAesthetic,
+        moodboardImages: topMoodboardImages,
+        conceptSilhouette,
+        conceptPalette,
+        directionInterpretationText: aestheticInflection.trim(),
+        directionInterpretationModifiers: combinedDirection?.modifierLabels ?? [],
+        directionInterpretationChips: selectedInterpretationChips,
+      });
+    }
+
+    try {
+      if (resolvedCollectionName) {
+        localStorage.setItem('muko_collectionName', resolvedCollectionName);
+      }
+      if (resolvedSeasonLabel) {
+        localStorage.setItem('muko_seasonLabel', resolvedSeasonLabel);
+      }
+    } catch {}
+
+    if (resolvedCollectionName) {
+      router.push(`/collections?collection=${encodeURIComponent(resolvedCollectionName)}`);
+      return;
+    }
+
+    const activeCollection = useSessionStore.getState().activeCollection;
+    if (activeCollection) {
+      router.push(`/collections?collection=${encodeURIComponent(activeCollection)}`);
+    } else {
+      router.push('/collections');
+    }
+  }, [
+    aestheticInflection,
+    combinedDirection?.modifierLabels,
+    conceptPalette,
+    conceptSilhouette,
+    handleConfirmDirection,
+    headerCollectionName,
+    headerSeasonLabel,
+    persistLockedCollectionContext,
+    router,
+    season,
+    selectedAesthetic,
+    selectedInterpretationChips,
+    storeCollectionName,
+    topMoodboardImages,
+  ]);
+
   /* ─── RENDER ──────────────────────────────────────────────────────────────── */
   const askMukoContext: AskMukoContext = {
     step: "concept",
@@ -3600,12 +3766,7 @@ export default function ConceptStudioPage() {
         seasonLabel={headerSeasonLabel}
         onBack={() => window.history.back()}
         onSaveClose={() => {
-          const activeCollection = useSessionStore.getState().activeCollection;
-          if (activeCollection) {
-            router.push(`/collections?collection=${encodeURIComponent(activeCollection)}`);
-          } else {
-            router.push('/collections');
-          }
+          void handleSaveAndClose();
         }}
       />
 
@@ -4585,20 +4746,36 @@ export default function ConceptStudioPage() {
 
             {/* MUKO INSIGHT */}
             {!selectedAesthetic ? (
-              <div style={{ marginBottom: 28 }}>
-                <MukoInsightSection
-                  headline={directionSelectionRead.headline}
-                  paragraphs={directionSelectionRead.paragraphs}
-                  bullets={directionSelectionRead.bullets}
-                  mode={undefined}
-                  pageMode="concept"
-                  conceptStage="direction"
-                  nextMove={{
-                    mode: "concept",
-                    guidance: null,
-                  }}
-                />
-              </div>
+              directionBriefLoading && !directionBriefIsStreaming && !directionBriefHeadline && !marketMoment ? (
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 20 }}>
+                    Muko&apos;s Read
+                  </div>
+                  {[82, 58, 88, 64].map((w, i) => (
+                    <div key={i} style={{ height: i === 0 ? 18 : 12, borderRadius: 6, background: "rgba(67,67,43,0.07)", marginBottom: i === 0 ? 14 : 8, width: `${w}%`, animation: "pulse 1.4s ease-in-out infinite" }} />
+                  ))}
+                </div>
+              ) : (
+                <div style={{ marginBottom: 28 }}>
+                  <MukoInsightSection
+                    marketMoment={preClickMarketMoment}
+                    headline={directionBriefHeadline ?? ""}
+                    paragraphs={[]}
+                    bullets={directionSelectionRead.bullets}
+                    mode={undefined}
+                    pageMode="concept"
+                    conceptStage="direction"
+                    isStreaming={directionBriefIsStreaming}
+                    streamingText={directionBriefStreamingHeadline}
+                    streamingParagraph={directionBriefStreamingBody}
+                    isParagraphStreaming={directionBriefIsStreaming}
+                    nextMove={{
+                      mode: "concept",
+                      guidance: null,
+                    }}
+                  />
+                </div>
+              )
             ) : (
               (currentStage !== "language" && currentStage !== "product" && step1ReadLoading && !step1ReadData && !conceptStreamingText) ? (
                 <div style={{ marginBottom: 28 }}>
@@ -4820,7 +4997,7 @@ function DirectionCard({
         background: "rgba(255,255,255,0.88)",
         border: isHovered ? "1px solid rgba(67,67,43,0.16)" : "1px solid rgba(67,67,43,0.08)",
         boxShadow: isHovered ? "0 18px 38px rgba(17,17,12,0.08)" : "0 10px 26px rgba(67,67,43,0.04)",
-        padding: "18px",
+        padding: "24px 28px",
         cursor: "pointer",
         transition: "border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease",
         overflow: "hidden",
@@ -4839,10 +5016,10 @@ function DirectionCard({
       }}
       tabIndex={0}
     >
-      <div style={{ display: "grid", gap: 16 }}>
-        <div style={{ display: "grid", gridTemplateColumns: isHovered ? "minmax(0, 1fr)" : "minmax(0, 1fr) 144px", gap: 18, alignItems: "start" }}>
+      <div style={{ display: "grid", gap: 22 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isHovered ? "minmax(0, 1fr)" : "minmax(0, 1fr) 144px", gap: 28, alignItems: "start" }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
             <span
               style={{
                 display: "inline-flex",
@@ -4878,32 +5055,16 @@ function DirectionCard({
               <span style={{ color: locked ? "#6F7C46" : chartreuse }}>{locked ? "•" : "→"}</span>
             </span>
           </div>
-          <div style={{ fontFamily: sohne, fontWeight: 500, fontSize: 24, color: "rgba(67,67,43,0.92)", letterSpacing: "-0.04em", lineHeight: 0.98, marginBottom: 6 }}>
+          <div style={{ fontFamily: sohne, fontWeight: 500, fontSize: 24, color: "rgba(67,67,43,0.92)", letterSpacing: "-0.04em", lineHeight: 0.98, marginBottom: 16 }}>
             {aesthetic}
           </div>
-          <div style={{ fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.60)", lineHeight: 1.58, maxWidth: 500 }}>
+          <div style={{ fontFamily: inter, fontSize: 13, color: "rgba(67,67,43,0.60)", lineHeight: 1.68, maxWidth: 420 }}>
             {recommendation.descriptor}
           </div>
-          {recommendation.insight && (
-            <div
-              style={{
-                marginTop: 12,
-                fontFamily: sohne,
-                fontSize: 12.5,
-                fontWeight: 400,
-                color: "rgba(67,67,43,0.78)",
-                lineHeight: 1.42,
-                letterSpacing: "-0.01em",
-                maxWidth: 520,
-              }}
-            >
-              {`— ${recommendation.insight}`}
-            </div>
-          )}
         </div>
 
         {!isHovered ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
             {defaultImages.map((src, i) => (
               <div
                 key={`mb-${aesthetic}-default-${i}`}

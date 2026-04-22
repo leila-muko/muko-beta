@@ -39,7 +39,7 @@ import { trackEvent } from "@/lib/analytics";
 import type { AskMukoContext } from "@/lib/synthesizer/askMukoResponse";
 import { AESTHETIC_CONTENT } from "@/lib/concept-studio/constants";
 import { PulseSection } from "@/components/ui/PulseSection";
-import { MukoTypedLoadingState } from "@/components/ui/MukoTypedLoadingState";
+import { MukoTypedRead } from "@/components/ui/MukoTypedRead";
 import type { PulseChipProps } from "@/components/ui/PulseChip";
 import type { InsightData, SpecInsightMode } from "@/lib/types/insight";
 import { buildReportBlackboard, buildSpecBlackboard } from "@/lib/synthesizer/assemble";
@@ -4519,12 +4519,11 @@ function SpecStudioPageContent() {
                   />
                 </div>
               ) : (
-                <MukoTypedLoadingState
+                <MukoTypedRead
                   key={`spec-read-${activeSpecRail?.headline ?? "empty"}-${activeSpecRail?.decision.reason ?? ""}`}
                   headline={activeSpecRail?.headline ?? "Select a material and build path to activate the spec read."}
                   body={activeSpecRail?.decision.reason}
-                  showFooter={false}
-                  headlineStyle={{ fontFamily: sohne, fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: "#191919", letterSpacing: "-0.01em" }}
+                  headlineStyle={{ fontFamily: sohne, fontSize: 18, fontWeight: 500, lineHeight: 1.26, color: "#43432B", letterSpacing: "-0.03em" }}
                   bodyContainerStyle={activeSpecRail ? { marginTop: 12 } : undefined}
                   bodyStyle={{ fontFamily: inter, fontSize: 11, lineHeight: 1.55, color: "rgba(67,67,43,0.66)" }}
                 />

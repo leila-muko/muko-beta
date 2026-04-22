@@ -41,6 +41,28 @@ interface CollectionGroup {
   season: string | null;
 }
 
+function upsertCollectionGroup(
+  groups: Map<string, CollectionGroup>,
+  name: string | null | undefined,
+  season: string | null | undefined
+) {
+  const normalizedName = name?.trim();
+  if (!normalizedName) return;
+
+  const existing = groups.get(normalizedName);
+  if (existing) {
+    if (!existing.season && season?.trim()) {
+      existing.season = season.trim();
+    }
+    return;
+  }
+
+  groups.set(normalizedName, {
+    name: normalizedName,
+    season: season?.trim() || null,
+  });
+}
+
 function getNextDuplicateName(name: string, existingNames: string[]) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(`^${escaped}(?:\\s(\\d+))?$`);
@@ -79,30 +101,45 @@ export default function CollectionsHubPage() {
       .not('collection_name', 'is', null)
       .order('created_at', { ascending: false });
 
+    const groups = new Map<string, CollectionGroup>();
+
     if (data) {
-      const groups = new Map<string, CollectionGroup>();
-
       for (const row of data) {
-        const name = row.collection_name as string;
-        const existing = groups.get(name);
-
-        if (existing) {
-          if (!existing.season && row.season) existing.season = row.season;
-          continue;
-        }
-
-        groups.set(name, {
-          name,
-          season: row.season ?? null,
-        });
+        upsertCollectionGroup(groups, row.collection_name as string | null, row.season);
       }
+    }
 
-      const nextCollections = Array.from(groups.values());
-      setCollections(nextCollections);
+    const sessionState = useSessionStore.getState();
+    const snapshotCandidates = [
+      sessionState.activeCollection,
+      sessionState.collectionName,
+      typeof window !== 'undefined' ? window.localStorage.getItem('muko_collectionName') : null,
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('collection')
+        : null,
+    ];
 
-      if (activeCollection && !nextCollections.some((collection) => collection.name === activeCollection)) {
-        setActiveCollection(null);
-      }
+    snapshotCandidates.forEach((candidateName) => {
+      const normalizedCandidate = candidateName?.trim().toLowerCase();
+      if (!normalizedCandidate) return;
+
+      const snapshot = sessionState.collectionContextSnapshots[normalizedCandidate];
+      if (!snapshot && !groups.has(candidateName?.trim() ?? '')) return;
+
+      upsertCollectionGroup(
+        groups,
+        candidateName,
+        snapshot?.season ?? sessionState.season ?? (typeof window !== 'undefined'
+          ? window.localStorage.getItem('muko_seasonLabel')
+          : null)
+      );
+    });
+
+    const nextCollections = Array.from(groups.values());
+    setCollections(nextCollections);
+
+    if (activeCollection && !nextCollections.some((collection) => collection.name === activeCollection)) {
+      setActiveCollection(null);
     }
 
     setLoading(false);

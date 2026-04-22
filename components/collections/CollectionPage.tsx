@@ -17,7 +17,7 @@ import type {
   CollectionReportPayload,
 } from '@/lib/collection-report/types';
 import { useSessionStore } from '@/lib/store/sessionStore';
-import { parseSelectedPieceImage, resolvePieceImageType } from '@/lib/piece-image';
+import { resolveSelectedPieceImage } from '@/lib/piece-image';
 import { buildAssortmentIntelligence } from '@/lib/collection-report/buildAssortmentIntelligence';
 import { hydrateSpecSessionFromAnalysis, type PersistedSpecAnalysisRow } from '@/lib/collections/hydrateSpecSessionFromAnalysis';
 import { sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
@@ -27,6 +27,7 @@ import { IconIdentity, IconResonance } from '../concept-studio/Icons';
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
 const MIN_REPORT_PIECES = 5;
+const STEEL_BLUE = '#7D96AC';
 
 function HoverHint({
   copy,
@@ -211,6 +212,29 @@ const headerActionButtonBase: React.CSSProperties = {
   cursor: 'pointer',
   transition: 'background 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease',
   boxShadow: '0 12px 30px rgba(67,67,43,0.08)',
+  whiteSpace: 'nowrap',
+};
+
+const collectionAddPieceButtonStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  minHeight: 38,
+  padding: '0 16px',
+  borderRadius: 999,
+  border: `1px solid ${STEEL_BLUE}`,
+  background: 'transparent',
+  boxShadow: 'none',
+  fontFamily: sohne,
+  fontSize: 10.5,
+  fontWeight: 600,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: STEEL_BLUE,
+  cursor: 'pointer',
+  flexShrink: 0,
+  transition: 'transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease',
   whiteSpace: 'nowrap',
 };
 
@@ -563,22 +587,15 @@ function PieceCard({
 
   const pieceName = getPieceName(analysis);
   const score = getScore(analysis);
-  const storedPieceImage = parseSelectedPieceImage(
-    getAgentString(analysis.agent_versions, 'selected_piece_image')
-  );
-  const resolvedPieceType =
-    resolvePieceImageType({
-      pieceName,
-      category: analysis.category,
-      silhouette: analysis.silhouette,
-    }) ??
-    resolvePieceImageType({
-      type: storedPieceImage?.pieceType,
-      pieceName,
-      category: analysis.category,
-      silhouette: analysis.silhouette,
-    });
-  const flat = resolvedPieceType ? getFlatForPiece(resolvedPieceType, storedPieceImage?.signal ?? null) : null;
+  const selectedPieceImage = resolveSelectedPieceImage({
+    storedImageRaw: getAgentString(analysis.agent_versions, 'selected_piece_image'),
+    pieceName,
+    category: analysis.category,
+    silhouette: analysis.silhouette,
+  });
+  const flat = selectedPieceImage?.pieceType
+    ? getFlatForPiece(selectedPieceImage.pieceType, selectedPieceImage.signal)
+    : null;
   const materialLabel = titleCase(analysis.material_id) || 'Unknown material';
   const complexityLabel = titleCase(analysis.construction_tier) || 'Unknown';
   const role = getAssignedRole(analysis) ?? getPieceRole(analysis);
@@ -1097,6 +1114,7 @@ export default function CollectionPage({
   const conceptSilhouette = useSessionStore((state) => state.conceptSilhouette);
   const directionInterpretationText = useSessionStore((state) => state.directionInterpretationText);
   const directionInterpretationChips = useSessionStore((state) => state.directionInterpretationChips);
+  const collectionContextSnapshots = useSessionStore((state) => state.collectionContextSnapshots);
   const [analyses, setAnalyses] = useState<AnalysisRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -1291,8 +1309,34 @@ export default function CollectionPage({
     [collectionName, storeCollectionName]
   );
 
+  const currentCollectionSnapshot = useMemo(() => {
+    const normalizedCollectionName = collectionName.trim().toLowerCase();
+    return normalizedCollectionName ? collectionContextSnapshots[normalizedCollectionName] ?? null : null;
+  }, [collectionContextSnapshots, collectionName]);
+
+  const conceptSetupComplete = useMemo(() => {
+    const candidates: unknown[] = [
+      currentCollectionSnapshot?.agent_versions?.concept_setup_complete,
+      ...analyses.map((analysis) => analysis.agent_versions?.concept_setup_complete),
+    ];
+
+    for (const candidate of candidates) {
+      if (typeof candidate === 'boolean') return candidate;
+      if (typeof candidate === 'string') {
+        const trimmed = candidate.trim().toLowerCase();
+        if (trimmed === 'true') return true;
+        if (trimmed === 'false') return false;
+      }
+    }
+
+    return analyses.length > 0;
+  }, [analyses, currentCollectionSnapshot]);
+
   const editorialDirection = useMemo(() => {
     const preferred = [
+      currentCollectionSnapshot?.collection_aesthetic,
+      currentCollectionSnapshot?.aesthetic_inflection,
+      currentCollectionSnapshot?.aesthetic_matched_id,
       analyses[0]?.collection_aesthetic,
       analyses[0]?.aesthetic_inflection,
       analyses[0]?.aesthetic_input,
@@ -1306,11 +1350,16 @@ export default function CollectionPage({
     aestheticInflection,
     analyses,
     collectionAesthetic,
+    currentCollectionSnapshot,
     directionInterpretationText,
     storeMatchesCollection,
   ]);
 
   const conceptCompleteForCollection = useMemo(() => {
+    if (!conceptSetupComplete) {
+      return false;
+    }
+
     if (
       storeMatchesCollection &&
       conceptSilhouette.trim() &&
@@ -1333,6 +1382,7 @@ export default function CollectionPage({
     analyses,
     collectionAesthetic,
     conceptSilhouette,
+    conceptSetupComplete,
     directionInterpretationText,
     storeMatchesCollection,
   ]);
@@ -1343,6 +1393,11 @@ export default function CollectionPage({
     }
     return [];
   }, [directionInterpretationChips, storeMatchesCollection]);
+
+  const showConceptInProgressBanner = useMemo(
+    () => !conceptSetupComplete && Boolean(editorialDirection),
+    [conceptSetupComplete, editorialDirection]
+  );
 
   const handleGenerateReport = () => {
     if (!canGenerateReport) return;
@@ -1574,60 +1629,6 @@ export default function CollectionPage({
                     >
                       · {seasonLabel}
                     </span>
-                  ) : collectionAesthetic ? (
-                    <div style={{
-                      padding: '14px 20px 16px',
-                      borderBottom: '0.5px solid rgba(67,67,43,0.08)',
-                    }}>
-                      <div style={{
-                        background: 'rgba(168,180,117,0.07)',
-                        border: '0.5px solid rgba(168,180,117,0.28)',
-                        borderRadius: 10,
-                        padding: '11px 14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 16,
-                      }}>
-                        <div>
-                          <div style={{
-                            fontFamily: inter,
-                            fontSize: 12,
-                            fontWeight: 500,
-                            color: '#191919',
-                            marginBottom: 3,
-                          }}>
-                            Concept in progress
-                          </div>
-                          <div style={{
-                            fontFamily: inter,
-                            fontSize: 11,
-                            color: 'rgba(67,67,43,0.50)',
-                            lineHeight: 1.4,
-                          }}>
-                            Direction set — language and product not yet complete
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => router.push('/concept')}
-                          style={{
-                            fontFamily: inter,
-                            fontSize: 12,
-                            fontWeight: 500,
-                            background: '#191919',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: 100,
-                            padding: '7px 14px',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                            flexShrink: 0,
-                          }}
-                        >
-                          Continue Concept →
-                        </button>
-                      </div>
-                    </div>
                   ) : null}
                   {reportExists ? (
                     <>
@@ -1714,6 +1715,72 @@ export default function CollectionPage({
               </button>
             </div>
           </div>
+
+          {showConceptInProgressBanner ? (
+            <div
+              style={{
+                marginTop: 16,
+                padding: '18px 28px',
+                borderTop: '1px solid rgba(67,67,43,0.09)',
+                borderBottom: '1px solid rgba(67,67,43,0.09)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 20,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: sohne,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: '#191919',
+                    marginBottom: 6,
+                    lineHeight: 1.28,
+                    letterSpacing: '-0.02em',
+                  }}
+                >
+                  Concept in progress — language and product direction not yet set
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontFamily: inter,
+                    fontSize: 12,
+                    color: 'rgba(67,67,43,0.62)',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  <span style={{ color: '#A8B475', fontSize: 18, lineHeight: 1 }}>→</span>
+                  Continue in Concept Studio to finish
+                </div>
+              </div>
+
+              <button
+                onClick={() => router.push('/concept')}
+                style={{
+                  flexShrink: 0,
+                  borderRadius: 999,
+                  border: '1px solid rgba(67,67,43,0.18)',
+                  background: 'transparent',
+                  color: '#191919',
+                  padding: '12px 20px',
+                  fontFamily: sohne,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  letterSpacing: '0.01em',
+                  cursor: 'pointer',
+                  boxShadow: 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Continue Concept →
+              </button>
+            </div>
+          ) : null}
 
           {reportExists ? (
             <div
@@ -1956,19 +2023,29 @@ export default function CollectionPage({
               {activeTab === 'pieces' ? (
                 <>
                   <button
+                    type="button"
                     onClick={conceptCompleteForCollection ? onNewPiece : undefined}
+                    aria-disabled={!conceptCompleteForCollection}
                     style={{
-                      ...headerActionButtonBase,
-                      padding: '7px 16px',
-                      border: '1px solid rgba(67,67,43,0.18)',
-                      background: 'transparent',
-                      color: '#43432B',
-                      fontWeight: 600,
-                      letterSpacing: '0.07em',
+                      ...collectionAddPieceButtonStyle,
                       opacity: conceptCompleteForCollection ? 1 : 0.35,
                       cursor: conceptCompleteForCollection ? 'pointer' : 'not-allowed',
                     }}
+                    onMouseEnter={(e) => {
+                      if (!conceptCompleteForCollection) return;
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 10px 24px rgba(125,150,172,0.14)';
+                      e.currentTarget.style.borderColor = 'rgba(125,150,172,0.72)';
+                      e.currentTarget.style.background = 'rgba(125,150,172,0.04)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.borderColor = STEEL_BLUE;
+                      e.currentTarget.style.background = 'transparent';
+                    }}
                   >
+                    <span style={{ fontSize: 13, lineHeight: 1 }}>+</span>
                     Add Piece
                   </button>
                 </>
@@ -2072,16 +2149,60 @@ export default function CollectionPage({
                   <div
                     style={{
                       gridColumn: '1 / -1',
-                      padding: '40px 0',
+                      minHeight: 420,
+                      padding: '54px 0 36px',
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
                       textAlign: 'center',
                     }}
                   >
-                    <span style={{ fontFamily: inter, fontSize: 13, color: '#888078' }}>
-                      No pieces have been added yet. Add your first piece to get started.
-                    </span>
+                    <div
+                      style={{
+                        width: 54,
+                        height: 54,
+                        borderRadius: 18,
+                        border: '1px solid rgba(67,67,43,0.18)',
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,244,236,0.92) 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 22,
+                        boxShadow: '0 8px 22px rgba(67,67,43,0.06)',
+                      }}
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <rect x="6" y="3.5" width="12" height="17" rx="2.5" stroke="rgba(67,67,43,0.58)" strokeWidth="1.5" />
+                        <path d="M9 9.5H15" stroke="rgba(67,67,43,0.58)" strokeWidth="1.5" strokeLinecap="round" />
+                        <path d="M9 13.5H15" stroke="rgba(67,67,43,0.58)" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 18,
+                        fontWeight: 700,
+                        color: '#191919',
+                        marginBottom: 12,
+                        letterSpacing: '-0.02em',
+                      }}
+                    >
+                      No pieces yet
+                    </div>
+                    <div
+                      style={{
+                        maxWidth: 420,
+                        fontFamily: inter,
+                        fontSize: 13,
+                        lineHeight: 1.55,
+                        color: '#888078',
+                      }}
+                    >
+                      {showConceptInProgressBanner
+                        ? 'Finish setting up your concept direction first, then add pieces to start building this collection.'
+                        : 'Add your first piece to start building this collection.'}
+                    </div>
                   </div>
                 ) : (
                   analyses.map((analysis) => (

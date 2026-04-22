@@ -23,6 +23,7 @@ export interface PersistedCollectionContextRow {
 const CONTEXT_AGENT_VERSION_KEYS = [
   "strategy_summary",
   "selected_palette",
+  "concept_setup_complete",
   "direction_interpretation_chips",
   "collection_language",
   "expression_signals",

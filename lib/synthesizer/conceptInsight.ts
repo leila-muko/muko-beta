@@ -97,6 +97,23 @@ export interface SynthesizerResult {
   meta: { method: 'llm' | 'template'; latency_ms: number };
 }
 
+export interface GenerateMarketMomentInput {
+  brandName: string;
+  brandKeywords: string[];
+  customerProfile: string;
+  priceTier: string;
+  intentGoals: string;
+  intentTradeoff: string;
+  bestFit: string;
+  anchor: string;
+  stretch: string;
+}
+
+export interface DirectionBrief {
+  headline: string;
+  body: string;
+}
+
 export interface CollectionGuidanceSummary {
   stage: 'directional' | 'comparative' | 'diagnostic';
   piece_count: number;
@@ -1598,4 +1615,85 @@ export async function generateConceptInsight(
 
     return { data, meta: { method: 'template', latency_ms: Date.now() - start } };
   }
+}
+
+export async function generateDirectionBrief(input: GenerateMarketMomentInput): Promise<DirectionBrief> {
+  const prompt = [
+    'You are writing the pre-decision brief for a fashion merchandising tool.',
+    'The user is about to choose between three creative directions for their collection.',
+    '',
+    `Brand: ${input.brandName}`,
+    `Brand codes: ${input.brandKeywords.join(', ')}`,
+    `Customer: ${input.customerProfile}`,
+    `Price tier: ${input.priceTier}`,
+    `Collection intent: ${input.intentGoals}`,
+    `Tension the brand is navigating: ${input.intentTradeoff}`,
+    '',
+    'Three directions being considered:',
+    `- Best Fit: ${input.bestFit}`,
+    `- Commercial Anchor: ${input.anchor}`,
+    `- Stretch Path: ${input.stretch}`,
+    '',
+    'Return JSON only. No preamble. No markdown. Exact shape:',
+    '{',
+    '  "headline": "one sharp declarative sentence that frames the real decision this brand faces right now — not generic, specific to their market position and these three directions",',
+    '  "body": "three sentences, one per direction. Format each as: **{Direction name}** — [commercial argument for this brand specifically]. But [clearest tradeoff or risk]."',
+    '}',
+    '',
+    'Rules for headline:',
+    '- Not "The real decision is..." — write something specific to this brand',
+    '- Declarative, present tense, no hedging',
+    '- Max 12 words',
+    '',
+    'Rules for body:',
+    '- Bold the direction name using **markdown bold**',
+    '- One sentence per direction, no more',
+    '- Commercial argument must be specific to this brand and market — not generic',
+    '- Tradeoff must be real, not softened',
+    '- No preamble, no closing sentence',
+  ].join('\n');
+
+  const response = await fetch('/api/ask-muko', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      question: prompt,
+      context: {
+        step: 'concept',
+        brand: {
+          brandName: input.brandName,
+          keywords: input.brandKeywords,
+          priceTier: input.priceTier,
+        },
+        intent: {
+          collectionName: null,
+          season: null,
+          collectionRole: null,
+        },
+        brandInterpretation: [
+          `Best Fit: ${input.bestFit}`,
+          `Commercial Anchor: ${input.anchor}`,
+          `Stretch Path: ${input.stretch}`,
+          `Customer: ${input.customerProfile}`,
+          `Collection intent: ${input.intentGoals}`,
+          `Tension: ${input.intentTradeoff}`,
+        ].join(' | '),
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to generate market moment: ${response.status}`);
+  }
+  const payload = await response.json() as { answer?: string };
+  const raw = payload.answer?.trim() ?? '';
+  const cleaned = raw
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+  const parsed = JSON.parse(cleaned) as Partial<DirectionBrief>;
+  return {
+    headline: typeof parsed.headline === 'string' ? parsed.headline.trim() : '',
+    body: typeof parsed.body === 'string' ? parsed.body.trim() : '',
+  };
 }

@@ -12,7 +12,7 @@ import { getFlatForPiece } from "@/components/flats";
 import { MukoNav } from "@/components/MukoNav";
 import { createClient } from "@/lib/supabase/client";
 import { getCollectionLanguageLabels, getExpressionSignalLabels } from "@/lib/collection-signals";
-import { resolvePieceImageType } from "@/lib/piece-image";
+import { resolvePieceImageType, resolveSelectedPieceImage } from "@/lib/piece-image";
 import aestheticsData from "@/data/aesthetics.json";
 import categoriesData from "@/data/categories.json";
 import materialsData from "@/data/materials.json";
@@ -418,6 +418,15 @@ function getDisplayPieceName(piece: Pick<CollectionPiece, "piece_name" | "catego
 
 function getDisplayPieceExpression(piece: Pick<CollectionPiece, "agent_versions">) {
   return piece.agent_versions?.saved_piece_expression?.trim() || null;
+}
+
+function getDisplayPieceImage(piece: Pick<CollectionPiece, "piece_name" | "category" | "silhouette" | "agent_versions">) {
+  return resolveSelectedPieceImage({
+    storedImageRaw: piece.agent_versions?.selected_piece_image ?? null,
+    pieceName: getDisplayPieceName(piece),
+    category: piece.category,
+    silhouette: piece.silhouette,
+  });
 }
 
 function getDisplayPieceMaterial(piece: Pick<CollectionPiece, "material_id">) {
@@ -953,6 +962,7 @@ function ConfirmedPieceCard({
   ].filter(Boolean) as string[];
   const expression = getDisplayPieceExpression(piece);
   const pieceName = getDisplayPieceName(piece);
+  const pieceImage = getDisplayPieceImage(piece);
 
   const beginRename = () => {
     setDraftName(pieceName);
@@ -1038,7 +1048,13 @@ function ConfirmedPieceCard({
           overflow: "hidden",
         }}
       >
-        <PieceFlat type={null} signal={null} category={piece.category} pieceName={getDisplayPieceName(piece)} size={65} />
+        <PieceFlat
+          type={pieceImage?.pieceType ?? null}
+          signal={pieceImage?.signal ?? null}
+          category={piece.category}
+          pieceName={pieceName}
+          size={65}
+        />
         {/* Score pill */}
         <div
           style={{
@@ -1686,6 +1702,557 @@ function ConfirmDrawer({
     target.style.height = `${Math.min(target.scrollHeight, 220)}px`;
   };
 
+  const hasCustomProposal = Boolean(customProposal.trim());
+  const isCustomThinking = piece.custom && hasCustomProposal && customRefinementState === "loading";
+  const hasCustomResponse = piece.custom && Boolean(customRefinement);
+  const shouldShowCustomRead = piece.custom && hasCustomProposal && (isCustomThinking || hasCustomResponse);
+  const customStartReady = Boolean(piece.custom && hasCustomResponse);
+
+  if (piece.custom) {
+    return (
+      <>
+        <style>{`
+          @keyframes mukoFadeUp {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+
+          @keyframes mukoDotPulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+          }
+
+          .muko-custom-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(25,25,25,0.34);
+            z-index: 300;
+          }
+
+          .muko-custom-shell {
+            position: fixed;
+            inset: 0;
+            z-index: 400;
+            padding: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+          }
+
+          .muko-custom-card {
+            width: min(760px, calc(100vw - 32px));
+            max-height: min(840px, calc(100vh - 32px));
+            overflow-y: auto;
+            pointer-events: auto;
+          }
+
+          @media (max-width: 720px) {
+            .muko-custom-shell {
+              padding: 16px;
+              align-items: flex-end;
+            }
+
+            .muko-custom-card {
+              width: 100%;
+              max-height: calc(100vh - 20px);
+            }
+          }
+        `}</style>
+
+        <div className="muko-custom-overlay" onClick={onCancel} />
+
+        <div className="muko-custom-shell">
+          <div
+            className="muko-custom-card"
+            style={{
+              background: "rgba(252,249,243,0.58)",
+              backdropFilter: "blur(48px)",
+              WebkitBackdropFilter: "blur(48px)",
+              borderRadius: 24,
+              border: "1px solid rgba(255,255,255,0.82)",
+              boxShadow: "0 24px 64px rgba(50,40,20,0.18)",
+              padding: "22px 22px 18px",
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+                marginBottom: 22,
+              }}
+            >
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={onCancel}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 999,
+                  border: "none",
+                  background: "rgba(67,67,43,0.07)",
+                  color: "#43432B",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{ fontSize: 16, lineHeight: 1 }}>×</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onStartBuilding}
+                disabled={!canPressStart}
+                style={{
+                  borderRadius: 999,
+                  border: "none",
+                  background: "#191919",
+                  color: "#F5F2EC",
+                  padding: "11px 18px",
+                  fontFamily: sohne,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  cursor: canPressStart ? "pointer" : "not-allowed",
+                  textTransform: "none",
+                  opacity: customStartReady ? 1 : 0.35,
+                  transition: "opacity 180ms ease",
+                }}
+              >
+                Start building →
+              </button>
+            </div>
+
+            <div style={{ padding: "8px 6px 0" }}>
+              <div
+                style={{
+                  fontFamily: inter,
+                  fontSize: 10,
+                  fontWeight: 500,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "rgba(67,67,43,0.3)",
+                  marginBottom: 14,
+                }}
+              >
+                What are you thinking?
+              </div>
+
+              <textarea
+                value={customProposal}
+                onChange={(e) => onCustomProposalChange(e.target.value)}
+                onInput={autoResizeTextarea}
+                rows={1}
+                placeholder="Describe the piece you want to build"
+                style={{
+                  width: "100%",
+                  minHeight: 72,
+                  resize: "none",
+                  overflow: "hidden",
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  fontFamily: sohne,
+                  fontSize: 24,
+                  fontWeight: 300,
+                  letterSpacing: "-0.025em",
+                  color: "#1E1C12",
+                  lineHeight: 1.16,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  marginTop: 18,
+                  marginBottom: shouldShowCustomRead ? 22 : 8,
+                }}
+              >
+                {categories.map((entry) => {
+                  const isSelected = category === entry.id;
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) return;
+                        onCategoryChange(entry.id);
+                        onSubcategoryChange("");
+                      }}
+                      style={{
+                        borderRadius: 999,
+                        border: isSelected
+                          ? "0.5px solid rgba(67,67,43,0.38)"
+                          : "0.5px solid rgba(67,67,43,0.13)",
+                        background: isSelected ? "rgba(67,67,43,0.06)" : "transparent",
+                        color: "#43432B",
+                        padding: "8px 13px",
+                        fontFamily: inter,
+                        fontSize: 11.5,
+                        fontWeight: 500,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {entry.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div
+                style={{
+                  overflow: "hidden",
+                  maxHeight: shouldShowCustomRead ? 1200 : 0,
+                  opacity: shouldShowCustomRead ? 1 : 0,
+                  transition: "max-height 400ms ease, opacity 240ms ease",
+                }}
+              >
+                <div
+                  style={{
+                    borderTop: "0.5px solid rgba(67,67,43,0.08)",
+                    paddingTop: 18,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: hasCustomResponse ? 14 : 0,
+                    }}
+                  >
+                    <div
+                      aria-hidden
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 999,
+                        background: "#A97B8F",
+                        animation: isCustomThinking ? "mukoDotPulse 0.8s ease-in-out infinite" : "none",
+                      }}
+                    />
+                    <div
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        color: "rgba(67,67,43,0.56)",
+                      }}
+                    >
+                      MUKO&apos;S READ
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      overflow: "hidden",
+                      maxHeight: hasCustomResponse ? 200 : 0,
+                      opacity: hasCustomResponse ? 1 : 0,
+                      transform: hasCustomResponse ? "translateY(0)" : "translateY(6px)",
+                      transition: "max-height 500ms ease, opacity 500ms ease, transform 500ms ease",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 13,
+                        color: "#4A4530",
+                        lineHeight: 1.8,
+                        animation: hasCustomResponse ? "mukoFadeUp 0.5s cubic-bezier(0.4,0,0.2,1)" : "none",
+                      }}
+                    >
+                      {customRefinement?.read}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      overflow: "hidden",
+                      maxHeight: hasCustomResponse ? 220 : 0,
+                      opacity: hasCustomResponse ? 1 : 0,
+                      transform: hasCustomResponse ? "translateY(0)" : "translateY(6px)",
+                      transition:
+                        "max-height 500ms ease 150ms, opacity 500ms ease 150ms, transform 500ms ease 150ms",
+                    }}
+                  >
+                    <div
+                      style={{
+                        marginTop: hasCustomResponse ? 14 : 0,
+                        fontFamily: inter,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: "#1E1C12",
+                        lineHeight: 1.8,
+                        animation: hasCustomResponse ? "mukoFadeUp 0.5s cubic-bezier(0.4,0,0.2,1) 150ms both" : "none",
+                      }}
+                    >
+                      {customRefinement?.refined_expression}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      overflow: "hidden",
+                      maxHeight: hasCustomResponse ? 84 : 0,
+                      opacity: hasCustomResponse ? 1 : 0,
+                      transform: hasCustomResponse ? "translateY(0)" : "translateY(6px)",
+                      transition:
+                        "max-height 500ms ease 300ms, opacity 500ms ease 300ms, transform 500ms ease 300ms",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        marginTop: hasCustomResponse ? 16 : 0,
+                        animation: hasCustomResponse ? "mukoFadeUp 0.5s cubic-bezier(0.4,0,0.2,1) 300ms both" : "none",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={onAcceptRefinedExpression}
+                        style={{
+                          borderRadius: 999,
+                          background: "#A8B475",
+                          border: "none",
+                          color: "#43432B",
+                          fontFamily: inter,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: "8px 14px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onContinueWithOriginal}
+                        style={{
+                          borderRadius: 999,
+                          background: "transparent",
+                          border: "0.5px solid rgba(67,67,43,0.18)",
+                          color: "#43432B",
+                          fontFamily: inter,
+                          fontSize: 11,
+                          fontWeight: 500,
+                          padding: "8px 14px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      overflow: "hidden",
+                      maxHeight: hasCustomResponse ? 200 : 0,
+                      opacity: hasCustomResponse ? 1 : 0,
+                      transition:
+                        "max-height 0.5s cubic-bezier(0.4,0,0.2,1) 0.5s, opacity 0.5s ease 0.5s",
+                    }}
+                  >
+                    <div
+                      role="radiogroup"
+                      aria-label="Piece role"
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                        gap: 5,
+                        marginTop: hasCustomResponse ? 18 : 0,
+                      }}
+                    >
+                      {PIECE_ROLE_OPTIONS.map((option) => {
+                        const isSelected = selectedRole === option.id;
+
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            aria-disabled={roleLocked}
+                            onClick={() => {
+                              if (roleLocked) return;
+                              onRoleSelect(option.id);
+                            }}
+                            style={{
+                              border: isSelected
+                                ? "0.5px solid rgba(184,135,107,0.55)"
+                                : "0.5px solid rgba(67,67,43,0.1)",
+                              background: isSelected ? "rgba(255,255,255,0.42)" : "rgba(255,255,255,0.18)",
+                              borderRadius: 9,
+                              padding: "11px 12px",
+                              cursor: roleLocked ? "not-allowed" : "pointer",
+                              textAlign: "left",
+                              width: "100%",
+                              opacity: roleLocked && !isSelected ? 0.72 : 1,
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontFamily: sohne,
+                                fontSize: 14,
+                                fontWeight: 500,
+                                color: "#1E1C12",
+                                marginBottom: 4,
+                                letterSpacing: "-0.02em",
+                              }}
+                            >
+                              {option.label}
+                            </div>
+                            <div
+                              style={{
+                                fontFamily: inter,
+                                fontSize: 10,
+                                color: "#7A7260",
+                                lineHeight: 1.45,
+                              }}
+                            >
+                              {option.description}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      overflow: "hidden",
+                      maxHeight: hasCustomResponse ? 120 : 0,
+                      opacity: hasCustomResponse ? 1 : 0,
+                      transition:
+                        "max-height 0.5s cubic-bezier(0.4,0,0.2,1) 0.7s, opacity 0.5s ease 0.7s",
+                    }}
+                  >
+                    <div
+                      style={{
+                        marginTop: hasCustomResponse ? 18 : 0,
+                        paddingTop: 14,
+                        borderTop: "0.5px solid rgba(67,67,43,0.08)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 16,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: "1 1 280px" }}>
+                        <div
+                          style={{
+                            fontFamily: inter,
+                            fontSize: 10,
+                            fontWeight: 500,
+                            letterSpacing: "0.08em",
+                            textTransform: "uppercase",
+                            color: "rgba(67,67,43,0.48)",
+                            marginBottom: 6,
+                          }}
+                        >
+                          Target retail price
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: inter,
+                              fontSize: 20,
+                              fontWeight: 300,
+                              color: "#1E1C12",
+                            }}
+                          >
+                            $
+                          </span>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="285"
+                            value={pieceTargetMsrp ?? ""}
+                            onChange={(event) => {
+                              const nextValue = Number(event.target.value);
+                              if (!event.target.value) {
+                                onPieceTargetMsrpChange(null);
+                                return;
+                              }
+                              onPieceTargetMsrpChange(Number.isFinite(nextValue) && nextValue > 0 ? nextValue : null);
+                            }}
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                              border: "none",
+                              outline: "none",
+                              background: "transparent",
+                              padding: 0,
+                              fontFamily: sohne,
+                              fontSize: 20,
+                              fontWeight: 300,
+                              letterSpacing: "-0.02em",
+                              color: "#1E1C12",
+                            }}
+                          />
+                        </div>
+                        {showPieceTargetMsrpError ? (
+                          <div
+                            style={{
+                              marginTop: 6,
+                              fontFamily: inter,
+                              fontSize: 12,
+                              color: "#B8876B",
+                            }}
+                          >
+                            Set a price to unlock cost analysis
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div
+                        style={{
+                          fontFamily: inter,
+                          fontSize: 10,
+                          fontWeight: 600,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          color: "#B8876B",
+                          alignSelf: "flex-start",
+                          paddingTop: 16,
+                        }}
+                      >
+                        Required
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <style>{`
@@ -2294,10 +2861,12 @@ function ConfirmDrawer({
                       <div>
                         <div
                           style={{
+                            fontFamily: sohne,
                             fontSize: 14,
                             fontWeight: 600,
                             color: "rgba(67,67,43,0.9)",
                             marginBottom: 2,
+                            letterSpacing: "-0.02em",
                           }}
                         >
                           {option.label}
@@ -3733,6 +4302,7 @@ function PiecesPageClient() {
     refinementAbortRef.current?.abort();
     const controller = new AbortController();
     refinementAbortRef.current = controller;
+    setCustomRefinement(null);
     setCustomRefinementState("loading");
 
     const timeoutId = window.setTimeout(async () => {
@@ -3768,7 +4338,7 @@ function PiecesPageClient() {
           refinementAbortRef.current = null;
         }
       }
-    }, 700);
+    }, 1200);
 
     return () => {
       window.clearTimeout(timeoutId);
@@ -4205,17 +4775,70 @@ function PiecesPageClient() {
 
           {/* Suggested pieces grid */}
           {startingPointSuggestions.length === 0 ? (
-            <div
-              style={{
-                ...BODY_SMALL_STYLE,
-                color: collectionAesthetic ? "#B6B3A7" : BODY_SMALL_STYLE.color,
-                fontStyle: collectionAesthetic ? "italic" : "normal",
-              }}
-            >
-              {collectionAesthetic
-                ? "All current market starting points have already been translated into your collection."
-                : "Set a collection direction to see starting points."}
-            </div>
+            collectionAesthetic ? (
+              <div
+                style={{
+                  background: "white",
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 14,
+                  padding: "56px 40px",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    width: 82,
+                    height: 82,
+                    borderRadius: 28,
+                    margin: "0 auto 22px",
+                    background: "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(250,249,246,0.96) 100%)",
+                    border: "1px solid rgba(226,221,214,0.95)",
+                    boxShadow: "0 18px 34px rgba(67,67,43,0.08)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <rect x="6" y="3.5" width="12" height="17" rx="2.5" stroke="rgba(67,67,43,0.58)" strokeWidth="1.5" />
+                    <path d="M9 9.5H15" stroke="rgba(67,67,43,0.58)" strokeWidth="1.5" strokeLinecap="round" />
+                    <path d="M9 13.5H15" stroke="rgba(67,67,43,0.58)" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: "#191919",
+                    marginBottom: 12,
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  All key pieces added
+                </div>
+                <div
+                  style={{
+                    maxWidth: 430,
+                    margin: "0 auto",
+                    fontFamily: inter,
+                    fontSize: 13,
+                    lineHeight: 1.55,
+                    color: "#888078",
+                  }}
+                >
+                  You&apos;ve already added every recommended starting point for this collection. Add your own piece to keep building from here.
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  ...BODY_SMALL_STYLE,
+                }}
+              >
+                Set a collection direction to see starting points.
+              </div>
+            )
           ) : (
             <div
               style={{
@@ -4269,18 +4892,18 @@ function PiecesPageClient() {
                   body={rightRailPiecesRead.read_body}
                   showFooter={false}
                   headlineStyle={{
-                    ...READ_HEADLINE_STYLE,
+                    ...SECTION_TITLE_STYLE,
                     marginBottom: 0,
                     fontSize: 18,
-                    lineHeight: 1.22,
+                    lineHeight: 1.26,
                   }}
                   bodyContainerStyle={{ marginTop: 10 }}
                   bodyStyle={{ ...READ_BODY_STYLE, lineHeight: 1.68 }}
                 />
-                <div style={{ display: "grid", gap: 16 }}>
+                <div style={{ display: "grid", gap: 30 }}>
                   {rightRailPiecesRead.how_to_lean_in?.trim() ? (
-                    <div>
-                      <div style={{ ...READ_ZONE_LABEL_STYLE, marginBottom: 8 }}>How to Lean In</div>
+                    <div style={{ paddingTop: 14 }}>
+                      <div style={{ ...READ_ZONE_LABEL_STYLE, marginBottom: 16 }}>How to Lean In</div>
                       <div style={{ ...READ_BODY_STYLE, lineHeight: 1.68 }}>{rightRailPiecesRead.how_to_lean_in}</div>
                     </div>
                   ) : null}
@@ -4316,29 +4939,32 @@ function PiecesPageClient() {
                     >
                       Start Here
                     </div>
-                    <MukoTypedLoadingState
-                      key={`pieces-start-here-${rightRailPiecesRead.start_here_title}-${rightRailPiecesRead.start_here_body}`}
-                      headline={
-                        rightRailPiecesRead.start_here_title?.trim()
-                          ? rightRailPiecesRead.start_here_title
-                          : recommendedStartPiece?.name ?? "Lead with the clearest piece"
-                      }
-                      body={rightRailPiecesRead.start_here_body}
-                      showFooter={false}
-                      headlineStyle={{
+                    <div
+                      style={{
                         ...SECTION_TITLE_STYLE,
                         fontSize: 18,
                         color: "#43432B",
                         lineHeight: 1.26,
                         marginBottom: 0,
                       }}
-                      bodyContainerStyle={{ marginTop: 8, marginBottom: 16 }}
-                      bodyStyle={{
-                        ...READ_BODY_STYLE,
-                        color: TEXT,
-                        lineHeight: 1.68,
-                      }}
-                    />
+                    >
+                      {rightRailPiecesRead.start_here_title?.trim()
+                        ? rightRailPiecesRead.start_here_title
+                        : recommendedStartPiece?.name ?? "Lead with the clearest piece"}
+                    </div>
+                    {rightRailPiecesRead.start_here_body ? (
+                      <div style={{ marginTop: 8, marginBottom: 16 }}>
+                        <p
+                          style={{
+                            ...READ_BODY_STYLE,
+                            color: TEXT,
+                            lineHeight: 1.68,
+                          }}
+                        >
+                          {rightRailPiecesRead.start_here_body}
+                        </p>
+                      </div>
+                    ) : null}
                     <div style={{ display: "grid", gap: 14, justifyItems: "start" }}>
                       <button
                         type="button"
@@ -4432,7 +5058,7 @@ function PiecesPageClient() {
         .pieces-read-ready-pill {
           position: fixed;
           bottom: 24px;
-          right: 24px;
+          right: var(--pieces-read-pill-right, 68px);
           z-index: 50;
           display: inline-flex;
           align-items: center;
@@ -4481,6 +5107,11 @@ function PiecesPageClient() {
           }}
           className="pieces-read-ready-pill"
           title={collectionReadPillTitle}
+          style={
+            {
+              "--pieces-read-pill-right": isAskMukoOpen ? "320px" : "68px",
+            } as React.CSSProperties
+          }
         >
           <span className="pieces-read-ready-count">{totalConfirmed}</span>
           <span>{`${totalConfirmed} pieces · Generate report →`}</span>
@@ -4516,10 +5147,31 @@ function PiecesPageClient() {
           customRefinement={customRefinement}
           customRefinementState={customRefinementState}
           onPieceNameChange={setDrawerPieceName}
-          onCategoryChange={setDrawerCategory}
-          onSubcategoryChange={setDrawerSubcategory}
+          onCategoryChange={(value) => {
+            setDrawerCategory(value);
+            setCustomRefinement(null);
+            setCustomRefinementState("idle");
+            if (!lastSuggestedRoleIsLocked) {
+              setDrawerRole(lastSuggestedRole ? (lastSuggestedRole as CollectionRoleId) : null);
+            }
+          }}
+          onSubcategoryChange={(value) => {
+            setDrawerSubcategory(value);
+            setCustomRefinement(null);
+            setCustomRefinementState("idle");
+            if (!lastSuggestedRoleIsLocked) {
+              setDrawerRole(lastSuggestedRole ? (lastSuggestedRole as CollectionRoleId) : null);
+            }
+          }}
           onRoleSelect={setDrawerRole}
-          onCustomProposalChange={setCustomProposal}
+          onCustomProposalChange={(value) => {
+            setCustomProposal(value);
+            setCustomRefinement(null);
+            setCustomRefinementState("idle");
+            if (!lastSuggestedRoleIsLocked) {
+              setDrawerRole(lastSuggestedRole ? (lastSuggestedRole as CollectionRoleId) : null);
+            }
+          }}
           onCustomFinalExpressionChange={setCustomFinalExpression}
           onAcceptRefinedExpression={() => {
             if (!customRefinement) return;
@@ -4560,321 +5212,345 @@ function PiecesPageClient() {
         <div
           onClick={closeSuggestedSheet}
           style={{
-            position: "absolute",
+            position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.32)",
-            zIndex: 50,
+            background: "rgba(25,25,25,0.34)",
+            zIndex: 300,
           }}
         >
           <div
-            onClick={(event) => event.stopPropagation()}
             style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              maxHeight: "80vh",
-              overflowY: "auto",
-              padding: 20,
-              background: BG,
-              borderTop: `0.5px solid ${BORDER}`,
-              borderRadius: "16px 16px 0 0",
-              zIndex: 51,
-              boxShadow: "0 -18px 48px rgba(25,25,25,0.16)",
+              position: "fixed",
+              inset: 0,
+              zIndex: 400,
+              padding: 28,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
             }}
           >
             <div
+              onClick={(event) => event.stopPropagation()}
               style={{
-                width: 32,
-                height: 3,
-                borderRadius: 999,
-                background: BG2,
-                margin: "0 auto 16px",
-              }}
-            />
-
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                marginBottom: 16,
+                width: "min(760px, calc(100vw - 32px))",
+                maxHeight: "min(840px, calc(100vh - 32px))",
+                overflowY: "auto",
+                pointerEvents: "auto",
+                background: "rgba(252,249,243,0.58)",
+                backdropFilter: "blur(48px)",
+                WebkitBackdropFilter: "blur(48px)",
+                borderRadius: 24,
+                border: "1px solid rgba(255,255,255,0.82)",
+                boxShadow: "0 24px 64px rgba(50,40,20,0.18)",
+                padding: "22px 22px 18px",
               }}
             >
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 12,
-                  border: `0.5px solid ${BORDER}`,
-                  background: BG2,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  overflow: "hidden",
-                  flexShrink: 0,
-                }}
-              >
-                {(() => {
-                  const previewType = resolvePieceImageType({
-                    type: selectedSuggestedPiece.sourcePiece.type,
-                    pieceName: selectedSuggestedPiece.adapted_title,
-                    category: selectedSuggestedPiece.sourcePiece.category ?? undefined,
-                  });
-                  const previewFlat = previewType
-                    ? getFlatForPiece(previewType, selectedSuggestedPiece.sourcePiece.signal) as {
-                        Flat: React.ComponentType<{ color: string }>;
-                        color: string;
-                      } | null
-                    : null;
-                  if (!previewFlat) return null;
-                  const PreviewFlat = previewFlat.Flat;
-                  return <PreviewFlat color={previewFlat.color} />;
-                })()}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 14,
-                    fontWeight: 500,
-                    color: TEXT,
-                    lineHeight: 1.3,
-                  }}
-                >
-                  {selectedSuggestedPiece.adapted_title}
-                </div>
-                <div
-                  style={{
-                    marginTop: 4,
-                    fontFamily: inter,
-                    fontSize: 12,
-                    color: MUTED,
-                    lineHeight: 1.45,
-                  }}
-                >
-                  {selectedSuggestedPiece.shortRationale}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ height: 1, background: BORDER, marginBottom: 16 }} />
-
-            <div style={{ marginBottom: 20 }}>
-              <div
-                style={{
-                  fontFamily: inter,
-                  fontSize: 11,
-                  fontWeight: 500,
-                  letterSpacing: "0.14em",
-                  textTransform: "uppercase",
-                  color: MUTED,
-                  marginBottom: 10,
-                }}
-              >
-                Piece role
-              </div>
-
-              <div style={{ display: "grid", gap: 10 }}>
-                {PIECE_ROLE_OPTIONS.map((option) => {
-                  const isSelected = suggestedRole === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setSuggestedRole(option.id)}
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "14px 16px",
-                        borderRadius: 12,
-                        border: isSelected ? "1px solid #B8876B" : `1px solid ${BORDER}`,
-                        background: isSelected ? "rgba(184,135,107,0.07)" : "rgba(255,255,255,0.92)",
-                        cursor: "pointer",
-                        transition: "background 160ms ease, border-color 160ms ease",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontFamily: sohne,
-                          fontSize: 18,
-                          color: TEXT,
-                          lineHeight: 1.2,
-                          marginBottom: 4,
-                        }}
-                      >
-                        {option.label}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: inter,
-                          fontSize: 12,
-                          color: isSelected ? "#6F6A63" : MUTED,
-                          lineHeight: 1.45,
-                        }}
-                      >
-                        {option.description}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 20 }}>
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
                   gap: 16,
-                  marginBottom: 12,
+                  marginBottom: 22,
                 }}
               >
-                <div
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={closeSuggestedSheet}
                   style={{
-                    fontFamily: inter,
-                    fontSize: 11,
-                    fontWeight: 500,
-                    letterSpacing: "0.14em",
-                    textTransform: "uppercase",
-                    color: MUTED,
-                  }}
-                >
-                  Target retail price
-                </div>
-                <div
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: "#B8876B",
-                  }}
-                >
-                  Required
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "10px 14px",
-                  borderRadius: 12,
-                  border: suggestedMsrp != null && suggestedMsrp > 0 ? "0.5px solid #A8B475" : `0.5px solid ${BORDER}`,
-                  background: "rgba(255,255,255,0.9)",
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: inter,
-                    fontSize: 15,
-                    color: MUTED,
-                  }}
-                >
-                  $
-                </span>
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="Ex. 285"
-                  value={suggestedMsrp ?? ""}
-                  onChange={(event) => {
-                    const nextValue = Number(event.target.value);
-                    if (!event.target.value) {
-                      setSuggestedMsrp(null);
-                      setSuggestedMsrpError(false);
-                      return;
-                    }
-                    setSuggestedMsrp(Number.isFinite(nextValue) && nextValue > 0 ? nextValue : null);
-                    setSuggestedMsrpError(false);
-                  }}
-                  style={{
-                    flex: 1,
+                    width: 38,
+                    height: 38,
+                    borderRadius: 999,
                     border: "none",
-                    outline: "none",
-                    background: "transparent",
-                    padding: 0,
-                    fontFamily: "inherit",
-                    fontSize: 15,
-                    color: TEXT,
-                    minWidth: 0,
-                  }}
-                />
-              </div>
-
-              <div
-                style={{
-                  marginTop: 4,
-                  fontFamily: inter,
-                  fontSize: 11,
-                  color: MUTED,
-                }}
-              >
-                Used to evaluate margin viability as you build
-              </div>
-
-              {suggestedMsrpError ? (
-                <div
-                  style={{
-                    marginTop: 6,
-                    fontFamily: inter,
-                    fontSize: 12,
-                    color: "#B8876B",
+                    background: "rgba(67,67,43,0.07)",
+                    color: "#43432B",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    flexShrink: 0,
                   }}
                 >
-                  Set a price to unlock cost analysis
+                  <span style={{ fontSize: 16, lineHeight: 1 }}>×</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleStartSuggestedPiece}
+                  style={{
+                    border: "none",
+                    borderRadius: 999,
+                    padding: "11px 18px",
+                    background: "#191919",
+                    color: "#F5F2EC",
+                    fontFamily: sohne,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.08em",
+                    cursor: suggestedMsrp != null && suggestedMsrp > 0 ? "pointer" : "not-allowed",
+                    opacity: suggestedMsrp != null && suggestedMsrp > 0 ? 1 : 0.35,
+                    transition: "opacity 180ms ease, background 160ms ease",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(event) => {
+                    if (suggestedMsrp != null && suggestedMsrp > 0) {
+                      event.currentTarget.style.background = "#2A2A2A";
+                    }
+                  }}
+                  onMouseLeave={(event) => {
+                    event.currentTarget.style.background = "#191919";
+                  }}
+                >
+                  Start building →
+                </button>
+              </div>
+
+              <div style={{ padding: "8px 6px 0" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 16,
+                    alignItems: "center",
+                    marginBottom: 18,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 72,
+                      height: 90,
+                      borderRadius: 12,
+                      background: "rgba(255,255,255,0.18)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      overflow: "hidden",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 44,
+                        height: 58,
+                      }}
+                    >
+                      {(() => {
+                        const previewType = resolvePieceImageType({
+                          type: selectedSuggestedPiece.sourcePiece.type,
+                          pieceName: selectedSuggestedPiece.adapted_title,
+                          category: selectedSuggestedPiece.sourcePiece.category ?? undefined,
+                        });
+                        const previewFlat = previewType
+                          ? getFlatForPiece(previewType, selectedSuggestedPiece.sourcePiece.signal) as {
+                              Flat: React.ComponentType<{ color: string }>;
+                              color: string;
+                            } | null
+                          : null;
+                        if (!previewFlat) return null;
+                        const PreviewFlat = previewFlat.Flat;
+                        return <PreviewFlat color={previewFlat.color} />;
+                      })()}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      minWidth: 0,
+                      flex: "1 1 360px",
+                      display: "flex",
+                      alignItems: "center",
+                      minHeight: 90,
+                    }}
+                  >
+                    <div
+                      style={{
+                        ...SECTION_TITLE_STYLE,
+                        fontSize: 24,
+                        color: "#1E1C12",
+                        lineHeight: 1.16,
+                      }}
+                    >
+                      {selectedSuggestedPiece.adapted_title}
+                    </div>
+                  </div>
                 </div>
-              ) : null}
+
+                <div style={{ marginBottom: 18 }}>
+                  <div
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 10,
+                      fontWeight: 500,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "rgba(67,67,43,0.48)",
+                      marginBottom: 10,
+                    }}
+                  >
+                    Piece role
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                      gap: 5,
+                    }}
+                  >
+                    {PIECE_ROLE_OPTIONS.map((option) => {
+                      const isSelected = suggestedRole === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => setSuggestedRole(option.id)}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "11px 12px",
+                            borderRadius: 9,
+                            border: isSelected
+                              ? "0.5px solid rgba(184,135,107,0.55)"
+                              : "0.5px solid rgba(67,67,43,0.1)",
+                            background: isSelected ? "rgba(255,255,255,0.42)" : "rgba(255,255,255,0.18)",
+                            cursor: "pointer",
+                            transition: "background 160ms ease, border-color 160ms ease",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontFamily: sohne,
+                              fontSize: 14,
+                              fontWeight: 500,
+                              color: "#1E1C12",
+                              marginBottom: 4,
+                              letterSpacing: "-0.02em",
+                            }}
+                          >
+                            {option.label}
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: inter,
+                              fontSize: 10,
+                              color: "#7A7260",
+                              lineHeight: 1.45,
+                            }}
+                          >
+                            {option.description}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    paddingTop: 14,
+                    borderTop: "0.5px solid rgba(67,67,43,0.08)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ minWidth: 0, flex: "1 1 280px" }}>
+                    <div
+                      style={{
+                        fontFamily: inter,
+                        fontSize: 10,
+                        fontWeight: 500,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        color: "rgba(67,67,43,0.48)",
+                        marginBottom: 6,
+                      }}
+                    >
+                      Target retail price
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: inter,
+                          fontSize: 20,
+                          fontWeight: 300,
+                          color: "#1E1C12",
+                        }}
+                      >
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="285"
+                        value={suggestedMsrp ?? ""}
+                        onChange={(event) => {
+                          const nextValue = Number(event.target.value);
+                          if (!event.target.value) {
+                            setSuggestedMsrp(null);
+                            setSuggestedMsrpError(false);
+                            return;
+                          }
+                          setSuggestedMsrp(Number.isFinite(nextValue) && nextValue > 0 ? nextValue : null);
+                          setSuggestedMsrpError(false);
+                        }}
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          border: "none",
+                          outline: "none",
+                          background: "transparent",
+                          padding: 0,
+                          fontFamily: sohne,
+                          fontSize: 20,
+                          fontWeight: 300,
+                          letterSpacing: "-0.02em",
+                          color: "#1E1C12",
+                        }}
+                      />
+                    </div>
+                    {suggestedMsrpError ? (
+                      <div
+                        style={{
+                          marginTop: 6,
+                          fontFamily: inter,
+                          fontSize: 12,
+                          color: "#B8876B",
+                        }}
+                      >
+                        Set a price to unlock cost analysis
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div
+                    style={{
+                      fontFamily: inter,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "#B8876B",
+                      alignSelf: "flex-start",
+                      paddingTop: 16,
+                    }}
+                  >
+                    Required
+                  </div>
+                </div>
+
+              </div>
             </div>
-
-            <button
-              type="button"
-              onClick={handleStartSuggestedPiece}
-              style={{
-                width: "100%",
-                border: "none",
-                borderRadius: 999,
-                padding: "12px 24px",
-                background: "#191919",
-                color: "#FFFFFF",
-                fontFamily: sohne,
-                fontSize: 14,
-                fontWeight: 500,
-                cursor: suggestedMsrp != null && suggestedMsrp > 0 ? "pointer" : "not-allowed",
-                opacity: suggestedMsrp != null && suggestedMsrp > 0 ? 1 : 0.4,
-                transition: "opacity 160ms ease, background 160ms ease",
-              }}
-              onMouseEnter={(event) => {
-                if (suggestedMsrp != null && suggestedMsrp > 0) {
-                  event.currentTarget.style.background = "#2A2A2A";
-                }
-              }}
-              onMouseLeave={(event) => {
-                event.currentTarget.style.background = "#191919";
-              }}
-            >
-              Start Building →
-            </button>
-
-            <button
-              type="button"
-              onClick={closeSuggestedSheet}
-              style={{
-                width: "100%",
-                marginTop: 12,
-                padding: 0,
-                border: "none",
-                background: "none",
-                fontFamily: inter,
-                fontSize: 13,
-                color: MUTED,
-                cursor: "pointer",
-              }}
-            >
-              Dismiss
-            </button>
           </div>
         </div>
       ) : null}

@@ -1,4 +1,7 @@
+'use client';
+
 import { fonts, heroSurface, reportPalette, sectionEyebrow } from '@/components/report/reportStyles';
+import { MukoTypedRead } from '@/components/ui/MukoTypedRead';
 
 export function OverallReadCallout({
   topMeta,
@@ -83,35 +86,30 @@ export function OverallReadCallout({
             ) : null}
           </div>
 
-          <p
-            style={{
-              margin: '12px 0 0',
-              fontFamily: fonts.heading,
-              fontSize: 'clamp(1.5rem, 2.35vw, 2.2rem)',
-              lineHeight: 0.98,
-              letterSpacing: '-0.05em',
-              color: reportPalette.olive,
-              maxWidth: 720,
-            }}
-          >
-            {value}
-          </p>
+          <div style={{ marginTop: 12, maxWidth: 760 }}>
+            <MukoTypedRead
+              key={`${value}-${thesis ?? ''}`}
+              headline={value}
+              body={thesis}
+              cursorColor="#A8B475"
+              headlineStyle={{
+                fontFamily: fonts.heading,
+                fontSize: 'clamp(1.5rem, 2.35vw, 2.2rem)',
+                lineHeight: 0.98,
+                letterSpacing: '-0.05em',
+                color: reportPalette.olive,
+                margin: 0,
+              }}
+              bodyContainerStyle={{ marginTop: 20 }}
+              bodyStyle={{
+                fontFamily: fonts.body,
+                fontSize: 14,
+                lineHeight: 1.75,
+                color: reportPalette.olive,
+              }}
+            />
+          </div>
         </div>
-
-        {thesis ? (
-          <p
-            style={{
-              margin: '0 0 20px',
-              fontFamily: fonts.body,
-              fontSize: 14,
-              lineHeight: 1.75,
-              color: reportPalette.olive,
-              maxWidth: 760,
-            }}
-          >
-            {thesis}
-          </p>
-        ) : null}
 
         {thesis && detail ? (
           <div
@@ -137,17 +135,18 @@ export function OverallReadCallout({
             >
               Where to focus
             </p>
-            <p
-              style={{
+            <MukoTypedRead
+              key={`${value}-${detail}`}
+              headline={detail}
+              cursorColor="#A8B475"
+              headlineStyle={{
                 margin: '8px 0 0',
                 fontFamily: fonts.body,
                 fontSize: 14,
                 lineHeight: 1.72,
                 color: reportPalette.olive,
               }}
-            >
-              {detail}
-            </p>
+            />
           </div>
         ) : null}
       </div>

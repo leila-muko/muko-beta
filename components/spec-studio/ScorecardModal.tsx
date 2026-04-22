@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import { trackEvent } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
-import { MukoStreamingParagraph } from "@/components/ui/MukoStreamingParagraph";
+import { MukoTypedRead } from "@/components/ui/MukoTypedRead";
 import { getCollectionLanguageLabels, getExpressionSignalLabels } from "@/lib/collection-signals";
 import type { SpecSuggestion } from "@/lib/types/next-move";
 import type { ScorecardInsight, Consideration } from "@/app/api/synthesizer/scorecard/route";
@@ -655,9 +655,11 @@ export function ScorecardModal({
                 }}
               />
             ) : (
-              <MukoStreamingParagraph
-                text={scorecardData?.insight ?? mukoInsight ?? "Reviewing your piece for creative and commercial fit."}
-                paragraphStyle={{
+              <MukoTypedRead
+                key={scorecardData?.insight ?? mukoInsight ?? "scorecard-read"}
+                headline={scorecardData?.insight ?? mukoInsight ?? "Reviewing your piece for creative and commercial fit."}
+                cursorColor="#A8B475"
+                headlineStyle={{
                   fontFamily: sohne,
                   fontSize: 17,
                   fontWeight: 600,

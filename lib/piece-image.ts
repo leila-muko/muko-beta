@@ -135,6 +135,35 @@ export function buildSelectedPieceImage(input: {
   };
 }
 
+export function resolveSelectedPieceImage(input: {
+  storedImage?: SelectedPieceImage | null;
+  storedImageRaw?: string | null;
+  type?: string | null;
+  pieceName?: string | null;
+  category?: string | null;
+  silhouette?: string | null;
+  signal?: PieceImageSignal;
+} | null): SelectedPieceImage | null {
+  if (!input) return null;
+
+  const storedImage = input.storedImage ?? parseSelectedPieceImage(input.storedImageRaw);
+  const pieceType =
+    storedImage?.pieceType ??
+    resolvePieceImageType({
+      type: input.type,
+      pieceName: input.pieceName,
+      category: input.category,
+      silhouette: input.silhouette,
+    });
+
+  if (!pieceType) return null;
+
+  return {
+    pieceType,
+    signal: input.signal ?? storedImage?.signal ?? null,
+  };
+}
+
 export function parseSelectedPieceImage(raw: string | null | undefined): SelectedPieceImage | null {
   if (!raw) return null;
 

@@ -109,6 +109,8 @@ export interface SpecFallbackContext {
   required_timeline_weeks?: number;
   timeline_gap_weeks?: number;
   brand_name?: string;
+  identity_score?: number;
+  resonance_score?: number;
   keyPiece?: { item: string; type: string; signal: string };
   diagnostics: SpecDecisionDiagnostics;
   resolved_redirects?: {
@@ -646,13 +648,20 @@ export function buildFallbackSpecRail(ctx: SpecFallbackContext): SpecRailInsight
     diagnostics.buffer_status !== 'tight' &&
     diagnostics.buffer_status !== 'negative' &&
     diagnostics.timeline_status === 'on_track';
+  const strongCreativeSignal =
+    (ctx.identity_score ?? 0) >= 80 &&
+    (ctx.resonance_score ?? 0) >= 75;
 
   const coreTension = hasAllClear
     ? null
     : diagnostics.failure_mode === 'timeline_fragile'
-      ? `${materialName} still carries the right tone, but the combination of ${diagnostics.primary_carrier} emphasis and ${diagnostics.complexity_level} complexity leaves the team solving calendar pressure and design expression at the same time.`
+      ? strongCreativeSignal
+        ? `${materialName} is the right call for this direction — this is a calendar question, not a creative one. The single move is getting the factory conversation started this week.`
+        : `${materialName} still carries the right tone, but the combination of ${diagnostics.primary_carrier} emphasis and ${diagnostics.complexity_level} complexity leaves the team solving calendar pressure and design expression at the same time.`
       : diagnostics.failure_mode === 'cost_without_read'
-        ? `The spec is paying for burden in ${diagnostics.primary_carrier}, yet the customer is more likely to notice the overall idea than the extra work. That is the wrong cost architecture for this role.`
+        ? strongCreativeSignal
+          ? `The direction is working. The cost structure needs one adjustment to match it — the burden in ${diagnostics.primary_carrier} is the specific lever, not the concept.`
+          : `The spec is paying for burden in ${diagnostics.primary_carrier}, yet the customer is more likely to notice the overall idea than the extra work. That is the wrong cost architecture for this role.`
         : diagnostics.failure_mode === 'identity_dilution'
           ? `The piece still points at the concept, but burden is landing across too many channels at once. The more the read spreads, the less owned it feels.`
           : diagnostics.failure_mode === 'underwhelming'

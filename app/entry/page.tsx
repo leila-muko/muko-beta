@@ -21,6 +21,17 @@ interface RecentCollectionItem {
   name: string;
 }
 
+function upsertRecentCollection(
+  collections: RecentCollectionItem[],
+  seen: Set<string>,
+  name: string | null | undefined
+) {
+  const normalizedName = name?.trim();
+  if (!normalizedName || seen.has(normalizedName)) return;
+  seen.add(normalizedName);
+  collections.push({ id: normalizedName, name: normalizedName });
+}
+
 function EntryScreenContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -146,11 +157,28 @@ function EntryScreenContent() {
       const nextCollections: RecentCollectionItem[] = [];
 
       for (const row of data) {
-        const name = (row.collection_name as string | null)?.trim();
-        if (!name || seen.has(name)) continue;
-        seen.add(name);
-        nextCollections.push({ id: name, name });
+        upsertRecentCollection(nextCollections, seen, row.collection_name as string | null);
       }
+
+      const sessionState = useSessionStore.getState();
+      const snapshotCandidates = [
+        sessionState.activeCollection,
+        sessionState.collectionName,
+        window.localStorage.getItem('muko_collectionName'),
+      ];
+
+      snapshotCandidates.forEach((candidateName) => {
+        const normalizedCandidate = candidateName?.trim().toLowerCase();
+        if (!normalizedCandidate) return;
+
+        if (
+          sessionState.collectionContextSnapshots[normalizedCandidate] ||
+          normalizedCandidate === sessionState.activeCollection?.trim().toLowerCase() ||
+          normalizedCandidate === sessionState.collectionName?.trim().toLowerCase()
+        ) {
+          upsertRecentCollection(nextCollections, seen, candidateName);
+        }
+      });
 
       setSavedCollections(nextCollections);
     };
