@@ -27,6 +27,50 @@ function sse(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
+function formatList(items: string[]): string {
+  const values = items.map((item) => item.trim()).filter(Boolean);
+  if (values.length === 0) return '';
+  if (values.length === 1) return values[0];
+  if (values.length === 2) return `${values[0]} and ${values[1]}`;
+  return `${values.slice(0, -1).join(', ')}, and ${values[values.length - 1]}`;
+}
+
+function buildConceptLanguageFallback(payload: ConceptLanguageRequest) {
+  const aestheticName = payload.aesthetic_name?.trim() || 'this direction';
+  const silhouetteText = formatList(payload.selected_silhouettes ?? []);
+  const paletteText = payload.selected_palette?.trim() || '';
+  const signalText = formatList(payload.expression_signals ?? payload.collection_language ?? []);
+  const customerText = payload.customer_profile?.trim() || '';
+  const priceTierText = payload.price_tier?.trim() || '';
+  const brandInterpretation = payload.brand_interpretation?.trim() || '';
+
+  const framingClauses = [
+    silhouetteText ? `hold it through ${silhouetteText.toLowerCase()} shape` : null,
+    paletteText ? `keep the palette in ${paletteText.toLowerCase()}` : null,
+    signalText ? `let ${signalText.toLowerCase()} carry the emphasis` : null,
+  ].filter(Boolean);
+
+  return {
+    headline: `Translate ${aestheticName} into disciplined product language.`,
+    core_read: [
+      brandInterpretation
+        ? `${brandInterpretation.replace(/[.]+$/g, '')}.`
+        : `Keep the product language precise enough that ${aestheticName.toLowerCase()} reads as authored rather than generic.`,
+      framingClauses.length > 0
+        ? `For this collection, ${framingClauses.join(', ')}.`
+        : null,
+    ].filter(Boolean).join(' '),
+    execution_moves: [
+      silhouetteText ? `Use ${silhouetteText.toLowerCase()} proportion to make the direction legible immediately.` : null,
+      paletteText ? `Keep finish and color tension anchored in ${paletteText.toLowerCase()} rather than widening the register.` : null,
+      signalText ? `Apply ${signalText.toLowerCase()} selectively so the read stays controlled.` : null,
+    ].filter((value): value is string => Boolean(value)).slice(0, 3),
+    guardrail: customerText || priceTierText
+      ? `Keep: the ${[customerText, priceTierText].filter(Boolean).join(' / ')} customer filter visible in every choice.`
+      : 'Keep: the collection read controlled, specific, and easy to recognize at first glance.',
+  };
+}
+
 export async function POST(req: NextRequest) {
   let body;
   try {
@@ -92,10 +136,10 @@ export async function POST(req: NextRequest) {
         if (parsed) {
           controller.enqueue(encoder.encode(sse('complete', parsed)));
         } else {
-          controller.enqueue(encoder.encode(sse('error', { error: 'Invalid model output' })));
+          controller.enqueue(encoder.encode(sse('complete', buildConceptLanguageFallback(payload))));
         }
       } catch {
-        controller.enqueue(encoder.encode(sse('error', { error: 'Concept language request failed' })));
+        controller.enqueue(encoder.encode(sse('complete', buildConceptLanguageFallback(payload))));
       } finally {
         controller.close();
       }

@@ -23,6 +23,7 @@ import { hydrateSpecSessionFromAnalysis, type PersistedSpecAnalysisRow } from '@
 import { sectionCard, sectionEyebrow } from '@/components/report/reportStyles';
 import { BRAND } from '@/lib/concept-studio/constants';
 import { IconIdentity, IconResonance } from '../concept-studio/Icons';
+import { ConceptResetModal } from './ConceptResetModal';
 
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
@@ -1110,11 +1111,37 @@ export default function CollectionPage({
   const setSeason = useSessionStore((state) => state.setSeason);
   const storeCollectionName = useSessionStore((state) => state.collectionName);
   const collectionAesthetic = useSessionStore((state) => state.collectionAesthetic);
+  const aestheticInput = useSessionStore((state) => state.aestheticInput);
   const aestheticInflection = useSessionStore((state) => state.aestheticInflection);
   const conceptSilhouette = useSessionStore((state) => state.conceptSilhouette);
   const directionInterpretationText = useSessionStore((state) => state.directionInterpretationText);
   const directionInterpretationChips = useSessionStore((state) => state.directionInterpretationChips);
+  const sliderTrend = useSessionStore((state) => state.sliderTrend);
+  const sliderCreative = useSessionStore((state) => state.sliderCreative);
+  const sliderElevated = useSessionStore((state) => state.sliderElevated);
+  const sliderNovelty = useSessionStore((state) => state.sliderNovelty);
+  const activeProductPieceId = useSessionStore((state) => state.activeProductPieceId);
+  const selectedKeyPiece = useSessionStore((state) => state.selectedKeyPiece);
+  const resetConceptState = useSessionStore((state) => state.resetConceptState);
   const collectionContextSnapshots = useSessionStore((state) => state.collectionContextSnapshots);
+  const SLIDER_NEUTRAL = 50;
+  const SLIDER_THRESHOLD = 15;
+  const intentChips: string[] = [];
+  if (sliderTrend < SLIDER_NEUTRAL - SLIDER_THRESHOLD) intentChips.push('long horizon');
+  if (sliderTrend > SLIDER_NEUTRAL + SLIDER_THRESHOLD) intentChips.push('of the moment');
+  if (sliderCreative < SLIDER_NEUTRAL - SLIDER_THRESHOLD) intentChips.push('commercial');
+  if (sliderCreative > SLIDER_NEUTRAL + SLIDER_THRESHOLD) intentChips.push('expressive');
+  if (sliderElevated < SLIDER_NEUTRAL - SLIDER_THRESHOLD) intentChips.push('accessible');
+  if (sliderElevated > SLIDER_NEUTRAL + SLIDER_THRESHOLD) intentChips.push('elevated');
+  if (sliderNovelty < SLIDER_NEUTRAL - SLIDER_THRESHOLD) intentChips.push('familiar');
+  if (sliderNovelty > SLIDER_NEUTRAL + SLIDER_THRESHOLD) intentChips.push('newness-led');
+  const isConceptDirty = !!(
+    collectionAesthetic ||
+    aestheticInput ||
+    directionInterpretationText ||
+    activeProductPieceId ||
+    selectedKeyPiece
+  );
   const [analyses, setAnalyses] = useState<AnalysisRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -1125,6 +1152,7 @@ export default function CollectionPage({
   const [isRefreshingCollectionRead, setIsRefreshingCollectionRead] = useState(false);
   const [activeTab, setActiveTab] = useState<'pieces' | 'report'>('pieces');
   const [snapshot, setSnapshot] = useState<CollectionSnapshotRow | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1630,6 +1658,35 @@ export default function CollectionPage({
                       · {seasonLabel}
                     </span>
                   ) : null}
+                  {intentChips.length > 0 && (
+                    <>
+                      <span
+                        style={{
+                          width: 3,
+                          height: 3,
+                          borderRadius: '50%',
+                          background: 'var(--color-border-secondary)',
+                          display: 'inline-block',
+                          flexShrink: 0,
+                        }}
+                      />
+                      {intentChips.map((chip) => (
+                        <span
+                          key={chip}
+                          style={{
+                            fontSize: 11,
+                            padding: '3px 9px',
+                            borderRadius: 20,
+                            background: '#43432b12',
+                            border: '0.5px solid #43432b30',
+                            color: '#43432b',
+                          }}
+                        >
+                          {chip}
+                        </span>
+                      ))}
+                    </>
+                  )}
                   {reportExists ? (
                     <>
                       <span
@@ -1703,18 +1760,31 @@ export default function CollectionPage({
               ) : null}
 
               <button
-                onClick={() => router.push('/intent')}
+                onClick={() => (isConceptDirty ? setShowResetModal(true) : router.push('/setup'))}
                 style={{
                   ...headerTextLinkBase,
+                  fontSize: 11,
+                  color: 'var(--color-text-tertiary)',
                   cursor: 'pointer',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: 3,
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#191919'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = '#888078'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
               >
-                Edit Setup →
+                edit setup →
               </button>
             </div>
           </div>
+          <ConceptResetModal
+            open={showResetModal}
+            onCancel={() => setShowResetModal(false)}
+            onConfirm={() => {
+              resetConceptState();
+              setShowResetModal(false);
+              router.push('/setup');
+            }}
+          />
 
           {showConceptInProgressBanner ? (
             <div

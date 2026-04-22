@@ -224,6 +224,7 @@ interface SessionState {
   unlockConcept: () => void;
   setCurrentStep: (step: 1 | 2 | 3 | 4) => void;
 
+  resetConceptState: () => void;
   resetSession: () => void;
 }
 
@@ -411,6 +412,32 @@ export const useSessionStore = create<SessionState>()(
       lockConcept: () => set({ conceptLocked: true }),
       unlockConcept: () => set({ conceptLocked: false }),
       setCurrentStep: (step) => set({ currentStep: step }),
+      resetConceptState: () =>
+        set({
+          aestheticInput: '',
+          collectionAesthetic: null,
+          aestheticInflection: null,
+          directionInterpretationText: '',
+          directionInterpretationModifiers: [],
+          directionInterpretationChips: [],
+          chipSelection: null,
+          customChips: {},
+          conceptSilhouette: '',
+          conceptPalette: null,
+          conceptInsightTitle: null,
+          conceptInsightDescription: null,
+          conceptInsightPositioning: null,
+          conceptInsightConfidence: null,
+          strategySummary: null,
+          activeProductPieceId: null,
+          pieceRolesById: {},
+          selectedKeyPiece: null,
+          selectedPieceImage: null,
+          decisionGuidanceState: { is_confirmed: false, selected_anchor_piece: null },
+          pieceBuildContext: null,
+          collectionRole: null,
+          conceptLocked: false,
+        }),
 
       resetSession: () => set((state) => ({
         ...createInitialSessionState(state.targetMargin > 0 ? state.targetMargin : 50),
@@ -495,7 +522,7 @@ export const useSessionStore = create<SessionState>()(
       },
       partialize: (state) => {
         // Persist everything except actions
-        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setStrategySummary, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, setConstructionMethod, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setSuccessPriorities, setTargetMargin, setSliderTrend, setSliderCreative, setSliderElevated, setSliderNovelty, setCollectionRole, setSelectedKeyPiece, setSelectedPieceImage, setDecisionGuidanceState, setActiveProductPieceId, setPieceRolesById, setPieceBuildContext, setSavedAnalysisId, setBrandProfileId, setActiveCollection, setCollectionContextSnapshot, setAssortmentInsightCache, setPreloadedCriticScores, setAskMukoLastResponse, setLastSuggestedRole, setLastSuggestedRoleIsLocked, setLastSuggestionRationale, lockConcept, unlockConcept, setCurrentStep, resetSession, lastAskMukoResponseTimestamp, ...rest } = state;
+        const { setSeason, setCollectionName, setAestheticInput, setColorPalette, setChipSelection, setCustomChips, setConceptSilhouette, setConceptPalette, setCollectionAesthetic, setAestheticInflection, setDirectionInterpretationText, setDirectionInterpretationModifiers, setDirectionInterpretationChips, setConceptInsight, clearConceptInsight, setStrategySummary, setIsProxyMatch, setCategory, setSubcategory, setTargetMsrp, setMaterial, setSilhouette, setConstructionTier, setConstructionMethod, updateIdentityPulse, updateResonancePulse, updateExecutionPulse, setIntentGoals, setIntentTradeoff, setSuccessPriorities, setTargetMargin, setSliderTrend, setSliderCreative, setSliderElevated, setSliderNovelty, setCollectionRole, setSelectedKeyPiece, setSelectedPieceImage, setDecisionGuidanceState, setActiveProductPieceId, setPieceRolesById, setPieceBuildContext, setSavedAnalysisId, setBrandProfileId, setActiveCollection, setCollectionContextSnapshot, setAssortmentInsightCache, setPreloadedCriticScores, setAskMukoLastResponse, setLastSuggestedRole, setLastSuggestedRoleIsLocked, setLastSuggestionRationale, lockConcept, unlockConcept, setCurrentStep, resetConceptState, resetSession, lastAskMukoResponseTimestamp, ...rest } = state;
         return rest;
       },
     }

@@ -3092,9 +3092,10 @@ export default function ConceptStudioPage() {
       : currentStageState;
   const isStep3ProductStage = currentStage === "product";
   const step3PulseReferenceLabel = selectedAesthetic ? `Concept locked · ${selectedAesthetic}` : null;
+  const shouldLoadConceptLanguageRead = currentStage === "language" || currentStage === "product";
 
   useEffect(() => {
-    if (currentStage !== "language" || !selectedAesthetic || !conceptLanguageRequestKey) return;
+    if (!shouldLoadConceptLanguageRead || !selectedAesthetic || !conceptLanguageRequestKey) return;
     if (conceptLanguageRequestKeyRef.current === conceptLanguageRequestKey) return;
 
     conceptLanguageRequestKeyRef.current = conceptLanguageRequestKey;
@@ -3212,7 +3213,6 @@ export default function ConceptStudioPage() {
     conceptLanguageRequestKey,
     conceptSilhouette,
     conceptStrategySummary,
-    currentStage,
     customerProfile,
     excludedBrands,
     interpretationSummary,
@@ -3220,6 +3220,7 @@ export default function ConceptStudioPage() {
     selectedAesthetic,
     selectedCollectionLanguage,
     selectedExpressionSignals,
+    shouldLoadConceptLanguageRead,
     storeDirectionInterpretationText,
   ]);
   const activePaletteName =
@@ -4808,6 +4809,7 @@ export default function ConceptStudioPage() {
                     languageStreamingText={step2StreamingText}
                     languageStreamingRows={step2StreamingRead}
                     isLanguageStreaming={currentStage === "language" && step2ReadLoading && !!step2StreamingText}
+                    isLanguageLoading={currentStage === "language" && step2ReadLoading}
                     pageMode="concept"
                     conceptStage={currentStage}
                     languageRead={step2ReadData}

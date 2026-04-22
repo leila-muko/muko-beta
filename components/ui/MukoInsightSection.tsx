@@ -86,6 +86,7 @@ export interface MukoInsightSectionProps {
   languageStreamingText?: string;
   languageStreamingRows?: { core_read: string; execution_moves: string[]; guardrail: string };
   isLanguageStreaming?: boolean;
+  isLanguageLoading?: boolean;
   /** Streaming state for product/piece stage */
   pieceStreamingTitle?: string;
   pieceStreamingBody?: string;
@@ -254,6 +255,7 @@ function ConceptDecisionRail({
   languageStreamingText = '',
   languageStreamingRows,
   isLanguageStreaming = false,
+  isLanguageLoading = false,
   pieceStreamingTitle = '',
   pieceStreamingBody = '',
   isPieceStreaming = false,
@@ -286,6 +288,7 @@ function ConceptDecisionRail({
   languageStreamingText?: string;
   languageStreamingRows?: { core_read: string; execution_moves: string[]; guardrail: string };
   isLanguageStreaming?: boolean;
+  isLanguageLoading?: boolean;
   pieceStreamingTitle?: string;
   pieceStreamingBody?: string;
   isPieceStreaming?: boolean;
@@ -425,6 +428,13 @@ function ConceptDecisionRail({
     const displayCoreRead = languageRead?.core_read ?? languageStreamingRows?.core_read ?? "";
     const displayExecutionMoves = (languageRead?.execution_moves ?? languageStreamingRows?.execution_moves ?? []).slice(0, 3);
     const displayGuardrail = languageRead?.guardrail ?? languageStreamingRows?.guardrail ?? "";
+    const showLanguageSkeleton =
+      isLanguageLoading &&
+      !isLanguageStreaming &&
+      !languageRead &&
+      !displayCoreRead &&
+      displayExecutionMoves.length === 0 &&
+      !displayGuardrail;
     const activeStreamIndex =
       isLanguageStreaming && displayExecutionMoves.length > 0 && !languageRead?.execution_moves?.length
         ? displayExecutionMoves.length - 1
@@ -450,6 +460,23 @@ function ConceptDecisionRail({
             )}
           </div>
         </div>
+
+        {showLanguageSkeleton && (
+          <div style={{ display: "grid", gap: 10 }}>
+            {[88, 72, 94].map((width, index) => (
+              <div
+                key={`language-skeleton-${width}-${index}`}
+                style={{
+                  height: index === 0 ? 14 : 11,
+                  width: `${width}%`,
+                  borderRadius: 999,
+                  background: "rgba(67,67,43,0.08)",
+                  animation: "mukoCursorBlink 1.2s ease-in-out infinite",
+                }}
+              />
+            ))}
+          </div>
+        )}
 
         {(displayCoreRead || displayExecutionMoves.length > 0 || displayGuardrail) && (
           <div style={{ display: "grid", gap: 18 }}>
@@ -618,6 +645,7 @@ export function MukoInsightSection({
   languageStreamingText = '',
   languageStreamingRows,
   isLanguageStreaming = false,
+  isLanguageLoading = false,
   pieceStreamingTitle = '',
   pieceStreamingBody = '',
   isPieceStreaming = false,
@@ -670,6 +698,7 @@ export function MukoInsightSection({
         languageStreamingText={languageStreamingText}
         languageStreamingRows={languageStreamingRows}
         isLanguageStreaming={isLanguageStreaming}
+        isLanguageLoading={isLanguageLoading}
         pieceStreamingTitle={pieceStreamingTitle}
         pieceStreamingBody={pieceStreamingBody}
         isPieceStreaming={isPieceStreaming}
