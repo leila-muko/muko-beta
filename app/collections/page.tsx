@@ -138,12 +138,12 @@ export default function CollectionsHubPage() {
     const nextCollections = Array.from(groups.values());
     setCollections(nextCollections);
 
-    if (activeCollection && !nextCollections.some((collection) => collection.name === activeCollection)) {
+    if (sessionState.activeCollection && !nextCollections.some((collection) => collection.name === sessionState.activeCollection)) {
       setActiveCollection(null);
     }
 
     setLoading(false);
-  }, [activeCollection, setActiveCollection]);
+  }, [setActiveCollection]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -236,6 +236,19 @@ export default function CollectionsHubPage() {
     setMenuOpenFor(null);
     const supabase = createClient();
     await supabase.from('analyses').delete().eq('user_id', userId).eq('collection_name', name);
+
+    // Clear cached references so loadCollections won't re-add the deleted collection
+    useSessionStore.getState().setCollectionContextSnapshot(name, null);
+    if (useSessionStore.getState().collectionName?.trim() === name) {
+      useSessionStore.getState().setCollectionName('');
+    }
+    try {
+      if (typeof window !== 'undefined' && window.localStorage.getItem('muko_collectionName')?.trim() === name) {
+        window.localStorage.removeItem('muko_collectionName');
+        window.localStorage.removeItem('muko_seasonLabel');
+      }
+    } catch {}
+
     setCollections((prev) => prev.filter((c) => c.name !== name));
     if (activeCollection === name) {
       setActiveCollection(null);

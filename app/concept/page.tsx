@@ -1709,6 +1709,9 @@ export default function ConceptStudioPage() {
       palette: conceptPalette ?? null,
       collectionLanguage: selectedCollectionLanguage,
       expressionSignals: selectedExpressionSignals,
+      referenceBrands,
+      excludedBrands,
+      customerProfile,
     });
   }, [
     brandKeywordSource,
@@ -1722,6 +1725,9 @@ export default function ConceptStudioPage() {
     selectedCollectionLanguage,
     selectedExpressionSignals,
     storeDirectionInterpretationText,
+    referenceBrands,
+    excludedBrands,
+    customerProfile,
   ]);
 
 
@@ -1977,7 +1983,8 @@ export default function ConceptStudioPage() {
     return () => {
       criticBatchAbortRef.current?.abort();
     };
-  }, [brandKeywordSource, preloadedCriticScores, setPreloadedCriticScores]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (Object.keys(preloadedCriticScores).length === 0) return;
@@ -3202,6 +3209,8 @@ export default function ConceptStudioPage() {
 
     return () => {
       conceptLanguageAbortRef.current?.abort();
+      conceptLanguageRequestKeyRef.current = null;
+      setStep2ReadLoading(false);
     };
   }, [
     brandKeywordSource,
@@ -3826,6 +3835,8 @@ export default function ConceptStudioPage() {
           stage={conceptStrategyRead.stage}
           stickyTop={72}
           isSticky
+          chips={intentGoals.length > 0 ? intentGoals : undefined}
+          onEditSetup={() => router.push("/intent")}
         />
       )}
 

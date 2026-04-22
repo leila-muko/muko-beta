@@ -16,6 +16,8 @@ export function CollectionReadBar({
   stage,
   stickyTop,
   isSticky = false,
+  chips,
+  onEditSetup,
 }: {
   collectionName?: string | null;
   season?: string | null;
@@ -23,6 +25,8 @@ export function CollectionReadBar({
   stage: 0 | 1 | 2 | 3;
   stickyTop?: number;
   isSticky?: boolean;
+  chips?: string[];
+  onEditSetup?: () => void;
 }) {
   const resolvedSummary = sanitizeContextBarSummary(summary);
   const summaryWeight = stage >= 3 ? 460 : stage === 2 ? 440 : stage === 1 ? 425 : 390;
@@ -106,13 +110,14 @@ export function CollectionReadBar({
               gap: isExpanded ? 8 : 2,
             }}
           >
+            {/* Single-line header row */}
             <div
               style={{
                 display: "flex",
-                alignItems: "baseline",
-                gap: 12,
+                alignItems: "center",
+                gap: 10,
                 minWidth: 0,
-                flexWrap: "wrap",
+                flexWrap: "nowrap",
               }}
             >
               <div
@@ -124,6 +129,7 @@ export function CollectionReadBar({
                   lineHeight: 0.98,
                   color: "rgba(67,67,43,0.92)",
                   textTransform: "lowercase",
+                  flexShrink: 0,
                 }}
               >
                 {collectionName?.trim() || "Collection"}
@@ -137,10 +143,95 @@ export function CollectionReadBar({
                     letterSpacing: "0.14em",
                     textTransform: "uppercase",
                     color: "rgba(67,67,43,0.42)",
+                    flexShrink: 0,
                   }}
                 >
                   {season}
                 </div>
+              ) : null}
+
+              {/* Dot separator before chips */}
+              {chips && chips.length > 0 ? (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 13,
+                    color: "rgba(67,67,43,0.25)",
+                    flexShrink: 0,
+                    lineHeight: 1,
+                  }}
+                >
+                  ·
+                </span>
+              ) : null}
+
+              {/* Chips */}
+              {chips && chips.length > 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "nowrap",
+                    gap: 6,
+                    alignItems: "center",
+                  }}
+                >
+                  {chips.map((chip) => (
+                    <span
+                      key={chip}
+                      style={{
+                        display: "inline-block",
+                        fontFamily: inter,
+                        fontSize: 12,
+                        fontWeight: 400,
+                        letterSpacing: "0em",
+                        textTransform: "lowercase",
+                        color: "rgba(67,67,43,0.6)",
+                        border: "1px solid rgba(67,67,43,0.18)",
+                        borderRadius: 999,
+                        padding: "4px 12px",
+                        whiteSpace: "nowrap",
+                        background: "transparent",
+                      }}
+                    >
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* Spacer */}
+              <div style={{ flex: 1 }} />
+
+              {/* Edit setup — far right */}
+              {onEditSetup ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditSetup();
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(67,67,43,0.75)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(67,67,43,0.45)"; }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: 0,
+                    border: "none",
+                    background: "none",
+                    fontFamily: inter,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0em",
+                    color: "rgba(67,67,43,0.45)",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  Edit setup →
+                </button>
               ) : null}
             </div>
 
