@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { unstable_batchedUpdates } from "react-dom";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSessionStore } from "@/lib/store/sessionStore";
 import type { CollectionRoleId, KeyPiece, PieceRolesById } from "@/lib/store/sessionStore";
@@ -625,6 +625,10 @@ function KeyPiecePlaceholder({ category }: { category: string | null }) {
 
 type ConceptStageId = "direction" | "language" | "product";
 
+function isConceptStageId(value: string | null): value is ConceptStageId {
+  return value === "direction" || value === "language" || value === "product";
+}
+
 type PieceRecommendationEntry = {
   piece: KeyPiece;
   recommendation: { bucket: "core" | "interpretation"; reason: string } | null;
@@ -878,6 +882,7 @@ function getPersistedPieceName(piece: {
 /* ─── Main component ──────────────────────────────────────────────────────── */
 export default function ConceptStudioPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     season,
     collectionName: storeCollectionName,
@@ -3076,7 +3081,11 @@ export default function ConceptStudioPage() {
   }, [combinedDirection, selectedAestheticData?.palette_options]);
   const [showAllInterpretationSuggestions, setShowAllInterpretationSuggestions] = useState(false);
   const [showAllExpressionSignals, setShowAllExpressionSignals] = useState(false);
-  const [currentStageState, setCurrentStageState] = useState<ConceptStageId>("direction");
+  const requestedStage = useMemo<ConceptStageId | null>(() => {
+    const stageParam = searchParams.get("stage");
+    return isConceptStageId(stageParam) ? stageParam : null;
+  }, [searchParams]);
+  const [currentStageState, setCurrentStageState] = useState<ConceptStageId>(requestedStage ?? "direction");
   const [stageTransitionDirection, setStageTransitionDirection] = useState<1 | -1>(1);
   const isSubsequentPiece = collectionPieces.length > 0 || Object.keys(pieceRolesById).length > 0;
   const visibleInterpretationSuggestions = showAllInterpretationSuggestions ? interpretationSuggestions : interpretationSuggestions.slice(0, 4);
@@ -3097,6 +3106,10 @@ export default function ConceptStudioPage() {
       : currentStageState === "language" && !canAdvanceToStage2 && !isSubsequentPiece
       ? "direction"
       : currentStageState;
+  useEffect(() => {
+    if (!requestedStage) return;
+    setCurrentStageState(requestedStage);
+  }, [requestedStage]);
   const isStep3ProductStage = currentStage === "product";
   const step3PulseReferenceLabel = selectedAesthetic ? `Concept locked · ${selectedAesthetic}` : null;
   const shouldLoadConceptLanguageRead = currentStage === "language" || currentStage === "product";

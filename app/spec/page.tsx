@@ -4593,7 +4593,7 @@ function SpecStudioPageContent() {
                   </div>
                 ) : activeSpecRail ? (
                   <>
-                    <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.62 }}>
+                    <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.66)", lineHeight: 1.62 }}>
                       {activeSpecRail.core_tension}
                     </div>
                     <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -4819,7 +4819,7 @@ function SpecStudioPageContent() {
                     <>
                       <div style={{ fontFamily: inter, fontSize: 9, fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", color: "#888078", marginBottom: 14 }}>Better path</div>
                       {specStep === "material" && executionScore >= 75 ? (
-                        <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.56)", lineHeight: 1.58 }}>
+                        <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.66)", lineHeight: 1.58 }}>
                           Material selection is working. No swap suggested.
                         </div>
                       ) : (
@@ -4827,7 +4827,7 @@ function SpecStudioPageContent() {
                           <div style={{ fontFamily: sohne, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: "#191919", marginBottom: 8 }}>
                             {activeSpecRail?.alternative_path?.title}
                           </div>
-                          <div style={{ fontFamily: inter, fontSize: 12, color: "#191919", lineHeight: 1.58 }}>
+                          <div style={{ fontFamily: inter, fontSize: 12, color: "rgba(67,67,43,0.66)", lineHeight: 1.58 }}>
                             {activeSpecRail?.alternative_path?.description}
                           </div>
                           {betterPathDimension === "construction" && betterPathTargetTier ? (

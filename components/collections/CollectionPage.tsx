@@ -268,6 +268,40 @@ function getAgentString(
   return typeof value === 'string' ? value : null;
 }
 
+function getAgentBoolean(
+  agentVersions: Record<string, unknown> | null | undefined,
+  key: string
+) {
+  const value = agentVersions?.[key];
+  if (typeof value === 'boolean') return value;
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed === 'true') return true;
+  if (trimmed === 'false') return false;
+  return null;
+}
+
+function getAgentStringArray(
+  agentVersions: Record<string, unknown> | null | undefined,
+  key: string
+) {
+  const value = agentVersions?.[key];
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0);
+  }
+  if (typeof value !== 'string') return [];
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 function getScore(row: AnalysisRow) {
   return row.score ?? 0;
 }
@@ -1116,12 +1150,15 @@ export default function CollectionPage({
   const conceptSilhouette = useSessionStore((state) => state.conceptSilhouette);
   const directionInterpretationText = useSessionStore((state) => state.directionInterpretationText);
   const directionInterpretationChips = useSessionStore((state) => state.directionInterpretationChips);
+  const conceptPalette = useSessionStore((state) => state.conceptPalette);
+  const chipSelection = useSessionStore((state) => state.chipSelection);
   const sliderTrend = useSessionStore((state) => state.sliderTrend);
   const sliderCreative = useSessionStore((state) => state.sliderCreative);
   const sliderElevated = useSessionStore((state) => state.sliderElevated);
   const sliderNovelty = useSessionStore((state) => state.sliderNovelty);
   const activeProductPieceId = useSessionStore((state) => state.activeProductPieceId);
   const selectedKeyPiece = useSessionStore((state) => state.selectedKeyPiece);
+  const pieceRolesById = useSessionStore((state) => state.pieceRolesById);
   const resetConceptState = useSessionStore((state) => state.resetConceptState);
   const collectionContextSnapshots = useSessionStore((state) => state.collectionContextSnapshots);
   const SLIDER_NEUTRAL = 50;
@@ -1341,91 +1378,110 @@ export default function CollectionPage({
     const normalizedCollectionName = collectionName.trim().toLowerCase();
     return normalizedCollectionName ? collectionContextSnapshots[normalizedCollectionName] ?? null : null;
   }, [collectionContextSnapshots, collectionName]);
-
-  const conceptSetupComplete = useMemo(() => {
-    const candidates: unknown[] = [
-      currentCollectionSnapshot?.agent_versions?.concept_setup_complete,
-      ...analyses.map((analysis) => analysis.agent_versions?.concept_setup_complete),
-    ];
-
-    for (const candidate of candidates) {
-      if (typeof candidate === 'boolean') return candidate;
-      if (typeof candidate === 'string') {
-        const trimmed = candidate.trim().toLowerCase();
-        if (trimmed === 'true') return true;
-        if (trimmed === 'false') return false;
-      }
-    }
-
-    return analyses.length > 0;
-  }, [analyses, currentCollectionSnapshot]);
-
-  const editorialDirection = useMemo(() => {
-    const preferred = [
-      currentCollectionSnapshot?.collection_aesthetic,
-      currentCollectionSnapshot?.aesthetic_inflection,
-      currentCollectionSnapshot?.aesthetic_matched_id,
-      analyses[0]?.collection_aesthetic,
-      analyses[0]?.aesthetic_inflection,
-      analyses[0]?.aesthetic_input,
-      storeMatchesCollection ? collectionAesthetic : null,
-      storeMatchesCollection ? aestheticInflection : null,
-      storeMatchesCollection ? directionInterpretationText : null,
-    ].find((value) => value?.trim());
-
-    return preferred?.trim() ?? null;
-  }, [
-    aestheticInflection,
-    analyses,
-    collectionAesthetic,
-    currentCollectionSnapshot,
-    directionInterpretationText,
-    storeMatchesCollection,
-  ]);
-
-  const conceptCompleteForCollection = useMemo(() => {
-    if (!conceptSetupComplete) {
-      return false;
-    }
-
-    if (
+  const conceptProgress = useMemo(() => {
+    const snapshotAgentVersions = currentCollectionSnapshot?.agent_versions ?? null;
+    const storeHasDirection =
       storeMatchesCollection &&
-      conceptSilhouette.trim() &&
-      (collectionAesthetic?.trim() || aestheticInflection?.trim() || directionInterpretationText?.trim())
-    ) {
-      return true;
-    }
-
-    return analyses.some((analysis) => {
-      const hasDirection = Boolean(
+      Boolean(collectionAesthetic?.trim() || aestheticInflection?.trim() || directionInterpretationText?.trim());
+    const reportHasDirection = analyses.some((analysis) =>
+      Boolean(
         analysis.collection_aesthetic?.trim() ||
         analysis.aesthetic_inflection?.trim() ||
-        analysis.aesthetic_matched_id?.trim()
-      );
+        analysis.aesthetic_matched_id?.trim() ||
+        analysis.aesthetic_input?.trim()
+      )
+    );
+    const snapshotHasDirection = Boolean(
+      currentCollectionSnapshot?.collection_aesthetic?.trim() ||
+      currentCollectionSnapshot?.aesthetic_inflection?.trim() ||
+      currentCollectionSnapshot?.aesthetic_matched_id?.trim()
+    );
+    const hasDirection = storeHasDirection || snapshotHasDirection || reportHasDirection;
 
-      return hasDirection && Boolean(analysis.silhouette?.trim());
-    });
+    const storeHasLanguage =
+      storeMatchesCollection &&
+      Boolean(
+        conceptSilhouette.trim() ||
+        conceptPalette?.trim() ||
+        chipSelection?.activatedChips?.length ||
+        directionInterpretationChips.length
+      );
+    const snapshotHasLanguage =
+      Boolean(currentCollectionSnapshot?.silhouette?.trim()) ||
+      Boolean(getAgentString(snapshotAgentVersions, 'selected_palette')?.trim()) ||
+      getAgentStringArray(snapshotAgentVersions, 'collection_language').length > 0 ||
+      getAgentStringArray(snapshotAgentVersions, 'expression_signals').length > 0 ||
+      getAgentStringArray(snapshotAgentVersions, 'direction_interpretation_chips').length > 0;
+    const reportHasLanguage = analyses.some((analysis) => Boolean(analysis.silhouette?.trim()));
+    const hasLanguage = storeHasLanguage || snapshotHasLanguage || reportHasLanguage;
+
+    const snapshotIsComplete = getAgentBoolean(snapshotAgentVersions, 'concept_setup_complete');
+    const hasProductProgress =
+      (storeMatchesCollection && (Boolean(activeProductPieceId) || Object.keys(pieceRolesById).length > 0)) ||
+      analyses.length > 0 ||
+      snapshotIsComplete === true;
+
+    const hasAnyProgress =
+      Boolean(aestheticInput?.trim()) ||
+      hasDirection ||
+      hasLanguage ||
+      hasProductProgress;
+
+    const resumeStage =
+      !hasAnyProgress ? null : !hasDirection ? 'direction' : !hasLanguage ? 'language' : !hasProductProgress ? 'product' : null;
+
+    return {
+      hasDirection,
+      hasLanguage,
+      hasProductProgress,
+      hasAnyProgress,
+      isComplete: resumeStage === null && hasAnyProgress,
+      resumeStage,
+    } as const;
   }, [
+    activeProductPieceId,
     aestheticInflection,
+    aestheticInput,
     analyses,
+    chipSelection,
     collectionAesthetic,
+    conceptPalette,
     conceptSilhouette,
-    conceptSetupComplete,
+    currentCollectionSnapshot,
+    directionInterpretationChips,
     directionInterpretationText,
+    pieceRolesById,
     storeMatchesCollection,
   ]);
 
-  const editorialChips = useMemo(() => {
-    if (storeMatchesCollection && directionInterpretationChips.length > 0) {
-      return directionInterpretationChips.slice(0, 4);
-    }
-    return [];
-  }, [directionInterpretationChips, storeMatchesCollection]);
+  const conceptCompleteForCollection = conceptProgress.isComplete;
 
   const showConceptInProgressBanner = useMemo(
-    () => !conceptSetupComplete && Boolean(editorialDirection),
-    [conceptSetupComplete, editorialDirection]
+    () => Boolean(conceptProgress.resumeStage && conceptProgress.hasAnyProgress),
+    [conceptProgress]
   );
+
+  const handleContinueConcept = () => {
+    setActiveCollection(collectionName);
+    setCollectionName(collectionName);
+    if (seasonLabel) {
+      setSeason(seasonLabel);
+    }
+
+    try {
+      localStorage.setItem('muko_collectionName', collectionName);
+      if (seasonLabel) {
+        localStorage.setItem('muko_seasonLabel', seasonLabel);
+      }
+    } catch {}
+
+    const params = new URLSearchParams();
+    if (conceptProgress.resumeStage) {
+      params.set('stage', conceptProgress.resumeStage);
+    }
+
+    router.push(params.size > 0 ? `/concept?${params.toString()}` : '/concept');
+  };
 
   const handleGenerateReport = () => {
     if (!canGenerateReport) return;
@@ -1830,7 +1886,7 @@ export default function CollectionPage({
               </div>
 
               <button
-                onClick={() => router.push('/concept')}
+                onClick={handleContinueConcept}
                 style={{
                   flexShrink: 0,
                   borderRadius: 999,

@@ -4972,7 +4972,6 @@ function PiecesPageClient() {
                         <p
                           style={{
                             ...READ_BODY_STYLE,
-                            color: TEXT,
                             lineHeight: 1.68,
                           }}
                         >
@@ -5109,15 +5108,19 @@ function PiecesPageClient() {
         }
 
         .pieces-read-progress-pill {
-          background: #ffffff;
-          color: #6b7a3a;
-          border: 1.5px solid #A8B475;
-          box-shadow: none;
+          background: rgba(196, 187, 177, 0.78);
+          color: #5b534b;
+          border: none;
+          box-shadow:
+            0 14px 32px rgba(91, 83, 75, 0.12),
+            inset 0 1px 0 rgba(255,255,255,0.34);
+          backdrop-filter: blur(14px) saturate(135%);
+          -webkit-backdrop-filter: blur(14px) saturate(135%);
           pointer-events: none;
         }
 
         .pieces-read-progress-pill:hover {
-          background: #ffffff;
+          background: rgba(196, 187, 177, 0.82);
         }
 
         .pieces-read-progress-count {
@@ -5126,8 +5129,8 @@ function PiecesPageClient() {
           justify-content: center;
           padding: 1px 7px;
           border-radius: 100px;
-          background: rgba(168,180,117,0.18);
-          color: #6b7a3a;
+          background: rgba(255,255,255,0.28);
+          color: #5b534b;
           font-size: 11px;
           line-height: 1.2;
         }
