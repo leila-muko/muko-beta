@@ -683,9 +683,8 @@ function stripInvalidConstructionRedirect(rail: SpecRailInsight, bb: SpecBlackbo
 }
 
 export function validateSpecRailOutput(rail: SpecRailInsight, bb: SpecBlackboard): boolean {
-  const parsed = stripInvalidConstructionRedirect(rail, bb);
+  stripInvalidConstructionRedirect(rail, bb);
   if (railLeaksInternalFieldNames(rail)) return false;
-  if (!railHasValidMaterialSwap(parsed, bb)) return false;
   return true;
 }
 

@@ -2200,6 +2200,7 @@ function SpecStudioPageContent() {
   } | null>(null);
   const [specRailLoading, setSpecRailLoading] = useState(false);
   const [specRailResolvedKey, setSpecRailResolvedKey] = useState<string | null>(null);
+  const [specRailSource, setSpecRailSource] = useState<'llm' | 'template' | null>(null);
   const specRailRequestKey = useMemo(() => JSON.stringify({
     aesthetic: conceptContext.aestheticMatchedId,
     categoryId,
@@ -2307,8 +2308,9 @@ function SpecStudioPageContent() {
     setSpecRailLoading(true);
     setSpecRailInsight(null);
     setSpecSynthInsightData(null);
+    setSpecRailSource(null);
 
-    const finishSpecRail = (nextRail: SpecRailInsight | null, nextData?: InsightData | null) => {
+    const finishSpecRail = (nextRail: SpecRailInsight | null, nextData?: InsightData | null, source?: 'llm' | 'template') => {
       if (settled || controller.signal.aborted) return;
       settled = true;
       const now = typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -2322,6 +2324,9 @@ function SpecStudioPageContent() {
         ) {
           nextRail = { ...nextRail, alternative_path: null };
         }
+        const resolvedSource = source ?? 'template';
+        console.log('[SpecRail] source:', resolvedSource);
+        setSpecRailSource(resolvedSource);
         setSpecRailInsight(nextRail);
         if (
           specStep === "material" &&
@@ -2353,7 +2358,7 @@ function SpecStudioPageContent() {
           signal: controller.signal,
         });
         if (!res.ok || !res.body || controller.signal.aborted) {
-          finishSpecRail(specFallbackRail);
+          finishSpecRail(specFallbackRail, null, 'template');
           return;
         }
 
@@ -2374,7 +2379,7 @@ function SpecStudioPageContent() {
             try {
               const result = JSON.parse(data) as { rail: SpecRailInsight; data: InsightData; meta: { method: string } };
               if (!controller.signal.aborted) {
-                finishSpecRail(result.rail, result.data);
+                finishSpecRail(result.rail, result.data, result.meta.method as 'llm' | 'template');
                 // Persist analysis — awaited inside async IIFE so the stream loop is not blocked
                 void (async () => {
                   try {
@@ -2562,10 +2567,10 @@ function SpecStudioPageContent() {
         }
       } catch (e) {
         if ((e as Error).name === 'AbortError') return;
-        finishSpecRail(specFallbackRail);
+        finishSpecRail(specFallbackRail, null, 'template');
       } finally {
         if (controller.signal.aborted) return;
-        if (!settled) finishSpecRail(specFallbackRail);
+        if (!settled) finishSpecRail(specFallbackRail, null, 'template');
       }
     }, 400);
 
@@ -4255,6 +4260,7 @@ function SpecStudioPageContent() {
                               textAlign: "left",
                               borderRadius: 18,
                               padding: "16px 16px 17px",
+                              overflow: "hidden",
                               background: hoveredComplexity === tier ? "rgba(255,255,255,0.84)" : "rgba(255,255,255,0.72)",
                               border: isSel ? "1px solid rgba(168,180,117,0.46)" : "1px solid rgba(67,67,43,0.06)",
                               cursor: "pointer",
@@ -4323,7 +4329,7 @@ function SpecStudioPageContent() {
                       })}
                     </div>
                     {overrideWarning && <div style={{ marginTop: 12, fontSize: 12, color: "rgba(67,67,43,0.56)", fontFamily: inter }}>{overrideWarning}</div>}
-                    {(executionNotes.length > 0 || selectedLevers.size > 0) && (
+                    {executionNotes.length > 0 && (
                       <div
                         style={{
                           marginTop: 18,
@@ -4346,12 +4352,7 @@ function SpecStudioPageContent() {
                         >
                           Applied notes
                         </div>
-                        {executionNotes.length === 0 ? (
-                          <p style={{ fontSize: 13, color: "var(--color-text-tertiary)", margin: 0 }}>
-                            Selected notes will appear here
-                          </p>
-                        ) : (
-                          <div style={{ display: "grid", gap: 10 }}>
+                        <div style={{ display: "grid", gap: 10 }}>
                             {executionNotes.map((note) => (
                               <div
                                 key={note}
@@ -4414,7 +4415,6 @@ function SpecStudioPageContent() {
                               </div>
                             ))}
                           </div>
-                        )}
                       </div>
                     )}
                   </section>

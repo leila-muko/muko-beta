@@ -206,6 +206,12 @@ function FrameValueField({
   max?: number;
   onChange: (next: number) => void;
 }) {
+  const [rawValue, setRawValue] = useState<string>(value != null ? String(value) : "");
+
+  useEffect(() => {
+    setRawValue(value != null ? String(value) : "");
+  }, [value]);
+
   return (
     <div style={{ minWidth: 220, flex: "0 1 320px" }}>
       <div
@@ -248,10 +254,14 @@ function FrameValueField({
           className="intent-card-field"
           type="number"
           placeholder={placeholder}
-          value={value ?? ""}
+          value={rawValue}
           min={min}
           max={max}
-          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : 0)}
+          onChange={(e) => setRawValue(e.target.value)}
+          onBlur={(e) => {
+            const parsed = e.target.value !== "" ? Number(e.target.value) : 0;
+            if (!isNaN(parsed)) onChange(parsed);
+          }}
           style={{ borderBottom: "none", padding: 0 }}
         />
         {suffix ? (
@@ -468,7 +478,7 @@ export default function IntentCalibrationPage() {
         setBrandDnaChips(data.keywords as string[]);
       }
     })();
-  }, [storeTargetMargin, targetMargin]);
+  }, [storeTargetMargin]);
   useEffect(() => {
     if (!hasMounted || timelineWeeksOverride) return;
     setTimelineWeeksInput(deliveryWeeks(resolvedSeason));

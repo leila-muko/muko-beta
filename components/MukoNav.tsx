@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 import { MukoWordmark } from "@/components/MukoWordmark";
+import { useSessionStore } from "@/lib/store/sessionStore";
 
 const CHARTREUSE = "#A8B475";
 const MUTED = "#888078";
@@ -45,11 +46,18 @@ export function MukoNav({
   onSaveClose,
 }: MukoNavProps) {
   const router = useRouter();
+  const conceptLocked = useSessionStore((s) => s.conceptLocked);
 
   const isComplete = (tabId: string) => {
     if (tabId === "setup") return setupComplete;
     if (tabId === "pieces") return piecesComplete;
     return false;
+  };
+
+  const isAccessible = (tabId: "setup" | "pieces" | "report") => {
+    if (tabId === "pieces") return conceptLocked;
+    if (tabId === "report") return piecesComplete;
+    return true;
   };
 
   const handleBack = () => {
@@ -85,6 +93,7 @@ export function MukoNav({
           {TABS.map((tab) => {
             const active = tab.id === activeTab;
             const done = isComplete(tab.id) && !active;
+            const locked = !active && !isAccessible(tab.id as "setup" | "pieces" | "report");
 
             let bg = "transparent";
             let color = MUTED;
@@ -107,7 +116,7 @@ export function MukoNav({
               <div
                 key={tab.id}
                 onClick={() => {
-                  if (active) return;
+                  if (active || locked) return;
                   if (STEP_INDEX[tab.id] > STEP_INDEX[activeTab]) {
                     trackEvent(null, "step_completed", {
                       from_step: activeTab,
@@ -133,7 +142,8 @@ export function MukoNav({
                   letterSpacing: "0.01em",
                   transition: "background 0.15s, color 0.15s",
                   userSelect: "none",
-                  cursor: active ? "default" : "pointer",
+                  cursor: active ? "default" : locked ? "not-allowed" : "pointer",
+                  opacity: locked ? 0.4 : 1,
                 }}
               >
                 {done ? (

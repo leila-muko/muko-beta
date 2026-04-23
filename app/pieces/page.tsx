@@ -12,7 +12,7 @@ import { getFlatForPiece } from "@/components/flats";
 import { MukoNav } from "@/components/MukoNav";
 import { createClient } from "@/lib/supabase/client";
 import { getCollectionLanguageLabels, getExpressionSignalLabels } from "@/lib/collection-signals";
-import { resolvePieceImageType, resolveSelectedPieceImage } from "@/lib/piece-image";
+import { buildSelectedPieceImage, resolvePieceImageType, resolveSelectedPieceImage } from "@/lib/piece-image";
 import aestheticsData from "@/data/aesthetics.json";
 import categoriesData from "@/data/categories.json";
 import materialsData from "@/data/materials.json";
@@ -1687,6 +1687,12 @@ function ConfirmDrawer({
   const hasValidPieceTargetMsrp = pieceTargetMsrp != null && pieceTargetMsrp > 0;
   const canPressStart = piece.custom ? canStart && hasValidPieceTargetMsrp : canStart;
   const [isPieceTypeEditorOpen, setIsPieceTypeEditorOpen] = useState(false);
+  const [expressionAccepted, setExpressionAccepted] = useState(false);
+  const [refinementDeclined, setRefinementDeclined] = useState(false);
+  React.useEffect(() => {
+    setExpressionAccepted(false);
+    setRefinementDeclined(false);
+  }, [customRefinement]);
   const availableSubcategories = category ? allSubcategories[category] ?? [] : [];
   const pieceTypeLabel =
     category && subcategory
@@ -1705,7 +1711,7 @@ function ConfirmDrawer({
   const hasCustomProposal = Boolean(customProposal.trim());
   const isCustomThinking = piece.custom && hasCustomProposal && customRefinementState === "loading";
   const hasCustomResponse = piece.custom && Boolean(customRefinement);
-  const shouldShowCustomRead = piece.custom && hasCustomProposal && (isCustomThinking || hasCustomResponse);
+  const shouldShowCustomRead = piece.custom && hasCustomProposal && !refinementDeclined && (isCustomThinking || hasCustomResponse);
   const customStartReady = Boolean(piece.custom && hasCustomResponse);
 
   if (piece.custom) {
@@ -2025,24 +2031,25 @@ function ConfirmDrawer({
                     >
                       <button
                         type="button"
-                        onClick={onAcceptRefinedExpression}
+                        onClick={() => { onAcceptRefinedExpression(); setExpressionAccepted(true); }}
                         style={{
                           borderRadius: 999,
-                          background: "#A8B475",
-                          border: "none",
-                          color: "#43432B",
+                          background: expressionAccepted ? "transparent" : "#A8B475",
+                          border: expressionAccepted ? "0.5px solid rgba(67,67,43,0.2)" : "none",
+                          color: expressionAccepted ? "rgba(67,67,43,0.5)" : "#43432B",
                           fontFamily: inter,
                           fontSize: 11,
                           fontWeight: 600,
                           padding: "8px 14px",
                           cursor: "pointer",
+                          transition: "background 200ms ease, color 200ms ease",
                         }}
                       >
-                        Accept
+                        {expressionAccepted ? "✓ Added to description" : "Accept"}
                       </button>
                       <button
                         type="button"
-                        onClick={onContinueWithOriginal}
+                        onClick={() => { onContinueWithOriginal(); setRefinementDeclined(true); setExpressionAccepted(false); }}
                         style={{
                           borderRadius: 999,
                           background: "transparent",
@@ -3125,6 +3132,7 @@ function PiecesPageClient() {
     resonancePulse,
     executionPulse,
     setSelectedKeyPiece,
+    setSelectedPieceImage,
     setCollectionName,
     setCollectionRole,
     setSeason,
@@ -4462,8 +4470,14 @@ function PiecesPageClient() {
     setLastSuggestionRationale(null);
     if (drawerPiece.custom) {
       setMaterial("");
-      setCategory(drawerCategory || inferredCategory || "");
+      setCategory(getCategoryLabel((categoriesData as CategoriesData).categories, drawerCategory || inferredCategory || ""));
       setSubcategory(drawerSubcategory || inferredType || "");
+      setSelectedPieceImage(buildSelectedPieceImage({
+        type: drawerSubcategory || inferredType || null,
+        pieceName: finalPieceName,
+        category: drawerCategory || inferredCategory || null,
+        signal: finalPiece.signal ?? null,
+      }));
     } else {
       setCategory(drawerCategory || drawerPiece.category || "");
       setSubcategory(drawerSubcategory || drawerPiece.type || "");
@@ -4482,6 +4496,7 @@ function PiecesPageClient() {
     customRefinement?.subcategory,
     pieceTargetMsrp,
     setSelectedKeyPiece,
+    setSelectedPieceImage,
     setCollectionRole,
     setPieceTargetMsrpError,
     setPieceBuildContext,
@@ -5092,6 +5107,30 @@ function PiecesPageClient() {
           font-size: 11px;
           line-height: 1.2;
         }
+
+        .pieces-read-progress-pill {
+          background: #ffffff;
+          color: #6b7a3a;
+          border: 1.5px solid #A8B475;
+          box-shadow: none;
+          pointer-events: none;
+        }
+
+        .pieces-read-progress-pill:hover {
+          background: #ffffff;
+        }
+
+        .pieces-read-progress-count {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1px 7px;
+          border-radius: 100px;
+          background: rgba(168,180,117,0.18);
+          color: #6b7a3a;
+          font-size: 11px;
+          line-height: 1.2;
+        }
       `}</style>
 
       {/* Floating readiness chip */}
@@ -5116,7 +5155,20 @@ function PiecesPageClient() {
           <span className="pieces-read-ready-count">{totalConfirmed}</span>
           <span>{`${totalConfirmed} pieces · Generate report →`}</span>
         </button>
-      ) : null}
+      ) : (
+        <div
+          className="pieces-read-ready-pill pieces-read-progress-pill"
+          style={
+            {
+              "--pieces-read-pill-right": isAskMukoOpen ? "320px" : "68px",
+              cursor: "default",
+            } as React.CSSProperties
+          }
+        >
+          <span className="pieces-read-progress-count">{totalConfirmed}</span>
+          <span>{`${totalConfirmed} of 5 pieces · Report in Progress`}</span>
+        </div>
+      )}
 
       {/* ── Confirm Drawer ─────────────────────────────────── */}
       {drawerPiece && (

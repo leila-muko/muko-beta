@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 
         const anthropicStream = client.messages.stream({
           model: 'claude-sonnet-4-6',
-          max_tokens: 650,
+          max_tokens: 1000,
           temperature: 0.35,
           system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }],
@@ -93,19 +93,31 @@ export async function POST(req: NextRequest) {
         try {
           const parsed = parseSpecRailOutput(accumulated);
           const repaired = parsed ? repairSpecRailOutput(parsed, blackboard) : null;
-          if (!repaired || !validateSpecRailOutput(repaired, blackboard)) {
-            console.warn('[SpecRoute] Invalid JSON in response, emitting fallback');
+
+          let fallbackReason: string | null = null;
+          if (!parsed) {
+            fallbackReason = 'parse_failure';
+          } else if (!repaired) {
+            fallbackReason = 'repair_failure_field_name_leak';
+          } else if (!validateSpecRailOutput(repaired, blackboard)) {
+            fallbackReason = 'validation_failure';
+          }
+
+          if (fallbackReason) {
+            console.warn('[SpecSynth] fallback triggered:', fallbackReason);
             emit('fallback', JSON.stringify(makeFallback(blackboard)));
             return;
           }
 
-          const data = mapSpecRailToInsightData(repaired, mode);
+          const data = mapSpecRailToInsightData(repaired!, mode);
           emit('complete', JSON.stringify({ rail: repaired, data, meta: { method: 'llm', latency_ms: 0 } }));
-        } catch {
+        } catch (err) {
+          console.warn('[SpecSynth] fallback triggered: parse_exception', err);
           emit('fallback', JSON.stringify(makeFallback(blackboard)));
         }
-      } catch {
+      } catch (err) {
         try {
+          console.warn('[SpecSynth] fallback triggered: stream_exception', err);
           emit('fallback', JSON.stringify(makeFallback(blackboard)));
         } catch { /* silent */ }
       } finally {
