@@ -880,7 +880,7 @@ function getPersistedPieceName(piece: {
 }
 
 /* ─── Main component ──────────────────────────────────────────────────────── */
-export default function ConceptStudioPage() {
+function ConceptStudioPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const {
@@ -4980,6 +4980,14 @@ export default function ConceptStudioPage() {
         /* ResizableSplitPanel handles mobile stacking */
       `}</style>
     </div>
+  );
+}
+
+export default function ConceptStudioPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <ConceptStudioPageContent />
+    </React.Suspense>
   );
 }
 
