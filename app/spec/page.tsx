@@ -2302,7 +2302,7 @@ function SpecStudioPageContent() {
     const controller = new AbortController();
     specAbortRef.current = controller;
     const loadStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
-    const minLoadingMs = 900;
+    const minLoadingMs = 400;
     let settled = false;
     setSpecRailLoading(true);
     setSpecRailInsight(null);
@@ -2574,7 +2574,7 @@ function SpecStudioPageContent() {
         if (controller.signal.aborted) return;
         if (!settled) finishSpecRail(specFallbackRail, null, 'template');
       }
-    }, 400);
+    }, 100);
 
     return () => {
       window.clearTimeout(timer);
