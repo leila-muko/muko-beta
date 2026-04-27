@@ -2303,7 +2303,8 @@ function ConceptStudioPageContent() {
       : null;
     const executionLevers = step1ReadData?.decision_guidance?.execution_levers ?? [];
     const shouldPersistCollectionAesthetic = collectionPieces.length === 0 || isAestheticSelectionUnlocked;
-    const selectedAestheticSlug = selectedAesthetic ? toAestheticSlug(selectedAesthetic) : null;
+    const confirmedAesthetic = selectedAesthetic;
+    const selectedAestheticSlug = confirmedAesthetic ? toAestheticSlug(confirmedAesthetic) : null;
     const primaryRole = primaryPieceName ? pieceRolesById[primaryPieceName] ?? null : null;
 
     setDecisionGuidanceState({
@@ -2326,7 +2327,7 @@ function ConceptStudioPageContent() {
       setCollectionRole(primaryRole);
     }
 
-    if (shouldPersistCollectionAesthetic && selectedAestheticSlug) {
+    if (shouldPersistCollectionAesthetic && confirmedAesthetic && selectedAestheticSlug) {
       try {
         const supabase = createClient();
         const {
@@ -2346,7 +2347,7 @@ function ConceptStudioPageContent() {
           await supabase
             .from("analyses")
             .update({
-              collection_aesthetic: selectedAesthetic,
+              collection_aesthetic: confirmedAesthetic,
               aesthetic_matched_id: selectedAestheticSlug,
               aesthetic_inflection: aestheticInflection.trim() || null,
             })
@@ -2357,13 +2358,13 @@ function ConceptStudioPageContent() {
       }
 
       try {
-        window.localStorage.setItem(COLLECTION_AESTHETIC_STORAGE_KEY, selectedAesthetic);
+        window.localStorage.setItem(COLLECTION_AESTHETIC_STORAGE_KEY, confirmedAesthetic);
       } catch {
         // Ignore storage failures.
       }
 
-      setCollectionAesthetic(selectedAesthetic);
-      setLockedCollectionAesthetic(selectedAesthetic);
+      setCollectionAesthetic(confirmedAesthetic);
+      setLockedCollectionAesthetic(confirmedAesthetic);
       setIsAestheticSelectionUnlocked(false);
     }
 
