@@ -112,13 +112,13 @@ export function resolveAestheticContext(
 
 /**
  * Resolve cost_reduction redirect from redirects.json.
- * Returns null when margin gate passes or no alternative exists.
+ * Returns null when no alternative exists.
  */
 function resolveCostReduction(
   materialId: string,
   marginGatePassed: boolean | null
 ): ResolvedRedirects['cost_reduction'] {
-  if (marginGatePassed !== false) return null;
+  void marginGatePassed;
   const alternatives = redirectsData.material_alternatives?.[materialId];
   if (!alternatives || alternatives.length === 0) return null;
 

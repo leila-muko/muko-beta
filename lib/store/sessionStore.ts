@@ -313,11 +313,7 @@ export const useSessionStore = create<SessionState>()(
       setCustomChips: (customChips) => set({ customChips }),
       setConceptSilhouette: (conceptSilhouette) => set({ conceptSilhouette }),
       setConceptPalette: (conceptPalette) => set({ conceptPalette }),
-      setCollectionAesthetic: (collectionAesthetic) => set((state) =>
-        state.collectionAesthetic !== null && state.selectedKeyPiece !== null
-          ? {}
-          : { collectionAesthetic }
-      ),
+      setCollectionAesthetic: (collectionAesthetic) => set({ collectionAesthetic }),
       setAestheticInflection: (aestheticInflection) => set({ aestheticInflection }),
       setDirectionInterpretationText: (directionInterpretationText) => set({ directionInterpretationText }),
       setDirectionInterpretationModifiers: (directionInterpretationModifiers) => set({ directionInterpretationModifiers }),

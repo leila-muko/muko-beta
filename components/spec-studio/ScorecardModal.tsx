@@ -464,7 +464,7 @@ export function ScorecardModal({
         target_msrp: storeTargetMsrp != null && storeTargetMsrp > 0 ? storeTargetMsrp : null,
         aesthetic_input: aestheticInput || null,
         aesthetic_matched_id: aestheticMatchedId ?? aestheticInput?.toLowerCase()?.replace(/\s+/g, '-') ?? null,
-        collection_aesthetic: collectionAesthetic || (aestheticMatchedId ?? aestheticInput) || null,
+        collection_aesthetic: collectionAesthetic || aestheticInput || null,
         aesthetic_inflection: aestheticInflection || directionInterpretationText || null,
         mood_board_images: moodboardImages,
         material_id: materialId || null,

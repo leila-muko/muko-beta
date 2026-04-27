@@ -1,5 +1,6 @@
 "use client";
 
+import aestheticsData from "@/data/aesthetics.json";
 import {
   useSessionStore,
   type ChipSelection,
@@ -30,6 +31,10 @@ const CONTEXT_AGENT_VERSION_KEYS = [
   "chip_selection",
 ] as const;
 
+const AESTHETIC_NAME_BY_ID = new Map(
+  (aestheticsData as Array<{ id: string; name: string }>).map((entry) => [entry.id, entry.name])
+);
+
 function toTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -40,6 +45,12 @@ function pickPreferredString(...values: Array<unknown>) {
     if (trimmed) return trimmed;
   }
   return null;
+}
+
+function normalizeAestheticName(value: unknown) {
+  const trimmed = toTrimmedString(value);
+  if (!trimmed) return null;
+  return AESTHETIC_NAME_BY_ID.get(trimmed) ?? trimmed;
 }
 
 function normalizeMoodboardImages(value: unknown) {
@@ -150,7 +161,9 @@ function applyCollectionContextSnapshot(
   const state = useSessionStore.getState();
 
   state.setCollectionName(collectionName);
-  state.setCollectionAesthetic(row?.collection_aesthetic?.trim() || row?.aesthetic_matched_id?.trim() || null);
+  state.setCollectionAesthetic(
+    normalizeAestheticName(row?.collection_aesthetic) ?? normalizeAestheticName(row?.aesthetic_matched_id) ?? null
+  );
 
   const inflection = row?.aesthetic_inflection?.trim() || "";
   state.setAestheticInflection(inflection || null);

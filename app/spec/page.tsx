@@ -1919,8 +1919,7 @@ function SpecStudioPageContent() {
 
   // Sync local spec selections to Zustand store so they persist across navigation
   useEffect(() => {
-    const cat = categories.find(c => c.id === categoryId);
-    setCategory(cat?.name ?? categoryId);
+    setCategory(categoryId);
   }, [categoryId, categories, setCategory]);
 
   useEffect(() => {
@@ -2580,7 +2579,7 @@ function SpecStudioPageContent() {
       reportAbortRef.current?.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materialId, constructionTier, categoryId, targetMSRP, specStep, specRailRequestKey]);
+  }, [materialId, constructionTier, categoryId, targetMSRP, specStep, specRailRequestKey, priorTabRecommendation]);
 
 
   // ─── Fix #1: Write execution state to store so report page gets real data ──
@@ -3027,6 +3026,26 @@ function SpecStudioPageContent() {
     return activeSpecRail.alternative_path.method
       ?? (betterPathTargetTier ? `${betterPathTargetTier} complexity` : 'simplified construction');
   }, [activeSpecRail, betterPathDimension, betterPathTargetTier]);
+  const betterPathHasActionableChange = useMemo(() => {
+    if (!activeSpecRail?.alternative_path) return false;
+
+    if (betterPathDimension === "material") {
+      return Boolean(betterPathMaterial && betterPathMaterial.id !== materialId);
+    }
+
+    if (betterPathDimension === "construction") {
+      return Boolean(betterPathTargetTier && betterPathTargetTier !== constructionTier);
+    }
+
+    return false;
+  }, [
+    activeSpecRail,
+    betterPathDimension,
+    betterPathMaterial,
+    betterPathTargetTier,
+    constructionTier,
+    materialId,
+  ]);
   const repriceRecommendationKey = useMemo(() => {
     if (viabilityState?.state !== "reprice" || !selectedMaterial) return null;
     return [
@@ -4269,10 +4288,34 @@ function SpecStudioPageContent() {
                               boxShadow: isSel ? "0 16px 28px rgba(67,67,43,0.06)" : "none",
                             }}
                           >
-                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8, alignItems: "center" }}>
-                              <div style={{ fontFamily: sohne, fontSize: 17, fontWeight: 600, color: OLIVE }}>{info.label}</div>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                justifyContent: "space-between",
+                                alignItems: "flex-start",
+                                columnGap: 8,
+                                rowGap: 8,
+                                marginBottom: 8,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontFamily: sohne,
+                                  fontSize: 17,
+                                  fontWeight: 600,
+                                  color: OLIVE,
+                                  flex: "1 1 auto",
+                                  minWidth: 0,
+                                }}
+                              >
+                                {info.label}
+                              </div>
                               {isSel && (
-                                <span className="specSelectionChip">
+                                <span
+                                  className="specSelectionChip"
+                                  style={{ flexShrink: 0, marginLeft: "auto" }}
+                                >
                                   Selected
                                 </span>
                               )}
@@ -4843,7 +4886,9 @@ function SpecStudioPageContent() {
                           ) : (
                             <>
                               <button
+                                disabled={!betterPathHasActionableChange}
                                 onClick={() => {
+                                  if (!betterPathHasActionableChange) return;
                                   trackEvent(null, "redirect_clicked", {
                                     redirect_type: betterPathDimension ?? getAlternativePathDimension(activeSpecRail) ?? "unknown",
                                     piece_id: savedAnalysisId ?? null,
@@ -4856,11 +4901,12 @@ function SpecStudioPageContent() {
                                   borderRadius: 999,
                                   border: "1px solid rgba(67,67,43,0.25)",
                                   background: "transparent",
-                                  color: "#43432B",
+                                  color: betterPathHasActionableChange ? "#43432B" : "rgba(67,67,43,0.38)",
                                   fontFamily: inter,
                                   fontSize: 11,
                                   fontWeight: 500,
-                                  cursor: "pointer",
+                                  cursor: betterPathHasActionableChange ? "pointer" : "not-allowed",
+                                  opacity: betterPathHasActionableChange ? 1 : 0.72,
                                 }}
                               >
                                 Apply

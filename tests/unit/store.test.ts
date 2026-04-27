@@ -838,16 +838,12 @@ describe('Piece role & collection fields', () => {
     expect(s().aestheticInflection).toBe('Rustic texture emphasis');
   });
 
-  it(
-    'collectionAesthetic locks (becomes read-only) after the first key piece is added',
-    () => {
-      s().setCollectionAesthetic('Terrain Luxe');
-      s().setSelectedKeyPiece(FIXTURE_KEY_PIECE); // first piece added
-      // Attempt to overwrite should be ignored
-      s().setCollectionAesthetic('Different Aesthetic');
-      expect(s().collectionAesthetic).toBe('Terrain Luxe');
-    },
-  );
+  it('collectionAesthetic can be updated after a key piece is selected', () => {
+    s().setCollectionAesthetic('Terrain Luxe');
+    s().setSelectedKeyPiece(FIXTURE_KEY_PIECE);
+    s().setCollectionAesthetic('Different Aesthetic');
+    expect(s().collectionAesthetic).toBe('Different Aesthetic');
+  });
 
   it('setPieceRolesById stores role mappings by piece id', () => {
     const roles: Record<string, CollectionRoleId> = {

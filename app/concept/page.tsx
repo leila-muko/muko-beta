@@ -1329,9 +1329,10 @@ function ConceptStudioPageContent() {
       storeCollectionAesthetic ??
       null;
     if (!inferredCollectionAesthetic) return;
-    setLockedCollectionAesthetic(inferredCollectionAesthetic);
-    setCollectionAesthetic(inferredCollectionAesthetic);
     const inferredAestheticName = resolveAestheticName(inferredCollectionAesthetic);
+    if (!inferredAestheticName) return;
+    setLockedCollectionAesthetic(inferredAestheticName);
+    setCollectionAesthetic(inferredAestheticName);
     if (inferredAestheticName) {
       setAestheticInput(inferredAestheticName);
     }
@@ -2345,7 +2346,8 @@ function ConceptStudioPageContent() {
           await supabase
             .from("analyses")
             .update({
-              collection_aesthetic: selectedAestheticSlug,
+              collection_aesthetic: selectedAesthetic,
+              aesthetic_matched_id: selectedAestheticSlug,
               aesthetic_inflection: aestheticInflection.trim() || null,
             })
             .eq("id", latestAnalysis.id);
@@ -2355,13 +2357,13 @@ function ConceptStudioPageContent() {
       }
 
       try {
-        window.localStorage.setItem(COLLECTION_AESTHETIC_STORAGE_KEY, selectedAestheticSlug);
+        window.localStorage.setItem(COLLECTION_AESTHETIC_STORAGE_KEY, selectedAesthetic);
       } catch {
         // Ignore storage failures.
       }
 
-      setCollectionAesthetic(selectedAestheticSlug);
-      setLockedCollectionAesthetic(selectedAestheticSlug);
+      setCollectionAesthetic(selectedAesthetic);
+      setLockedCollectionAesthetic(selectedAesthetic);
       setIsAestheticSelectionUnlocked(false);
     }
 
@@ -2593,11 +2595,11 @@ function ConceptStudioPageContent() {
     conceptLanguageRequestKeyRef.current = null;
     clearConceptInsight();
     setAestheticInput(aesthetic);
-    setLockedCollectionAesthetic(aestheticSlug);
-    setCollectionAesthetic(aestheticSlug);
+    setLockedCollectionAesthetic(aesthetic);
+    setCollectionAesthetic(aesthetic);
     setIsAestheticSelectionUnlocked(false);
     try {
-      window.localStorage.setItem(COLLECTION_AESTHETIC_STORAGE_KEY, aestheticSlug);
+      window.localStorage.setItem(COLLECTION_AESTHETIC_STORAGE_KEY, aesthetic);
     } catch {
       // Ignore storage failures.
     }
