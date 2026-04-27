@@ -2333,11 +2333,14 @@ function SpecStudioPageContent() {
           nextRail.alternative_path.dimension !== "construction" &&
           nextRail.alternative_path.dimension !== "execution"
         ) {
-          setPriorTabRecommendation({
+          const nextRecommendation = {
             dimension: nextRail.alternative_path.dimension ?? "material",
             title: nextRail.alternative_path.title,
             description: nextRail.alternative_path.description,
-          });
+          };
+          if (JSON.stringify(nextRecommendation) !== JSON.stringify(priorTabRecommendation)) {
+            setPriorTabRecommendation(nextRecommendation);
+          }
         }
         setSpecRailResolvedKey(specRailRequestKey);
         if (nextData !== undefined) {
