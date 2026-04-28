@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateReportNarrative } from '@/lib/synthesizer/reportNarrative';
 import type { ReportBlackboard } from '@/lib/synthesizer/reportNarrative';
 
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   let body;
   try {

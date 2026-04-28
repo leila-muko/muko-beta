@@ -19,6 +19,8 @@ import {
 } from '@/lib/synthesizer/specInsight';
 import { mapSpecRailToInsightData } from '@/lib/synthesizer/specDecision';
 
+export const maxDuration = 60;
+
 function makeFallback(bb: SpecBlackboard) {
   const { mode } = determineSpecMode(
     bb.margin_pass,
