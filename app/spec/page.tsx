@@ -1276,7 +1276,7 @@ function SpecStudioPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [analysisId, categories, savedAnalysisId, setCollectionName, setSeason]);
+  }, [analysisId, categories, setCollectionName, setSeason]);
 
   useEffect(() => {
     setIsClientMounted(true);
