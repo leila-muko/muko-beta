@@ -1191,6 +1191,7 @@ function SpecStudioPageContent() {
     let cancelled = false;
 
     const run = async () => {
+      isHydratingRef.current = true;
       const supabase = createClient();
       const {
         data: { user },
@@ -1268,6 +1269,7 @@ function SpecStudioPageContent() {
           console.error("Failed to hydrate spec header context", error);
         }
       }
+      isHydratingRef.current = false;
     };
 
     void run();
@@ -1932,6 +1934,7 @@ function SpecStudioPageContent() {
 
   // Auto-populate from selected key piece when it changes
   useEffect(() => {
+    if (isHydratingRef.current) return;
     setSpecStep("material");
     setSpecStepDirection(1);
     if (selectedKeyPiece?.custom) {
@@ -2187,6 +2190,7 @@ function SpecStudioPageContent() {
   // ─── Synthesizer: reactive MUKO INSIGHT (streaming) ──────────────────────
   const specAbortRef = useRef<AbortController | null>(null);
   const reportAbortRef = useRef<AbortController | null>(null);
+  const isHydratingRef = useRef(false);
   const specRawJsonRef = useRef<string>('');
   const leverNotesSavedTimeoutRef = useRef<number | null>(null);
   const priceUpdatedTimeoutRef = useRef<number | null>(null);
