@@ -849,22 +849,6 @@ function buildFallbackInput(bb: ReportBlackboard, mode: InsightMode) {
   };
 }
 
-// ─────────────────────────────────────────────
-// METADATA PROMPT (Call 2 — deterministic)
-// ─────────────────────────────────────────────
-
-const METADATA_PROMPT = `Return JSON only with exactly these fields:
-{
-  "confidence": <float 0-1 based on data completeness>,
-  "source_trace": {
-    "aesthetic_id": "<aesthetic_matched_id or null>",
-    "material_ids": ["<material_id>"],
-    "redirect_used": "<redirect id or null>",
-    "key_inputs_used": ["<list of key inputs>"]
-  }
-}
-No other fields. No markdown.`;
-
 function buildDefaultTrace(bb: ReportBlackboard): MetadataOutput['source_trace'] {
   return {
     aesthetic_id: bb.aesthetic_matched_id,
@@ -939,33 +923,10 @@ export async function generateReportNarrative(
       if (!narrativeParsed) throw new Error('Call 1 JSON parse failed after retry');
     }
 
-    // ── CALL 2: Metadata (deterministic, low-token) ───────────────────────
-    let metaParsed: MetadataOutput;
-    try {
-      const metaResponse = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 200,
-        temperature: 0,
-        system: METADATA_PROMPT,
-        messages: [{ role: 'user', content: userPrompt }],
-      });
-      const rawMeta = metaResponse.content[0];
-      if (!rawMeta || rawMeta.type !== 'text' || !rawMeta.text?.trim()) {
-        throw new Error('Empty metadata response');
-      }
-      const rawMetaText = stripFences(
-        Buffer.from(rawMeta.text, 'latin1').toString('utf8')
-      );
-      const attempt = parseMetadataOutput(rawMetaText);
-      if (!attempt) throw new Error('Metadata JSON parse failed');
-      metaParsed = attempt;
-    } catch (metaErr) {
-      console.warn('[ReportNarrative] Call 2 (metadata) failed, using defaults:', metaErr);
-      metaParsed = {
-        confidence: 0.7,
-        source_trace: buildDefaultTrace(blackboard),
-      };
-    }
+    const metaParsed = {
+      confidence: 0.7,
+      source_trace: buildDefaultTrace(blackboard),
+    };
 
     // ── MERGE + BRAND NAME REPLACEMENT + MAP ─────────────────────────────
     const merged = { ...narrativeParsed, ...metaParsed };
