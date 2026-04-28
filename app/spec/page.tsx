@@ -1183,6 +1183,7 @@ function SpecStudioPageContent() {
 
   const [headerCollectionName, setHeaderCollectionName] = useState("");
   const [headerSeasonLabel, setHeaderSeasonLabel] = useState("");
+  const analysisId = searchParams.get("analysis");
 
   useEffect(() => {
     const analysisId = searchParams.get("analysis")?.trim();
@@ -1275,7 +1276,7 @@ function SpecStudioPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [categories, headerCollectionName, headerSeasonLabel, savedAnalysisId, searchParams, setCollectionName, setSeason]);
+  }, [analysisId, categories, savedAnalysisId, setCollectionName, setSeason]);
 
   useEffect(() => {
     setIsClientMounted(true);
