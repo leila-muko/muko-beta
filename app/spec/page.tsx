@@ -1111,6 +1111,7 @@ function SpecStudioPageContent() {
 
   const storeAesthetic = useSessionStore((s) => s.aestheticMatchedId);
   const storeAestheticName = useSessionStore((s) => s.aestheticInput);
+  const storeCollectionAesthetic = useSessionStore((s) => s.collectionAesthetic);
   const storeModifiers = useSessionStore((s) => s.refinementModifiers);
   const selectedKeyPiece = useSessionStore((s) => s.selectedKeyPiece);
   const pieceBuildContext = useSessionStore((s) => s.pieceBuildContext);
@@ -1128,12 +1129,16 @@ function SpecStudioPageContent() {
   const sliderNovelty = useSessionStore((s) => s.sliderNovelty);
 
   const conceptContext = useMemo<ConceptContextType>(() => {
+    const trimmedCollectionAesthetic = storeCollectionAesthetic?.trim() || "";
     const trimmedAestheticName = storeAestheticName.trim();
+    const fallbackAestheticName = trimmedAestheticName || trimmedCollectionAesthetic;
+    const fallbackAestheticSlug = storeAesthetic || (fallbackAestheticName ? toSlug(fallbackAestheticName) : null);
+
     if (!storeAesthetic) {
-      if (trimmedAestheticName) {
+      if (fallbackAestheticName) {
         return {
-          aestheticName: storeAestheticName,
-          aestheticMatchedId: toSlug(trimmedAestheticName),
+          aestheticName: fallbackAestheticName,
+          aestheticMatchedId: fallbackAestheticSlug || FALLBACK_CONCEPT.aestheticMatchedId,
           identityScore: 88,
           resonanceScore: 92,
           moodboardImages: storeMoodboard || [],
@@ -1144,14 +1149,14 @@ function SpecStudioPageContent() {
     }
     const scores = AESTHETIC_CONTENT[storeAesthetic];
     return {
-      aestheticName: storeAestheticName,
-      aestheticMatchedId: toSlug(storeAesthetic),
+      aestheticName: fallbackAestheticName || FALLBACK_CONCEPT.aestheticName,
+      aestheticMatchedId: fallbackAestheticSlug || FALLBACK_CONCEPT.aestheticMatchedId,
       identityScore: scores?.identityScore ?? 88,
       resonanceScore: scores?.resonanceScore ?? 92,
       moodboardImages: storeMoodboard || [],
       recommendedPalette: [],
     };
-  }, [storeAesthetic, storeAestheticName, storeMoodboard]);
+  }, [storeAesthetic, storeAestheticName, storeCollectionAesthetic, storeMoodboard]);
 
   const storeTargetMargin = useSessionStore((s) => s.targetMargin);
   const brandTargetMargin = storeTargetMargin > 0 ? storeTargetMargin / 100 : 0.60;
@@ -2201,6 +2206,8 @@ function SpecStudioPageContent() {
   const [specRailLoading, setSpecRailLoading] = useState(false);
   const [specRailResolvedKey, setSpecRailResolvedKey] = useState<string | null>(null);
   const [specRailSource, setSpecRailSource] = useState<'llm' | 'template' | null>(null);
+  const priorTabRecommendationRef = useRef(priorTabRecommendation);
+  const lastCompletedRailKeyRef = useRef<string | null>(null);
   const specRailRequestKey = useMemo(() => JSON.stringify({
     aesthetic: conceptContext.aestheticMatchedId,
     categoryId,
@@ -2216,6 +2223,21 @@ function SpecStudioPageContent() {
     resolvedTargetMsrp,
     specStep,
   ]);
+
+  const prevDepsRef = useRef<Record<string, unknown> | null>(null);
+  useEffect(() => {
+    priorTabRecommendationRef.current = priorTabRecommendation;
+  }, [priorTabRecommendation]);
+
+  useEffect(() => {
+    const cur = { materialId, constructionTier, categoryId, targetMSRP, specStep, specRailRequestKey };
+    if (prevDepsRef.current) {
+      Object.entries(cur).forEach(([k, v]) => {
+        if (prevDepsRef.current![k] !== v) console.log("[DEP CHANGED]", k, prevDepsRef.current![k], "→", v);
+      });
+    }
+    prevDepsRef.current = cur;
+  }, [materialId, constructionTier, categoryId, targetMSRP, specStep, specRailRequestKey]);
 
   useEffect(() => {
     if (!materialId || !conceptContext.aestheticMatchedId || !specFallbackRail) {
@@ -2295,9 +2317,14 @@ function SpecStudioPageContent() {
       ],
       previousMaterialId: previousMaterialId ?? null,
       intent: intentPayload,
-      priorRecommendation: priorTabRecommendation ?? null,
+      priorRecommendation: priorTabRecommendationRef.current ?? null,
     });
     if (!blackboard) return;
+
+    if (specRailResolvedKey === specRailRequestKey && lastCompletedRailKeyRef.current === specRailRequestKey) {
+      console.log('[SpecRail] skipped duplicate rail key', specRailRequestKey);
+      return;
+    }
 
     specAbortRef.current?.abort();
     const controller = new AbortController();
@@ -2325,6 +2352,7 @@ function SpecStudioPageContent() {
           nextRail = { ...nextRail, alternative_path: null };
         }
         const resolvedSource = source ?? 'template';
+        console.log('[SpecRail] finish starting', { key: specRailRequestKey, source: resolvedSource });
         console.log('[SpecRail] source:', resolvedSource);
         setSpecRailSource(resolvedSource);
         setSpecRailInsight(nextRail);
@@ -2339,15 +2367,18 @@ function SpecStudioPageContent() {
             title: nextRail.alternative_path.title,
             description: nextRail.alternative_path.description,
           };
-          if (JSON.stringify(nextRecommendation) !== JSON.stringify(priorTabRecommendation)) {
+          if (JSON.stringify(nextRecommendation) !== JSON.stringify(priorTabRecommendationRef.current)) {
             setPriorTabRecommendation(nextRecommendation);
+            console.log('[SpecRail] prior recommendation updated', nextRecommendation);
           }
         }
+        lastCompletedRailKeyRef.current = specRailRequestKey;
         setSpecRailResolvedKey(specRailRequestKey);
         if (nextData !== undefined) {
           setSpecSynthInsightData(nextData);
         }
         setSpecRailLoading(false);
+        console.log('[SpecRail] finish complete', { key: specRailRequestKey, source: resolvedSource });
       }, remaining);
     };
 
@@ -2583,7 +2614,7 @@ function SpecStudioPageContent() {
       reportAbortRef.current?.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materialId, constructionTier, categoryId, targetMSRP, specStep, specRailRequestKey, priorTabRecommendation]);
+  }, [materialId, constructionTier, categoryId, targetMSRP, specStep, specRailRequestKey, specRailResolvedKey]);
 
 
   // ─── Fix #1: Write execution state to store so report page gets real data ──

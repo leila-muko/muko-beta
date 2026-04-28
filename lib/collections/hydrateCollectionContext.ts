@@ -53,6 +53,15 @@ function normalizeAestheticName(value: unknown) {
   return AESTHETIC_NAME_BY_ID.get(trimmed) ?? trimmed;
 }
 
+function toAestheticSlug(value: string | null) {
+  return value
+    ?.toLowerCase()
+    .trim()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || null;
+}
+
 function normalizeMoodboardImages(value: unknown) {
   if (!Array.isArray(value)) return [];
 
@@ -159,11 +168,22 @@ function applyCollectionContextSnapshot(
   row: PersistedCollectionContextRow | PersistedCollectionContextSnapshot | null
 ) {
   const state = useSessionStore.getState();
+  const normalizedAestheticName =
+    normalizeAestheticName(row?.collection_aesthetic) ?? normalizeAestheticName(row?.aesthetic_matched_id) ?? null;
+  const resolvedAestheticMatchedId =
+    pickPreferredString(row?.aesthetic_matched_id, toAestheticSlug(normalizedAestheticName)) ?? null;
 
   state.setCollectionName(collectionName);
-  state.setCollectionAesthetic(
-    normalizeAestheticName(row?.collection_aesthetic) ?? normalizeAestheticName(row?.aesthetic_matched_id) ?? null
-  );
+  state.setCollectionAesthetic(normalizedAestheticName);
+
+  // Fill Spec-facing concept keys from collection context without overriding
+  // a more specific concept/spec session that is already in memory.
+  if (normalizedAestheticName && !toTrimmedString(state.aestheticInput)) {
+    useSessionStore.setState({ aestheticInput: normalizedAestheticName });
+  }
+  if (resolvedAestheticMatchedId && !toTrimmedString(state.aestheticMatchedId)) {
+    useSessionStore.setState({ aestheticMatchedId: resolvedAestheticMatchedId });
+  }
 
   const inflection = row?.aesthetic_inflection?.trim() || "";
   state.setAestheticInflection(inflection || null);
