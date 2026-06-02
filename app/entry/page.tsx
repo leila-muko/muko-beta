@@ -16,6 +16,7 @@ const BORDER = 'rgba(78,47,46,0.12)';
 const BORDER_STRONG = 'rgba(78,47,46,0.22)';
 const inter = 'var(--font-inter), system-ui, sans-serif';
 const sohne = 'var(--font-sohne-breit), system-ui, sans-serif';
+const ENTRY_TYPED_WORDS = ['concept.', 'test.', 'commit.'];
 interface RecentCollectionItem {
   id: string;
   name: string;
@@ -61,6 +62,9 @@ function EntryScreenContent() {
   const [userId, setUserId] = useState<string | null>(null);
   const [hoveredCollection, setHoveredCollection] = useState<string | null>(null);
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
+  const [typedWordIndex, setTypedWordIndex] = useState(0);
+  const [typedHeadline, setTypedHeadline] = useState('');
+  const [isDeletingHeadline, setIsDeletingHeadline] = useState(false);
 
   const recentCollections = useMemo(() => {
     const names = new Set<string>();
@@ -81,6 +85,39 @@ function EntryScreenContent() {
     setCurrentStep,
     setActiveCollection,
   } = store;
+
+  useEffect(() => {
+    const currentWord = ENTRY_TYPED_WORDS[typedWordIndex];
+    let frameId = 0;
+
+    if (!isDeletingHeadline && typedHeadline === currentWord) {
+      const timeoutId = window.setTimeout(() => {
+        setIsDeletingHeadline(true);
+      }, 2400);
+
+      return () => window.clearTimeout(timeoutId);
+    }
+
+    if (isDeletingHeadline && typedHeadline === '') {
+      frameId = window.requestAnimationFrame(() => {
+        setIsDeletingHeadline(false);
+        setTypedWordIndex((current) => (current + 1) % ENTRY_TYPED_WORDS.length);
+      });
+
+      return () => window.cancelAnimationFrame(frameId);
+    }
+
+    const timeoutId = window.setTimeout(
+      () => {
+        setTypedHeadline((current) =>
+          isDeletingHeadline ? current.slice(0, -1) : currentWord.slice(0, current.length + 1)
+        );
+      },
+      isDeletingHeadline ? 110 : 175
+    );
+
+    return () => window.clearTimeout(timeoutId);
+  }, [typedWordIndex, typedHeadline, isDeletingHeadline]);
 
   const resetForNewCollection = () => {
     setCollectionName('');
@@ -487,22 +524,46 @@ function EntryScreenContent() {
               position: 'relative',
             }}
           >
-            <div style={{ animation: 'fadeIn 450ms ease both' }}>
+            <div
+              className="entry-headline-lockup"
+              style={{
+                animation: 'fadeIn 450ms ease both',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                width: 'fit-content',
+              }}
+            >
+              <Image
+                src="/mlogo.svg"
+                alt="Muko logo"
+                width={52}
+                height={55}
+                priority
+                style={{
+                  width: 'clamp(38px, 4.4vw, 52px)',
+                  height: 'auto',
+                  flexShrink: 0,
+                }}
+              />
               <h1
                 className="entry-headline-blur-line"
                 style={{
-                  fontSize: 'clamp(2.9rem, 5.2vw, 5rem)',
-                  fontWeight: 300,
+                  fontSize: 'clamp(2.9rem, 5vw, 5rem)',
+                  fontWeight: 500,
                   color: ESPRESSO,
                   lineHeight: 0.94,
-                  letterSpacing: '-0.04em',
+                  letterSpacing: '-0.015em',
                   fontFamily: '"Söhne Breit", var(--font-sohne-breit), Georgia, serif',
                   margin: 0,
-                  maxWidth: '10.5ch',
-                  whiteSpace: 'normal',
+                  width: 'fit-content',
+                  minWidth: '7.2ch',
+                  maxWidth: '92vw',
+                  whiteSpace: 'nowrap',
+                  animation: 'entryHeadlineBlurLine 900ms cubic-bezier(0.22, 1, 0.36, 1) 0.08s forwards',
                 }}
               >
-                the intentional collection.
+                {typedHeadline}
               </h1>
             </div>
 
@@ -541,19 +602,6 @@ function EntryScreenContent() {
                     maxWidth: '680px',
                   }}
                 >
-                  <Image
-                    src="/mlogo.svg"
-                    alt="Muko logo"
-                    width={46}
-                    height={46}
-                    style={{
-                      width: 46,
-                      height: 46,
-                      opacity: 0.14,
-                      flexShrink: 0,
-                      pointerEvents: 'none',
-                    }}
-                  />
                   <input
                     type="text"
                     value={collectionName}
@@ -747,25 +795,6 @@ function EntryScreenContent() {
                 </div>
               </div>
             </div>
-            <div
-              className="entry-microcopy"
-              style={{
-                position: 'absolute',
-                right: 'clamp(-440px, -26vw, -280px)',
-                bottom: 'clamp(4px, 1.4vh, 16px)',
-                fontFamily: inter,
-                fontSize: 12,
-                letterSpacing: '0.06em',
-                color: 'rgba(94,64,58,0.4)',
-                pointerEvents: 'none',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-              }}
-            >
-              A collection is a system of decisions.
-              <span>Nothing is neutral. Everything is intentional.</span>
-            </div>
           </div>
 
         </div>
@@ -921,17 +950,8 @@ function EntryScreenContent() {
             gap: 14px !important;
           }
 
-          .entry-name-row img {
-            width: 38px !important;
-            height: 38px !important;
-          }
-
           .entry-cta-row {
             gap: 12px !important;
-          }
-
-          .entry-microcopy {
-            display: none !important;
           }
         }
 
